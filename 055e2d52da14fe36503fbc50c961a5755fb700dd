@@ -1,0 +1,388 @@
+packages/client/src/index.ts
+  e103e99 6
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "base_commit_sha": "f75b20bc6e12e8c8a2c0ed7275fb48846df6c6d4",
+  "prompts": {
+    "e103e99": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e98d93d6-29d1-4d98-8730-3ada4aa66f59",
+        "model": "claude-sonnet-4-5-20250929"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [
+        {
+          "type": "user",
+          "text": "provide the capability to pass custom components to the UseAIProvider for the button and the chat interface ",
+          "timestamp": "2025-11-05T12:34:26.461Z"
+        },
+        {
+          "type": "user",
+          "text": "provide the capability to pass custom components to the UseAIProvider for the button and the chat interface (so people can style them)",
+          "timestamp": "2025-11-05T12:34:32.010Z"
+        },
+        {
+          "type": "assistant",
+          "text": "I'll help you add the capability to pass custom components to the UseAIProvider for styling customization. Let me first explore the current implementation.",
+          "timestamp": "2025-11-05T12:34:38.397Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "TodoWrite",
+          "input": {
+            "todos": [
+              {
+                "activeForm": "Exploring current UseAIProvider and UI component structure",
+                "content": "Explore current UseAIProvider and UI component structure",
+                "status": "in_progress"
+              },
+              {
+                "activeForm": "Adding custom component props to UseAIProvider",
+                "content": "Add custom component props to UseAIProvider",
+                "status": "pending"
+              },
+              {
+                "activeForm": "Updating types and implementation",
+                "content": "Update types and implementation",
+                "status": "pending"
+              },
+              {
+                "activeForm": "Testing the changes with example app",
+                "content": "Test the changes with example app",
+                "status": "pending"
+              }
+            ]
+          },
+          "timestamp": "2025-11-05T12:34:41.136Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/packages/client/src/UseAIProvider.tsx"
+          },
+          "timestamp": "2025-11-05T12:34:41.768Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/packages/client/src/FloatingAIButton.tsx"
+          },
+          "timestamp": "2025-11-05T12:34:42.246Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Glob",
+          "input": {
+            "pattern": "**/*Chat*.tsx"
+          },
+          "timestamp": "2025-11-05T12:34:42.499Z"
+        },
+        {
+          "type": "user",
+          "text": "Todos have been modified successfully. Ensure that you continue to use the todo list to track your progress. Please proceed with the current tasks if applicable",
+          "timestamp": "2025-11-05T12:34:42.624Z"
+        },
+        {
+          "type": "user",
+          "text": "<tool_use_error>File does not exist.</tool_use_error>",
+          "timestamp": "2025-11-05T12:34:42.663Z"
+        },
+        {
+          "type": "user",
+          "text": "<tool_use_error>File does not exist.</tool_use_error>",
+          "timestamp": "2025-11-05T12:34:42.663Z"
+        },
+        {
+          "type": "user",
+          "text": "/home/z/Desktop/work/use-ai/packages/client/src/components/AIChatPanel.tsx",
+          "timestamp": "2025-11-05T12:34:42.774Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Glob",
+          "input": {
+            "pattern": "**/UseAIProvider.tsx"
+          },
+          "timestamp": "2025-11-05T12:34:46.701Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Glob",
+          "input": {
+            "pattern": "**/FloatingAIButton.tsx"
+          },
+          "timestamp": "2025-11-05T12:34:47.030Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/packages/client/src/components/AIChatPanel.tsx"
+          },
+          "timestamp": "2025-11-05T12:34:47.509Z"
+        },
+        {
+          "type": "user",
+          "text": "     1→import React, { useState, useRef, useEffect } from 'react';\n     2→\n     3→interface Message {\n     4→  id: string;\n     5→  role: 'user' | 'assistant';\n     6→  content: string;\n     7→  timestamp: Date;\n     8→}\n     9→\n    10→interface AIChatPanelProps {\n    11→  isOpen: boolean;\n    12→  onClose: () => void;\n    13→  onSendMessage: (message: string) => void;\n    14→  messages: Message[];\n    15→  loading: boolean;\n    16→  connected: boolean;\n    17→}\n    18→\n    19→export function AIChatPanel({\n    20→  isOpen,\n    21→  onClose,\n    22→  onSendMessage,\n    23→  messages,\n    24→  loading,\n    25→  connected,\n    26→}: AIChatPanelProps) {\n    27→  const [input, setInput] = useState('');\n    28→  const messagesEndRef = useRef<HTMLDivElement>(null);\n    29→\n    30→  useEffect(() => {\n    31→    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });\n    32→  }, [messages]);\n    33→\n    34→  const handleSend = () => {\n    35→    if (!input.trim() || !connected || loading) return;\n    36→    onSendMessage(input);\n    37→    setInput('');\n    38→  };\n    39→\n    40→  const handleKeyPress = (e: React.KeyboardEvent) => {\n    41→    if (e.key === 'Enter' && !e.shiftKey) {\n    42→      e.preventDefault();\n    43→      handleSend();\n    44→    }\n    45→  };\n    46→\n    47→  if (!isOpen) return null;\n    48→\n    49→  return (\n    50→    <>\n    51→      <div\n    52→        style={{\n    53→          position: 'fixed',\n    54→          top: 0,\n    55→          left: 0,\n    56→          right: 0,\n    57→          bottom: 0,\n    58→          background: 'rgba(0, 0, 0, 0.3)',\n    59→          zIndex: 999,\n    60→          animation: 'fadeIn 0.2s',\n    61→        }}\n    62→        onClick={onClose}\n    63→      />\n    64→      <div\n    65→        style={{\n    66→          position: 'fixed',\n    67→          bottom: '24px',\n    68→          right: '24px',\n    69→          width: '380px',\n    70→          height: '600px',\n    71→          maxHeight: 'calc(100vh - 48px)',\n    72→          background: 'white',\n    73→          borderRadius: '16px',\n    74→          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',\n    75→          display: 'flex',\n    76→          flexDirection: 'column',\n    77→          zIndex: 1001,\n    78→          animation: 'slideIn 0.3s ease-out',\n    79→          fontFamily: '-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif',\n    80→        }}\n    81→      >\n    82→        {/* Header */}\n    83→        <div\n    84→          style={{\n    85→            padding: '16px 20px',\n    86→            borderBottom: '1px solid #e5e7eb',\n    87→            display: 'flex',\n    88→            alignItems: 'center',\n    89→            justifyContent: 'space-between',\n    90→            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',\n    91→            borderRadius: '16px 16px 0 0',\n    92→            color: 'white',\n    93→          }}\n    94→        >\n    95→          <div>\n    96→            <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '600' }}>\n    97→              AI Assistant\n    98→            </h3>\n    99→            <p style={{ margin: '4px 0 0', fontSize: '12px', opacity: 0.9 }}>\n   100→              {connected ? 'Online' : 'Offline'}\n   101→            </p>\n   102→          </div>\n   103→          <button\n   104→            onClick={onClose}\n   105→            style={{\n   106→              background: 'rgba(255, 255, 255, 0.2)',\n   107→              border: 'none',\n   108→              borderRadius: '50%',\n   109→              width: '32px',\n   110→              height: '32px',\n   111→              cursor: 'pointer',\n   112→              color: 'white',\n   113→              fontSize: '20px',\n   114→              display: 'flex',\n   115→              alignItems: 'center',\n   116→              justifyContent: 'center',\n   117→              transition: 'background 0.2s',\n   118→            }}\n   119→            onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {\n   120→              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';\n   121→            }}\n   122→            onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {\n   123→              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';\n   124→            }}\n   125→          >\n   126→            ×\n   127→          </button>\n   128→        </div>\n   129→\n   130→        {/* Messages */}\n   131→        <div\n   132→          style={{\n   133→            flex: 1,\n   134→            overflowY: 'auto',\n   135→            padding: '16px',\n   136→            display: 'flex',\n   137→            flexDirection: 'column',\n   138→            gap: '12px',\n   139→          }}\n   140→        >\n   141→          {messages.length === 0 && (\n   142→            <div\n   143→              style={{\n   144→                textAlign: 'center',\n   145→                color: '#9ca3af',\n   146→                padding: '40px 20px',\n   147→                fontSize: '14px',\n   148→              }}\n   149→            >\n   150→              <p style={{ margin: 0, fontSize: '32px', marginBottom: '12px' }}>💬</p>\n   151→              <p style={{ margin: 0 }}>Start a conversation with the AI assistant</p>\n   152→              <p style={{ margin: '8px 0 0', fontSize: '12px' }}>\n   153→                Ask me to help with your tasks!\n   154→              </p>\n   155→            </div>\n   156→          )}\n   157→\n   158→          {messages.map((message) => (\n   159→            <div\n   160→              key={message.id}\n   161→              style={{\n   162→                display: 'flex',\n   163→                flexDirection: 'column',\n   164→                alignItems: message.role === 'user' ? 'flex-end' : 'flex-start',\n   165→              }}\n   166→            >\n   167→              <div\n   168→                style={{\n   169→                  maxWidth: '80%',\n   170→                  padding: '10px 14px',\n   171→                  borderRadius: '12px',\n   172→                  background: message.role === 'user'\n   173→                    ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'\n   174→                    : '#f3f4f6',\n   175→                  color: message.role === 'user' ? 'white' : '#1f2937',\n   176→                  fontSize: '14px',\n   177→                  lineHeight: '1.5',\n   178→                  wordWrap: 'break-word',\n   179→                }}\n   180→              >\n   181→                {message.content}\n   182→              </div>\n   183→              <div\n   184→                style={{\n   185→                  fontSize: '11px',\n   186→                  color: '#9ca3af',\n   187→                  marginTop: '4px',\n   188→                  padding: '0 4px',\n   189→                }}\n   190→              >\n   191→                {message.timestamp.toLocaleTimeString([], {\n   192→                  hour: '2-digit',\n   193→                  minute: '2-digit'\n   194→                })}\n   195→              </div>\n   196→            </div>\n   197→          ))}\n   198→\n   199→          {loading && (\n   200→            <div\n   201→              style={{\n   202→                display: 'flex',\n   203→                alignItems: 'flex-start',\n   204→              }}\n   205→            >\n   206→              <div\n   207→                style={{\n   208→                  padding: '10px 14px',\n   209→                  borderRadius: '12px',\n   210→                  background: '#f3f4f6',\n   211→                  fontSize: '14px',\n   212→                }}\n   213→              >\n   214→                <span style={{ opacity: 0.6 }}>Thinking</span>\n   215→                <span className=\"dots\" style={{ marginLeft: '4px' }}>...</span>\n   216→              </div>\n   217→            </div>\n   218→          )}\n   219→\n   220→          <div ref={messagesEndRef} />\n   221→        </div>\n   222→\n   223→        {/* Input */}\n   224→        <div\n   225→          style={{\n   226→            padding: '16px',\n   227→            borderTop: '1px solid #e5e7eb',\n   228→          }}\n   229→        >\n   230→          <div\n   231→            style={{\n   232→              display: 'flex',\n   233→              gap: '8px',\n   234→            }}\n   235→          >\n   236→            <textarea\n   237→              value={input}\n   238→              onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setInput(e.target.value)}\n   239→              onKeyPress={handleKeyPress}\n   240→              placeholder={connected ? 'Type a message...' : 'Connecting...'}\n   241→              disabled={!connected || loading}\n   242→              style={{\n   243→                flex: 1,\n   244→                padding: '10px 12px',\n   245→                border: '1px solid #e5e7eb',\n   246→                borderRadius: '8px',\n   247→                fontSize: '14px',\n   248→                resize: 'none',\n   249→                minHeight: '44px',\n   250→                maxHeight: '120px',\n   251→                fontFamily: 'inherit',\n   252→                outline: 'none',\n   253→              }}\n   254→              rows={1}\n   255→            />\n   256→            <button\n   257→              onClick={handleSend}\n   258→              disabled={!connected || loading || !input.trim()}\n   259→              style={{\n   260→                padding: '10px 16px',\n   261→                background: connected && !loading && input.trim()\n   262→                  ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'\n   263→                  : '#e5e7eb',\n   264→                color: connected && !loading && input.trim() ? 'white' : '#9ca3af',\n   265→                border: 'none',\n   266→                borderRadius: '8px',\n   267→                cursor: connected && !loading && input.trim() ? 'pointer' : 'not-allowed',\n   268→                fontSize: '14px',\n   269→                fontWeight: '600',\n   270→                minWidth: '60px',\n   271→                transition: 'all 0.2s',\n   272→              }}\n   273→            >\n   274→              Send\n   275→            </button>\n   276→          </div>\n   277→        </div>\n   278→      </div>\n   279→\n   280→      <style>{`\n   281→        @keyframes fadeIn {\n   282→          from { opacity: 0; }\n   283→          to { opacity: 1; }\n   284→        }\n   285→        @keyframes slideIn {\n   286→          from {\n   287→            transform: translateY(20px);\n   288→            opacity: 0;\n   289→          }\n   290→          to {\n   291→            transform: translateY(0);\n   292→            opacity: 1;\n   293→          }\n   294→        }\n   295→      `}</style>\n   296→    </>\n   297→  );\n   298→}\n   299→\n   300→export type { Message };\n   301→\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\n</system-reminder>\n",
+          "timestamp": "2025-11-05T12:34:47.657Z"
+        },
+        {
+          "type": "user",
+          "text": "No files found",
+          "timestamp": "2025-11-05T12:34:47.717Z"
+        },
+        {
+          "type": "user",
+          "text": "/home/z/Desktop/work/use-ai/packages/client/src/components/FloatingAIButton.tsx",
+          "timestamp": "2025-11-05T12:34:47.758Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/packages/client/src/components/FloatingAIButton.tsx"
+          },
+          "timestamp": "2025-11-05T12:34:51.932Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Glob",
+          "input": {
+            "pattern": "**/Provider.tsx"
+          },
+          "timestamp": "2025-11-05T12:34:52.179Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Grep",
+          "input": {
+            "output_mode": "files_with_matches",
+            "pattern": "UseAIProvider",
+            "type": "tsx"
+          },
+          "timestamp": "2025-11-05T12:34:53.104Z"
+        },
+        {
+          "type": "user",
+          "text": "     1→import React from 'react';\n     2→\n     3→interface FloatingAIButtonProps {\n     4→  onClick: () => void;\n     5→  connected: boolean;\n     6→  hasUnread?: boolean;\n     7→}\n     8→\n     9→export function FloatingAIButton({ onClick, connected, hasUnread = false }: FloatingAIButtonProps) {\n    10→  return (\n    11→    <button\n    12→      onClick={onClick}\n    13→      style={{\n    14→        position: 'fixed',\n    15→        bottom: '24px',\n    16→        right: '24px',\n    17→        width: '56px',\n    18→        height: '56px',\n    19→        borderRadius: '50%',\n    20→        border: 'none',\n    21→        background: connected ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : '#999',\n    22→        color: 'white',\n    23→        fontSize: '20px',\n    24→        fontWeight: 'bold',\n    25→        cursor: connected ? 'pointer' : 'not-allowed',\n    26→        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',\n    27→        display: 'flex',\n    28→        alignItems: 'center',\n    29→        justifyContent: 'center',\n    30→        transition: 'transform 0.2s, box-shadow 0.2s',\n    31→        zIndex: 1000,\n    32→        fontFamily: '-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif',\n    33→      }}\n    34→      onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {\n    35→        if (connected) {\n    36→          e.currentTarget.style.transform = 'scale(1.1)';\n    37→          e.currentTarget.style.boxShadow = '0 6px 16px rgba(0, 0, 0, 0.2)';\n    38→        }\n    39→      }}\n    40→      onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {\n    41→        e.currentTarget.style.transform = 'scale(1)';\n    42→        e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';\n    43→      }}\n    44→      disabled={!connected}\n    45→      title={connected ? 'Open AI Assistant' : 'Connecting to AI...'}\n    46→    >\n    47→      AI\n    48→      {hasUnread && (\n    49→        <span\n    50→          style={{\n    51→            position: 'absolute',\n    52→            top: '4px',\n    53→            right: '4px',\n    54→            width: '12px',\n    55→            height: '12px',\n    56→            borderRadius: '50%',\n    57→            background: '#ff4444',\n    58→            border: '2px solid white',\n    59→          }}\n    60→        />\n    61→      )}\n    62→    </button>\n    63→  );\n    64→}\n    65→\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\n</system-reminder>\n",
+          "timestamp": "2025-11-05T12:34:53.263Z"
+        },
+        {
+          "type": "user",
+          "text": "No files found",
+          "timestamp": "2025-11-05T12:34:53.314Z"
+        },
+        {
+          "type": "user",
+          "text": "No files found",
+          "timestamp": "2025-11-05T12:34:53.361Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Grep",
+          "input": {
+            "output_mode": "files_with_matches",
+            "pattern": "createContext|AIContext",
+            "type": "tsx"
+          },
+          "timestamp": "2025-11-05T12:34:57.331Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Glob",
+          "input": {
+            "pattern": "**/useAI.tsx"
+          },
+          "timestamp": "2025-11-05T12:34:57.815Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/packages/client/src/index.ts"
+          },
+          "timestamp": "2025-11-05T12:34:58.757Z"
+        },
+        {
+          "type": "user",
+          "text": "     1→export { useAI } from './useAI';\n     2→export { UseAIProvider, useUseAIContext } from './context';\n     3→export { UseAIClient } from './client';\n     4→export { defineTool } from './defineTool';\n     5→export { z } from 'zod';\n     6→\n     7→export type { UseAIOptions, UseAIResult } from './useAI';\n     8→export type { UseAIConfig, ToolDefinition } from './types';\n     9→export type { UseAIContextValue } from './context';\n    10→export type { DefinedTool, ToolsDefinition } from './defineTool';\n    11→\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\n</system-reminder>\n",
+          "timestamp": "2025-11-05T12:34:58.920Z"
+        },
+        {
+          "type": "user",
+          "text": "No files found",
+          "timestamp": "2025-11-05T12:34:58.967Z"
+        },
+        {
+          "type": "user",
+          "text": "No files found",
+          "timestamp": "2025-11-05T12:34:59.017Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/packages/client/src/context.tsx"
+          },
+          "timestamp": "2025-11-05T12:35:03.182Z"
+        },
+        {
+          "type": "user",
+          "text": "     1→import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';\n     2→import type { UseAIConfig } from './types';\n     3→import { FloatingAIButton } from './components/FloatingAIButton';\n     4→import { AIChatPanel, type Message } from './components/AIChatPanel';\n     5→import { UseAIClient } from './client';\n     6→import { convertToolsToDefinitions, executeDefinedTool, type ToolsDefinition } from './defineTool';\n     7→import type { ServerMessage, ToolCallMessage, ResponseMessage } from './types';\n     8→\n     9→export interface UseAIContextValue {\n    10→  serverUrl: string;\n    11→  connected: boolean;\n    12→  registerTools: (\n    13→    id: string,\n    14→    tools: ToolsDefinition,\n    15→    waitForRender?: () => Promise<void>\n    16→  ) => void;\n    17→  unregisterTools: (id: string) => void;\n    18→  updatePrompt: (id: string, prompt?: string) => void;\n    19→  client: UseAIClient | null;\n    20→}\n    21→\n    22→const UseAIContext = createContext<UseAIContextValue | null>(null);\n    23→\n    24→export interface UseAIProviderProps extends UseAIConfig {\n    25→  children: ReactNode;\n    26→  systemPrompt?: string;\n    27→}\n    28→\n    29→export function UseAIProvider({\n    30→  serverUrl,\n    31→  children,\n    32→  systemPrompt,\n    33→}: UseAIProviderProps) {\n    34→  const [connected, setConnected] = useState(false);\n    35→  const [isChatOpen, setIsChatOpen] = useState(false);\n    36→  const [messages, setMessages] = useState<Message[]>([]);\n    37→  const [loading, setLoading] = useState(false);\n    38→  const toolRegistryRef = useRef<Map<string, ToolsDefinition>>(new Map());\n    39→  const [toolRegistryVersion, setToolRegistryVersion] = useState(0);\n    40→  const promptsRef = useRef<Map<string, string>>(new Map());\n    41→  const renderWaitersRef = useRef<Map<string, () => Promise<void>>>(new Map());\n    42→  const toolOwnershipRef = useRef<Map<string, string>>(new Map());\n    43→\n    44→  const clientRef = useRef<UseAIClient | null>(null);\n    45→\n    46→  const registerTools = useCallback((\n    47→    id: string,\n    48→    tools: ToolsDefinition,\n    49→    waitForRender?: () => Promise<void>\n    50→  ) => {\n    51→    const existingTools = toolRegistryRef.current.get(id);\n    52→\n    53→    // Always update the ref to capture latest closures\n    54→    toolRegistryRef.current.set(id, tools);\n    55→\n    56→    // Only increment version if tool names changed (added/removed tools)\n    57→    if (existingTools) {\n    58→      const existingKeys = Object.keys(existingTools).sort().join(',');\n    59→      const newKeys = Object.keys(tools).sort().join(',');\n    60→      if (existingKeys !== newKeys) {\n    61→        setToolRegistryVersion(v => v + 1);\n    62→      }\n    63→    } else {\n    64→      // First registration\n    65→      setToolRegistryVersion(v => v + 1);\n    66→    }\n    67→\n    68→    Object.keys(tools).forEach(toolName => {\n    69→      toolOwnershipRef.current.set(toolName, id);\n    70→    });\n    71→\n    72→    if (waitForRender) {\n    73→      renderWaitersRef.current.set(id, waitForRender);\n    74→    }\n    75→  }, []);\n    76→\n    77→  const updatePrompt = useCallback((id: string, prompt?: string) => {\n    78→    if (prompt) {\n    79→      promptsRef.current.set(id, prompt);\n    80→    } else {\n    81→      promptsRef.current.delete(id);\n    82→    }\n    83→  }, []);\n    84→\n    85→  const unregisterTools = useCallback((id: string) => {\n    86→    const tools = toolRegistryRef.current.get(id);\n    87→    if (tools) {\n    88→      Object.keys(tools).forEach(toolName => {\n    89→        toolOwnershipRef.current.delete(toolName);\n    90→      });\n    91→    }\n    92→\n    93→    toolRegistryRef.current.delete(id);\n    94→    setToolRegistryVersion(v => v + 1);\n    95→    promptsRef.current.delete(id);\n    96→    renderWaitersRef.current.delete(id);\n    97→  }, []);\n    98→\n    99→  const aggregatedTools = React.useMemo(() => {\n   100→    const tools: ToolsDefinition = {};\n   101→    toolRegistryRef.current.forEach((toolSet) => {\n   102→      Object.assign(tools, toolSet);\n   103→    });\n   104→    return tools;\n   105→  }, [toolRegistryVersion]);\n   106→\n   107→  const hasTools = toolRegistryRef.current.size > 0;\n   108→  const aggregatedToolsRef = useRef(aggregatedTools);\n   109→  aggregatedToolsRef.current = aggregatedTools;\n   110→\n   111→  useEffect(() => {\n   112→    const client = new UseAIClient(serverUrl);\n   113→\n   114→    client.connect()\n   115→      .then(() => {\n   116→        setConnected(true);\n   117→      })\n   118→      .catch((err) => {\n   119→        console.error('Failed to connect client:', err);\n   120→        setConnected(false);\n   121→      });\n   122→\n   123→    const unsubscribe = client.onMessage('globalChat', async (message: ServerMessage) => {\n   124→      if (message.type === 'tool_call') {\n   125→        const toolCall = message as ToolCallMessage;\n   126→        const { toolCallId, name, input } = toolCall.data;\n   127→\n   128→        try {\n   129→          const ownerId = toolOwnershipRef.current.get(name);\n   130→          console.log(`[useAI] Tool \"${name}\" owned by component:`, ownerId);\n   131→\n   132→          let renderPromise: Promise<void> | undefined;\n   133→          if (ownerId) {\n   134→            const waitForRender = renderWaitersRef.current.get(ownerId);\n   135→            if (waitForRender) {\n   136→              console.log(`[useAI] Setting up render listener for ${ownerId}...`);\n   137→              renderPromise = waitForRender();\n   138→            }\n   139→          }\n   140→\n   141→          console.log('[useAI] Executing tool...');\n   142→          const result = await executeDefinedTool(aggregatedToolsRef.current, name, input);\n   143→\n   144→          if (renderPromise) {\n   145→            console.log('[useAI] Tool executed, waiting for render...');\n   146→            await renderPromise;\n   147→            console.log('[useAI] Render complete');\n   148→          } else {\n   149→            console.log('[useAI] No render to wait for');\n   150→          }\n   151→\n   152→          let updatedPrompt: string | undefined;\n   153→          if (ownerId) {\n   154→            updatedPrompt = promptsRef.current.get(ownerId);\n   155→            if (updatedPrompt) {\n   156→              console.log(`[useAI] Updated prompt from ${ownerId}:`, updatedPrompt.substring(0, 100));\n   157→            }\n   158→          }\n   159→\n   160→          client.sendToolResponse(toolCallId, result, updatedPrompt);\n   161→        } catch (err) {\n   162→          console.error('Tool execution error:', err);\n   163→          client.sendToolResponse(toolCallId, {\n   164→            error: err instanceof Error ? err.message : 'Unknown error',\n   165→          });\n   166→        }\n   167→      } else if (message.type === 'response') {\n   168→        const responseMsg = message as ResponseMessage;\n   169→        setMessages((prev) => [\n   170→          ...prev,\n   171→          {\n   172→            id: responseMsg.data.conversationId,\n   173→            role: 'assistant',\n   174→            content: responseMsg.data.content,\n   175→            timestamp: new Date(),\n   176→          },\n   177→        ]);\n   178→        setLoading(false);\n   179→      }\n   180→    });\n   181→\n   182→    clientRef.current = client;\n   183→\n   184→    return () => {\n   185→      unsubscribe();\n   186→      client.disconnect();\n   187→      setConnected(false);\n   188→    };\n   189→  }, [serverUrl]);\n   190→\n   191→  const lastRegisteredToolsRef = useRef<string>('');\n   192→\n   193→  useEffect(() => {\n   194→    const client = clientRef.current;\n   195→    if (!client || !client.isConnected() || !hasTools) return;\n   196→\n   197→    const toolKeys = Object.keys(aggregatedTools).sort().join(',');\n   198→    if (toolKeys === lastRegisteredToolsRef.current) {\n   199→      console.log('[Provider] Skipping re-registration, tools unchanged');\n   200→      return;\n   201→    }\n   202→\n   203→    lastRegisteredToolsRef.current = toolKeys;\n   204→    console.log('[Provider] Registering tools:', toolKeys);\n   205→\n   206→    (async () => {\n   207→      try {\n   208→        const toolDefinitions = convertToolsToDefinitions(aggregatedTools);\n   209→\n   210→        const contextParts: string[] = [];\n   211→\n   212→        if (systemPrompt) {\n   213→          contextParts.push(systemPrompt);\n   214→        }\n   215→\n   216→        for (const [id, prompt] of promptsRef.current.entries()) {\n   217→          if (prompt) {\n   218→            contextParts.push(prompt);\n   219→          }\n   220→        }\n   221→\n   222→        const aggregatedContext = contextParts.length > 0 ? contextParts.join('\\n\\n---\\n\\n') : undefined;\n   223→        client.registerTools(toolDefinitions, aggregatedContext);\n   224→      } catch (err) {\n   225→        console.error('Failed to register tools:', err);\n   226→      }\n   227→    })();\n   228→  }, [hasTools, aggregatedTools, systemPrompt]);\n   229→\n   230→  const handleSendMessage = useCallback((message: string) => {\n   231→    if (!clientRef.current) return;\n   232→\n   233→    setMessages((prev) => [\n   234→      ...prev,\n   235→      {\n   236→        id: Date.now().toString(),\n   237→        role: 'user',\n   238→        content: message,\n   239→        timestamp: new Date(),\n   240→      },\n   241→    ]);\n   242→\n   243→    setLoading(true);\n   244→    clientRef.current.sendPrompt(message);\n   245→  }, []);\n   246→\n   247→  const value: UseAIContextValue = {\n   248→    serverUrl,\n   249→    connected,\n   250→    registerTools,\n   251→    unregisterTools,\n   252→    updatePrompt,\n   253→    client: clientRef.current,\n   254→  };\n   255→\n   256→  return (\n   257→    <UseAIContext.Provider value={value}>\n   258→      {children}\n   259→      {hasTools && (\n   260→        <>\n   261→          <FloatingAIButton\n   262→            onClick={() => setIsChatOpen(true)}\n   263→            connected={connected}\n   264→          />\n   265→          <AIChatPanel\n   266→            isOpen={isChatOpen}\n   267→            onClose={() => setIsChatOpen(false)}\n   268→            onSendMessage={handleSendMessage}\n   269→            messages={messages}\n   270→            loading={loading}\n   271→            connected={connected}\n   272→          />\n   273→        </>\n   274→      )}\n   275→    </UseAIContext.Provider>\n   276→  );\n   277→}\n   278→\n   279→export function useUseAIContext(): UseAIContextValue {\n   280→  const context = useContext(UseAIContext);\n   281→  if (!context) {\n   282→    throw new Error('useUseAIContext must be used within a UseAIProvider');\n   283→  }\n   284→  return context;\n   285→}\n   286→\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\n</system-reminder>\n",
+          "timestamp": "2025-11-05T12:35:03.274Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "TodoWrite",
+          "input": {
+            "todos": [
+              {
+                "activeForm": "Exploring current UseAIProvider and UI component structure",
+                "content": "Explore current UseAIProvider and UI component structure",
+                "status": "completed"
+              },
+              {
+                "activeForm": "Adding custom component props to UseAIProvider",
+                "content": "Add custom component props to UseAIProvider",
+                "status": "in_progress"
+              },
+              {
+                "activeForm": "Updating types and implementation",
+                "content": "Update types and implementation",
+                "status": "pending"
+              },
+              {
+                "activeForm": "Testing the changes with example app",
+                "content": "Test the changes with example app",
+                "status": "pending"
+              }
+            ]
+          },
+          "timestamp": "2025-11-05T12:35:10.663Z"
+        },
+        {
+          "type": "user",
+          "text": "Todos have been modified successfully. Ensure that you continue to use the todo list to track your progress. Please proceed with the current tasks if applicable",
+          "timestamp": "2025-11-05T12:35:10.762Z"
+        },
+        {
+          "type": "assistant",
+          "text": "Perfect! I found the structure. The `UseAIProvider` renders the `FloatingAIButton` and `AIChatPanel` components. Let me add support for custom components.",
+          "timestamp": "2025-11-05T12:35:17.924Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Edit",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/packages/client/src/context.tsx",
+            "new_string": "export interface FloatingButtonProps {\n  onClick: () => void;\n  connected: boolean;\n  hasUnread?: boolean;\n}\n\nexport interface ChatPanelProps {\n  isOpen: boolean;\n  onClose: () => void;\n  onSendMessage: (message: string) => void;\n  messages: Message[];\n  loading: boolean;\n  connected: boolean;\n}\n\nexport interface UseAIProviderProps extends UseAIConfig {\n  children: ReactNode;\n  systemPrompt?: string;\n  CustomButton?: React.ComponentType<FloatingButtonProps>;\n  CustomChat?: React.ComponentType<ChatPanelProps>;\n}",
+            "old_string": "export interface UseAIProviderProps extends UseAIConfig {\n  children: ReactNode;\n  systemPrompt?: string;\n}"
+          },
+          "timestamp": "2025-11-05T12:35:20.354Z"
+        },
+        {
+          "type": "user",
+          "text": "The file /home/z/Desktop/work/use-ai/packages/client/src/context.tsx has been updated. Here's the result of running `cat -n` on a snippet of the edited file:\n    20→}\n    21→\n    22→const UseAIContext = createContext<UseAIContextValue | null>(null);\n    23→\n    24→export interface FloatingButtonProps {\n    25→  onClick: () => void;\n    26→  connected: boolean;\n    27→  hasUnread?: boolean;\n    28→}\n    29→\n    30→export interface ChatPanelProps {\n    31→  isOpen: boolean;\n    32→  onClose: () => void;\n    33→  onSendMessage: (message: string) => void;\n    34→  messages: Message[];\n    35→  loading: boolean;\n    36→  connected: boolean;\n    37→}\n    38→\n    39→export interface UseAIProviderProps extends UseAIConfig {\n    40→  children: ReactNode;\n    41→  systemPrompt?: string;\n    42→  CustomButton?: React.ComponentType<FloatingButtonProps>;\n    43→  CustomChat?: React.ComponentType<ChatPanelProps>;\n    44→}\n    45→\n    46→export function UseAIProvider({\n    47→  serverUrl,\n    48→  children,",
+          "timestamp": "2025-11-05T12:35:27.502Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Edit",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/packages/client/src/context.tsx",
+            "new_string": "export function UseAIProvider({\n  serverUrl,\n  children,\n  systemPrompt,\n  CustomButton,\n  CustomChat,\n}: UseAIProviderProps) {",
+            "old_string": "export function UseAIProvider({\n  serverUrl,\n  children,\n  systemPrompt,\n}: UseAIProviderProps) {"
+          },
+          "timestamp": "2025-11-05T12:35:33.154Z"
+        },
+        {
+          "type": "user",
+          "text": "The file /home/z/Desktop/work/use-ai/packages/client/src/context.tsx has been updated. Here's the result of running `cat -n` on a snippet of the edited file:\n    42→  CustomButton?: React.ComponentType<FloatingButtonProps>;\n    43→  CustomChat?: React.ComponentType<ChatPanelProps>;\n    44→}\n    45→\n    46→export function UseAIProvider({\n    47→  serverUrl,\n    48→  children,\n    49→  systemPrompt,\n    50→  CustomButton,\n    51→  CustomChat,\n    52→}: UseAIProviderProps) {\n    53→  const [connected, setConnected] = useState(false);\n    54→  const [isChatOpen, setIsChatOpen] = useState(false);\n    55→  const [messages, setMessages] = useState<Message[]>([]);\n    56→  const [loading, setLoading] = useState(false);",
+          "timestamp": "2025-11-05T12:35:33.375Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Edit",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/packages/client/src/context.tsx",
+            "new_string": "  const ButtonComponent = CustomButton || FloatingAIButton;\n  const ChatComponent = CustomChat || AIChatPanel;\n\n  return (\n    <UseAIContext.Provider value={value}>\n      {children}\n      {hasTools && (\n        <>\n          <ButtonComponent\n            onClick={() => setIsChatOpen(true)}\n            connected={connected}\n          />\n          <ChatComponent\n            isOpen={isChatOpen}\n            onClose={() => setIsChatOpen(false)}\n            onSendMessage={handleSendMessage}\n            messages={messages}\n            loading={loading}\n            connected={connected}\n          />\n        </>\n      )}\n    </UseAIContext.Provider>\n  );",
+            "old_string": "  return (\n    <UseAIContext.Provider value={value}>\n      {children}\n      {hasTools && (\n        <>\n          <FloatingAIButton\n            onClick={() => setIsChatOpen(true)}\n            connected={connected}\n          />\n          <AIChatPanel\n            isOpen={isChatOpen}\n            onClose={() => setIsChatOpen(false)}\n            onSendMessage={handleSendMessage}\n            messages={messages}\n            loading={loading}\n            connected={connected}\n          />\n        </>\n      )}\n    </UseAIContext.Provider>\n  );"
+          },
+          "timestamp": "2025-11-05T12:35:39.307Z"
+        },
+        {
+          "type": "user",
+          "text": "The file /home/z/Desktop/work/use-ai/packages/client/src/context.tsx has been updated. Here's the result of running `cat -n` on a snippet of the edited file:\n   271→    updatePrompt,\n   272→    client: clientRef.current,\n   273→  };\n   274→\n   275→  const ButtonComponent = CustomButton || FloatingAIButton;\n   276→  const ChatComponent = CustomChat || AIChatPanel;\n   277→\n   278→  return (\n   279→    <UseAIContext.Provider value={value}>\n   280→      {children}\n   281→      {hasTools && (\n   282→        <>\n   283→          <ButtonComponent\n   284→            onClick={() => setIsChatOpen(true)}\n   285→            connected={connected}\n   286→          />\n   287→          <ChatComponent\n   288→            isOpen={isChatOpen}\n   289→            onClose={() => setIsChatOpen(false)}\n   290→            onSendMessage={handleSendMessage}\n   291→            messages={messages}\n   292→            loading={loading}\n   293→            connected={connected}\n   294→          />\n   295→        </>\n   296→      )}\n   297→    </UseAIContext.Provider>\n   298→  );\n   299→}\n   300→\n   301→export function useUseAIContext(): UseAIContextValue {\n   302→  const context = useContext(UseAIContext);",
+          "timestamp": "2025-11-05T12:35:39.522Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "TodoWrite",
+          "input": {
+            "todos": [
+              {
+                "activeForm": "Exploring current UseAIProvider and UI component structure",
+                "content": "Explore current UseAIProvider and UI component structure",
+                "status": "completed"
+              },
+              {
+                "activeForm": "Adding custom component props to UseAIProvider",
+                "content": "Add custom component props to UseAIProvider",
+                "status": "completed"
+              },
+              {
+                "activeForm": "Updating types and implementation",
+                "content": "Update types and implementation",
+                "status": "in_progress"
+              },
+              {
+                "activeForm": "Testing the changes with example app",
+                "content": "Test the changes with example app",
+                "status": "pending"
+              }
+            ]
+          },
+          "timestamp": "2025-11-05T12:35:44.462Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Edit",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/packages/client/src/index.ts",
+            "new_string": "export { useAI } from './useAI';\nexport { UseAIProvider, useUseAIContext } from './context';\nexport { UseAIClient } from './client';\nexport { defineTool } from './defineTool';\nexport { z } from 'zod';\n\nexport type { UseAIOptions, UseAIResult } from './useAI';\nexport type { UseAIConfig, ToolDefinition } from './types';\nexport type { UseAIContextValue, FloatingButtonProps, ChatPanelProps } from './context';\nexport type { DefinedTool, ToolsDefinition } from './defineTool';",
+            "old_string": "export { useAI } from './useAI';\nexport { UseAIProvider, useUseAIContext } from './context';\nexport { UseAIClient } from './client';\nexport { defineTool } from './defineTool';\nexport { z } from 'zod';\n\nexport type { UseAIOptions, UseAIResult } from './useAI';\nexport type { UseAIConfig, ToolDefinition } from './types';\nexport type { UseAIContextValue } from './context';\nexport type { DefinedTool, ToolsDefinition } from './defineTool';"
+          },
+          "timestamp": "2025-11-05T12:35:48.230Z"
+        },
+        {
+          "type": "user",
+          "text": "Todos have been modified successfully. Ensure that you continue to use the todo list to track your progress. Please proceed with the current tasks if applicable",
+          "timestamp": "2025-11-05T12:35:48.350Z"
+        },
+        {
+          "type": "user",
+          "text": "The file /home/z/Desktop/work/use-ai/packages/client/src/index.ts has been updated. Here's the result of running `cat -n` on a snippet of the edited file:\n     1→export { useAI } from './useAI';\n     2→export { UseAIProvider, useUseAIContext } from './context';\n     3→export { UseAIClient } from './client';\n     4→export { defineTool } from './defineTool';\n     5→export { z } from 'zod';\n     6→\n     7→export type { UseAIOptions, UseAIResult } from './useAI';\n     8→export type { UseAIConfig, ToolDefinition } from './types';\n     9→export type { UseAIContextValue, FloatingButtonProps, ChatPanelProps } from './context';\n    10→export type { DefinedTool, ToolsDefinition } from './defineTool';\n    11→",
+          "timestamp": "2025-11-05T12:35:48.515Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Edit",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/packages/client/src/index.ts",
+            "new_string": "export { useAI } from './useAI';\nexport { UseAIProvider, useUseAIContext } from './context';\nexport { UseAIClient } from './client';\nexport { defineTool } from './defineTool';\nexport { z } from 'zod';\nexport type { Message } from './components/AIChatPanel';\n\nexport type { UseAIOptions, UseAIResult } from './useAI';\nexport type { UseAIConfig, ToolDefinition } from './types';\nexport type { UseAIContextValue, FloatingButtonProps, ChatPanelProps } from './context';\nexport type { DefinedTool, ToolsDefinition } from './defineTool';",
+            "old_string": "export { useAI } from './useAI';\nexport { UseAIProvider, useUseAIContext } from './context';\nexport { UseAIClient } from './client';\nexport { defineTool } from './defineTool';\nexport { z } from 'zod';\n\nexport type { UseAIOptions, UseAIResult } from './useAI';\nexport type { UseAIConfig, ToolDefinition } from './types';\nexport type { UseAIContextValue, FloatingButtonProps, ChatPanelProps } from './context';\nexport type { DefinedTool, ToolsDefinition } from './defineTool';"
+          },
+          "timestamp": "2025-11-05T12:35:55.229Z"
+        }
+      ],
+      "total_additions": 98,
+      "total_deletions": 8,
+      "accepted_lines": 29,
+      "overriden_lines": 0
+    }
+  }
+}
