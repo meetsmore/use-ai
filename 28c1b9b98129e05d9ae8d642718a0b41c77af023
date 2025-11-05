@@ -1,0 +1,8 @@
+apps/example/src/TodoList.tsx
+  fcebdf6 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "base_commit_sha": "2d0cefc7037c74ad3dee97ce04dfa637ff6052ad",
+  "prompts": {}
+}
