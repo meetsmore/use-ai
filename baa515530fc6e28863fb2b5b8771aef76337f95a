@@ -1,0 +1,12 @@
+CLAUDE.md
+  fcebdf6 187
+packages/client/src/index.ts
+  e103e99 6
+packages/client/src/useAI.ts
+  e93ce33 34
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "base_commit_sha": "055e2d52da14fe36503fbc50c961a5755fb700dd",
+  "prompts": {}
+}
