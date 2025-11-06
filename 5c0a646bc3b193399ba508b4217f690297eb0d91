@@ -1,0 +1,629 @@
+apps/example/src/TodoList.tsx
+  466f83d 10
+  e890d40 3,7
+  fcebdf6 1,16,21,25
+apps/example/src/Calculator.tsx
+  466f83d 1,10,16,20
+  e890d40 3,7
+apps/example/src/useTodoLogic.ts
+  e890d40 1-3,5-9,11-13,15-18,20-24,26,28-29,31-32,34-38,40-42,44-45,47-48,50-52,54-57,59-61,63-67,69-70,72-75,77-82,84-91,93-100,102-108,110-115,117-123,125-133
+apps/example/src/useCalculatorLogic.ts
+  e890d40 1-3,5-9,11-12,14-17,19-22,24,26-28,30-31,33-35,37-39,41-47,49-50,52-65,67-69,71-75,77-84,86-90,92-96,98-105
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "base_commit_sha": "b372e33671ce69761e2e2fdd13b3ff8baa6a799f",
+  "prompts": {
+    "466f83d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b3d852f6-056c-4bc4-9b50-3f04fab6f8ed",
+        "model": "claude-sonnet-4-5-20250929"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [
+        {
+          "type": "user",
+          "text": "refactor the example app so that the tools provided to the `useAI` hooks are defined in the same component file. Any state should also be included in the component (instead of as variables in a separate file).\n",
+          "timestamp": "2025-11-06T12:43:00.278Z"
+        },
+        {
+          "type": "assistant",
+          "text": "I'll help you refactor the example app to colocate tools and state with their components. Let me first explore the current structure of the example app.",
+          "timestamp": "2025-11-06T12:43:05.222Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Bash",
+          "input": {
+            "command": "find apps/example -type f -name \"*.tsx\" -o -name \"*.ts\" | grep -E \"(tsx?$)\" | head -20",
+            "description": "Find TypeScript files in example app"
+          },
+          "timestamp": "2025-11-06T12:43:06.313Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Glob",
+          "input": {
+            "pattern": "apps/example/src/**/*.{ts,tsx}"
+          },
+          "timestamp": "2025-11-06T12:43:06.782Z"
+        },
+        {
+          "type": "user",
+          "text": "/home/z/Desktop/work/use-ai/apps/example/src/router.tsx\n/home/z/Desktop/work/use-ai/apps/example/src/pages/TodoPage.tsx\n/home/z/Desktop/work/use-ai/apps/example/src/pages/CalculatorPage.tsx\n/home/z/Desktop/work/use-ai/apps/example/src/pages/CombinedPage.tsx\n/home/z/Desktop/work/use-ai/apps/example/src/calculatorTools.ts\n/home/z/Desktop/work/use-ai/apps/example/src/pages/MultiListPage.tsx\n/home/z/Desktop/work/use-ai/apps/example/src/components/ListItem.tsx\n/home/z/Desktop/work/use-ai/apps/example/src/Calculator.tsx\n/home/z/Desktop/work/use-ai/apps/example/src/TodoList.tsx\n/home/z/Desktop/work/use-ai/apps/example/src/todoTools.ts\n/home/z/Desktop/work/use-ai/apps/example/src/providers/InvisibleAIProvider.tsx\n/home/z/Desktop/work/use-ai/apps/example/src/pages/InvisibleTestPage.tsx\n/home/z/Desktop/work/use-ai/apps/example/src/App.tsx\n/home/z/Desktop/work/use-ai/apps/example/src/index.tsx",
+          "timestamp": "2025-11-06T12:43:07.967Z"
+        },
+        {
+          "type": "user",
+          "text": "apps/example/server.ts\napps/example/test/edge-cases.e2e.test.ts\napps/example/test/invisible.e2e.test.ts\napps/example/src/App.tsx\napps/example/src/todoTools.ts\napps/example/src/index.tsx\napps/example/src/pages/CalculatorPage.tsx\napps/example/src/pages/TodoPage.tsx\napps/example/src/pages/InvisibleTestPage.tsx\napps/example/src/pages/MultiListPage.tsx\napps/example/src/pages/CombinedPage.tsx\napps/example/src/Calculator.tsx\napps/example/src/calculatorTools.ts\napps/example/src/TodoList.tsx\napps/example/src/components/ListItem.tsx\napps/example/src/router.tsx\napps/example/src/providers/InvisibleAIProvider.tsx\napps/example/playwright.config.ts",
+          "timestamp": "2025-11-06T12:43:08.348Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/apps/example/src/todoTools.ts"
+          },
+          "timestamp": "2025-11-06T12:43:13.603Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/apps/example/src/TodoList.tsx"
+          },
+          "timestamp": "2025-11-06T12:43:14.081Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/apps/example/src/calculatorTools.ts"
+          },
+          "timestamp": "2025-11-06T12:43:14.561Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/apps/example/src/Calculator.tsx"
+          },
+          "timestamp": "2025-11-06T12:43:14.912Z"
+        },
+        {
+          "type": "user",
+          "text": "     1→import { defineTool } from '@use-ai/client';\n     2→import { z } from 'zod';\n     3→\n     4→export interface Todo {\n     5→  id: number;\n     6→  text: string;\n     7→  completed: boolean;\n     8→}\n     9→\n    10→let todos: Todo[] = [];\n    11→let nextId = 1;\n    12→const listeners: Set<(todos: Todo[]) => void> = new Set();\n    13→\n    14→export function subscribeTodos(callback: (todos: Todo[]) => void) {\n    15→  listeners.add(callback);\n    16→  callback(todos);\n    17→\n    18→  return () => {\n    19→    listeners.delete(callback);\n    20→  };\n    21→}\n    22→\n    23→function notifyListeners() {\n    24→  listeners.forEach((callback) => callback([...todos]));\n    25→}\n    26→\n    27→export const todoTools = {\n    28→  addTodo: defineTool(\n    29→    'Add a new todo item to the list',\n    30→    z.object({\n    31→      text: z.string().describe('The text content of the todo item'),\n    32→    }),\n    33→    (input) => {\n    34→      if (!input.text.trim()) {\n    35→        return { success: false, error: 'Text is required' };\n    36→      }\n    37→\n    38→      const newTodo: Todo = {\n    39→        id: nextId++,\n    40→        text: input.text.trim(),\n    41→        completed: false,\n    42→      };\n    43→\n    44→      todos = [...todos, newTodo];\n    45→      notifyListeners();\n    46→\n    47→      return { success: true, id: newTodo.id, message: `Added todo: \"${input.text}\"` };\n    48→    }\n    49→  ),\n    50→\n    51→  deleteTodo: defineTool(\n    52→    'Delete a todo item by its ID',\n    53→    z.object({\n    54→      id: z.number().describe('The ID of the todo item to delete'),\n    55→    }),\n    56→    (input) => {\n    57→      const todo = todos.find((t) => t.id === input.id);\n    58→\n    59→      if (!todo) {\n    60→        return { success: false, error: `Todo with id ${input.id} not found` };\n    61→      }\n    62→\n    63→      todos = todos.filter((t) => t.id !== input.id);\n    64→      notifyListeners();\n    65→\n    66→      return { success: true, message: `Deleted todo: \"${todo.text}\"` };\n    67→    },\n    68→    { confirmationRequired: true }\n    69→  ),\n    70→\n    71→  toggleTodo: defineTool(\n    72→    'Toggle the completed status of a todo item',\n    73→    z.object({\n    74→      id: z.number().describe('The ID of the todo item to toggle'),\n    75→    }),\n    76→    (input) => {\n    77→      const todo = todos.find((t) => t.id === input.id);\n    78→\n    79→      if (!todo) {\n    80→        return { success: false, error: `Todo with id ${input.id} not found` };\n    81→      }\n    82→\n    83→      todos = todos.map((t) =>\n    84→        t.id === input.id ? { ...t, completed: !t.completed } : t\n    85→      );\n    86→      notifyListeners();\n    87→\n    88→      return {\n    89→        success: true,\n    90→        message: `Marked \"${todo.text}\" as ${!todo.completed ? 'completed' : 'incomplete'}`,\n    91→      };\n    92→    }\n    93→  ),\n    94→\n    95→  clearCompleted: defineTool(\n    96→    'Remove all completed todos from the list',\n    97→    z.object({}),\n    98→    () => {\n    99→      const completedCount = todos.filter((t) => t.completed).length;\n   100→      todos = todos.filter((t) => !t.completed);\n   101→      notifyListeners();\n   102→\n   103→      return {\n   104→        success: true,\n   105→        message: `Cleared ${completedCount} completed todo(s)`,\n   106→        count: completedCount,\n   107→      };\n   108→    },\n   109→    { confirmationRequired: true }\n   110→  ),\n   111→};\n   112→\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\n</system-reminder>\n",
+          "timestamp": "2025-11-06T12:43:15.093Z"
+        },
+        {
+          "type": "user",
+          "text": "     1→import React, { useState, useEffect } from 'react';\n     2→import { useAI } from '@use-ai/client';\n     3→import { subscribeTodos, type Todo, todoTools } from './todoTools';\n     4→\n     5→export default function TodoList() {\n     6→  const [todos, setTodos] = useState<Todo[]>([]);\n     7→  const [input, setInput] = useState('');\n     8→\n     9→  const { ref } = useAI({\n    10→    tools: todoTools,\n    11→    prompt: `Todo List: ${JSON.stringify(todos)}`,\n    12→  });\n    13→\n    14→  useEffect(() => {\n    15→    const unsubscribe = subscribeTodos((newTodos) => {\n    16→      setTodos(newTodos);\n    17→    });\n    18→\n    19→    return unsubscribe;\n    20→  }, []);\n    21→\n    22→  const handleAddTodo = () => {\n    23→    if (!input.trim()) return;\n    24→    todoTools.addTodo._execute({ text: input.trim() });\n    25→    setInput('');\n    26→  };\n    27→\n    28→  const handleToggleTodo = (id: number) => {\n    29→    todoTools.toggleTodo._execute({ id });\n    30→  };\n    31→\n    32→  const handleDeleteTodo = (id: number) => {\n    33→    todoTools.deleteTodo._execute({ id });\n    34→  };\n    35→\n    36→  return (\n    37→    <div ref={ref} style={styles.container}>\n    38→      <div style={styles.card}>\n    39→        <h1 style={styles.title}>Todo List</h1>\n    40→        <p style={styles.subtitle}>\n    41→          Click the AI button in the bottom right to manage todos with natural language\n    42→        </p>\n    43→\n    44→        <div style={styles.inputGroup}>\n    45→          <input\n    46→            type=\"text\"\n    47→            value={input}\n    48→            onChange={(e) => setInput(e.target.value)}\n    49→            onKeyPress={(e) => e.key === 'Enter' && handleAddTodo()}\n    50→            placeholder=\"Add a new todo...\"\n    51→            style={styles.input}\n    52→          />\n    53→          <button onClick={handleAddTodo} style={styles.button}>\n    54→            Add\n    55→          </button>\n    56→        </div>\n    57→\n    58→        <ul style={styles.todoList}>\n    59→          {todos.map(todo => (\n    60→            <li key={todo.id} style={styles.todoItem}>\n    61→              <label style={styles.todoLabel}>\n    62→                <input\n    63→                  type=\"checkbox\"\n    64→                  checked={todo.completed}\n    65→                  onChange={() => handleToggleTodo(todo.id)}\n    66→                  style={styles.checkbox}\n    67→                />\n    68→                <span style={{\n    69→                  ...styles.todoText,\n    70→                  textDecoration: todo.completed ? 'line-through' : 'none',\n    71→                  opacity: todo.completed ? 0.6 : 1,\n    72→                }}>\n    73→                  {todo.text}\n    74→                </span>\n    75→              </label>\n    76→              <button\n    77→                onClick={() => handleDeleteTodo(todo.id)}\n    78→                style={styles.deleteButton}\n    79→              >\n    80→                Delete\n    81→              </button>\n    82→            </li>\n    83→          ))}\n    84→        </ul>\n    85→\n    86→        {todos.length === 0 && (\n    87→          <p style={styles.emptyState}>No todos yet. Add one above!</p>\n    88→        )}\n    89→      </div>\n    90→    </div>\n    91→  );\n    92→}\n    93→\n    94→const styles: Record<string, React.CSSProperties> = {\n    95→  container: {\n    96→    maxWidth: '600px',\n    97→    margin: '0 auto',\n    98→    padding: '20px',\n    99→  },\n   100→  card: {\n   101→    background: 'white',\n   102→    borderRadius: '8px',\n   103→    padding: '24px',\n   104→    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',\n   105→  },\n   106→  title: {\n   107→    fontSize: '28px',\n   108→    fontWeight: 'bold',\n   109→    marginBottom: '8px',\n   110→    color: '#333',\n   111→  },\n   112→  subtitle: {\n   113→    fontSize: '14px',\n   114→    color: '#666',\n   115→    marginBottom: '24px',\n   116→  },\n   117→  inputGroup: {\n   118→    display: 'flex',\n   119→    gap: '8px',\n   120→    marginBottom: '16px',\n   121→  },\n   122→  input: {\n   123→    flex: 1,\n   124→    padding: '10px 12px',\n   125→    border: '1px solid #ddd',\n   126→    borderRadius: '4px',\n   127→    fontSize: '14px',\n   128→  },\n   129→  button: {\n   130→    padding: '10px 20px',\n   131→    background: '#007bff',\n   132→    color: 'white',\n   133→    border: 'none',\n   134→    borderRadius: '4px',\n   135→    cursor: 'pointer',\n   136→    fontSize: '14px',\n   137→    fontWeight: '500',\n   138→  },\n   139→  todoList: {\n   140→    listStyle: 'none',\n   141→  },\n   142→  todoItem: {\n   143→    display: 'flex',\n   144→    alignItems: 'center',\n   145→    justifyContent: 'space-between',\n   146→    padding: '12px',\n   147→    borderBottom: '1px solid #eee',\n   148→  },\n   149→  todoLabel: {\n   150→    display: 'flex',\n   151→    alignItems: 'center',\n   152→    flex: 1,\n   153→    cursor: 'pointer',\n   154→  },\n   155→  checkbox: {\n   156→    marginRight: '12px',\n   157→    cursor: 'pointer',\n   158→  },\n   159→  todoText: {\n   160→    fontSize: '14px',\n   161→    color: '#333',\n   162→  },\n   163→  deleteButton: {\n   164→    padding: '6px 12px',\n   165→    background: '#dc3545',\n   166→    color: 'white',\n   167→    border: 'none',\n   168→    borderRadius: '4px',\n   169→    cursor: 'pointer',\n   170→    fontSize: '12px',\n   171→  },\n   172→  emptyState: {\n   173→    textAlign: 'center',\n   174→    color: '#999',\n   175→    fontSize: '14px',\n   176→    padding: '24px',\n   177→  },\n   178→};\n   179→\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\n</system-reminder>\n",
+          "timestamp": "2025-11-06T12:43:15.094Z"
+        },
+        {
+          "type": "user",
+          "text": "     1→import { defineTool } from '@use-ai/client';\n     2→import { z } from 'zod';\n     3→\n     4→export interface Calculation {\n     5→  expression: string;\n     6→  result: number;\n     7→  timestamp: number;\n     8→}\n     9→\n    10→let currentResult: number | null = null;\n    11→let history: Calculation[] = [];\n    12→const listeners: Set<(data: { result: number | null; history: Calculation[] }) => void> = new Set();\n    13→\n    14→export function subscribeCalculator(callback: (data: { result: number | null; history: Calculation[] }) => void) {\n    15→  listeners.add(callback);\n    16→  callback({ result: currentResult, history: [...history] });\n    17→\n    18→  return () => {\n    19→    listeners.delete(callback);\n    20→  };\n    21→}\n    22→\n    23→function notifyListeners() {\n    24→  listeners.forEach((callback) => callback({ result: currentResult, history: [...history] }));\n    25→}\n    26→\n    27→function evaluateExpression(expression: string): number {\n    28→  const cleaned = expression.replace(/\\s+/g, '');\n    29→\n    30→  const validChars = /^[0-9+\\-*/().]+$/;\n    31→  if (!validChars.test(cleaned)) {\n    32→    throw new Error('Invalid characters in expression');\n    33→  }\n    34→\n    35→  const parenBalance = (cleaned.match(/\\(/g) || []).length - (cleaned.match(/\\)/g) || []).length;\n    36→  if (parenBalance !== 0) {\n    37→    throw new Error('Unbalanced parentheses');\n    38→  }\n    39→\n    40→  const result = Function('\"use strict\"; return (' + cleaned + ')')();\n    41→\n    42→  if (typeof result !== 'number' || !isFinite(result)) {\n    43→    throw new Error('Invalid calculation result');\n    44→  }\n    45→\n    46→  return result;\n    47→}\n    48→\n    49→export const calculatorTools = {\n    50→  calculate: defineTool(\n    51→    'Perform a mathematical calculation and display the result in the calculator',\n    52→    z.object({\n    53→      expression: z.string().describe('The mathematical expression to evaluate (e.g., \"2 + 2\", \"10 * 5 - 3\", \"(8 + 2) / 2\")'),\n    54→    }),\n    55→    (input) => {\n    56→      try {\n    57→        const result = evaluateExpression(input.expression);\n    58→        currentResult = result;\n    59→\n    60→        history = [...history, {\n    61→          expression: input.expression,\n    62→          result,\n    63→          timestamp: Date.now(),\n    64→        }];\n    65→\n    66→        if (history.length > 10) {\n    67→          history = history.slice(-10);\n    68→        }\n    69→\n    70→        notifyListeners();\n    71→\n    72→        return {\n    73→          success: true,\n    74→          expression: input.expression,\n    75→          result,\n    76→          message: `${input.expression} = ${result}`,\n    77→        };\n    78→      } catch (error) {\n    79→        return {\n    80→          success: false,\n    81→          error: error instanceof Error ? error.message : 'Unknown error',\n    82→          message: `Failed to calculate: ${input.expression}`,\n    83→        };\n    84→      }\n    85→    }\n    86→  ),\n    87→\n    88→  clearCalculator: defineTool(\n    89→    'Clear the calculator display and history',\n    90→    z.object({}),\n    91→    () => {\n    92→      currentResult = null;\n    93→      history = [];\n    94→      notifyListeners();\n    95→\n    96→      return {\n    97→        success: true,\n    98→        message: 'Calculator cleared',\n    99→      };\n   100→    }\n   101→  ),\n   102→};\n   103→\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\n</system-reminder>\n",
+          "timestamp": "2025-11-06T12:43:15.094Z"
+        },
+        {
+          "type": "user",
+          "text": "     1→import React, { useState, useEffect } from 'react';\n     2→import { useAI } from '@use-ai/client';\n     3→import { subscribeCalculator, type Calculation, calculatorTools } from './calculatorTools';\n     4→\n     5→export default function Calculator() {\n     6→  const [result, setResult] = useState<number | null>(null);\n     7→  const [history, setHistory] = useState<Calculation[]>([]);\n     8→  const [input, setInput] = useState('');\n     9→\n    10→  const { ref } = useAI({\n    11→    tools: calculatorTools,\n    12→    prompt: 'Current result: ' + result\n    13→  });\n    14→\n    15→  useEffect(() => {\n    16→    const unsubscribe = subscribeCalculator((data) => {\n    17→      setResult(data.result);\n    18→      setHistory(data.history);\n    19→    });\n    20→\n    21→    return unsubscribe;\n    22→  }, []);\n    23→\n    24→  const handleCalculate = () => {\n    25→    if (!input.trim()) return;\n    26→    calculatorTools.calculate._execute({ expression: input.trim() });\n    27→  };\n    28→\n    29→  const handleClear = () => {\n    30→    calculatorTools.clearCalculator._execute({});\n    31→    setInput('');\n    32→  };\n    33→\n    34→  return (\n    35→    <div ref={ref} style={styles.container}>\n    36→      <div style={styles.card}>\n    37→        <h1 style={styles.title}>Calculator</h1>\n    38→        <p style={styles.subtitle}>\n    39→          Enter calculations below or ask the AI to perform calculations for you\n    40→        </p>\n    41→\n    42→        <div style={styles.display}>\n    43→          {result !== null ? result : '0'}\n    44→        </div>\n    45→\n    46→        <div style={styles.inputGroup}>\n    47→          <input\n    48→            type=\"text\"\n    49→            value={input}\n    50→            onChange={(e) => setInput(e.target.value)}\n    51→            onKeyPress={(e) => e.key === 'Enter' && handleCalculate()}\n    52→            placeholder=\"Enter calculation (e.g., 2 + 2)\"\n    53→            style={styles.input}\n    54→          />\n    55→          <button onClick={handleCalculate} style={styles.button}>\n    56→            Calculate\n    57→          </button>\n    58→          <button onClick={handleClear} style={styles.clearButton}>\n    59→            Clear\n    60→          </button>\n    61→        </div>\n    62→\n    63→        {history.length > 0 && (\n    64→          <div style={styles.historySection}>\n    65→            <h3 style={styles.historyTitle}>History</h3>\n    66→            <ul style={styles.historyList}>\n    67→              {history.slice().reverse().map((calc) => (\n    68→                <li key={calc.timestamp} style={styles.historyItem}>\n    69→                  <span style={styles.expression}>{calc.expression}</span>\n    70→                  <span style={styles.equals}>=</span>\n    71→                  <span style={styles.historyResult}>{calc.result}</span>\n    72→                </li>\n    73→              ))}\n    74→            </ul>\n    75→          </div>\n    76→        )}\n    77→\n    78→        {history.length === 0 && (\n    79→          <p style={styles.emptyState}>No calculations yet. Try one above!</p>\n    80→        )}\n    81→      </div>\n    82→    </div>\n    83→  );\n    84→}\n    85→\n    86→const styles: Record<string, React.CSSProperties> = {\n    87→  container: {\n    88→    maxWidth: '600px',\n    89→    margin: '0 auto',\n    90→    padding: '20px',\n    91→  },\n    92→  card: {\n    93→    background: 'white',\n    94→    borderRadius: '8px',\n    95→    padding: '24px',\n    96→    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',\n    97→  },\n    98→  title: {\n    99→    fontSize: '28px',\n   100→    fontWeight: 'bold',\n   101→    marginBottom: '8px',\n   102→    color: '#333',\n   103→  },\n   104→  subtitle: {\n   105→    fontSize: '14px',\n   106→    color: '#666',\n   107→    marginBottom: '24px',\n   108→  },\n   109→  display: {\n   110→    background: '#f8f9fa',\n   111→    border: '2px solid #dee2e6',\n   112→    borderRadius: '4px',\n   113→    padding: '20px',\n   114→    fontSize: '32px',\n   115→    fontWeight: 'bold',\n   116→    textAlign: 'right',\n   117→    marginBottom: '16px',\n   118→    color: '#212529',\n   119→    fontFamily: 'monospace',\n   120→    minHeight: '60px',\n   121→    display: 'flex',\n   122→    alignItems: 'center',\n   123→    justifyContent: 'flex-end',\n   124→  },\n   125→  inputGroup: {\n   126→    display: 'flex',\n   127→    gap: '8px',\n   128→    marginBottom: '16px',\n   129→  },\n   130→  input: {\n   131→    flex: 1,\n   132→    padding: '10px 12px',\n   133→    border: '1px solid #ddd',\n   134→    borderRadius: '4px',\n   135→    fontSize: '14px',\n   136→    fontFamily: 'monospace',\n   137→  },\n   138→  button: {\n   139→    padding: '10px 20px',\n   140→    background: '#28a745',\n   141→    color: 'white',\n   142→    border: 'none',\n   143→    borderRadius: '4px',\n   144→    cursor: 'pointer',\n   145→    fontSize: '14px',\n   146→    fontWeight: '500',\n   147→  },\n   148→  clearButton: {\n   149→    padding: '10px 20px',\n   150→    background: '#6c757d',\n   151→    color: 'white',\n   152→    border: 'none',\n   153→    borderRadius: '4px',\n   154→    cursor: 'pointer',\n   155→    fontSize: '14px',\n   156→    fontWeight: '500',\n   157→  },\n   158→  historySection: {\n   159→    marginTop: '24px',\n   160→  },\n   161→  historyTitle: {\n   162→    fontSize: '18px',\n   163→    fontWeight: 'bold',\n   164→    marginBottom: '12px',\n   165→    color: '#333',\n   166→  },\n   167→  historyList: {\n   168→    listStyle: 'none',\n   169→    padding: 0,\n   170→    margin: 0,\n   171→  },\n   172→  historyItem: {\n   173→    display: 'flex',\n   174→    alignItems: 'center',\n   175→    gap: '8px',\n   176→    padding: '8px 12px',\n   177→    background: '#f8f9fa',\n   178→    borderRadius: '4px',\n   179→    marginBottom: '8px',\n   180→    fontFamily: 'monospace',\n   181→    fontSize: '14px',\n   182→  },\n   183→  expression: {\n   184→    color: '#495057',\n   185→    flex: 1,\n   186→  },\n   187→  equals: {\n   188→    color: '#6c757d',\n   189→  },\n   190→  historyResult: {\n   191→    color: '#28a745',\n   192→    fontWeight: 'bold',\n   193→  },\n   194→  emptyState: {\n   195→    textAlign: 'center',\n   196→    color: '#999',\n   197→    fontSize: '14px',\n   198→    padding: '24px',\n   199→  },\n   200→};\n   201→\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\n</system-reminder>\n",
+          "timestamp": "2025-11-06T12:43:15.094Z"
+        },
+        {
+          "type": "assistant",
+          "text": "Now let me check if these tools are used in other files:",
+          "timestamp": "2025-11-06T12:43:21.781Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Grep",
+          "input": {
+            "output_mode": "files_with_matches",
+            "path": "apps/example/src",
+            "pattern": "import.*todoTools"
+          },
+          "timestamp": "2025-11-06T12:43:22.932Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Grep",
+          "input": {
+            "output_mode": "files_with_matches",
+            "path": "apps/example/src",
+            "pattern": "import.*calculatorTools"
+          },
+          "timestamp": "2025-11-06T12:43:23.484Z"
+        },
+        {
+          "type": "user",
+          "text": "Found 1 file\napps/example/src/Calculator.tsx",
+          "timestamp": "2025-11-06T12:43:23.648Z"
+        },
+        {
+          "type": "user",
+          "text": "Found 1 file\napps/example/src/TodoList.tsx",
+          "timestamp": "2025-11-06T12:43:23.673Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/apps/example/src/pages/TodoPage.tsx"
+          },
+          "timestamp": "2025-11-06T12:43:28.529Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/apps/example/src/pages/CalculatorPage.tsx"
+          },
+          "timestamp": "2025-11-06T12:43:29.066Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/apps/example/src/pages/MultiListPage.tsx"
+          },
+          "timestamp": "2025-11-06T12:43:29.592Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/apps/example/src/pages/CombinedPage.tsx"
+          },
+          "timestamp": "2025-11-06T12:43:30.118Z"
+        },
+        {
+          "type": "user",
+          "text": "     1→import React from 'react';\n     2→import TodoList from '../TodoList';\n     3→\n     4→export default function TodoPage() {\n     5→  return <TodoList />;\n     6→}\n     7→\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\n</system-reminder>\n",
+          "timestamp": "2025-11-06T12:43:30.386Z"
+        },
+        {
+          "type": "user",
+          "text": "     1→import React from 'react';\n     2→import Calculator from '../Calculator';\n     3→\n     4→export default function CalculatorPage() {\n     5→  return <Calculator />;\n     6→}\n     7→\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\n</system-reminder>\n",
+          "timestamp": "2025-11-06T12:43:30.387Z"
+        },
+        {
+          "type": "user",
+          "text": "     1→import React from 'react';\n     2→import ListItem from '../components/ListItem';\n     3→\n     4→export default function MultiListPage() {\n     5→  const items = [\n     6→    { id: 'Item-A', initialLabel: 'First Item', initialColor: '#ffebee' },\n     7→    { id: 'Item-B', initialLabel: 'Second Item', initialColor: '#e3f2fd' },\n     8→    { id: 'Item-C', initialLabel: 'Third Item', initialColor: '#e8f5e9' },\n     9→    { id: 'Item-D', initialLabel: 'Fourth Item', initialColor: '#fff3e0' },\n    10→  ];\n    11→\n    12→  return (\n    13→    <div style={styles.container}>\n    14→      <div style={styles.card}>\n    15→        <h1 style={styles.title}>Multiple List Items Test</h1>\n    16→        <p style={styles.subtitle}>\n    17→          Each item below has its own useAI hook with tools. Try asking the AI to:\n    18→        </p>\n    19→        <ul style={styles.instructions}>\n    20→          <li>Change the label of Item-A</li>\n    21→          <li>Increment the counter on all items</li>\n    22→          <li>Change Item-B's color to blue</li>\n    23→          <li>Get the state of all items</li>\n    24→          <li>Reset counters for items A and C</li>\n    25→        </ul>\n    26→        <p style={styles.note}>\n    27→          <strong>Note:</strong> This page tests what happens when multiple components\n    28→          with similar tools are mounted. Each list item registers its own set of tools\n    29→          with unique descriptions that include the item ID.\n    30→        </p>\n    31→\n    32→        <div style={styles.itemsContainer}>\n    33→          {items.map(item => (\n    34→            <ListItem\n    35→              key={item.id}\n    36→              id={item.id}\n    37→              initialLabel={item.initialLabel}\n    38→              initialColor={item.initialColor}\n    39→            />\n    40→          ))}\n    41→        </div>\n    42→      </div>\n    43→    </div>\n    44→  );\n    45→}\n    46→\n    47→const styles: Record<string, React.CSSProperties> = {\n    48→  container: {\n    49→    maxWidth: '900px',\n    50→    margin: '0 auto',\n    51→    padding: '20px',\n    52→  },\n    53→  card: {\n    54→    background: 'white',\n    55→    borderRadius: '8px',\n    56→    padding: '24px',\n    57→    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',\n    58→  },\n    59→  title: {\n    60→    fontSize: '28px',\n    61→    fontWeight: 'bold',\n    62→    marginBottom: '8px',\n    63→    color: '#333',\n    64→  },\n    65→  subtitle: {\n    66→    fontSize: '14px',\n    67→    color: '#666',\n    68→    marginBottom: '12px',\n    69→  },\n    70→  instructions: {\n    71→    fontSize: '14px',\n    72→    color: '#555',\n    73→    marginBottom: '16px',\n    74→    paddingLeft: '20px',\n    75→  },\n    76→  note: {\n    77→    fontSize: '13px',\n    78→    color: '#666',\n    79→    padding: '12px',\n    80→    background: '#f8f9fa',\n    81→    borderRadius: '4px',\n    82→    marginBottom: '24px',\n    83→    borderLeft: '3px solid #007bff',\n    84→  },\n    85→  itemsContainer: {\n    86→    display: 'grid',\n    87→    gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',\n    88→    gap: '16px',\n    89→  },\n    90→};\n    91→\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\n</system-reminder>\n",
+          "timestamp": "2025-11-06T12:43:30.387Z"
+        },
+        {
+          "type": "user",
+          "text": "     1→import React from 'react';\n     2→import TodoList from '../TodoList';\n     3→import Calculator from '../Calculator';\n     4→\n     5→export default function CombinedPage() {\n     6→  return (\n     7→    <div style={styles.container}>\n     8→      <div style={styles.pageHeader}>\n     9→        <h1 style={styles.pageTitle}>Combined Page</h1>\n    10→        <p style={styles.pageSubtitle}>\n    11→          Both todo and calculator tools are available to the AI on this page\n    12→        </p>\n    13→      </div>\n    14→      <div style={styles.grid}>\n    15→        <div style={styles.column}>\n    16→          <TodoList />\n    17→        </div>\n    18→        <div style={styles.column}>\n    19→          <Calculator />\n    20→        </div>\n    21→      </div>\n    22→    </div>\n    23→  );\n    24→}\n    25→\n    26→const styles: Record<string, React.CSSProperties> = {\n    27→  container: {\n    28→    maxWidth: '1400px',\n    29→    margin: '0 auto',\n    30→    padding: '20px',\n    31→  },\n    32→  pageHeader: {\n    33→    textAlign: 'center',\n    34→    marginBottom: '32px',\n    35→  },\n    36→  pageTitle: {\n    37→    fontSize: '36px',\n    38→    fontWeight: 'bold',\n    39→    color: '#333',\n    40→    marginBottom: '8px',\n    41→  },\n    42→  pageSubtitle: {\n    43→    fontSize: '16px',\n    44→    color: '#666',\n    45→  },\n    46→  grid: {\n    47→    display: 'grid',\n    48→    gridTemplateColumns: '1fr 1fr',\n    49→    gap: '24px',\n    50→  },\n    51→  column: {\n    52→    minWidth: 0,\n    53→  },\n    54→};\n    55→\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\n</system-reminder>\n",
+          "timestamp": "2025-11-06T12:43:30.387Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "TodoWrite",
+          "input": {
+            "todos": [
+              {
+                "activeForm": "Refactoring TodoList.tsx to include state and tools inline",
+                "content": "Refactor TodoList.tsx to include state and tools inline",
+                "status": "in_progress"
+              },
+              {
+                "activeForm": "Refactoring Calculator.tsx to include state and tools inline",
+                "content": "Refactor Calculator.tsx to include state and tools inline",
+                "status": "pending"
+              },
+              {
+                "activeForm": "Deleting todoTools.ts file",
+                "content": "Delete todoTools.ts file",
+                "status": "pending"
+              },
+              {
+                "activeForm": "Deleting calculatorTools.ts file",
+                "content": "Delete calculatorTools.ts file",
+                "status": "pending"
+              },
+              {
+                "activeForm": "Testing the refactored example app",
+                "content": "Test the refactored example app",
+                "status": "pending"
+              }
+            ]
+          },
+          "timestamp": "2025-11-06T12:43:41.922Z"
+        },
+        {
+          "type": "user",
+          "text": "Todos have been modified successfully. Ensure that you continue to use the todo list to track your progress. Please proceed with the current tasks if applicable",
+          "timestamp": "2025-11-06T12:43:42.003Z"
+        },
+        {
+          "type": "assistant",
+          "text": "Now I'll refactor both components to include their state and tools inline. Let me start with TodoList:",
+          "timestamp": "2025-11-06T12:43:49.555Z"
+        },
+        {
+          "type": "assistant",
+          "text": "Now I'll refactor the TodoList component to include all state and tools inline:",
+          "timestamp": "2025-11-06T12:44:14.761Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Edit",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/apps/example/src/TodoList.tsx",
+            "new_string": "import React, { useState, useMemo, useRef } from 'react';\nimport { useAI, defineTool } from '@use-ai/client';\nimport { z } from 'zod';\n\ninterface Todo {\n  id: number;\n  text: string;\n  completed: boolean;\n}\n\nexport default function TodoList() {\n  const [todos, setTodos] = useState<Todo[]>([]);\n  const [input, setInput] = useState('');\n  const nextIdRef = useRef(1);\n\n  const todoTools = useMemo(() => {\n    const addTodo = defineTool(\n      'Add a new todo item to the list',\n      z.object({\n        text: z.string().describe('The text content of the todo item'),\n      }),\n      (input) => {\n        if (!input.text.trim()) {\n          return { success: false, error: 'Text is required' };\n        }\n\n        const newTodo: Todo = {\n          id: nextIdRef.current++,\n          text: input.text.trim(),\n          completed: false,\n        };\n\n        setTodos(prev => [...prev, newTodo]);\n\n        return { success: true, id: newTodo.id, message: `Added todo: \"${input.text}\"` };\n      }\n    );\n\n    const deleteTodo = defineTool(\n      'Delete a todo item by its ID',\n      z.object({\n        id: z.number().describe('The ID of the todo item to delete'),\n      }),\n      (input) => {\n        let deletedTodo: Todo | undefined;\n\n        setTodos(prev => {\n          deletedTodo = prev.find((t) => t.id === input.id);\n          if (!deletedTodo) return prev;\n          return prev.filter((t) => t.id !== input.id);\n        });\n\n        if (!deletedTodo) {\n          return { success: false, error: `Todo with id ${input.id} not found` };\n        }\n\n        return { success: true, message: `Deleted todo: \"${deletedTodo.text}\"` };\n      },\n      { confirmationRequired: true }\n    );\n\n    const toggleTodo = defineTool(\n      'Toggle the completed status of a todo item',\n      z.object({\n        id: z.number().describe('The ID of the todo item to toggle'),\n      }),\n      (input) => {\n        let targetTodo: Todo | undefined;\n\n        setTodos(prev => {\n          targetTodo = prev.find((t) => t.id === input.id);\n          if (!targetTodo) return prev;\n\n          return prev.map((t) =>\n            t.id === input.id ? { ...t, completed: !t.completed } : t\n          );\n        });\n\n        if (!targetTodo) {\n          return { success: false, error: `Todo with id ${input.id} not found` };\n        }\n\n        return {\n          success: true,\n          message: `Marked \"${targetTodo.text}\" as ${!targetTodo.completed ? 'completed' : 'incomplete'}`,\n        };\n      }\n    );\n\n    const clearCompleted = defineTool(\n      'Remove all completed todos from the list',\n      z.object({}),\n      () => {\n        let completedCount = 0;\n\n        setTodos(prev => {\n          completedCount = prev.filter((t) => t.completed).length;\n          return prev.filter((t) => !t.completed);\n        });\n\n        return {\n          success: true,\n          message: `Cleared ${completedCount} completed todo(s)`,\n          count: completedCount,\n        };\n      },\n      { confirmationRequired: true }\n    );\n\n    return {\n      addTodo,\n      deleteTodo,\n      toggleTodo,\n      clearCompleted,\n    };\n  }, []);\n\n  const { ref } = useAI({\n    tools: todoTools,\n    prompt: `Todo List: ${JSON.stringify(todos)}`,\n  });\n\n  const handleAddTodo = () => {\n    if (!input.trim()) return;\n    todoTools.addTodo._execute({ text: input.trim() });\n    setInput('');\n  };\n\n  const handleToggleTodo = (id: number) => {\n    todoTools.toggleTodo._execute({ id });\n  };\n\n  const handleDeleteTodo = (id: number) => {\n    todoTools.deleteTodo._execute({ id });\n  };",
+            "old_string": "import React, { useState, useEffect } from 'react';\nimport { useAI } from '@use-ai/client';\nimport { subscribeTodos, type Todo, todoTools } from './todoTools';\n\nexport default function TodoList() {\n  const [todos, setTodos] = useState<Todo[]>([]);\n  const [input, setInput] = useState('');\n\n  const { ref } = useAI({\n    tools: todoTools,\n    prompt: `Todo List: ${JSON.stringify(todos)}`,\n  });\n\n  useEffect(() => {\n    const unsubscribe = subscribeTodos((newTodos) => {\n      setTodos(newTodos);\n    });\n\n    return unsubscribe;\n  }, []);\n\n  const handleAddTodo = () => {\n    if (!input.trim()) return;\n    todoTools.addTodo._execute({ text: input.trim() });\n    setInput('');\n  };\n\n  const handleToggleTodo = (id: number) => {\n    todoTools.toggleTodo._execute({ id });\n  };\n\n  const handleDeleteTodo = (id: number) => {\n    todoTools.deleteTodo._execute({ id });\n  };"
+          },
+          "timestamp": "2025-11-06T12:44:14.761Z"
+        },
+        {
+          "type": "user",
+          "text": "The file /home/z/Desktop/work/use-ai/apps/example/src/TodoList.tsx has been updated. Here's the result of running `cat -n` on a snippet of the edited file:\n     1→import React, { useState, useMemo, useRef } from 'react';\n     2→import { useAI, defineTool } from '@use-ai/client';\n     3→import { z } from 'zod';\n     4→\n     5→interface Todo {\n     6→  id: number;\n     7→  text: string;\n     8→  completed: boolean;\n     9→}\n    10→\n    11→export default function TodoList() {\n    12→  const [todos, setTodos] = useState<Todo[]>([]);\n    13→  const [input, setInput] = useState('');\n    14→  const nextIdRef = useRef(1);\n    15→\n    16→  const todoTools = useMemo(() => {\n    17→    const addTodo = defineTool(\n    18→      'Add a new todo item to the list',\n    19→      z.object({\n    20→        text: z.string().describe('The text content of the todo item'),\n    21→      }),\n    22→      (input) => {\n    23→        if (!input.text.trim()) {\n    24→          return { success: false, error: 'Text is required' };\n    25→        }\n    26→\n    27→        const newTodo: Todo = {\n    28→          id: nextIdRef.current++,\n    29→          text: input.text.trim(),\n    30→          completed: false,\n    31→        };\n    32→\n    33→        setTodos(prev => [...prev, newTodo]);\n    34→\n    35→        return { success: true, id: newTodo.id, message: `Added todo: \"${input.text}\"` };\n    36→      }\n    37→    );\n    38→\n    39→    const deleteTodo = defineTool(\n    40→      'Delete a todo item by its ID',\n    41→      z.object({\n    42→        id: z.number().describe('The ID of the todo item to delete'),\n    43→      }),\n    44→      (input) => {\n    45→        let deletedTodo: Todo | undefined;\n    46→\n    47→        setTodos(prev => {\n    48→          deletedTodo = prev.find((t) => t.id === input.id);\n    49→          if (!deletedTodo) return prev;\n    50→          return prev.filter((t) => t.id !== input.id);\n    51→        });\n    52→\n    53→        if (!deletedTodo) {\n    54→          return { success: false, error: `Todo with id ${input.id} not found` };\n    55→        }\n    56→\n    57→        return { success: true, message: `Deleted todo: \"${deletedTodo.text}\"` };\n    58→      },\n    59→      { confirmationRequired: true }\n    60→    );\n    61→\n    62→    const toggleTodo = defineTool(\n    63→      'Toggle the completed status of a todo item',\n    64→      z.object({\n    65→        id: z.number().describe('The ID of the todo item to toggle'),\n    66→      }),\n    67→      (input) => {\n    68→        let targetTodo: Todo | undefined;\n    69→\n    70→        setTodos(prev => {\n    71→          targetTodo = prev.find((t) => t.id === input.id);\n    72→          if (!targetTodo) return prev;\n    73→\n    74→          return prev.map((t) =>\n    75→            t.id === input.id ? { ...t, completed: !t.completed } : t\n    76→          );\n    77→        });\n    78→\n    79→        if (!targetTodo) {\n    80→          return { success: false, error: `Todo with id ${input.id} not found` };\n    81→        }\n    82→\n    83→        return {\n    84→          success: true,\n    85→          message: `Marked \"${targetTodo.text}\" as ${!targetTodo.completed ? 'completed' : 'incomplete'}`,\n    86→        };\n    87→      }\n    88→    );\n    89→\n    90→    const clearCompleted = defineTool(\n    91→      'Remove all completed todos from the list',\n    92→      z.object({}),\n    93→      () => {\n    94→        let completedCount = 0;\n    95→\n    96→        setTodos(prev => {\n    97→          completedCount = prev.filter((t) => t.completed).length;\n    98→          return prev.filter((t) => !t.completed);\n    99→        });\n   100→\n   101→        return {\n   102→          success: true,\n   103→          message: `Cleared ${completedCount} completed todo(s)`,\n   104→          count: completedCount,\n   105→        };\n   106→      },\n   107→      { confirmationRequired: true }\n   108→    );\n   109→\n   110→    return {\n   111→      addTodo,\n   112→      deleteTodo,\n   113→      toggleTodo,\n   114→      clearCompleted,\n   115→    };\n   116→  }, []);\n   117→\n   118→  const { ref } = useAI({\n   119→    tools: todoTools,\n   120→    prompt: `Todo List: ${JSON.stringify(todos)}`,\n   121→  });\n   122→\n   123→  const handleAddTodo = () => {\n   124→    if (!input.trim()) return;\n   125→    todoTools.addTodo._execute({ text: input.trim() });\n   126→    setInput('');\n   127→  };\n   128→\n   129→  const handleToggleTodo = (id: number) => {\n   130→    todoTools.toggleTodo._execute({ id });\n   131→  };\n   132→\n   133→  const handleDeleteTodo = (id: number) => {\n   134→    todoTools.deleteTodo._execute({ id });\n   135→  };\n   136→\n   137→  return (\n   138→    <div ref={ref} style={styles.container}>\n   139→      <div style={styles.card}>",
+          "timestamp": "2025-11-06T12:44:32.218Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "TodoWrite",
+          "input": {
+            "todos": [
+              {
+                "activeForm": "Refactoring TodoList.tsx to include state and tools inline",
+                "content": "Refactor TodoList.tsx to include state and tools inline",
+                "status": "completed"
+              },
+              {
+                "activeForm": "Refactoring Calculator.tsx to include state and tools inline",
+                "content": "Refactor Calculator.tsx to include state and tools inline",
+                "status": "in_progress"
+              },
+              {
+                "activeForm": "Deleting todoTools.ts file",
+                "content": "Delete todoTools.ts file",
+                "status": "pending"
+              },
+              {
+                "activeForm": "Deleting calculatorTools.ts file",
+                "content": "Delete calculatorTools.ts file",
+                "status": "pending"
+              },
+              {
+                "activeForm": "Testing the refactored example app",
+                "content": "Test the refactored example app",
+                "status": "pending"
+              }
+            ]
+          },
+          "timestamp": "2025-11-06T12:44:40.363Z"
+        },
+        {
+          "type": "user",
+          "text": "Todos have been modified successfully. Ensure that you continue to use the todo list to track your progress. Please proceed with the current tasks if applicable",
+          "timestamp": "2025-11-06T12:44:40.895Z"
+        },
+        {
+          "type": "assistant",
+          "text": "Now I'll refactor the Calculator component:",
+          "timestamp": "2025-11-06T12:44:46.750Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Edit",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/apps/example/src/Calculator.tsx",
+            "new_string": "import React, { useState, useMemo } from 'react';\nimport { useAI, defineTool } from '@use-ai/client';\nimport { z } from 'zod';\n\ninterface Calculation {\n  expression: string;\n  result: number;\n  timestamp: number;\n}\n\nfunction evaluateExpression(expression: string): number {\n  const cleaned = expression.replace(/\\s+/g, '');\n\n  const validChars = /^[0-9+\\-*/().]+$/;\n  if (!validChars.test(cleaned)) {\n    throw new Error('Invalid characters in expression');\n  }\n\n  const parenBalance = (cleaned.match(/\\(/g) || []).length - (cleaned.match(/\\)/g) || []).length;\n  if (parenBalance !== 0) {\n    throw new Error('Unbalanced parentheses');\n  }\n\n  const result = Function('\"use strict\"; return (' + cleaned + ')')();\n\n  if (typeof result !== 'number' || !isFinite(result)) {\n    throw new Error('Invalid calculation result');\n  }\n\n  return result;\n}\n\nexport default function Calculator() {\n  const [result, setResult] = useState<number | null>(null);\n  const [history, setHistory] = useState<Calculation[]>([]);\n  const [input, setInput] = useState('');\n\n  const calculatorTools = useMemo(() => {\n    const calculate = defineTool(\n      'Perform a mathematical calculation and display the result in the calculator',\n      z.object({\n        expression: z.string().describe('The mathematical expression to evaluate (e.g., \"2 + 2\", \"10 * 5 - 3\", \"(8 + 2) / 2\")'),\n      }),\n      (input) => {\n        try {\n          const calculatedResult = evaluateExpression(input.expression);\n\n          setResult(calculatedResult);\n          setHistory(prev => {\n            const newHistory = [...prev, {\n              expression: input.expression,\n              result: calculatedResult,\n              timestamp: Date.now(),\n            }];\n\n            return newHistory.length > 10 ? newHistory.slice(-10) : newHistory;\n          });\n\n          return {\n            success: true,\n            expression: input.expression,\n            result: calculatedResult,\n            message: `${input.expression} = ${calculatedResult}`,\n          };\n        } catch (error) {\n          return {\n            success: false,\n            error: error instanceof Error ? error.message : 'Unknown error',\n            message: `Failed to calculate: ${input.expression}`,\n          };\n        }\n      }\n    );\n\n    const clearCalculator = defineTool(\n      'Clear the calculator display and history',\n      z.object({}),\n      () => {\n        setResult(null);\n        setHistory([]);\n\n        return {\n          success: true,\n          message: 'Calculator cleared',\n        };\n      }\n    );\n\n    return {\n      calculate,\n      clearCalculator,\n    };\n  }, []);\n\n  const { ref } = useAI({\n    tools: calculatorTools,\n    prompt: 'Current result: ' + result\n  });\n\n  const handleCalculate = () => {\n    if (!input.trim()) return;\n    calculatorTools.calculate._execute({ expression: input.trim() });\n  };\n\n  const handleClear = () => {\n    calculatorTools.clearCalculator._execute({});\n    setInput('');\n  };",
+            "old_string": "import React, { useState, useEffect } from 'react';\nimport { useAI } from '@use-ai/client';\nimport { subscribeCalculator, type Calculation, calculatorTools } from './calculatorTools';\n\nexport default function Calculator() {\n  const [result, setResult] = useState<number | null>(null);\n  const [history, setHistory] = useState<Calculation[]>([]);\n  const [input, setInput] = useState('');\n\n  const { ref } = useAI({\n    tools: calculatorTools,\n    prompt: 'Current result: ' + result\n  });\n\n  useEffect(() => {\n    const unsubscribe = subscribeCalculator((data) => {\n      setResult(data.result);\n      setHistory(data.history);\n    });\n\n    return unsubscribe;\n  }, []);\n\n  const handleCalculate = () => {\n    if (!input.trim()) return;\n    calculatorTools.calculate._execute({ expression: input.trim() });\n  };\n\n  const handleClear = () => {\n    calculatorTools.clearCalculator._execute({});\n    setInput('');\n  };"
+          },
+          "timestamp": "2025-11-06T12:45:03.425Z"
+        }
+      ],
+      "total_additions": 262,
+      "total_deletions": 28,
+      "accepted_lines": 182,
+      "overriden_lines": 0
+    },
+    "e890d40": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "350f281c-2c77-4594-ab1e-590bad37ce62",
+        "model": "claude-sonnet-4-5-20250929"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [
+        {
+          "type": "user",
+          "text": "refactor the tools that are embedded in the components into a separate hook `useLogic` that contains the functions like 'addTodo' etc",
+          "timestamp": "2025-11-06T13:46:12.288Z"
+        },
+        {
+          "type": "assistant",
+          "text": "I'll help you refactor the tools into separate `useLogic` hooks. Let me first examine the current structure of the components.",
+          "timestamp": "2025-11-06T13:46:20.626Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "TodoWrite",
+          "input": {
+            "todos": [
+              {
+                "activeForm": "Reading TodoList.tsx and Calculator.tsx",
+                "content": "Read TodoList.tsx and Calculator.tsx to understand current structure",
+                "status": "in_progress"
+              },
+              {
+                "activeForm": "Creating useTodoLogic hook",
+                "content": "Create useTodoLogic hook with todo functions and tools",
+                "status": "pending"
+              },
+              {
+                "activeForm": "Creating useCalculatorLogic hook",
+                "content": "Create useCalculatorLogic hook with calculator functions and tools",
+                "status": "pending"
+              },
+              {
+                "activeForm": "Refactoring TodoList.tsx",
+                "content": "Refactor TodoList.tsx to use useTodoLogic",
+                "status": "pending"
+              },
+              {
+                "activeForm": "Refactoring Calculator.tsx",
+                "content": "Refactor Calculator.tsx to use useCalculatorLogic",
+                "status": "pending"
+              }
+            ]
+          },
+          "timestamp": "2025-11-06T13:46:23.737Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/apps/example/src/TodoList.tsx"
+          },
+          "timestamp": "2025-11-06T13:46:24.247Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/apps/example/src/Calculator.tsx"
+          },
+          "timestamp": "2025-11-06T13:46:24.536Z"
+        },
+        {
+          "type": "user",
+          "text": "Todos have been modified successfully. Ensure that you continue to use the todo list to track your progress. Please proceed with the current tasks if applicable",
+          "timestamp": "2025-11-06T13:46:24.722Z"
+        },
+        {
+          "type": "user",
+          "text": "     1→import React, { useState, useMemo, useRef } from 'react';\n     2→import { useAI, defineTool } from '@use-ai/client';\n     3→import { z } from 'zod';\n     4→\n     5→interface Todo {\n     6→  id: number;\n     7→  text: string;\n     8→  completed: boolean;\n     9→}\n    10→\n    11→export default function TodoList() {\n    12→  const [todos, setTodos] = useState<Todo[]>([]);\n    13→  const [input, setInput] = useState('');\n    14→  const nextIdRef = useRef(1);\n    15→\n    16→  const todoTools = useMemo(() => {\n    17→    const addTodo = defineTool(\n    18→      'Add a new todo item to the list',\n    19→      z.object({\n    20→        text: z.string().describe('The text content of the todo item'),\n    21→      }),\n    22→      (input) => {\n    23→        if (!input.text.trim()) {\n    24→          return { success: false, error: 'Text is required' };\n    25→        }\n    26→\n    27→        const newTodo: Todo = {\n    28→          id: nextIdRef.current++,\n    29→          text: input.text.trim(),\n    30→          completed: false,\n    31→        };\n    32→\n    33→        setTodos(prev => [...prev, newTodo]);\n    34→\n    35→        return { success: true, id: newTodo.id, message: `Added todo: \"${input.text}\"` };\n    36→      }\n    37→    );\n    38→\n    39→    const deleteTodo = defineTool(\n    40→      'Delete a todo item by its ID',\n    41→      z.object({\n    42→        id: z.number().describe('The ID of the todo item to delete'),\n    43→      }),\n    44→      (input) => {\n    45→        let deletedTodo: Todo | undefined;\n    46→\n    47→        setTodos(prev => {\n    48→          deletedTodo = prev.find((t) => t.id === input.id);\n    49→          if (!deletedTodo) return prev;\n    50→          return prev.filter((t) => t.id !== input.id);\n    51→        });\n    52→\n    53→        if (!deletedTodo) {\n    54→          return { success: false, error: `Todo with id ${input.id} not found` };\n    55→        }\n    56→\n    57→        return { success: true, message: `Deleted todo: \"${deletedTodo.text}\"` };\n    58→      },\n    59→      { confirmationRequired: true }\n    60→    );\n    61→\n    62→    const toggleTodo = defineTool(\n    63→      'Toggle the completed status of a todo item',\n    64→      z.object({\n    65→        id: z.number().describe('The ID of the todo item to toggle'),\n    66→      }),\n    67→      (input) => {\n    68→        let targetTodo: Todo | undefined;\n    69→\n    70→        setTodos(prev => {\n    71→          targetTodo = prev.find((t) => t.id === input.id);\n    72→          if (!targetTodo) return prev;\n    73→\n    74→          return prev.map((t) =>\n    75→            t.id === input.id ? { ...t, completed: !t.completed } : t\n    76→          );\n    77→        });\n    78→\n    79→        if (!targetTodo) {\n    80→          return { success: false, error: `Todo with id ${input.id} not found` };\n    81→        }\n    82→\n    83→        return {\n    84→          success: true,\n    85→          message: `Marked \"${targetTodo.text}\" as ${!targetTodo.completed ? 'completed' : 'incomplete'}`,\n    86→        };\n    87→      }\n    88→    );\n    89→\n    90→    const clearCompleted = defineTool(\n    91→      'Remove all completed todos from the list',\n    92→      z.object({}),\n    93→      () => {\n    94→        let completedCount = 0;\n    95→\n    96→        setTodos(prev => {\n    97→          completedCount = prev.filter((t) => t.completed).length;\n    98→          return prev.filter((t) => !t.completed);\n    99→        });\n   100→\n   101→        return {\n   102→          success: true,\n   103→          message: `Cleared ${completedCount} completed todo(s)`,\n   104→          count: completedCount,\n   105→        };\n   106→      },\n   107→      { confirmationRequired: true }\n   108→    );\n   109→\n   110→    return {\n   111→      addTodo,\n   112→      deleteTodo,\n   113→      toggleTodo,\n   114→      clearCompleted,\n   115→    };\n   116→  }, []);\n   117→\n   118→  const { ref } = useAI({\n   119→    tools: todoTools,\n   120→    prompt: `Todo List: ${JSON.stringify(todos)}`,\n   121→  });\n   122→\n   123→  const handleAddTodo = () => {\n   124→    if (!input.trim()) return;\n   125→    todoTools.addTodo._execute({ text: input.trim() });\n   126→    setInput('');\n   127→  };\n   128→\n   129→  const handleToggleTodo = (id: number) => {\n   130→    todoTools.toggleTodo._execute({ id });\n   131→  };\n   132→\n   133→  const handleDeleteTodo = (id: number) => {\n   134→    todoTools.deleteTodo._execute({ id });\n   135→  };\n   136→\n   137→  return (\n   138→    <div ref={ref} style={styles.container}>\n   139→      <div style={styles.card}>\n   140→        <h1 style={styles.title}>Todo List</h1>\n   141→        <p style={styles.subtitle}>\n   142→          Click the AI button in the bottom right to manage todos with natural language\n   143→        </p>\n   144→\n   145→        <div style={styles.inputGroup}>\n   146→          <input\n   147→            type=\"text\"\n   148→            value={input}\n   149→            onChange={(e) => setInput(e.target.value)}\n   150→            onKeyPress={(e) => e.key === 'Enter' && handleAddTodo()}\n   151→            placeholder=\"Add a new todo...\"\n   152→            style={styles.input}\n   153→          />\n   154→          <button onClick={handleAddTodo} style={styles.button}>\n   155→            Add\n   156→          </button>\n   157→        </div>\n   158→\n   159→        <ul style={styles.todoList}>\n   160→          {todos.map(todo => (\n   161→            <li key={todo.id} style={styles.todoItem}>\n   162→              <label style={styles.todoLabel}>\n   163→                <input\n   164→                  type=\"checkbox\"\n   165→                  checked={todo.completed}\n   166→                  onChange={() => handleToggleTodo(todo.id)}\n   167→                  style={styles.checkbox}\n   168→                />\n   169→                <span style={{\n   170→                  ...styles.todoText,\n   171→                  textDecoration: todo.completed ? 'line-through' : 'none',\n   172→                  opacity: todo.completed ? 0.6 : 1,\n   173→                }}>\n   174→                  {todo.text}\n   175→                </span>\n   176→              </label>\n   177→              <button\n   178→                onClick={() => handleDeleteTodo(todo.id)}\n   179→                style={styles.deleteButton}\n   180→              >\n   181→                Delete\n   182→              </button>\n   183→            </li>\n   184→          ))}\n   185→        </ul>\n   186→\n   187→        {todos.length === 0 && (\n   188→          <p style={styles.emptyState}>No todos yet. Add one above!</p>\n   189→        )}\n   190→      </div>\n   191→    </div>\n   192→  );\n   193→}\n   194→\n   195→const styles: Record<string, React.CSSProperties> = {\n   196→  container: {\n   197→    maxWidth: '600px',\n   198→    margin: '0 auto',\n   199→    padding: '20px',\n   200→  },\n   201→  card: {\n   202→    background: 'white',\n   203→    borderRadius: '8px',\n   204→    padding: '24px',\n   205→    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',\n   206→  },\n   207→  title: {\n   208→    fontSize: '28px',\n   209→    fontWeight: 'bold',\n   210→    marginBottom: '8px',\n   211→    color: '#333',\n   212→  },\n   213→  subtitle: {\n   214→    fontSize: '14px',\n   215→    color: '#666',\n   216→    marginBottom: '24px',\n   217→  },\n   218→  inputGroup: {\n   219→    display: 'flex',\n   220→    gap: '8px',\n   221→    marginBottom: '16px',\n   222→  },\n   223→  input: {\n   224→    flex: 1,\n   225→    padding: '10px 12px',\n   226→    border: '1px solid #ddd',\n   227→    borderRadius: '4px',\n   228→    fontSize: '14px',\n   229→  },\n   230→  button: {\n   231→    padding: '10px 20px',\n   232→    background: '#007bff',\n   233→    color: 'white',\n   234→    border: 'none',\n   235→    borderRadius: '4px',\n   236→    cursor: 'pointer',\n   237→    fontSize: '14px',\n   238→    fontWeight: '500',\n   239→  },\n   240→  todoList: {\n   241→    listStyle: 'none',\n   242→  },\n   243→  todoItem: {\n   244→    display: 'flex',\n   245→    alignItems: 'center',\n   246→    justifyContent: 'space-between',\n   247→    padding: '12px',\n   248→    borderBottom: '1px solid #eee',\n   249→  },\n   250→  todoLabel: {\n   251→    display: 'flex',\n   252→    alignItems: 'center',\n   253→    flex: 1,\n   254→    cursor: 'pointer',\n   255→  },\n   256→  checkbox: {\n   257→    marginRight: '12px',\n   258→    cursor: 'pointer',\n   259→  },\n   260→  todoText: {\n   261→    fontSize: '14px',\n   262→    color: '#333',\n   263→  },\n   264→  deleteButton: {\n   265→    padding: '6px 12px',\n   266→    background: '#dc3545',\n   267→    color: 'white',\n   268→    border: 'none',\n   269→    borderRadius: '4px',\n   270→    cursor: 'pointer',\n   271→    fontSize: '12px',\n   272→  },\n   273→  emptyState: {\n   274→    textAlign: 'center',\n   275→    color: '#999',\n   276→    fontSize: '14px',\n   277→    padding: '24px',\n   278→  },\n   279→};\n   280→\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\n</system-reminder>\n",
+          "timestamp": "2025-11-06T13:46:24.819Z"
+        },
+        {
+          "type": "user",
+          "text": "     1→import React, { useState, useMemo } from 'react';\n     2→import { useAI, defineTool } from '@use-ai/client';\n     3→import { z } from 'zod';\n     4→\n     5→interface Calculation {\n     6→  expression: string;\n     7→  result: number;\n     8→  timestamp: number;\n     9→}\n    10→\n    11→function evaluateExpression(expression: string): number {\n    12→  const cleaned = expression.replace(/\\s+/g, '');\n    13→\n    14→  const validChars = /^[0-9+\\-*/().]+$/;\n    15→  if (!validChars.test(cleaned)) {\n    16→    throw new Error('Invalid characters in expression');\n    17→  }\n    18→\n    19→  const parenBalance = (cleaned.match(/\\(/g) || []).length - (cleaned.match(/\\)/g) || []).length;\n    20→  if (parenBalance !== 0) {\n    21→    throw new Error('Unbalanced parentheses');\n    22→  }\n    23→\n    24→  const result = Function('\"use strict\"; return (' + cleaned + ')')();\n    25→\n    26→  if (typeof result !== 'number' || !isFinite(result)) {\n    27→    throw new Error('Invalid calculation result');\n    28→  }\n    29→\n    30→  return result;\n    31→}\n    32→\n    33→export default function Calculator() {\n    34→  const [result, setResult] = useState<number | null>(null);\n    35→  const [history, setHistory] = useState<Calculation[]>([]);\n    36→  const [input, setInput] = useState('');\n    37→\n    38→  const calculatorTools = useMemo(() => {\n    39→    const calculate = defineTool(\n    40→      'Perform a mathematical calculation and display the result in the calculator',\n    41→      z.object({\n    42→        expression: z.string().describe('The mathematical expression to evaluate (e.g., \"2 + 2\", \"10 * 5 - 3\", \"(8 + 2) / 2\")'),\n    43→      }),\n    44→      (input) => {\n    45→        try {\n    46→          const calculatedResult = evaluateExpression(input.expression);\n    47→\n    48→          setResult(calculatedResult);\n    49→          setHistory(prev => {\n    50→            const newHistory = [...prev, {\n    51→              expression: input.expression,\n    52→              result: calculatedResult,\n    53→              timestamp: Date.now(),\n    54→            }];\n    55→\n    56→            return newHistory.length > 10 ? newHistory.slice(-10) : newHistory;\n    57→          });\n    58→\n    59→          return {\n    60→            success: true,\n    61→            expression: input.expression,\n    62→            result: calculatedResult,\n    63→            message: `${input.expression} = ${calculatedResult}`,\n    64→          };\n    65→        } catch (error) {\n    66→          return {\n    67→            success: false,\n    68→            error: error instanceof Error ? error.message : 'Unknown error',\n    69→            message: `Failed to calculate: ${input.expression}`,\n    70→          };\n    71→        }\n    72→      }\n    73→    );\n    74→\n    75→    const clearCalculator = defineTool(\n    76→      'Clear the calculator display and history',\n    77→      z.object({}),\n    78→      () => {\n    79→        setResult(null);\n    80→        setHistory([]);\n    81→\n    82→        return {\n    83→          success: true,\n    84→          message: 'Calculator cleared',\n    85→        };\n    86→      }\n    87→    );\n    88→\n    89→    return {\n    90→      calculate,\n    91→      clearCalculator,\n    92→    };\n    93→  }, []);\n    94→\n    95→  const { ref } = useAI({\n    96→    tools: calculatorTools,\n    97→    prompt: 'Current result: ' + result\n    98→  });\n    99→\n   100→  const handleCalculate = () => {\n   101→    if (!input.trim()) return;\n   102→    calculatorTools.calculate._execute({ expression: input.trim() });\n   103→  };\n   104→\n   105→  const handleClear = () => {\n   106→    calculatorTools.clearCalculator._execute({});\n   107→    setInput('');\n   108→  };\n   109→\n   110→  return (\n   111→    <div ref={ref} style={styles.container}>\n   112→      <div style={styles.card}>\n   113→        <h1 style={styles.title}>Calculator</h1>\n   114→        <p style={styles.subtitle}>\n   115→          Enter calculations below or ask the AI to perform calculations for you\n   116→        </p>\n   117→\n   118→        <div style={styles.display}>\n   119→          {result !== null ? result : '0'}\n   120→        </div>\n   121→\n   122→        <div style={styles.inputGroup}>\n   123→          <input\n   124→            type=\"text\"\n   125→            value={input}\n   126→            onChange={(e) => setInput(e.target.value)}\n   127→            onKeyPress={(e) => e.key === 'Enter' && handleCalculate()}\n   128→            placeholder=\"Enter calculation (e.g., 2 + 2)\"\n   129→            style={styles.input}\n   130→          />\n   131→          <button onClick={handleCalculate} style={styles.button}>\n   132→            Calculate\n   133→          </button>\n   134→          <button onClick={handleClear} style={styles.clearButton}>\n   135→            Clear\n   136→          </button>\n   137→        </div>\n   138→\n   139→        {history.length > 0 && (\n   140→          <div style={styles.historySection}>\n   141→            <h3 style={styles.historyTitle}>History</h3>\n   142→            <ul style={styles.historyList}>\n   143→              {history.slice().reverse().map((calc) => (\n   144→                <li key={calc.timestamp} style={styles.historyItem}>\n   145→                  <span style={styles.expression}>{calc.expression}</span>\n   146→                  <span style={styles.equals}>=</span>\n   147→                  <span style={styles.historyResult}>{calc.result}</span>\n   148→                </li>\n   149→              ))}\n   150→            </ul>\n   151→          </div>\n   152→        )}\n   153→\n   154→        {history.length === 0 && (\n   155→          <p style={styles.emptyState}>No calculations yet. Try one above!</p>\n   156→        )}\n   157→      </div>\n   158→    </div>\n   159→  );\n   160→}\n   161→\n   162→const styles: Record<string, React.CSSProperties> = {\n   163→  container: {\n   164→    maxWidth: '600px',\n   165→    margin: '0 auto',\n   166→    padding: '20px',\n   167→  },\n   168→  card: {\n   169→    background: 'white',\n   170→    borderRadius: '8px',\n   171→    padding: '24px',\n   172→    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',\n   173→  },\n   174→  title: {\n   175→    fontSize: '28px',\n   176→    fontWeight: 'bold',\n   177→    marginBottom: '8px',\n   178→    color: '#333',\n   179→  },\n   180→  subtitle: {\n   181→    fontSize: '14px',\n   182→    color: '#666',\n   183→    marginBottom: '24px',\n   184→  },\n   185→  display: {\n   186→    background: '#f8f9fa',\n   187→    border: '2px solid #dee2e6',\n   188→    borderRadius: '4px',\n   189→    padding: '20px',\n   190→    fontSize: '32px',\n   191→    fontWeight: 'bold',\n   192→    textAlign: 'right',\n   193→    marginBottom: '16px',\n   194→    color: '#212529',\n   195→    fontFamily: 'monospace',\n   196→    minHeight: '60px',\n   197→    display: 'flex',\n   198→    alignItems: 'center',\n   199→    justifyContent: 'flex-end',\n   200→  },\n   201→  inputGroup: {\n   202→    display: 'flex',\n   203→    gap: '8px',\n   204→    marginBottom: '16px',\n   205→  },\n   206→  input: {\n   207→    flex: 1,\n   208→    padding: '10px 12px',\n   209→    border: '1px solid #ddd',\n   210→    borderRadius: '4px',\n   211→    fontSize: '14px',\n   212→    fontFamily: 'monospace',\n   213→  },\n   214→  button: {\n   215→    padding: '10px 20px',\n   216→    background: '#28a745',\n   217→    color: 'white',\n   218→    border: 'none',\n   219→    borderRadius: '4px',\n   220→    cursor: 'pointer',\n   221→    fontSize: '14px',\n   222→    fontWeight: '500',\n   223→  },\n   224→  clearButton: {\n   225→    padding: '10px 20px',\n   226→    background: '#6c757d',\n   227→    color: 'white',\n   228→    border: 'none',\n   229→    borderRadius: '4px',\n   230→    cursor: 'pointer',\n   231→    fontSize: '14px',\n   232→    fontWeight: '500',\n   233→  },\n   234→  historySection: {\n   235→    marginTop: '24px',\n   236→  },\n   237→  historyTitle: {\n   238→    fontSize: '18px',\n   239→    fontWeight: 'bold',\n   240→    marginBottom: '12px',\n   241→    color: '#333',\n   242→  },\n   243→  historyList: {\n   244→    listStyle: 'none',\n   245→    padding: 0,\n   246→    margin: 0,\n   247→  },\n   248→  historyItem: {\n   249→    display: 'flex',\n   250→    alignItems: 'center',\n   251→    gap: '8px',\n   252→    padding: '8px 12px',\n   253→    background: '#f8f9fa',\n   254→    borderRadius: '4px',\n   255→    marginBottom: '8px',\n   256→    fontFamily: 'monospace',\n   257→    fontSize: '14px',\n   258→  },\n   259→  expression: {\n   260→    color: '#495057',\n   261→    flex: 1,\n   262→  },\n   263→  equals: {\n   264→    color: '#6c757d',\n   265→  },\n   266→  historyResult: {\n   267→    color: '#28a745',\n   268→    fontWeight: 'bold',\n   269→  },\n   270→  emptyState: {\n   271→    textAlign: 'center',\n   272→    color: '#999',\n   273→    fontSize: '14px',\n   274→    padding: '24px',\n   275→  },\n   276→};\n   277→\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\n</system-reminder>\n",
+          "timestamp": "2025-11-06T13:46:24.819Z"
+        },
+        {
+          "type": "assistant",
+          "text": "Now I'll create the separate logic hooks for each component.",
+          "timestamp": "2025-11-06T13:46:31.931Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "TodoWrite",
+          "input": {
+            "todos": [
+              {
+                "activeForm": "Reading TodoList.tsx and Calculator.tsx",
+                "content": "Read TodoList.tsx and Calculator.tsx to understand current structure",
+                "status": "completed"
+              },
+              {
+                "activeForm": "Creating useTodoLogic hook",
+                "content": "Create useTodoLogic hook with todo functions and tools",
+                "status": "in_progress"
+              },
+              {
+                "activeForm": "Creating useCalculatorLogic hook",
+                "content": "Create useCalculatorLogic hook with calculator functions and tools",
+                "status": "pending"
+              },
+              {
+                "activeForm": "Refactoring TodoList.tsx",
+                "content": "Refactor TodoList.tsx to use useTodoLogic",
+                "status": "pending"
+              },
+              {
+                "activeForm": "Refactoring Calculator.tsx",
+                "content": "Refactor Calculator.tsx to use useCalculatorLogic",
+                "status": "pending"
+              }
+            ]
+          },
+          "timestamp": "2025-11-06T13:46:34.869Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Write",
+          "input": {
+            "content": "import { useState, useMemo, useRef } from 'react';\nimport { defineTool } from '@use-ai/client';\nimport { z } from 'zod';\n\nexport interface Todo {\n  id: number;\n  text: string;\n  completed: boolean;\n}\n\nexport function useTodoLogic() {\n  const [todos, setTodos] = useState<Todo[]>([]);\n  const nextIdRef = useRef(1);\n\n  const addTodoFn = (text: string) => {\n    if (!text.trim()) {\n      return { success: false, error: 'Text is required' };\n    }\n\n    const newTodo: Todo = {\n      id: nextIdRef.current++,\n      text: text.trim(),\n      completed: false,\n    };\n\n    setTodos(prev => [...prev, newTodo]);\n\n    return { success: true, id: newTodo.id, message: `Added todo: \"${text}\"` };\n  };\n\n  const deleteTodoFn = (id: number) => {\n    let deletedTodo: Todo | undefined;\n\n    setTodos(prev => {\n      deletedTodo = prev.find((t) => t.id === id);\n      if (!deletedTodo) return prev;\n      return prev.filter((t) => t.id !== id);\n    });\n\n    if (!deletedTodo) {\n      return { success: false, error: `Todo with id ${id} not found` };\n    }\n\n    return { success: true, message: `Deleted todo: \"${deletedTodo.text}\"` };\n  };\n\n  const toggleTodoFn = (id: number) => {\n    let targetTodo: Todo | undefined;\n\n    setTodos(prev => {\n      targetTodo = prev.find((t) => t.id === id);\n      if (!targetTodo) return prev;\n\n      return prev.map((t) =>\n        t.id === id ? { ...t, completed: !t.completed } : t\n      );\n    });\n\n    if (!targetTodo) {\n      return { success: false, error: `Todo with id ${id} not found` };\n    }\n\n    return {\n      success: true,\n      message: `Marked \"${targetTodo.text}\" as ${!targetTodo.completed ? 'completed' : 'incomplete'}`,\n    };\n  };\n\n  const clearCompletedFn = () => {\n    let completedCount = 0;\n\n    setTodos(prev => {\n      completedCount = prev.filter((t) => t.completed).length;\n      return prev.filter((t) => !t.completed);\n    });\n\n    return {\n      success: true,\n      message: `Cleared ${completedCount} completed todo(s)`,\n      count: completedCount,\n    };\n  };\n\n  const tools = useMemo(() => {\n    const addTodo = defineTool(\n      'Add a new todo item to the list',\n      z.object({\n        text: z.string().describe('The text content of the todo item'),\n      }),\n      (input) => addTodoFn(input.text)\n    );\n\n    const deleteTodo = defineTool(\n      'Delete a todo item by its ID',\n      z.object({\n        id: z.number().describe('The ID of the todo item to delete'),\n      }),\n      (input) => deleteTodoFn(input.id),\n      { confirmationRequired: true }\n    );\n\n    const toggleTodo = defineTool(\n      'Toggle the completed status of a todo item',\n      z.object({\n        id: z.number().describe('The ID of the todo item to toggle'),\n      }),\n      (input) => toggleTodoFn(input.id)\n    );\n\n    const clearCompleted = defineTool(\n      'Remove all completed todos from the list',\n      z.object({}),\n      () => clearCompletedFn(),\n      { confirmationRequired: true }\n    );\n\n    return {\n      addTodo,\n      deleteTodo,\n      toggleTodo,\n      clearCompleted,\n    };\n  }, []);\n\n  return {\n    todos,\n    tools,\n    addTodo: addTodoFn,\n    deleteTodo: deleteTodoFn,\n    toggleTodo: toggleTodoFn,\n    clearCompleted: clearCompletedFn,\n  };\n}\n",
+            "file_path": "/home/z/Desktop/work/use-ai/apps/example/src/useTodoLogic.ts"
+          },
+          "timestamp": "2025-11-06T13:46:46.564Z"
+        },
+        {
+          "type": "user",
+          "text": "Todos have been modified successfully. Ensure that you continue to use the todo list to track your progress. Please proceed with the current tasks if applicable",
+          "timestamp": "2025-11-06T13:46:46.722Z"
+        },
+        {
+          "type": "user",
+          "text": "File created successfully at: /home/z/Desktop/work/use-ai/apps/example/src/useTodoLogic.ts",
+          "timestamp": "2025-11-06T13:46:57.866Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "TodoWrite",
+          "input": {
+            "todos": [
+              {
+                "activeForm": "Reading TodoList.tsx and Calculator.tsx",
+                "content": "Read TodoList.tsx and Calculator.tsx to understand current structure",
+                "status": "completed"
+              },
+              {
+                "activeForm": "Creating useTodoLogic hook",
+                "content": "Create useTodoLogic hook with todo functions and tools",
+                "status": "completed"
+              },
+              {
+                "activeForm": "Creating useCalculatorLogic hook",
+                "content": "Create useCalculatorLogic hook with calculator functions and tools",
+                "status": "in_progress"
+              },
+              {
+                "activeForm": "Refactoring TodoList.tsx",
+                "content": "Refactor TodoList.tsx to use useTodoLogic",
+                "status": "pending"
+              },
+              {
+                "activeForm": "Refactoring Calculator.tsx",
+                "content": "Refactor Calculator.tsx to use useCalculatorLogic",
+                "status": "pending"
+              }
+            ]
+          },
+          "timestamp": "2025-11-06T13:47:04.757Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Write",
+          "input": {
+            "content": "import { useState, useMemo } from 'react';\nimport { defineTool } from '@use-ai/client';\nimport { z } from 'zod';\n\nexport interface Calculation {\n  expression: string;\n  result: number;\n  timestamp: number;\n}\n\nfunction evaluateExpression(expression: string): number {\n  const cleaned = expression.replace(/\\s+/g, '');\n\n  const validChars = /^[0-9+\\-*/().]+$/;\n  if (!validChars.test(cleaned)) {\n    throw new Error('Invalid characters in expression');\n  }\n\n  const parenBalance = (cleaned.match(/\\(/g) || []).length - (cleaned.match(/\\)/g) || []).length;\n  if (parenBalance !== 0) {\n    throw new Error('Unbalanced parentheses');\n  }\n\n  const result = Function('\"use strict\"; return (' + cleaned + ')')();\n\n  if (typeof result !== 'number' || !isFinite(result)) {\n    throw new Error('Invalid calculation result');\n  }\n\n  return result;\n}\n\nexport function useCalculatorLogic() {\n  const [result, setResult] = useState<number | null>(null);\n  const [history, setHistory] = useState<Calculation[]>([]);\n\n  const calculateFn = (expression: string) => {\n    try {\n      const calculatedResult = evaluateExpression(expression);\n\n      setResult(calculatedResult);\n      setHistory(prev => {\n        const newHistory = [...prev, {\n          expression,\n          result: calculatedResult,\n          timestamp: Date.now(),\n        }];\n\n        return newHistory.length > 10 ? newHistory.slice(-10) : newHistory;\n      });\n\n      return {\n        success: true,\n        expression,\n        result: calculatedResult,\n        message: `${expression} = ${calculatedResult}`,\n      };\n    } catch (error) {\n      return {\n        success: false,\n        error: error instanceof Error ? error.message : 'Unknown error',\n        message: `Failed to calculate: ${expression}`,\n      };\n    }\n  };\n\n  const clearCalculatorFn = () => {\n    setResult(null);\n    setHistory([]);\n\n    return {\n      success: true,\n      message: 'Calculator cleared',\n    };\n  };\n\n  const tools = useMemo(() => {\n    const calculate = defineTool(\n      'Perform a mathematical calculation and display the result in the calculator',\n      z.object({\n        expression: z.string().describe('The mathematical expression to evaluate (e.g., \"2 + 2\", \"10 * 5 - 3\", \"(8 + 2) / 2\")'),\n      }),\n      (input) => calculateFn(input.expression)\n    );\n\n    const clearCalculator = defineTool(\n      'Clear the calculator display and history',\n      z.object({}),\n      () => clearCalculatorFn()\n    );\n\n    return {\n      calculate,\n      clearCalculator,\n    };\n  }, []);\n\n  return {\n    result,\n    history,\n    tools,\n    calculate: calculateFn,\n    clearCalculator: clearCalculatorFn,\n  };\n}\n",
+            "file_path": "/home/z/Desktop/work/use-ai/apps/example/src/useCalculatorLogic.ts"
+          },
+          "timestamp": "2025-11-06T13:47:15.614Z"
+        },
+        {
+          "type": "user",
+          "text": "Todos have been modified successfully. Ensure that you continue to use the todo list to track your progress. Please proceed with the current tasks if applicable",
+          "timestamp": "2025-11-06T13:47:15.807Z"
+        },
+        {
+          "type": "user",
+          "text": "File created successfully at: /home/z/Desktop/work/use-ai/apps/example/src/useCalculatorLogic.ts",
+          "timestamp": "2025-11-06T13:47:15.936Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "TodoWrite",
+          "input": {
+            "todos": [
+              {
+                "activeForm": "Reading TodoList.tsx and Calculator.tsx",
+                "content": "Read TodoList.tsx and Calculator.tsx to understand current structure",
+                "status": "completed"
+              },
+              {
+                "activeForm": "Creating useTodoLogic hook",
+                "content": "Create useTodoLogic hook with todo functions and tools",
+                "status": "completed"
+              },
+              {
+                "activeForm": "Creating useCalculatorLogic hook",
+                "content": "Create useCalculatorLogic hook with calculator functions and tools",
+                "status": "completed"
+              },
+              {
+                "activeForm": "Refactoring TodoList.tsx",
+                "content": "Refactor TodoList.tsx to use useTodoLogic",
+                "status": "in_progress"
+              },
+              {
+                "activeForm": "Refactoring Calculator.tsx",
+                "content": "Refactor Calculator.tsx to use useCalculatorLogic",
+                "status": "pending"
+              }
+            ]
+          },
+          "timestamp": "2025-11-06T13:47:21.674Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Edit",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/apps/example/src/TodoList.tsx",
+            "new_string": "import React, { useState } from 'react';\nimport { useAI } from '@use-ai/client';\nimport { useTodoLogic } from './useTodoLogic';\n\nexport default function TodoList() {\n  const [input, setInput] = useState('');\n  const { todos, tools, addTodo, deleteTodo, toggleTodo } = useTodoLogic();\n\n  const { ref } = useAI({\n    tools,\n    prompt: `Todo List: ${JSON.stringify(todos)}`,\n  });\n\n  const handleAddTodo = () => {\n    if (!input.trim()) return;\n    addTodo(input.trim());\n    setInput('');\n  };\n\n  const handleToggleTodo = (id: number) => {\n    toggleTodo(id);\n  };\n\n  const handleDeleteTodo = (id: number) => {\n    deleteTodo(id);\n  };",
+            "old_string": "import React, { useState, useMemo, useRef } from 'react';\nimport { useAI, defineTool } from '@use-ai/client';\nimport { z } from 'zod';\n\ninterface Todo {\n  id: number;\n  text: string;\n  completed: boolean;\n}\n\nexport default function TodoList() {\n  const [todos, setTodos] = useState<Todo[]>([]);\n  const [input, setInput] = useState('');\n  const nextIdRef = useRef(1);\n\n  const todoTools = useMemo(() => {\n    const addTodo = defineTool(\n      'Add a new todo item to the list',\n      z.object({\n        text: z.string().describe('The text content of the todo item'),\n      }),\n      (input) => {\n        if (!input.text.trim()) {\n          return { success: false, error: 'Text is required' };\n        }\n\n        const newTodo: Todo = {\n          id: nextIdRef.current++,\n          text: input.text.trim(),\n          completed: false,\n        };\n\n        setTodos(prev => [...prev, newTodo]);\n\n        return { success: true, id: newTodo.id, message: `Added todo: \"${input.text}\"` };\n      }\n    );\n\n    const deleteTodo = defineTool(\n      'Delete a todo item by its ID',\n      z.object({\n        id: z.number().describe('The ID of the todo item to delete'),\n      }),\n      (input) => {\n        let deletedTodo: Todo | undefined;\n\n        setTodos(prev => {\n          deletedTodo = prev.find((t) => t.id === input.id);\n          if (!deletedTodo) return prev;\n          return prev.filter((t) => t.id !== input.id);\n        });\n\n        if (!deletedTodo) {\n          return { success: false, error: `Todo with id ${input.id} not found` };\n        }\n\n        return { success: true, message: `Deleted todo: \"${deletedTodo.text}\"` };\n      },\n      { confirmationRequired: true }\n    );\n\n    const toggleTodo = defineTool(\n      'Toggle the completed status of a todo item',\n      z.object({\n        id: z.number().describe('The ID of the todo item to toggle'),\n      }),\n      (input) => {\n        let targetTodo: Todo | undefined;\n\n        setTodos(prev => {\n          targetTodo = prev.find((t) => t.id === input.id);\n          if (!targetTodo) return prev;\n\n          return prev.map((t) =>\n            t.id === input.id ? { ...t, completed: !t.completed } : t\n          );\n        });\n\n        if (!targetTodo) {\n          return { success: false, error: `Todo with id ${input.id} not found` };\n        }\n\n        return {\n          success: true,\n          message: `Marked \"${targetTodo.text}\" as ${!targetTodo.completed ? 'completed' : 'incomplete'}`,\n        };\n      }\n    );\n\n    const clearCompleted = defineTool(\n      'Remove all completed todos from the list',\n      z.object({}),\n      () => {\n        let completedCount = 0;\n\n        setTodos(prev => {\n          completedCount = prev.filter((t) => t.completed).length;\n          return prev.filter((t) => !t.completed);\n        });\n\n        return {\n          success: true,\n          message: `Cleared ${completedCount} completed todo(s)`,\n          count: completedCount,\n        };\n      },\n      { confirmationRequired: true }\n    );\n\n    return {\n      addTodo,\n      deleteTodo,\n      toggleTodo,\n      clearCompleted,\n    };\n  }, []);\n\n  const { ref } = useAI({\n    tools: todoTools,\n    prompt: `Todo List: ${JSON.stringify(todos)}`,\n  });\n\n  const handleAddTodo = () => {\n    if (!input.trim()) return;\n    todoTools.addTodo._execute({ text: input.trim() });\n    setInput('');\n  };\n\n  const handleToggleTodo = (id: number) => {\n    todoTools.toggleTodo._execute({ id });\n  };\n\n  const handleDeleteTodo = (id: number) => {\n    todoTools.deleteTodo._execute({ id });\n  };"
+          },
+          "timestamp": "2025-11-06T13:47:33.610Z"
+        },
+        {
+          "type": "user",
+          "text": "Todos have been modified successfully. Ensure that you continue to use the todo list to track your progress. Please proceed with the current tasks if applicable",
+          "timestamp": "2025-11-06T13:47:33.770Z"
+        },
+        {
+          "type": "user",
+          "text": "The file /home/z/Desktop/work/use-ai/apps/example/src/TodoList.tsx has been updated. Here's the result of running `cat -n` on a snippet of the edited file:\n     1→import React, { useState } from 'react';\n     2→import { useAI } from '@use-ai/client';\n     3→import { useTodoLogic } from './useTodoLogic';\n     4→\n     5→export default function TodoList() {\n     6→  const [input, setInput] = useState('');\n     7→  const { todos, tools, addTodo, deleteTodo, toggleTodo } = useTodoLogic();\n     8→\n     9→  const { ref } = useAI({\n    10→    tools,\n    11→    prompt: `Todo List: ${JSON.stringify(todos)}`,\n    12→  });\n    13→\n    14→  const handleAddTodo = () => {\n    15→    if (!input.trim()) return;\n    16→    addTodo(input.trim());\n    17→    setInput('');\n    18→  };\n    19→\n    20→  const handleToggleTodo = (id: number) => {\n    21→    toggleTodo(id);\n    22→  };\n    23→\n    24→  const handleDeleteTodo = (id: number) => {\n    25→    deleteTodo(id);\n    26→  };\n    27→\n    28→  return (\n    29→    <div ref={ref} style={styles.container}>\n    30→      <div style={styles.card}>",
+          "timestamp": "2025-11-06T13:47:33.910Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "TodoWrite",
+          "input": {
+            "todos": [
+              {
+                "activeForm": "Reading TodoList.tsx and Calculator.tsx",
+                "content": "Read TodoList.tsx and Calculator.tsx to understand current structure",
+                "status": "completed"
+              },
+              {
+                "activeForm": "Creating useTodoLogic hook",
+                "content": "Create useTodoLogic hook with todo functions and tools",
+                "status": "completed"
+              },
+              {
+                "activeForm": "Creating useCalculatorLogic hook",
+                "content": "Create useCalculatorLogic hook with calculator functions and tools",
+                "status": "completed"
+              },
+              {
+                "activeForm": "Refactoring TodoList.tsx",
+                "content": "Refactor TodoList.tsx to use useTodoLogic",
+                "status": "completed"
+              },
+              {
+                "activeForm": "Refactoring Calculator.tsx",
+                "content": "Refactor Calculator.tsx to use useCalculatorLogic",
+                "status": "in_progress"
+              }
+            ]
+          },
+          "timestamp": "2025-11-06T13:47:38.770Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Edit",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/apps/example/src/Calculator.tsx",
+            "new_string": "import React, { useState } from 'react';\nimport { useAI } from '@use-ai/client';\nimport { useCalculatorLogic } from './useCalculatorLogic';\n\nexport default function Calculator() {\n  const [input, setInput] = useState('');\n  const { result, history, tools, calculate, clearCalculator } = useCalculatorLogic();\n\n  const { ref } = useAI({\n    tools,\n    prompt: 'Current result: ' + result\n  });\n\n  const handleCalculate = () => {\n    if (!input.trim()) return;\n    calculate(input.trim());\n  };\n\n  const handleClear = () => {\n    clearCalculator();\n    setInput('');\n  };",
+            "old_string": "import React, { useState, useMemo } from 'react';\nimport { useAI, defineTool } from '@use-ai/client';\nimport { z } from 'zod';\n\ninterface Calculation {\n  expression: string;\n  result: number;\n  timestamp: number;\n}\n\nfunction evaluateExpression(expression: string): number {\n  const cleaned = expression.replace(/\\s+/g, '');\n\n  const validChars = /^[0-9+\\-*/().]+$/;\n  if (!validChars.test(cleaned)) {\n    throw new Error('Invalid characters in expression');\n  }\n\n  const parenBalance = (cleaned.match(/\\(/g) || []).length - (cleaned.match(/\\)/g) || []).length;\n  if (parenBalance !== 0) {\n    throw new Error('Unbalanced parentheses');\n  }\n\n  const result = Function('\"use strict\"; return (' + cleaned + ')')();\n\n  if (typeof result !== 'number' || !isFinite(result)) {\n    throw new Error('Invalid calculation result');\n  }\n\n  return result;\n}\n\nexport default function Calculator() {\n  const [result, setResult] = useState<number | null>(null);\n  const [history, setHistory] = useState<Calculation[]>([]);\n  const [input, setInput] = useState('');\n\n  const calculatorTools = useMemo(() => {\n    const calculate = defineTool(\n      'Perform a mathematical calculation and display the result in the calculator',\n      z.object({\n        expression: z.string().describe('The mathematical expression to evaluate (e.g., \"2 + 2\", \"10 * 5 - 3\", \"(8 + 2) / 2\")'),\n      }),\n      (input) => {\n        try {\n          const calculatedResult = evaluateExpression(input.expression);\n\n          setResult(calculatedResult);\n          setHistory(prev => {\n            const newHistory = [...prev, {\n              expression: input.expression,\n              result: calculatedResult,\n              timestamp: Date.now(),\n            }];\n\n            return newHistory.length > 10 ? newHistory.slice(-10) : newHistory;\n          });\n\n          return {\n            success: true,\n            expression: input.expression,\n            result: calculatedResult,\n            message: `${input.expression} = ${calculatedResult}`,\n          };\n        } catch (error) {\n          return {\n            success: false,\n            error: error instanceof Error ? error.message : 'Unknown error',\n            message: `Failed to calculate: ${input.expression}`,\n          };\n        }\n      }\n    );\n\n    const clearCalculator = defineTool(\n      'Clear the calculator display and history',\n      z.object({}),\n      () => {\n        setResult(null);\n        setHistory([]);\n\n        return {\n          success: true,\n          message: 'Calculator cleared',\n        };\n      }\n    );\n\n    return {\n      calculate,\n      clearCalculator,\n    };\n  }, []);\n\n  const { ref } = useAI({\n    tools: calculatorTools,\n    prompt: 'Current result: ' + result\n  });\n\n  const handleCalculate = () => {\n    if (!input.trim()) return;\n    calculatorTools.calculate._execute({ expression: input.trim() });\n  };\n\n  const handleClear = () => {\n    calculatorTools.clearCalculator._execute({});\n    setInput('');\n  };"
+          },
+          "timestamp": "2025-11-06T13:47:47.596Z"
+        },
+        {
+          "type": "user",
+          "text": "Todos have been modified successfully. Ensure that you continue to use the todo list to track your progress. Please proceed with the current tasks if applicable",
+          "timestamp": "2025-11-06T13:47:47.660Z"
+        }
+      ],
+      "total_additions": 1392,
+      "total_deletions": 353,
+      "accepted_lines": 200,
+      "overriden_lines": 0
+    }
+  }
+}
