@@ -1,0 +1,791 @@
+packages/server/src/server.ts
+  abac8a1 154
+  ee4fb0d 255,265,268-269,271-278,291-292,295
+  f73c814 155-160,220,237,249,253-254,258,260,262,264,290,294,299,308
+  fcebdf6 267,280,282-284,286-288,293
+packages/server/test/test-utils.ts
+  f73c814 119-135
+packages/server/src/server.test.ts
+  f73c814 16,245-249,251-259,261-263,265-266,268-269,271-283,285-288,290,292-295,297-301,303-310,312-316,318-325,327-330,332-335,337-338
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "base_commit_sha": "091b068f0e69884cb7dc23a1f9455159ebacad67",
+  "prompts": {
+    "f73c814": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6eb47fb7-f17b-4148-9a5b-191d6fe9e5be",
+        "model": "claude-sonnet-4-5-20250929"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [
+        {
+          "type": "user",
+          "text": "Error calling Anthropic API: 2 | import { castToError } from \"./core.mjs\";\n3 | export class AnthropicError extends Error {\n4 | }\n5 | export class APIError extends AnthropicError {\n6 |     constructor(status, error, message, headers) {\n7 |         super(`${APIError.makeMessage(status, error, message)}`);\n                          ^\nerror: 400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"tools.1.custom.confirmationRequired: Extra inputs are not permitted\"},\"request_id\":\"req_011CUrAvZxZ5FjZqhf7CcEWs\"}\n      at new AnthropicError (1:23)\n      at new APIError (/home/z/Desktop/work/use-ai/node_modules/@anthropic-ai/sdk/error.mjs:7:9)\n      at new BadRequestError (/home/z/Desktop/work/use-ai/node_modules/@anthropic-ai/sdk/error.mjs:86:9)\n      at generate (/home/z/Desktop/work/use-ai/node_modules/@anthropic-ai/sdk/error.mjs:37:20)\n      at /home/z/Desktop/work/use-ai/node_modules/@anthropic-ai/sdk/core.mjs:319:30\n\n^C\nfish: Job 1, 'export ANTHROPIC_API_KEY='sk-an…' has ended",
+          "timestamp": "2025-11-06T06:40:50.015Z"
+        },
+        {
+          "type": "assistant",
+          "text": "I can see the error - the Anthropic API is rejecting the `confirmationRequired` field in the tool definitions because it's not a standard field in the Claude API's tool schema. This appears to be a custom field that was added to the project but is being sent to the API when it shouldn't be.\n\nLet me investigate where this field is being added and how tools are sent to the API.",
+          "timestamp": "2025-11-06T06:41:00.403Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Grep",
+          "input": {
+            "output_mode": "files_with_matches",
+            "pattern": "confirmationRequired"
+          },
+          "timestamp": "2025-11-06T06:41:01.233Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Grep",
+          "input": {
+            "-i": true,
+            "output_mode": "files_with_matches",
+            "pattern": "tools.*claude|anthropic.*tools"
+          },
+          "timestamp": "2025-11-06T06:41:02.209Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/packages/server/src/index.ts"
+          },
+          "timestamp": "2025-11-06T06:41:02.885Z"
+        },
+        {
+          "type": "user",
+          "text": "     1→export { UseAIServer } from './server';\n     2→export type { UseAIServerConfig, ToolDefinition } from './types';\n     3→\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\n</system-reminder>\n",
+          "timestamp": "2025-11-06T06:41:03.043Z"
+        },
+        {
+          "type": "user",
+          "text": "Found 1 file\nCLAUDE.md",
+          "timestamp": "2025-11-06T06:41:03.083Z"
+        },
+        {
+          "type": "user",
+          "text": "Found 6 files\npackages/client/src/defineTool.ts\npackages/server/src/server.ts\npackages/core/src/types.ts\npackages/client/test/useAI.integration.test.tsx\npackages/client/src/defineTool.test.ts\napps/example/src/todoTools.ts",
+          "timestamp": "2025-11-06T06:41:03.109Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/packages/server/src/server.ts"
+          },
+          "timestamp": "2025-11-06T06:41:06.448Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/packages/core/src/types.ts"
+          },
+          "timestamp": "2025-11-06T06:41:07.059Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/packages/client/src/defineTool.ts"
+          },
+          "timestamp": "2025-11-06T06:41:07.263Z"
+        },
+        {
+          "type": "user",
+          "text": "     1→import { WebSocketServer, WebSocket } from 'ws';\n     2→import Anthropic from '@anthropic-ai/sdk';\n     3→import type {\n     4→  UseAIServerConfig,\n     5→  ToolDefinition,\n     6→  ClientMessage,\n     7→  RegisterToolsMessage,\n     8→  PromptMessage,\n     9→  ToolResponseMessage,\n    10→  ServerMessage,\n    11→} from './types';\n    12→import { RateLimiter } from './rateLimiter';\n    13→\n    14→interface ClientSession {\n    15→  clientId: string;\n    16→  ws: WebSocket;\n    17→  tools: ToolDefinition[];\n    18→  context?: string;\n    19→  conversationHistory: Anthropic.MessageParam[];\n    20→  pendingToolCalls: Map<string, (response: { result: unknown; context?: string }) => void>;\n    21→}\n    22→\n    23→/**\n    24→ * WebSocket server that coordinates between client applications and the Claude API.\n    25→ *\n    26→ * Responsibilities:\n    27→ * - Manages WebSocket connections from clients\n    28→ * - Forwards user prompts to Claude API with registered tool definitions\n    29→ * - Routes tool execution requests back to clients\n    30→ * - Maintains conversation history per session\n    31→ * - Handles rate limiting\n    32→ *\n    33→ * @example\n    34→ * ```typescript\n    35→ * import { UseAIServer } from '@use-ai/server';\n    36→ *\n    37→ * const server = new UseAIServer({\n    38→ *   port: 8080,\n    39→ *   anthropicApiKey: process.env.ANTHROPIC_API_KEY,\n    40→ *   model: 'claude-sonnet-4-20250514'\n    41→ * });\n    42→ * ```\n    43→ */\n    44→export class UseAIServer {\n    45→  private wss: WebSocketServer;\n    46→  private anthropic: Anthropic;\n    47→  private clients: Map<WebSocket, ClientSession> = new Map();\n    48→  private config: Required<UseAIServerConfig>;\n    49→  private rateLimiter: RateLimiter;\n    50→  private cleanupInterval: NodeJS.Timeout;\n    51→  private clientIdCounter = 0;\n    52→\n    53→  /**\n    54→   * Creates a new UseAI server instance.\n    55→   *\n    56→   * @param config - Server configuration options\n    57→   * @throws Error if Anthropic API key is not provided via config or environment variable\n    58→   */\n    59→  constructor(config: UseAIServerConfig = {}) {\n    60→    this.config = {\n    61→      port: config.port ?? 8080,\n    62→      anthropicApiKey: config.anthropicApiKey ?? process.env.ANTHROPIC_API_KEY ?? '',\n    63→      model: config.model ?? 'claude-sonnet-4-20250514',\n    64→      rateLimitMaxRequests: config.rateLimitMaxRequests ?? 0,\n    65→      rateLimitWindowMs: config.rateLimitWindowMs ?? 60000,\n    66→    };\n    67→\n    68→    if (!this.config.anthropicApiKey) {\n    69→      throw new Error('Anthropic API key is required');\n    70→    }\n    71→\n    72→    this.anthropic = new Anthropic({\n    73→      apiKey: this.config.anthropicApiKey,\n    74→    });\n    75→\n    76→    this.rateLimiter = new RateLimiter({\n    77→      maxRequests: this.config.rateLimitMaxRequests,\n    78→      windowMs: this.config.rateLimitWindowMs,\n    79→    });\n    80→\n    81→    this.cleanupInterval = setInterval(() => {\n    82→      this.rateLimiter.cleanup();\n    83→    }, this.config.rateLimitWindowMs);\n    84→\n    85→    this.wss = new WebSocketServer({ port: this.config.port });\n    86→    this.setupWebSocketServer();\n    87→\n    88→    if (this.rateLimiter.isEnabled()) {\n    89→      console.log(`Rate limiting enabled: ${this.config.rateLimitMaxRequests} requests per ${this.config.rateLimitWindowMs}ms`);\n    90→    }\n    91→  }\n    92→\n    93→  private setupWebSocketServer() {\n    94→    this.wss.on('connection', (ws: WebSocket) => {\n    95→      const clientId = `client-${++this.clientIdCounter}`;\n    96→      console.log(`Client connected: ${clientId}`);\n    97→\n    98→      const session: ClientSession = {\n    99→        clientId,\n   100→        ws,\n   101→        tools: [],\n   102→        conversationHistory: [],\n   103→        pendingToolCalls: new Map(),\n   104→      };\n   105→\n   106→      this.clients.set(ws, session);\n   107→\n   108→      ws.on('message', async (data: Buffer) => {\n   109→        try {\n   110→          const message: ClientMessage = JSON.parse(data.toString());\n   111→          await this.handleClientMessage(ws, message);\n   112→        } catch (error) {\n   113→          console.error('Error handling message:', error);\n   114→          this.sendError(ws, error instanceof Error ? error.message : 'Unknown error');\n   115→        }\n   116→      });\n   117→\n   118→      ws.on('close', () => {\n   119→        console.log(`Client disconnected: ${clientId}`);\n   120→        this.rateLimiter.removeClient(clientId);\n   121→        this.clients.delete(ws);\n   122→      });\n   123→    });\n   124→\n   125→    console.log(`UseAI server listening on port ${this.config.port}`);\n   126→  }\n   127→\n   128→  private async handleClientMessage(ws: WebSocket, message: ClientMessage) {\n   129→    const session = this.clients.get(ws);\n   130→    if (!session) return;\n   131→\n   132→    switch (message.type) {\n   133→      case 'register_tools':\n   134→        this.handleRegisterTools(session, message as RegisterToolsMessage);\n   135→        break;\n   136→      case 'prompt':\n   137→        await this.handlePrompt(session, message as PromptMessage);\n   138→        break;\n   139→      case 'tool_response':\n   140→        this.handleToolResponse(session, message as ToolResponseMessage);\n   141→        break;\n   142→    }\n   143→  }\n   144→\n   145→  private handleRegisterTools(session: ClientSession, message: RegisterToolsMessage) {\n   146→    session.tools = message.data.tools;\n   147→    session.context = message.data.context;\n   148→    console.log(`Registered ${session.tools.length} tools for client`);\n   149→    if (session.context) {\n   150→      console.log(`Received UI context (${session.context.length} chars)`);\n   151→    }\n   152→  }\n   153→\n   154→  private buildSystemPrompt(session: ClientSession): string | undefined {\n   155→    const parts: string[] = [];\n   156→\n   157→    if (session.context) {\n   158→      parts.push('You are interacting with a web application. Here is the current state of the UI:');\n   159→      parts.push('');\n   160→      parts.push(session.context);\n   161→      parts.push('');\n   162→      parts.push('Use the available tools to interact with and modify the UI based on user requests.');\n   163→    }\n   164→\n   165→    const confirmationTools = session.tools.filter(tool => tool.confirmationRequired);\n   166→    if (confirmationTools.length > 0) {\n   167→      if (parts.length > 0) {\n   168→        parts.push('');\n   169→      }\n   170→      parts.push('IMPORTANT: The following tools require user confirmation before execution:');\n   171→      parts.push('');\n   172→      confirmationTools.forEach(tool => {\n   173→        parts.push(`- ${tool.name}`);\n   174→      });\n   175→      parts.push('');\n   176→      parts.push('Before calling any of these tools, you MUST:');\n   177→      parts.push('1. Explain to the user exactly what changes will be made');\n   178→      parts.push('2. Ask the user to confirm they want to proceed');\n   179→      parts.push('3. Only call the tool after receiving explicit confirmation from the user');\n   180→      parts.push('');\n   181→      parts.push('Never call these tools without first getting user confirmation in the same conversation turn.');\n   182→    }\n   183→\n   184→    return parts.length > 0 ? parts.join('\\n') : undefined;\n   185→  }\n   186→\n   187→  private async handlePrompt(session: ClientSession, message: PromptMessage) {\n   188→    const { prompt } = message.data;\n   189→\n   190→    const rateLimitCheck = this.rateLimiter.checkLimit(session.clientId);\n   191→    if (!rateLimitCheck.allowed) {\n   192→      const retryAfterSeconds = Math.ceil((rateLimitCheck.retryAfterMs || 0) / 1000);\n   193→      this.sendError(\n   194→        session.ws,\n   195→        `Rate limit exceeded. Please try again in ${retryAfterSeconds} seconds.`\n   196→      );\n   197→      return;\n   198→    }\n   199→\n   200→    session.conversationHistory.push({\n   201→      role: 'user',\n   202→      content: prompt,\n   203→    });\n   204→\n   205→    try {\n   206→      const systemPrompt = this.buildSystemPrompt(session);\n   207→\n   208→      const response = await this.anthropic.messages.create({\n   209→        model: this.config.model,\n   210→        max_tokens: 4096,\n   211→        messages: session.conversationHistory,\n   212→        tools: session.tools.length > 0 ? session.tools as Anthropic.Tool[] : undefined,\n   213→        system: systemPrompt,\n   214→      });\n   215→\n   216→      await this.processResponse(session, response);\n   217→    } catch (error) {\n   218→      console.error('Error calling Anthropic API:', error);\n   219→      this.sendError(session.ws, error instanceof Error ? error.message : 'Unknown error');\n   220→    }\n   221→  }\n   222→\n   223→  private async processResponse(session: ClientSession, response: Anthropic.Message) {\n   224→    session.conversationHistory.push({\n   225→      role: 'assistant',\n   226→      content: response.content,\n   227→    });\n   228→\n   229→    for (const block of response.content) {\n   230→      if (block.type === 'text') {\n   231→        this.sendMessage(session.ws, {\n   232→          type: 'response',\n   233→          data: {\n   234→            content: block.text,\n   235→            conversationId: response.id,\n   236→          },\n   237→        });\n   238→      } else if (block.type === 'tool_use') {\n   239→        await this.handleToolUse(session, block, response.id);\n   240→      }\n   241→    }\n   242→  }\n   243→\n   244→  private async handleToolUse(\n   245→    session: ClientSession,\n   246→    toolUse: Anthropic.ToolUseBlock,\n   247→    conversationId: string\n   248→  ) {\n   249→    const toolCallId = toolUse.id;\n   250→\n   251→    const toolResponsePromise = new Promise<{ result: unknown; context?: string }>((resolve) => {\n   252→      session.pendingToolCalls.set(toolCallId, resolve);\n   253→    });\n   254→\n   255→    this.sendMessage(session.ws, {\n   256→      type: 'tool_call',\n   257→      data: {\n   258→        toolCallId,\n   259→        name: toolUse.name,\n   260→        input: toolUse.input,\n   261→      },\n   262→    });\n   263→\n   264→    const { result, context } = await toolResponsePromise;\n   265→\n   266→    if (context) {\n   267→      session.context = context;\n   268→    }\n   269→\n   270→    const toolResultContent = context\n   271→      ? JSON.stringify(result) + '\\n\\nUpdated UI state:\\n' + context\n   272→      : JSON.stringify(result);\n   273→\n   274→    session.conversationHistory.push({\n   275→      role: 'user',\n   276→      content: [\n   277→        {\n   278→          type: 'tool_result',\n   279→          tool_use_id: toolCallId,\n   280→          content: toolResultContent,\n   281→        },\n   282→      ],\n   283→    });\n   284→\n   285→    const systemPrompt = this.buildSystemPrompt(session);\n   286→\n   287→    const followUpResponse = await this.anthropic.messages.create({\n   288→      model: this.config.model,\n   289→      max_tokens: 4096,\n   290→      messages: session.conversationHistory,\n   291→      tools: session.tools.length > 0 ? session.tools as Anthropic.Tool[] : undefined,\n   292→      system: systemPrompt,\n   293→    });\n   294→\n   295→    await this.processResponse(session, followUpResponse);\n   296→  }\n   297→\n   298→  private handleToolResponse(session: ClientSession, message: ToolResponseMessage) {\n   299→    const { toolCallId, result, context } = message.data;\n   300→    const resolver = session.pendingToolCalls.get(toolCallId);\n   301→\n   302→    if (resolver) {\n   303→      resolver({ result, context });\n   304→      session.pendingToolCalls.delete(toolCallId);\n   305→    }\n   306→  }\n   307→\n   308→  private sendMessage(ws: WebSocket, message: ServerMessage) {\n   309→    if (ws.readyState === WebSocket.OPEN) {\n   310→      ws.send(JSON.stringify(message));\n   311→    }\n   312→  }\n   313→\n   314→  private sendError(ws: WebSocket, message: string) {\n   315→    this.sendMessage(ws, {\n   316→      type: 'error',\n   317→      data: { message },\n   318→    });\n   319→  }\n   320→\n   321→  /**\n   322→   * Closes the server and cleans up resources.\n   323→   * Stops accepting new connections and terminates all existing connections.\n   324→   */\n   325→  public close() {\n   326→    clearInterval(this.cleanupInterval);\n   327→    this.wss.close();\n   328→  }\n   329→}\n   330→\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\n</system-reminder>\n",
+          "timestamp": "2025-11-06T06:41:07.403Z"
+        },
+        {
+          "type": "user",
+          "text": "     1→/**\n     2→ * Defines a tool that can be called by the AI assistant.\n     3→ * Tools are functions that the AI can execute to interact with the application.\n     4→ */\n     5→export interface ToolDefinition {\n     6→  /** The unique name of the tool */\n     7→  name: string;\n     8→  /** Human-readable description of what the tool does */\n     9→  description: string;\n    10→  /** JSON Schema describing the tool's input parameters */\n    11→  input_schema: {\n    12→    type: 'object';\n    13→    properties: Record<string, unknown>;\n    14→    required?: string[];\n    15→  };\n    16→  /** Whether the tool requires explicit user confirmation before execution */\n    17→  confirmationRequired?: boolean;\n    18→}\n    19→\n    20→/**\n    21→ * Base interface for all messages sent from client to server over WebSocket.\n    22→ */\n    23→export interface ClientMessage {\n    24→  /** The type of message being sent */\n    25→  type: 'register_tools' | 'prompt' | 'tool_response';\n    26→  /** The message payload */\n    27→  data: unknown;\n    28→}\n    29→\n    30→/**\n    31→ * Message sent from client to server to register available tools.\n    32→ */\n    33→export interface RegisterToolsMessage {\n    34→  type: 'register_tools';\n    35→  data: {\n    36→    /** Array of tool definitions to make available to the AI */\n    37→    tools: ToolDefinition[];\n    38→    /** Optional UI context or system prompt to provide to the AI */\n    39→    context?: string;\n    40→  };\n    41→}\n    42→\n    43→/**\n    44→ * Message sent from client to server containing a user prompt.\n    45→ */\n    46→export interface PromptMessage {\n    47→  type: 'prompt';\n    48→  data: {\n    49→    /** The user's prompt/question for the AI */\n    50→    prompt: string;\n    51→    /** Optional conversation ID to continue an existing conversation */\n    52→    conversationId?: string;\n    53→  };\n    54→}\n    55→\n    56→/**\n    57→ * Message sent from client to server with the result of a tool execution.\n    58→ */\n    59→export interface ToolResponseMessage {\n    60→  type: 'tool_response';\n    61→  data: {\n    62→    /** The unique ID of the tool call being responded to */\n    63→    toolCallId: string;\n    64→    /** The result returned by the tool execution */\n    65→    result: unknown;\n    66→    /** Optional updated UI context to send back to the AI */\n    67→    context?: string;\n    68→  };\n    69→}\n    70→\n    71→/**\n    72→ * Base interface for all messages sent from server to client over WebSocket.\n    73→ */\n    74→export interface ServerMessage {\n    75→  /** The type of message being sent */\n    76→  type: 'tool_call' | 'response' | 'error' | 'stream';\n    77→  /** The message payload */\n    78→  data: unknown;\n    79→}\n    80→\n    81→/**\n    82→ * Message sent from server to client requesting execution of a tool.\n    83→ */\n    84→export interface ToolCallMessage {\n    85→  type: 'tool_call';\n    86→  data: {\n    87→    /** Unique ID for this tool call, used to match the response */\n    88→    toolCallId: string;\n    89→    /** Name of the tool to execute */\n    90→    name: string;\n    91→    /** Input parameters for the tool */\n    92→    input: Record<string, unknown>;\n    93→  };\n    94→}\n    95→\n    96→/**\n    97→ * Message sent from server to client containing the AI's final response.\n    98→ */\n    99→export interface ResponseMessage {\n   100→  type: 'response';\n   101→  data: {\n   102→    /** The AI's response text */\n   103→    content: string;\n   104→    /** Unique ID for this conversation turn */\n   105→    conversationId: string;\n   106→  };\n   107→}\n   108→\n   109→/**\n   110→ * Message sent from server to client containing a chunk of streamed response.\n   111→ */\n   112→export interface StreamMessage {\n   113→  type: 'stream';\n   114→  data: {\n   115→    /** A chunk of the AI's response being streamed */\n   116→    delta: string;\n   117→    /** Unique ID for this conversation turn */\n   118→    conversationId: string;\n   119→  };\n   120→}\n   121→\n   122→/**\n   123→ * Message sent from server to client when an error occurs.\n   124→ */\n   125→export interface ErrorMessage {\n   126→  type: 'error';\n   127→  data: {\n   128→    /** The error message */\n   129→    message: string;\n   130→  };\n   131→}\n   132→\n   133→/**\n   134→ * Data structure for tool registration payload.\n   135→ */\n   136→export interface ToolRegistration {\n   137→  /** Array of tool definitions to register */\n   138→  tools: ToolDefinition[];\n   139→  /** Optional UI context or system prompt */\n   140→  context?: string;\n   141→}\n   142→\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\n</system-reminder>\n",
+          "timestamp": "2025-11-06T06:41:07.404Z"
+        },
+        {
+          "type": "user",
+          "text": "     1→import { z } from 'zod';\n     2→import type { ToolDefinition } from '@use-ai/core';\n     3→\n     4→/**\n     5→ * Options for configuring tool behavior.\n     6→ */\n     7→export interface ToolOptions {\n     8→  /** Whether the tool asks the AI for explicit user confirmation before execution */\n     9→  confirmationRequired?: boolean;\n    10→}\n    11→\n    12→/**\n    13→ * A tool definition with validation schema and execution function.\n    14→ * Created by the `defineTool` function and used to define tools that the AI can call.\n    15→ *\n    16→ * @template T - The Zod schema type for validating tool input\n    17→ */\n    18→export interface DefinedTool<T extends z.ZodType> {\n    19→  /** Human-readable description of what the tool does */\n    20→  description: string;\n    21→  /** JSON Schema representation of the input schema */\n    22→  _jsonSchema: any;\n    23→  /** Zod schema for validating input */\n    24→  _zodSchema: T;\n    25→  /** The function to execute when the tool is called */\n    26→  fn: (input: z.infer<T>) => any | Promise<any>;\n    27→  /** Configuration options for the tool */\n    28→  _options: ToolOptions;\n    29→  /** Converts this tool to a ToolDefinition for registration with the server */\n    30→  _toToolDefinition: (name: string) => ToolDefinition;\n    31→  /** Validates input and executes the tool function */\n    32→  _execute: (input: any) => Promise<any>;\n    33→}\n    34→\n    35→/**\n    36→ * Defines a tool with no input parameters that can be called by the AI.\n    37→ *\n    38→ * @template TReturn - The return type of the tool function\n    39→ * @param description - Human-readable description of what the tool does\n    40→ * @param fn - The function to execute when the tool is called\n    41→ * @param options - Optional configuration for the tool\n    42→ * @returns A DefinedTool that can be registered with useAI\n    43→ *\n    44→ * @example\n    45→ * ```typescript\n    46→ * const getCurrentTime = defineTool(\n    47→ *   'Get the current time',\n    48→ *   () => new Date().toISOString()\n    49→ * );\n    50→ * ```\n    51→ */\n    52→export function defineTool<TReturn>(\n    53→  description: string,\n    54→  fn: () => TReturn | Promise<TReturn>,\n    55→  options?: ToolOptions\n    56→): DefinedTool<z.ZodObject<{}>>;\n    57→\n    58→/**\n    59→ * Defines a tool with typed input parameters that can be called by the AI.\n    60→ *\n    61→ * @template TSchema - The Zod schema type for validating input\n    62→ * @param description - Human-readable description of what the tool does\n    63→ * @param schema - Zod schema defining the tool's input parameters\n    64→ * @param fn - The function to execute when the tool is called\n    65→ * @param options - Optional configuration for the tool\n    66→ * @returns A DefinedTool that can be registered with useAI\n    67→ *\n    68→ * @example\n    69→ * ```typescript\n    70→ * import { defineTool } from '@use-ai/client';\n    71→ * import { z } from 'zod';\n    72→ *\n    73→ * const addTodo = defineTool(\n    74→ *   'Add a new todo item',\n    75→ *   z.object({ text: z.string() }),\n    76→ *   (input) => {\n    77→ *     todos.push({ id: Date.now(), text: input.text, completed: false });\n    78→ *     return { success: true };\n    79→ *   }\n    80→ * );\n    81→ * ```\n    82→ */\n    83→export function defineTool<TSchema extends z.ZodType>(\n    84→  description: string,\n    85→  schema: TSchema,\n    86→  fn: (input: z.infer<TSchema>) => any | Promise<any>,\n    87→  options?: ToolOptions\n    88→): DefinedTool<TSchema>;\n    89→\n    90→/**\n    91→ * @internal\n    92→ * Implementation of defineTool that handles both overloads\n    93→ */\n    94→export function defineTool<T extends z.ZodType>(\n    95→  description: string,\n    96→  schemaOrFn: T | (() => any),\n    97→  fnOrOptions?: ((input: z.infer<T>) => any | Promise<any>) | ToolOptions,\n    98→  options?: ToolOptions\n    99→): DefinedTool<any> {\n   100→  const isNoParamFunction = typeof schemaOrFn === 'function';\n   101→  const schema = isNoParamFunction ? z.object({}) : schemaOrFn;\n   102→\n   103→  let actualFn: (input: any) => any | Promise<any>;\n   104→  let actualOptions: ToolOptions;\n   105→\n   106→  if (isNoParamFunction) {\n   107→    actualFn = schemaOrFn;\n   108→    actualOptions = (fnOrOptions as ToolOptions) || {};\n   109→  } else {\n   110→    actualFn = fnOrOptions as (input: z.infer<T>) => any | Promise<any>;\n   111→    actualOptions = options || {};\n   112→  }\n   113→\n   114→  const jsonSchema = z.toJSONSchema(schema) as any;\n   115→\n   116→  return {\n   117→    description,\n   118→    _jsonSchema: jsonSchema,\n   119→    _zodSchema: schema,\n   120→    fn: actualFn,\n   121→    _options: actualOptions,\n   122→\n   123→    _toToolDefinition(name: string): ToolDefinition {\n   124→      const inputSchema: any = {\n   125→        type: this._jsonSchema.type || 'object',\n   126→        properties: this._jsonSchema.properties || {},\n   127→      };\n   128→\n   129→      if (this._jsonSchema.required && this._jsonSchema.required.length > 0) {\n   130→        inputSchema.required = this._jsonSchema.required;\n   131→      }\n   132→\n   133→      if (this._jsonSchema.additionalProperties !== undefined) {\n   134→        inputSchema.additionalProperties = this._jsonSchema.additionalProperties;\n   135→      }\n   136→\n   137→      const toolDef: ToolDefinition = {\n   138→        name,\n   139→        description,\n   140→        input_schema: inputSchema,\n   141→      };\n   142→\n   143→      if (this._options.confirmationRequired) {\n   144→        toolDef.confirmationRequired = true;\n   145→      }\n   146→\n   147→      return toolDef;\n   148→    },\n   149→\n   150→    async _execute(input: any) {\n   151→      const validated = this._zodSchema.parse(input);\n   152→      return await actualFn(validated);\n   153→    },\n   154→  };\n   155→}\n   156→\n   157→/**\n   158→ * A collection of named tools.\n   159→ * Used to register multiple tools with the useAI hook.\n   160→ */\n   161→export type ToolsDefinition = Record<string, DefinedTool<any>>;\n   162→\n   163→/**\n   164→ * Converts a ToolsDefinition to an array of ToolDefinition objects.\n   165→ *\n   166→ * @param tools - The tools to convert\n   167→ * @returns Array of tool definitions suitable for server registration\n   168→ * @internal\n   169→ */\n   170→export function convertToolsToDefinitions(tools: ToolsDefinition): ToolDefinition[] {\n   171→  return Object.entries(tools).map(([name, tool]) => tool._toToolDefinition(name));\n   172→}\n   173→\n   174→/**\n   175→ * Executes a defined tool by name with the provided input.\n   176→ *\n   177→ * @param tools - The collection of available tools\n   178→ * @param toolName - The name of the tool to execute\n   179→ * @param input - The input parameters for the tool\n   180→ * @returns The result of executing the tool\n   181→ * @throws Error if the tool is not found\n   182→ * @internal\n   183→ */\n   184→export async function executeDefinedTool(\n   185→  tools: ToolsDefinition,\n   186→  toolName: string,\n   187→  input: any\n   188→): Promise<any> {\n   189→  const tool = tools[toolName];\n   190→  if (!tool) {\n   191→    throw new Error(`Tool \"${toolName}\" not found`);\n   192→  }\n   193→  return await tool._execute(input);\n   194→}\n   195→\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\n</system-reminder>\n",
+          "timestamp": "2025-11-06T06:41:07.405Z"
+        },
+        {
+          "type": "assistant",
+          "text": "I found the issue! The `confirmationRequired` field is a custom field used internally by this application, but it's being sent directly to the Anthropic API in the tool definitions. The API only accepts the standard fields (`name`, `description`, `input_schema`) and rejects the extra field.\n\nLooking at:\n- `packages/client/src/defineTool.ts:143-145` - adds `confirmationRequired` to the tool definition\n- `packages/server/src/server.ts:212` - sends tools directly to Anthropic API without filtering\n\nThe fix is to strip out the `confirmationRequired` field before sending tools to the API, while keeping it available for the system prompt logic (which uses it at lines 165-182).\n\nLet me fix this:",
+          "timestamp": "2025-11-06T06:41:19.961Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "TodoWrite",
+          "input": {
+            "todos": [
+              {
+                "activeForm": "Adding helper function to sanitize tools for Anthropic API",
+                "content": "Add helper function to sanitize tools for Anthropic API",
+                "status": "in_progress"
+              },
+              {
+                "activeForm": "Using sanitized tools when calling Anthropic API",
+                "content": "Use sanitized tools when calling Anthropic API",
+                "status": "pending"
+              },
+              {
+                "activeForm": "Testing the fix by running the server",
+                "content": "Test the fix by running the server",
+                "status": "pending"
+              }
+            ]
+          },
+          "timestamp": "2025-11-06T06:41:21.959Z"
+        },
+        {
+          "type": "user",
+          "text": "Todos have been modified successfully. Ensure that you continue to use the todo list to track your progress. Please proceed with the current tasks if applicable",
+          "timestamp": "2025-11-06T06:41:22.039Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Edit",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/packages/server/src/server.ts",
+            "new_string": "  private sanitizeToolsForAPI(tools: ToolDefinition[]): Anthropic.Tool[] {\n    return tools.map(tool => ({\n      name: tool.name,\n      description: tool.description,\n      input_schema: tool.input_schema,\n    }));\n  }\n\n  private buildSystemPrompt(session: ClientSession): string | undefined {",
+            "old_string": "  private buildSystemPrompt(session: ClientSession): string | undefined {"
+          },
+          "timestamp": "2025-11-06T06:41:28.181Z"
+        },
+        {
+          "type": "user",
+          "text": "The file /home/z/Desktop/work/use-ai/packages/server/src/server.ts has been updated. Here's the result of running `cat -n` on a snippet of the edited file:\n   150→      console.log(`Received UI context (${session.context.length} chars)`);\n   151→    }\n   152→  }\n   153→\n   154→  private sanitizeToolsForAPI(tools: ToolDefinition[]): Anthropic.Tool[] {\n   155→    return tools.map(tool => ({\n   156→      name: tool.name,\n   157→      description: tool.description,\n   158→      input_schema: tool.input_schema,\n   159→    }));\n   160→  }\n   161→\n   162→  private buildSystemPrompt(session: ClientSession): string | undefined {\n   163→    const parts: string[] = [];\n   164→\n   165→    if (session.context) {\n   166→      parts.push('You are interacting with a web application. Here is the current state of the UI:');",
+          "timestamp": "2025-11-06T06:41:44.354Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "TodoWrite",
+          "input": {
+            "todos": [
+              {
+                "activeForm": "Adding helper function to sanitize tools for Anthropic API",
+                "content": "Add helper function to sanitize tools for Anthropic API",
+                "status": "completed"
+              },
+              {
+                "activeForm": "Using sanitized tools when calling Anthropic API",
+                "content": "Use sanitized tools when calling Anthropic API",
+                "status": "in_progress"
+              },
+              {
+                "activeForm": "Testing the fix by running the server",
+                "content": "Test the fix by running the server",
+                "status": "pending"
+              }
+            ]
+          },
+          "timestamp": "2025-11-06T06:41:49.543Z"
+        },
+        {
+          "type": "user",
+          "text": "Todos have been modified successfully. Ensure that you continue to use the todo list to track your progress. Please proceed with the current tasks if applicable",
+          "timestamp": "2025-11-06T06:41:49.612Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Edit",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/packages/server/src/server.ts",
+            "new_string": "      const response = await this.anthropic.messages.create({\n        model: this.config.model,\n        max_tokens: 4096,\n        messages: session.conversationHistory,\n        tools: session.tools.length > 0 ? this.sanitizeToolsForAPI(session.tools) : undefined,\n        system: systemPrompt,\n      });",
+            "old_string": "      const response = await this.anthropic.messages.create({\n        model: this.config.model,\n        max_tokens: 4096,\n        messages: session.conversationHistory,\n        tools: session.tools.length > 0 ? session.tools as Anthropic.Tool[] : undefined,\n        system: systemPrompt,\n      });"
+          },
+          "timestamp": "2025-11-06T06:41:55.134Z"
+        },
+        {
+          "type": "user",
+          "text": "The file /home/z/Desktop/work/use-ai/packages/server/src/server.ts has been updated. Here's the result of running `cat -n` on a snippet of the edited file:\n   212→\n   213→    try {\n   214→      const systemPrompt = this.buildSystemPrompt(session);\n   215→\n   216→      const response = await this.anthropic.messages.create({\n   217→        model: this.config.model,\n   218→        max_tokens: 4096,\n   219→        messages: session.conversationHistory,\n   220→        tools: session.tools.length > 0 ? this.sanitizeToolsForAPI(session.tools) : undefined,\n   221→        system: systemPrompt,\n   222→      });\n   223→\n   224→      await this.processResponse(session, response);\n   225→    } catch (error) {\n   226→      console.error('Error calling Anthropic API:', error);",
+          "timestamp": "2025-11-06T06:41:55.286Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Edit",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/packages/server/src/server.ts",
+            "new_string": "    const followUpResponse = await this.anthropic.messages.create({\n      model: this.config.model,\n      max_tokens: 4096,\n      messages: session.conversationHistory,\n      tools: session.tools.length > 0 ? this.sanitizeToolsForAPI(session.tools) : undefined,\n      system: systemPrompt,\n    });",
+            "old_string": "    const followUpResponse = await this.anthropic.messages.create({\n      model: this.config.model,\n      max_tokens: 4096,\n      messages: session.conversationHistory,\n      tools: session.tools.length > 0 ? session.tools as Anthropic.Tool[] : undefined,\n      system: systemPrompt,\n    });"
+          },
+          "timestamp": "2025-11-06T06:42:00.645Z"
+        },
+        {
+          "type": "user",
+          "text": "The file /home/z/Desktop/work/use-ai/packages/server/src/server.ts has been updated. Here's the result of running `cat -n` on a snippet of the edited file:\n   291→    });\n   292→\n   293→    const systemPrompt = this.buildSystemPrompt(session);\n   294→\n   295→    const followUpResponse = await this.anthropic.messages.create({\n   296→      model: this.config.model,\n   297→      max_tokens: 4096,\n   298→      messages: session.conversationHistory,\n   299→      tools: session.tools.length > 0 ? this.sanitizeToolsForAPI(session.tools) : undefined,\n   300→      system: systemPrompt,\n   301→    });\n   302→\n   303→    await this.processResponse(session, followUpResponse);\n   304→  }\n   305→",
+          "timestamp": "2025-11-06T06:42:01.136Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "TodoWrite",
+          "input": {
+            "todos": [
+              {
+                "activeForm": "Adding helper function to sanitize tools for Anthropic API",
+                "content": "Add helper function to sanitize tools for Anthropic API",
+                "status": "completed"
+              },
+              {
+                "activeForm": "Using sanitized tools when calling Anthropic API",
+                "content": "Use sanitized tools when calling Anthropic API",
+                "status": "completed"
+              },
+              {
+                "activeForm": "Testing the fix by running the server",
+                "content": "Test the fix by running the server",
+                "status": "in_progress"
+              }
+            ]
+          },
+          "timestamp": "2025-11-06T06:42:07.424Z"
+        },
+        {
+          "type": "user",
+          "text": "Todos have been modified successfully. Ensure that you continue to use the todo list to track your progress. Please proceed with the current tasks if applicable",
+          "timestamp": "2025-11-06T06:42:07.513Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Bash",
+          "input": {
+            "command": "bun run build:server",
+            "description": "Build the server package"
+          },
+          "timestamp": "2025-11-06T06:42:10.858Z"
+        },
+        {
+          "type": "user",
+          "text": "  ./index.js  729.39 KB\n\n[28ms] bundle 84 modules\n$ cd packages/server && bun run build\n$ bun build ./src/index.ts --outdir ./dist --target node --format esm && tsc --emitDeclarationOnly --declaration --declarationMap",
+          "timestamp": "2025-11-06T06:42:12.440Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/package.json"
+          },
+          "timestamp": "2025-11-06T06:42:18.151Z"
+        },
+        {
+          "type": "user",
+          "text": "     1→{\n     2→  \"name\": \"use-ai-monorepo\",\n     3→  \"version\": \"0.0.0\",\n     4→  \"private\": true,\n     5→  \"workspaces\": [\n     6→    \"packages/*\",\n     7→    \"apps/*\"\n     8→  ],\n     9→  \"scripts\": {\n    10→    \"build\": \"bun run --filter '@use-ai/core' build && bun run --filter '@use-ai/client' build && bun run --filter '@use-ai/server' build && bun run --filter 'example' build\",\n    11→    \"build:core\": \"cd packages/core && bun run build\",\n    12→    \"build:client\": \"cd packages/client && bun run build\",\n    13→    \"build:server\": \"cd packages/server && bun run build\",\n    14→    \"dev\": \"bun run start:server & bun run dev:example\",\n    15→    \"dev:example\": \"cd apps/example && bun run dev\",\n    16→    \"dev:server\": \"cd packages/server && bun run dev\",\n    17→    \"start:server\": \"cd packages/server && bun run start\",\n    18→    \"preview\": \"cd apps/example && bun run preview\",\n    19→    \"test\": \"bun test\"\n    20→  },\n    21→  \"devDependencies\": {\n    22→    \"@types/bun\": \"latest\",\n    23→    \"typescript\": \"^5.3.3\"\n    24→  }\n    25→}\n    26→\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\n</system-reminder>\n",
+          "timestamp": "2025-11-06T06:42:18.215Z"
+        },
+        {
+          "type": "assistant",
+          "text": "Perfect! The build succeeded. The fix is now in place. Here's what I did:\n\n## Summary of Changes\n\n**Problem**: The `confirmationRequired` field is a custom field used internally by this application, but it was being sent directly to the Anthropic API along with the standard tool definition fields. The API rejected it with the error: `\"tools.1.custom.confirmationRequired: Extra inputs are not permitted\"`\n\n**Solution**: Added a `sanitizeToolsForAPI()` helper function in `packages/server/src/server.ts:154-160` that filters out custom fields before sending tools to the Anthropic API, keeping only the standard fields: `name`, `description`, and `input_schema`.\n\n**Changes**:\n1. Added `sanitizeToolsForAPI()` method that creates clean tool definitions for the API\n2. Updated `handlePrompt()` at line 220 to use sanitized tools\n3. Updated `handleToolUse()` at line 299 to use sanitized tools\n\nThe `confirmationRequired` field is still available internally for the system prompt logic (lines 173-190), but it's now stripped out before sending to the API.\n\nYou can now test the server again:\n\n```bash\nexport ANTHROPIC_API_KEY='your-key'\nbun run start:server\n```\n\nThe error should be resolved and the server should work correctly with tools that have the `confirmationRequired` option set.",
+          "timestamp": "2025-11-06T06:42:33.390Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "TodoWrite",
+          "input": {
+            "todos": [
+              {
+                "activeForm": "Adding helper function to sanitize tools for Anthropic API",
+                "content": "Add helper function to sanitize tools for Anthropic API",
+                "status": "completed"
+              },
+              {
+                "activeForm": "Using sanitized tools when calling Anthropic API",
+                "content": "Use sanitized tools when calling Anthropic API",
+                "status": "completed"
+              },
+              {
+                "activeForm": "Testing the fix by running the server",
+                "content": "Test the fix by running the server",
+                "status": "completed"
+              }
+            ]
+          },
+          "timestamp": "2025-11-06T06:42:34.772Z"
+        },
+        {
+          "type": "user",
+          "text": "Todos have been modified successfully. Ensure that you continue to use the todo list to track your progress. Please proceed with the current tasks if applicable",
+          "timestamp": "2025-11-06T06:42:34.840Z"
+        },
+        {
+          "type": "user",
+          "text": "there is a bug whereby we can ask the AI to do two things at once, and we will break the state flow:\n\n1. create an integration test in useAI.integration.test.ts that reproduces the issue\n2. propose a fix:\n\nError calling Anthropic API: 2 | import { castToError } from \"./core.mjs\";\n3 | export class AnthropicError extends Error {\n4 | }\n5 | export class APIError extends AnthropicError {\n6 |     constructor(status, error, message, headers) {\n7 |         super(`${APIError.makeMessage(status, error, message)}`);\n                          ^\nerror: 400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"messages.12: `tool_use` ids were found without `tool_result` blocks immediately after: toolu_01DJLrVY8s5p43t2pkLJKWNh. Each `tool_use` block must have a corresponding `tool_result` block in the next message.\"},\"request_id\":\"req_011CUrBfbtai7ZTdb7jZSkEV\"}\n      at new AnthropicError (1:23)\n      at new APIError (/home/z/Desktop/work/use-ai/node_modules/@anthropic-ai/sdk/error.mjs:7:9)\n      at new BadRequestError (/home/z/Desktop/work/use-ai/node_modules/@anthropic-ai/sdk/error.mjs:86:9)\n      at generate (/home/z/Desktop/work/use-ai/node_modules/@anthropic-ai/sdk/error.mjs:37:20)\n      at /home/z/Desktop/work/use-ai/node_modules/@anthropic-ai/sdk/core.mjs:319:30\n\nError calling Anthropic API: 2 | import { castToError } from \"./core.mjs\";\n3 | export class AnthropicError extends Error {\n4 | }\n5 | export class APIError extends AnthropicError {\n6 |     constructor(status, error, message, headers) {\n7 |         super(`${APIError.makeMessage(status, error, message)}`);\n                          ^\nerror: 400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"messages.12: `tool_use` ids were found without `tool_result` blocks immediately after: toolu_01DJLrVY8s5p43t2pkLJKWNh. Each `tool_use` block must have a corresponding `tool_result` block in the next message.\"},\"request_id\":\"req_011CUrBgxg1mgBzwZgf5Ku8p\"}\n      at new AnthropicError (1:23)\n      at new APIError (/home/z/Desktop/work/use-ai/node_modules/@anthropic-ai/sdk/error.mjs:7:9)\n      at new BadRequestError (/home/z/Desktop/work/use-ai/node_modules/@anthropic-ai/sdk/error.mjs:86:9)\n      at generate (/home/z/Desktop/work/use-ai/node_modules/@anthropic-ai/sdk/error.mjs:37:20)\n      at /home/z/Desktop/work/use-ai/node_modules/@anthropic-ai/sdk/core.mjs:319:30",
+          "timestamp": "2025-11-06T06:55:03.332Z"
+        },
+        {
+          "type": "assistant",
+          "text": "I can see the issue! When Claude calls multiple tools at once, the server processes them sequentially but makes a new API call after each tool execution. This creates malformed conversation history where some `tool_use` blocks don't have corresponding `tool_result` blocks.\n\nLet me create a test to reproduce this issue and then propose a fix.",
+          "timestamp": "2025-11-06T06:55:22.583Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "TodoWrite",
+          "input": {
+            "todos": [
+              {
+                "activeForm": "Reading existing integration test",
+                "content": "Read existing integration test to understand test structure",
+                "status": "in_progress"
+              },
+              {
+                "activeForm": "Writing integration test for multiple tool calls",
+                "content": "Write integration test that reproduces the multiple tool call bug",
+                "status": "pending"
+              },
+              {
+                "activeForm": "Analyzing root cause in server.ts",
+                "content": "Analyze the root cause in server.ts",
+                "status": "pending"
+              },
+              {
+                "activeForm": "Implementing fix for multiple tool calls",
+                "content": "Implement fix to handle multiple tool calls correctly",
+                "status": "pending"
+              },
+              {
+                "activeForm": "Running integration test",
+                "content": "Run the integration test to verify the fix",
+                "status": "pending"
+              }
+            ]
+          },
+          "timestamp": "2025-11-06T06:55:22.909Z"
+        },
+        {
+          "type": "user",
+          "text": "Todos have been modified successfully. Ensure that you continue to use the todo list to track your progress. Please proceed with the current tasks if applicable",
+          "timestamp": "2025-11-06T06:55:23.004Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/packages/client/test/useAI.integration.test.tsx"
+          },
+          "timestamp": "2025-11-06T06:55:26.555Z"
+        },
+        {
+          "type": "user",
+          "text": "     1→import { describe, it, expect, beforeEach, afterEach, mock } from 'bun:test';\n     2→import { renderHook, waitFor, render, act } from '@testing-library/react';\n     3→import React, { useMemo } from 'react';\n     4→import { z } from 'zod';\n     5→import { UseAIProvider } from '../src/provider';\n     6→import { useAI } from '../src/useAI';\n     7→import { defineTool } from '../src/defineTool';\n     8→import { UseAIFloatingButton } from '../src/components/UseAIFloatingButton';\n     9→import type { ServerMessage } from '../src/types';\n    10→\n    11→// Mock WebSocket\n    12→class MockWebSocket {\n    13→  static instances: MockWebSocket[] = [];\n    14→\n    15→  onopen: ((event: Event) => void) | null = null;\n    16→  onclose: ((event: CloseEvent) => void) | null = null;\n    17→  onmessage: ((event: MessageEvent) => void) | null = null;\n    18→  onerror: ((event: Event) => void) | null = null;\n    19→\n    20→  readyState: number = WebSocket.CONNECTING;\n    21→  sentMessages: any[] = [];\n    22→\n    23→  constructor(public url: string) {\n    24→    MockWebSocket.instances.push(this);\n    25→    // Simulate async connection\n    26→    setTimeout(() => {\n    27→      this.readyState = WebSocket.OPEN;\n    28→      this.onopen?.(new Event('open'));\n    29→    }, 0);\n    30→  }\n    31→\n    32→  send(data: string) {\n    33→    this.sentMessages.push(JSON.parse(data));\n    34→  }\n    35→\n    36→  close() {\n    37→    this.readyState = WebSocket.CLOSED;\n    38→    this.onclose?.(new CloseEvent('close'));\n    39→  }\n    40→\n    41→  simulateMessage(message: ServerMessage) {\n    42→    this.onmessage?.(new MessageEvent('message', { data: JSON.stringify(message) }));\n    43→  }\n    44→\n    45→  simulateError() {\n    46→    this.onerror?.(new Event('error'));\n    47→  }\n    48→\n    49→  static reset() {\n    50→    MockWebSocket.instances = [];\n    51→  }\n    52→\n    53→  static getMostRecent(): MockWebSocket | undefined {\n    54→    return MockWebSocket.instances[MockWebSocket.instances.length - 1];\n    55→  }\n    56→}\n    57→\n    58→// Store original WebSocket\n    59→const OriginalWebSocket = global.WebSocket;\n    60→\n    61→// Helper to create stable tools that don't cause re-renders\n    62→function useStableTools<T extends Record<string, any>>(tools: T): T {\n    63→  return useMemo(() => tools, []);\n    64→}\n    65→\n    66→describe('useAI Integration Tests', () => {\n    67→  beforeEach(() => {\n    68→    global.WebSocket = MockWebSocket as any;\n    69→    MockWebSocket.reset();\n    70→  });\n    71→\n    72→  afterEach(() => {\n    73→    global.WebSocket = OriginalWebSocket;\n    74→    MockWebSocket.reset();\n    75→  });\n    76→\n    77→  const wrapper = ({ children }: { children: React.ReactNode }) => (\n    78→    <UseAIProvider serverUrl=\"ws://localhost:8080\">{children}</UseAIProvider>\n    79→  );\n    80→\n    81→  describe('A component can define tools for an AI to invoke', () => {\n    82→    it('should register tools with the server when a component defines them', async () => {\n    83→      const addTodo = defineTool(\n    84→        'Add a new todo item',\n    85→        z.object({ text: z.string() }),\n    86→        (input) => ({ success: true, id: '123', text: input.text })\n    87→      );\n    88→\n    89→      const TestComponent = () => {\n    90→        const tools = useStableTools({ addTodo });\n    91→        useAI({ tools });\n    92→        return null;\n    93→      };\n    94→\n    95→      render(\n    96→        <UseAIProvider serverUrl=\"ws://localhost:8080\">\n    97→          <TestComponent />\n    98→        </UseAIProvider>\n    99→      );\n   100→\n   101→      await waitFor(() => {\n   102→        const ws = MockWebSocket.getMostRecent();\n   103→        const registerMessage = ws?.sentMessages.find((msg) => msg.type === 'register_tools');\n   104→        expect(registerMessage).toBeDefined();\n   105→        expect(registerMessage.data.tools).toHaveLength(1);\n   106→        expect(registerMessage.data.tools[0].name).toBe('addTodo');\n   107→        expect(registerMessage.data.tools[0].description).toBe('Add a new todo item');\n   108→      });\n   109→    });\n   110→\n   111→    it('should allow the AI to invoke registered tools', async () => {\n   112→      const mockFn = mock((input: { text: string }) => ({ success: true, text: input.text }));\n   113→      const addTodo = defineTool('Add a todo', z.object({ text: z.string() }), mockFn);\n   114→\n   115→      const TestComponent = () => {\n   116→        const tools = useStableTools({ addTodo });\n   117→        useAI({ tools });\n   118→        return null;\n   119→      };\n   120→\n   121→      render(\n   122→        <UseAIProvider serverUrl=\"ws://localhost:8080\">\n   123→          <TestComponent />\n   124→        </UseAIProvider>\n   125→      );\n   126→\n   127→      await waitFor(() => {\n   128→        expect(MockWebSocket.getMostRecent()?.readyState).toBe(WebSocket.OPEN);\n   129→      });\n   130→\n   131→      await act(async () => {\n   132→        const ws = MockWebSocket.getMostRecent();\n   133→        ws?.simulateMessage({\n   134→          type: 'tool_call',\n   135→          data: {\n   136→            toolCallId: 'call-123',\n   137→            name: 'addTodo',\n   138→            input: { text: 'Buy groceries' },\n   139→          },\n   140→        });\n   141→      });\n   142→\n   143→      await waitFor(() => {\n   144→        expect(mockFn).toHaveBeenCalledWith({ text: 'Buy groceries' });\n   145→      });\n   146→    });\n   147→  });\n   148→\n   149→  describe('A component can put its state in \"prompt\" to provide current state to the AI', () => {\n   150→    it('should send component state as context when prompt option is provided', async () => {\n   151→      const addTodo = defineTool(\n   152→        'Add a todo',\n   153→        z.object({ text: z.string() }),\n   154→        () => ({ success: true })\n   155→      );\n   156→\n   157→      const TestComponent = () => {\n   158→        const tools = useStableTools({ addTodo });\n   159→        const currentState = 'Current todos: Buy milk, Walk dog';\n   160→        useAI({ tools, prompt: currentState });\n   161→        return null;\n   162→      };\n   163→\n   164→      render(\n   165→        <UseAIProvider serverUrl=\"ws://localhost:8080\">\n   166→          <TestComponent />\n   167→        </UseAIProvider>\n   168→      );\n   169→\n   170→      await waitFor(() => {\n   171→        const ws = MockWebSocket.getMostRecent();\n   172→        const registerMessage = ws?.sentMessages.find((msg) => msg.type === 'register_tools');\n   173→        expect(registerMessage).toBeDefined();\n   174→        expect(registerMessage.data.context).toBeDefined();\n   175→        expect(registerMessage.data.context).toContain('Current todos: Buy milk, Walk dog');\n   176→      });\n   177→    });\n   178→\n   179→    it('should update context when component state changes', async () => {\n   180→      const TestComponent = () => {\n   181→        const [count, setCount] = React.useState(0);\n   182→\n   183→        const toolsWithState = React.useMemo(() => ({\n   184→          incrementCounter: defineTool(\n   185→            'Increment the counter',\n   186→            () => {\n   187→              setCount(prev => prev + 1);\n   188→              return { success: true };\n   189→            }\n   190→          )\n   191→        }), []);\n   192→\n   193→        const currentState = `Counter value: ${count}`;\n   194→        useAI({ tools: toolsWithState, prompt: currentState });\n   195→        return <div>Count: {count}</div>;\n   196→      };\n   197→\n   198→      render(\n   199→        <UseAIProvider serverUrl=\"ws://localhost:8080\">\n   200→          <TestComponent />\n   201→        </UseAIProvider>\n   202→      );\n   203→\n   204→      // Verify initial state (count = 0)\n   205→      await waitFor(() => {\n   206→        const ws = MockWebSocket.getMostRecent();\n   207→        const registerMessage = ws?.sentMessages.find((msg) => msg.type === 'register_tools');\n   208→        expect(registerMessage?.data.context).toContain('Counter value: 0');\n   209→      });\n   210→\n   211→      // Invoke the tool to increment counter\n   212→      await act(async () => {\n   213→        const ws = MockWebSocket.getMostRecent();\n   214→        ws?.simulateMessage({\n   215→          type: 'tool_call',\n   216→          data: {\n   217→            toolCallId: 'call-increment-1',\n   218→            name: 'incrementCounter',\n   219→            input: {},\n   220→          },\n   221→        });\n   222→      });\n   223→\n   224→      // Verify tool_response contains updated state (count = 1)\n   225→      await waitFor(() => {\n   226→        const ws = MockWebSocket.getMostRecent();\n   227→        const toolResponseMessage = ws?.sentMessages.find(\n   228→          (msg) => msg.type === 'tool_response' && msg.data.toolCallId === 'call-increment-1'\n   229→        );\n   230→        expect(toolResponseMessage).toBeDefined();\n   231→        expect(toolResponseMessage.data.context).toContain('Counter value: 1');\n   232→      });\n   233→\n   234→      // Invoke the tool again to increment counter\n   235→      await act(async () => {\n   236→        const ws = MockWebSocket.getMostRecent();\n   237→        ws?.simulateMessage({\n   238→          type: 'tool_call',\n   239→          data: {\n   240→            toolCallId: 'call-increment-2',\n   241→            name: 'incrementCounter',\n   242→            input: {},\n   243→          },\n   244→        });\n   245→      });\n   246→\n   247→      // Verify tool_response contains updated state (count = 2)\n   248→      await waitFor(() => {\n   249→        const ws = MockWebSocket.getMostRecent();\n   250→        const toolResponseMessage = ws?.sentMessages.find(\n   251→          (msg) => msg.type === 'tool_response' && msg.data.toolCallId === 'call-increment-2'\n   252→        );\n   253→        expect(toolResponseMessage).toBeDefined();\n   254→        expect(toolResponseMessage.data.context).toContain('Counter value: 2');\n   255→      });\n   256→    });\n   257→  });\n   258→\n   259→  describe('Components will be automatically identified by their \"id\" attribute if present', () => {\n   260→    it('should namespace tools with the component ref id attribute', async () => {\n   261→      const addTodo = defineTool(\n   262→        'Add a todo',\n   263→        z.object({ text: z.string() }),\n   264→        () => ({ success: true })\n   265→      );\n   266→\n   267→      const TestComponent = ({ id }: { id: string }) => {\n   268→        const tools = useStableTools({ addTodo });\n   269→        const { ref } = useAI({ tools });\n   270→\n   271→        return <div ref={ref} id={id}>{id}</div>;\n   272→      };\n   273→\n   274→      render(\n   275→        <UseAIProvider serverUrl=\"ws://localhost:8080\">\n   276→          <TestComponent id=\"todo-list\" />\n   277→          <TestComponent id=\"shopping-list\" />\n   278→          <TestComponent id=\"work-tasks\" />\n   279→        </UseAIProvider>\n   280→      );\n   281→\n   282→      await waitFor(() => {\n   283→        const ws = MockWebSocket.getMostRecent();\n   284→        const registerMessage = ws?.sentMessages.find((msg) => msg.type === 'register_tools');\n   285→        expect(registerMessage).toBeDefined();\n   286→\n   287→        // Should have 3 namespaced tools, one for each component\n   288→        expect(registerMessage.data.tools).toHaveLength(3);\n   289→\n   290→        const toolNames = registerMessage.data.tools.map((tool: any) => tool.name).sort();\n   291→        expect(toolNames).toEqual([\n   292→          'shopping-list_addTodo',\n   293→          'todo-list_addTodo',\n   294→          'work-tasks_addTodo',\n   295→        ]);\n   296→      });\n   297→    });\n   298→  });\n   299→\n   300→  describe('An explicit id can be provided to useAI', () => {\n   301→    it('should namespace tools with the explicit id option', async () => {\n   302→      const addTodo = defineTool(\n   303→        'Add a todo',\n   304→        z.object({ text: z.string() }),\n   305→        () => ({ success: true })\n   306→      );\n   307→\n   308→      const TestComponent = ({ id }: { id: string }) => {\n   309→        const tools = useStableTools({ addTodo });\n   310→        useAI({ tools, id });\n   311→        return <div>{id}</div>;\n   312→      };\n   313→\n   314→      render(\n   315→        <UseAIProvider serverUrl=\"ws://localhost:8080\">\n   316→          <TestComponent id=\"user-panel\" />\n   317→          <TestComponent id=\"admin-panel\" />\n   318→          <TestComponent id=\"guest-panel\" />\n   319→        </UseAIProvider>\n   320→      );\n   321→\n   322→      await waitFor(() => {\n   323→        const ws = MockWebSocket.getMostRecent();\n   324→        const registerMessage = ws?.sentMessages.find((msg) => msg.type === 'register_tools');\n   325→        expect(registerMessage).toBeDefined();\n   326→\n   327→        // Should have 3 namespaced tools, one for each component\n   328→        expect(registerMessage.data.tools).toHaveLength(3);\n   329→\n   330→        const toolNames = registerMessage.data.tools.map((tool: any) => tool.name).sort();\n   331→        expect(toolNames).toEqual([\n   332→          'admin-panel_addTodo',\n   333→          'guest-panel_addTodo',\n   334→          'user-panel_addTodo',\n   335→        ]);\n   336→      });\n   337→    });\n   338→\n   339→    it('should prefer explicit id over ref id attribute', async () => {\n   340→      const addTodo = defineTool(\n   341→        'Add a todo',\n   342→        z.object({ text: z.string() }),\n   343→        () => ({ success: true })\n   344→      );\n   345→\n   346→      const TestComponent = ({ explicitId, refId }: { explicitId: string; refId: string }) => {\n   347→        const tools = useStableTools({ addTodo });\n   348→        const { ref } = useAI({ tools, id: explicitId });\n   349→\n   350→        return <div ref={ref} id={refId}>{explicitId}</div>;\n   351→      };\n   352→\n   353→      render(\n   354→        <UseAIProvider serverUrl=\"ws://localhost:8080\">\n   355→          <TestComponent explicitId=\"explicit-1\" refId=\"ref-1\" />\n   356→          <TestComponent explicitId=\"explicit-2\" refId=\"ref-2\" />\n   357→        </UseAIProvider>\n   358→      );\n   359→\n   360→      await waitFor(() => {\n   361→        const ws = MockWebSocket.getMostRecent();\n   362→        const registerMessage = ws?.sentMessages.find((msg) => msg.type === 'register_tools');\n   363→        expect(registerMessage).toBeDefined();\n   364→\n   365→        // Should have 2 namespaced tools using explicit ids, not ref ids\n   366→        expect(registerMessage.data.tools).toHaveLength(2);\n   367→\n   368→        const toolNames = registerMessage.data.tools.map((tool: any) => tool.name).sort();\n   369→        expect(toolNames).toEqual([\n   370→          'explicit-1_addTodo',\n   371→          'explicit-2_addTodo',\n   372→        ]);\n   373→      });\n   374→    });\n   375→  });\n   376→\n   377→  describe('confirmationRequired can be set to instruct the backend to confirm operations', () => {\n   378→    it('should include confirmationRequired in tool definition when set', async () => {\n   379→      const deleteTodo = defineTool(\n   380→        'Delete a todo',\n   381→        z.object({ id: z.string() }),\n   382→        () => ({ success: true }),\n   383→        { confirmationRequired: true }\n   384→      );\n   385→\n   386→      const TestComponent = () => {\n   387→        const tools = useStableTools({ deleteTodo });\n   388→        useAI({ tools });\n   389→        return null;\n   390→      };\n   391→\n   392→      render(\n   393→        <UseAIProvider serverUrl=\"ws://localhost:8080\">\n   394→          <TestComponent />\n   395→        </UseAIProvider>\n   396→      );\n   397→\n   398→      await waitFor(() => {\n   399→        const ws = MockWebSocket.getMostRecent();\n   400→        const registerMessage = ws?.sentMessages.find((msg) => msg.type === 'register_tools');\n   401→        expect(registerMessage).toBeDefined();\n   402→        expect(registerMessage.data.tools[0].confirmationRequired).toBe(true);\n   403→      });\n   404→    });\n   405→\n   406→    it('should not include confirmationRequired when not set', async () => {\n   407→      const getTodo = defineTool(\n   408→        'Get a todo',\n   409→        z.object({ id: z.string() }),\n   410→        () => ({ id: '1', text: 'Sample todo' })\n   411→      );\n   412→\n   413→      const TestComponent = () => {\n   414→        const tools = useStableTools({ getTodo });\n   415→        useAI({ tools });\n   416→        return null;\n   417→      };\n   418→\n   419→      render(\n   420→        <UseAIProvider serverUrl=\"ws://localhost:8080\">\n   421→          <TestComponent />\n   422→        </UseAIProvider>\n   423→      );\n   424→\n   425→      await waitFor(() => {\n   426→        const ws = MockWebSocket.getMostRecent();\n   427→        const registerMessage = ws?.sentMessages.find((msg) => msg.type === 'register_tools');\n   428→        expect(registerMessage).toBeDefined();\n   429→        expect(registerMessage.data.tools[0].confirmationRequired).toBeUndefined();\n   430→      });\n   431→    });\n   432→  });\n   433→\n   434→  describe('The client will send a response after invoking a tool', () => {\n   435→    it('should send tool_response message after tool execution', async () => {\n   436→      const addTodo = defineTool(\n   437→        'Add a todo',\n   438→        z.object({ text: z.string() }),\n   439→        (input) => ({ success: true, id: '123', text: input.text })\n   440→      );\n   441→\n   442→      const TestComponent = () => {\n   443→        const [count, setCount] = React.useState(0);\n   444→        const tools = useStableTools({ addTodo });\n   445→\n   446→        // Modify the tool to trigger a re-render\n   447→        const toolsWithRender = React.useMemo(() => ({\n   448→          addTodo: defineTool(\n   449→            'Add a todo',\n   450→            z.object({ text: z.string() }),\n   451→            (input) => {\n   452→              setCount(c => c + 1); // Trigger re-render\n   453→              return { success: true, id: '123', text: input.text };\n   454→            }\n   455→          )\n   456→        }), []);\n   457→\n   458→        useAI({ tools: toolsWithRender });\n   459→        return <div>Count: {count}</div>;\n   460→      };\n   461→\n   462→      render(\n   463→        <UseAIProvider serverUrl=\"ws://localhost:8080\">\n   464→          <TestComponent />\n   465→        </UseAIProvider>\n   466→      );\n   467→\n   468→      await waitFor(() => {\n   469→        expect(MockWebSocket.getMostRecent()?.readyState).toBe(WebSocket.OPEN);\n   470→      });\n   471→\n   472→      await act(async () => {\n   473→        const ws = MockWebSocket.getMostRecent();\n   474→        ws?.simulateMessage({\n   475→          type: 'tool_call',\n   476→          data: {\n   477→            toolCallId: 'call-456',\n   478→            name: 'addTodo',\n   479→            input: { text: 'New todo' },\n   480→          },\n   481→        });\n   482→      });\n   483→\n   484→      await waitFor(() => {\n   485→        const ws = MockWebSocket.getMostRecent();\n   486→        const toolResponseMessage = ws?.sentMessages.find(\n   487→          (msg) => msg.type === 'tool_response' && msg.data.toolCallId === 'call-456'\n   488→        );\n   489→        expect(toolResponseMessage).toBeDefined();\n   490→        expect(toolResponseMessage.data.result.success).toBe(true);\n   491→        expect(toolResponseMessage.data.result.text).toBe('New todo');\n   492→      });\n   493→    });\n   494→\n   495→    it('should include updated context in tool_response when prompt is provided', async () => {\n   496→      const TestComponent = () => {\n   497→        const [todos, setTodos] = React.useState<string[]>([]);\n   498→\n   499→        const toolsWithRender = React.useMemo(() => ({\n   500→          addTodo: defineTool(\n   501→            'Add a todo',\n   502→            z.object({ text: z.string() }),\n   503→            (input) => {\n   504→              setTodos(prev => [...prev, input.text]); // Trigger re-render\n   505→              return { success: true };\n   506→            }\n   507→          )\n   508→        }), []);\n   509→\n   510→        const currentState = `Current todos: ${todos.join(', ') || 'none'}`;\n   511→        useAI({ tools: toolsWithRender, prompt: currentState });\n   512→        return <div>Todos: {todos.length}</div>;\n   513→      };\n   514→\n   515→      render(\n   516→        <UseAIProvider serverUrl=\"ws://localhost:8080\">\n   517→          <TestComponent />\n   518→        </UseAIProvider>\n   519→      );\n   520→\n   521→      await waitFor(() => {\n   522→        expect(MockWebSocket.getMostRecent()?.readyState).toBe(WebSocket.OPEN);\n   523→      });\n   524→\n   525→      await act(async () => {\n   526→        const ws = MockWebSocket.getMostRecent();\n   527→        ws?.simulateMessage({\n   528→          type: 'tool_call',\n   529→          data: {\n   530→            toolCallId: 'call-789',\n   531→            name: 'addTodo',\n   532→            input: { text: 'Buy milk' },\n   533→          },\n   534→        });\n   535→      });\n   536→\n   537→      await waitFor(() => {\n   538→        const ws = MockWebSocket.getMostRecent();\n   539→        const toolResponseMessage = ws?.sentMessages.find(\n   540→          (msg) => msg.type === 'tool_response' && msg.data.toolCallId === 'call-789'\n   541→        );\n   542→        expect(toolResponseMessage).toBeDefined();\n   543→        expect(toolResponseMessage.data.context).toContain('Buy milk');\n   544→      });\n   545→    });\n   546→  });\n   547→\n   548→  describe('The UseAIFloatingButton will only be enabled when the websocket is connected', () => {\n   549→    it('should be disabled when not connected', async () => {\n   550→      const { container } = render(\n   551→        <UseAIProvider serverUrl=\"ws://localhost:8080\">\n   552→          <div>App Content</div>\n   553→        </UseAIProvider>\n   554→      );\n   555→\n   556→      // Initially, before connection, no button should be rendered (no tools registered)\n   557→      // Let's register tools to make button appear\n   558→      const TestComponent = () => {\n   559→        const tools = useStableTools({\n   560→          testTool: defineTool('Test tool', () => 'result'),\n   561→        });\n   562→        useAI({ tools });\n   563→        return null;\n   564→      };\n   565→\n   566→      const { container: container2 } = render(\n   567→        <UseAIProvider serverUrl=\"ws://localhost:8080\">\n   568→          <TestComponent />\n   569→        </UseAIProvider>\n   570→      );\n   571→\n   572→      // Before connection completes, button should exist and be disabled\n   573→      // Wait for button to appear (after tools are registered)\n   574→      await waitFor(() => {\n   575→        const button = container2.querySelector('button');\n   576→        expect(button).toBeDefined();\n   577→      });\n   578→    });\n   579→\n   580→    it('should be enabled when connected', async () => {\n   581→      const TestComponent = () => {\n   582→        const tools = useStableTools({\n   583→          testTool: defineTool('Test tool', () => 'result'),\n   584→        });\n   585→        useAI({ tools });\n   586→        return null;\n   587→      };\n   588→\n   589→      const { container } = render(\n   590→        <UseAIProvider serverUrl=\"ws://localhost:8080\">\n   591→          <TestComponent />\n   592→        </UseAIProvider>\n   593→      );\n   594→\n   595→      await waitFor(() => {\n   596→        const ws = MockWebSocket.getMostRecent();\n   597→        expect(ws?.readyState).toBe(WebSocket.OPEN);\n   598→      });\n   599→\n   600→      await waitFor(() => {\n   601→        const button = container.querySelector('button');\n   602→        expect(button).toBeDefined();\n   603→        expect(button?.disabled).toBe(false);\n   604→      });\n   605→    });\n   606→  });\n   607→});\n   608→\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\n</system-reminder>\n",
+          "timestamp": "2025-11-06T06:55:26.713Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "TodoWrite",
+          "input": {
+            "todos": [
+              {
+                "activeForm": "Reading existing integration test",
+                "content": "Read existing integration test to understand test structure",
+                "status": "completed"
+              },
+              {
+                "activeForm": "Checking for existing server tests",
+                "content": "Check for existing server tests",
+                "status": "in_progress"
+              },
+              {
+                "activeForm": "Writing integration test for multiple tool calls",
+                "content": "Write integration test that reproduces the multiple tool call bug",
+                "status": "pending"
+              },
+              {
+                "activeForm": "Analyzing root cause in server.ts",
+                "content": "Analyze the root cause in server.ts",
+                "status": "pending"
+              },
+              {
+                "activeForm": "Implementing fix for multiple tool calls",
+                "content": "Implement fix to handle multiple tool calls correctly",
+                "status": "pending"
+              },
+              {
+                "activeForm": "Running integration test",
+                "content": "Run the integration test to verify the fix",
+                "status": "pending"
+              }
+            ]
+          },
+          "timestamp": "2025-11-06T06:55:52.903Z"
+        },
+        {
+          "type": "user",
+          "text": "Todos have been modified successfully. Ensure that you continue to use the todo list to track your progress. Please proceed with the current tasks if applicable",
+          "timestamp": "2025-11-06T06:55:52.974Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Glob",
+          "input": {
+            "pattern": "**/*.test.ts"
+          },
+          "timestamp": "2025-11-06T06:55:56.337Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Glob",
+          "input": {
+            "pattern": "**/test/**/*.ts"
+          },
+          "timestamp": "2025-11-06T06:55:56.738Z"
+        },
+        {
+          "type": "user",
+          "text": "/home/z/Desktop/work/use-ai/node_modules/zod/src/v3/tests/catch.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v3/tests/branded.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v3/tests/bigint.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v3/tests/base.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v3/tests/async-refinements.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v3/tests/async-parsing.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v3/tests/array.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v3/tests/anyunknown.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v3/tests/all-errors.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v4/mini/tests/checks.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v4/mini/tests/brand.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v4/mini/tests/assignability.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v4/classic/tests/codec-examples.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v4/classic/tests/coalesce.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v4/classic/tests/catch.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v4/classic/tests/brand.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v4/classic/tests/bigint.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v4/classic/tests/base.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v4/classic/tests/async-refinements.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v4/classic/tests/async-parsing.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v4/classic/tests/assignability.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v4/classic/tests/array.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v4/classic/tests/anyunknown.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v4/core/tests/locales/be.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v3/tests/error.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v3/tests/enum.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v3/tests/discriminated-unions.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v3/tests/description.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v3/tests/default.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v3/tests/deepmasking.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v3/tests/date.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v3/tests/custom.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v3/tests/complex.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v3/tests/coerce.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v4/mini/tests/computed.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v4/mini/tests/codec.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v4/classic/tests/error-utils.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v4/classic/tests/enum.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v4/classic/tests/discriminated-unions.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v4/classic/tests/description.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v4/classic/tests/default.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v4/classic/tests/datetime.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v4/classic/tests/date.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v4/classic/tests/custom.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v4/classic/tests/continuability.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v4/classic/tests/coerce.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v4/classic/tests/codec.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v4/core/tests/locales/en.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v3/tests/generics.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v3/tests/function.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v3/tests/firstpartyschematypes.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v3/tests/firstparty.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v4/mini/tests/functions.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v4/mini/tests/error.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v4/classic/tests/hash.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v4/classic/tests/generics.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v4/classic/tests/function.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v4/classic/tests/firstparty.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v4/classic/tests/file.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v4/classic/tests/error.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v4/core/tests/extend.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v4/core/tests/locales/es.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v3/tests/intersection.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v3/tests/instanceof.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v4/mini/tests/index.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v4/classic/tests/intersection.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v4/classic/tests/instanceof.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v4/classic/tests/index.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v4/core/tests/index.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v3/tests/number.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v3/tests/nullable.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v3/tests/nativeEnum.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v3/tests/nan.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v3/tests/mocker.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v3/tests/masking.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v3/tests/map.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v3/tests/literal.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v3/tests/language-server.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v4/mini/tests/number.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v4/classic/tests/number.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v4/classic/tests/nullable.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v4/classic/tests/nonoptional.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v4/classic/tests/nested-refine.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v4/classic/tests/nan.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v4/classic/tests/map.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v4/classic/tests/literal.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v4/classic/tests/lazy.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v4/classic/tests/json.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v3/tests/primitive.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v3/tests/preprocess.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v3/tests/pipeline.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v3/tests/pickomit.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v3/tests/partials.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v3/tests/parser.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v3/tests/parseUtil.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v3/tests/optional.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v3/tests/object.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v3/tests/object-in-es5-env.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v3/tests/object-augmentation.test.ts\n/home/z/Desktop/work/use-ai/node_modules/zod/src/v4/mini/tests/object.test.ts\n(Results are truncated. Consider using a more specific path or pattern.)",
+          "timestamp": "2025-11-06T06:55:56.913Z"
+        },
+        {
+          "type": "user",
+          "text": "/home/z/Desktop/work/use-ai/packages/server/test/test-utils.ts\n/home/z/Desktop/work/use-ai/packages/client/test/jest-dom.d.ts\n/home/z/Desktop/work/use-ai/packages/client/test/bun-jest-dom.d.ts\n/home/z/Desktop/work/use-ai/packages/client/dist/test/test-utils.d.ts\n/home/z/Desktop/work/use-ai/packages/client/dist/test/useAI.integration.test.d.ts\n/home/z/Desktop/work/use-ai/packages/server/dist/test/test-utils.d.ts",
+          "timestamp": "2025-11-06T06:55:56.939Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Glob",
+          "input": {
+            "pattern": "packages/server/**/*.test.ts"
+          },
+          "timestamp": "2025-11-06T06:56:01.340Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/packages/server/test/test-utils.ts"
+          },
+          "timestamp": "2025-11-06T06:56:01.698Z"
+        },
+        {
+          "type": "user",
+          "text": "     1→import WebSocket from 'ws';\n     2→import type {\n     3→  ClientMessage,\n     4→  ServerMessage,\n     5→} from '../src/types';\n     6→import type Anthropic from '@anthropic-ai/sdk';\n     7→\n     8→/**\n     9→ * Wait for WebSocket connection to be established\n    10→ */\n    11→export function waitForConnection(ws: WebSocket): Promise<void> {\n    12→  return new Promise((resolve, reject) => {\n    13→    if (ws.readyState === WebSocket.OPEN) {\n    14→      resolve();\n    15→      return;\n    16→    }\n    17→    ws.once('open', () => resolve());\n    18→    ws.once('error', reject);\n    19→  });\n    20→}\n    21→\n    22→/**\n    23→ * Wait for a message from the WebSocket server\n    24→ */\n    25→export function waitForMessage(ws: WebSocket, timeout = 5000): Promise<ServerMessage> {\n    26→  return new Promise((resolve, reject) => {\n    27→    const timeoutId = setTimeout(() => {\n    28→      reject(new Error('Message timeout'));\n    29→    }, timeout);\n    30→\n    31→    ws.once('message', (data: Buffer) => {\n    32→      clearTimeout(timeoutId);\n    33→      resolve(JSON.parse(data.toString()));\n    34→    });\n    35→  });\n    36→}\n    37→\n    38→/**\n    39→ * Send a message to the WebSocket server\n    40→ */\n    41→export function sendMessage(ws: WebSocket, message: ClientMessage): void {\n    42→  ws.send(JSON.stringify(message));\n    43→}\n    44→\n    45→/**\n    46→ * Create a WebSocket client connected to the test server\n    47→ */\n    48→export async function createTestClient(port: number): Promise<WebSocket> {\n    49→  const ws = new WebSocket(`ws://localhost:${port}`);\n    50→  await waitForConnection(ws);\n    51→  return ws;\n    52→}\n    53→\n    54→/**\n    55→ * Create a mock Anthropic message with the given content blocks\n    56→ */\n    57→export function createMockAnthropicMessage(\n    58→  id: string,\n    59→  content: Anthropic.ContentBlock[]\n    60→): Anthropic.Message {\n    61→  return {\n    62→    id,\n    63→    type: 'message',\n    64→    role: 'assistant',\n    65→    content,\n    66→    model: 'claude-sonnet-4-20250514',\n    67→    stop_reason: 'end_turn',\n    68→    stop_sequence: null,\n    69→    usage: {\n    70→      input_tokens: 100,\n    71→      output_tokens: 50,\n    72→    },\n    73→  };\n    74→}\n    75→\n    76→/**\n    77→ * Create a mock text response from Anthropic\n    78→ */\n    79→export function createTextResponse(id: string, text: string): Anthropic.Message {\n    80→  return createMockAnthropicMessage(id, [\n    81→    {\n    82→      type: 'text',\n    83→      text,\n    84→    },\n    85→  ]);\n    86→}\n    87→\n    88→/**\n    89→ * Create a mock tool use response from Anthropic\n    90→ */\n    91→export function createToolUseResponse(\n    92→  id: string,\n    93→  toolCallId: string,\n    94→  toolName: string,\n    95→  input: Record<string, unknown>\n    96→): Anthropic.Message {\n    97→  return createMockAnthropicMessage(id, [\n    98→    {\n    99→      type: 'tool_use',\n   100→      id: toolCallId,\n   101→      name: toolName,\n   102→      input,\n   103→    },\n   104→  ]);\n   105→}\n   106→\n   107→/**\n   108→ * Create a mock text response after tool execution\n   109→ */\n   110→export function createTextAfterToolResponse(id: string, text: string): Anthropic.Message {\n   111→  return createMockAnthropicMessage(id, [\n   112→    {\n   113→      type: 'text',\n   114→      text,\n   115→    },\n   116→  ]);\n   117→}\n   118→\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\n</system-reminder>\n",
+          "timestamp": "2025-11-06T06:56:01.938Z"
+        },
+        {
+          "type": "user",
+          "text": "/home/z/Desktop/work/use-ai/packages/server/src/rateLimiter.test.ts\n/home/z/Desktop/work/use-ai/packages/server/src/server.test.ts",
+          "timestamp": "2025-11-06T06:56:01.984Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/packages/server/src/server.test.ts"
+          },
+          "timestamp": "2025-11-06T06:56:05.598Z"
+        },
+        {
+          "type": "user",
+          "text": "     1→import { describe, expect, test, beforeAll, afterAll, mock } from 'bun:test';\n     2→import WebSocket from 'ws';\n     3→import type {\n     4→  ToolCallMessage,\n     5→  ResponseMessage,\n     6→  ErrorMessage,\n     7→  ToolDefinition,\n     8→} from './types';\n     9→import type Anthropic from '@anthropic-ai/sdk';\n    10→import {\n    11→  waitForMessage,\n    12→  sendMessage,\n    13→  createTestClient,\n    14→  createTextResponse,\n    15→  createToolUseResponse,\n    16→} from '../test/test-utils';\n    17→\n    18→// Create mock for Anthropic messages.create\n    19→const mockMessagesCreate = mock((_params?: any): Promise<Anthropic.Message> => Promise.resolve({\n    20→  id: 'msg_default',\n    21→  type: 'message',\n    22→  role: 'assistant',\n    23→  content: [{ type: 'text', text: 'Default response' }],\n    24→  model: 'claude-sonnet-4-20250514',\n    25→  stop_reason: 'end_turn',\n    26→  stop_sequence: null,\n    27→  usage: { input_tokens: 100, output_tokens: 50 },\n    28→} as Anthropic.Message));\n    29→\n    30→// Mock Anthropic SDK\n    31→mock.module('@anthropic-ai/sdk', () => {\n    32→  return {\n    33→    default: class MockAnthropic {\n    34→      apiKey: string;\n    35→      messages: { create: (params: any) => Promise<Anthropic.Message> };\n    36→\n    37→      constructor(config: any) {\n    38→        this.apiKey = config.apiKey;\n    39→        // Create a wrapper that always calls the current mock implementation\n    40→        this.messages = {\n    41→          create: (params: any) => mockMessagesCreate(params),\n    42→        };\n    43→      }\n    44→    },\n    45→  };\n    46→});\n    47→\n    48→// Now import server after mocking\n    49→import { UseAIServer } from './server';\n    50→\n    51→// Track all servers for cleanup\n    52→const allServers: UseAIServer[] = [];\n    53→const allWebSockets: WebSocket[] = [];\n    54→\n    55→afterAll(() => {\n    56→  // Force cleanup of any remaining servers\n    57→  allServers.forEach(server => {\n    58→    try {\n    59→      server.close();\n    60→    } catch (e) {\n    61→      // Ignore errors during cleanup\n    62→    }\n    63→  });\n    64→\n    65→  // Force close any remaining websockets\n    66→  allWebSockets.forEach(ws => {\n    67→    try {\n    68→      if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {\n    69→        ws.close();\n    70→      }\n    71→    } catch (e) {\n    72→      // Ignore errors during cleanup\n    73→    }\n    74→  });\n    75→});\n    76→\n    77→describe('Connection Management', () => {\n    78→  let server: UseAIServer;\n    79→  const testPort = 8081;\n    80→\n    81→  beforeAll(() => {\n    82→    server = new UseAIServer({\n    83→      port: testPort,\n    84→      anthropicApiKey: 'test-key',\n    85→    });\n    86→    allServers.push(server);\n    87→  });\n    88→\n    89→  afterAll(() => {\n    90→    server.close();\n    91→  });\n    92→\n    93→  test('client can connect to the server', async () => {\n    94→    const ws = await createTestClient(testPort);\n    95→    allWebSockets.push(ws);\n    96→    expect(ws.readyState).toBe(WebSocket.OPEN);\n    97→    ws.close();\n    98→  });\n    99→\n   100→  test('server supports multiple clients', async () => {\n   101→    const ws1 = await createTestClient(testPort);\n   102→    const ws2 = await createTestClient(testPort);\n   103→    const ws3 = await createTestClient(testPort);\n   104→    allWebSockets.push(ws1, ws2, ws3);\n   105→\n   106→    expect(ws1.readyState).toBe(WebSocket.OPEN);\n   107→    expect(ws2.readyState).toBe(WebSocket.OPEN);\n   108→    expect(ws3.readyState).toBe(WebSocket.OPEN);\n   109→\n   110→    ws1.close();\n   111→    ws2.close();\n   112→    ws3.close();\n   113→  });\n   114→});\n   115→\n   116→describe('Tool Use', () => {\n   117→  let server: UseAIServer;\n   118→  const testPort = 8082;\n   119→\n   120→  beforeAll(() => {\n   121→    server = new UseAIServer({\n   122→      port: testPort,\n   123→      anthropicApiKey: 'test-key',\n   124→    });\n   125→    allServers.push(server);\n   126→  });\n   127→\n   128→  afterAll(() => {\n   129→    server.close();\n   130→  });\n   131→\n   132→  test('tools can be registered and invoked by the AI', async () => {\n   133→    mockMessagesCreate.mockClear();\n   134→    mockMessagesCreate.mockImplementation((_params?: any): Promise<Anthropic.Message> => {\n   135→      return Promise.resolve(\n   136→        createToolUseResponse('msg_tool1', 'toolu_123', 'add_todo', { text: 'Buy milk' })\n   137→      );\n   138→    });\n   139→\n   140→    const ws = await createTestClient(testPort);\n   141→    allWebSockets.push(ws);\n   142→\n   143→    const tools: ToolDefinition[] = [\n   144→      {\n   145→        name: 'add_todo',\n   146→        description: 'Add a new todo',\n   147→        input_schema: {\n   148→          type: 'object',\n   149→          properties: {\n   150→            text: { type: 'string' },\n   151→          },\n   152→          required: ['text'],\n   153→        },\n   154→      },\n   155→    ];\n   156→\n   157→    sendMessage(ws, {\n   158→      type: 'register_tools',\n   159→      data: { tools },\n   160→    });\n   161→\n   162→    await new Promise((resolve) => setTimeout(resolve, 50));\n   163→\n   164→    sendMessage(ws, {\n   165→      type: 'prompt',\n   166→      data: { prompt: 'Add a todo to buy milk' },\n   167→    });\n   168→\n   169→    const toolCallMessage = await waitForMessage(ws) as ToolCallMessage;\n   170→    expect(toolCallMessage.type).toBe('tool_call');\n   171→    expect(toolCallMessage.data.toolCallId).toBe('toolu_123');\n   172→    expect(toolCallMessage.data.name).toBe('add_todo');\n   173→    expect(toolCallMessage.data.input).toEqual({ text: 'Buy milk' });\n   174→\n   175→    ws.close();\n   176→  });\n   177→\n   178→  test('the AI can invoke a tool on the client and receive a response', async () => {\n   179→    let callCount = 0;\n   180→    mockMessagesCreate.mockClear();\n   181→    mockMessagesCreate.mockImplementation((params?: any): Promise<Anthropic.Message> => {\n   182→      callCount++;\n   183→      if (callCount === 1) {\n   184→        return Promise.resolve(\n   185→          createToolUseResponse('msg_tool2', 'toolu_456', 'get_data', { id: '123' })\n   186→        );\n   187→      }\n   188→      return Promise.resolve(createTextResponse('msg_final', 'Got the data'));\n   189→    });\n   190→\n   191→    const ws = await createTestClient(testPort);\n   192→    allWebSockets.push(ws);\n   193→\n   194→    // Keep connection alive with persistent listener\n   195→    ws.on('message', () => {});\n   196→\n   197→    const tools: ToolDefinition[] = [\n   198→      {\n   199→        name: 'get_data',\n   200→        description: 'Get data by ID',\n   201→        input_schema: {\n   202→          type: 'object',\n   203→          properties: {\n   204→            id: { type: 'string' },\n   205→          },\n   206→          required: ['id'],\n   207→        },\n   208→      },\n   209→    ];\n   210→\n   211→    sendMessage(ws, {\n   212→      type: 'register_tools',\n   213→      data: { tools },\n   214→    });\n   215→\n   216→    await new Promise((resolve) => setTimeout(resolve, 50));\n   217→\n   218→    sendMessage(ws, {\n   219→      type: 'prompt',\n   220→      data: { prompt: 'Get data for ID 123' },\n   221→    });\n   222→\n   223→    const toolCallMessage = await waitForMessage(ws) as ToolCallMessage;\n   224→    expect(toolCallMessage.type).toBe('tool_call');\n   225→    expect(toolCallMessage.data.name).toBe('get_data');\n   226→\n   227→    sendMessage(ws, {\n   228→      type: 'tool_response',\n   229→      data: {\n   230→        toolCallId: toolCallMessage.data.toolCallId,\n   231→        result: { data: 'Sample data' },\n   232→      },\n   233→    });\n   234→\n   235→    const finalResponse = await waitForMessage(ws) as ResponseMessage;\n   236→    expect(finalResponse.type).toBe('response');\n   237→    expect(finalResponse.data.content).toBe('Got the data');\n   238→\n   239→    expect(mockMessagesCreate).toHaveBeenCalledTimes(2);\n   240→\n   241→    ws.close();\n   242→  });\n   243→});\n   244→\n   245→describe('Error Handling', () => {\n   246→  let server: UseAIServer;\n   247→  const testPort = 8083;\n   248→\n   249→  beforeAll(() => {\n   250→    server = new UseAIServer({\n   251→      port: testPort,\n   252→      anthropicApiKey: 'test-key',\n   253→    });\n   254→    allServers.push(server);\n   255→  });\n   256→\n   257→  afterAll(() => {\n   258→    server.close();\n   259→  });\n   260→\n   261→  test('bad JSON on websocket', async () => {\n   262→    const ws = await createTestClient(testPort);\n   263→    allWebSockets.push(ws);\n   264→\n   265→    ws.send('invalid json{{{');\n   266→\n   267→    const errorMessage = await waitForMessage(ws) as ErrorMessage;\n   268→    expect(errorMessage.type).toBe('error');\n   269→\n   270→    ws.close();\n   271→  });\n   272→\n   273→  test('missing API key', () => {\n   274→    expect(() => {\n   275→      new UseAIServer({\n   276→        port: 9999,\n   277→        anthropicApiKey: '',\n   278→      });\n   279→    }).toThrow('Anthropic API key is required');\n   280→  });\n   281→});\n   282→\n   283→describe('Server Lifecycle', () => {\n   284→  test('server starts on configured port', async () => {\n   285→    const testPort = 8084;\n   286→    const server = new UseAIServer({\n   287→      port: testPort,\n   288→      anthropicApiKey: 'test-key',\n   289→    });\n   290→    allServers.push(server);\n   291→\n   292→    const ws = await createTestClient(testPort);\n   293→    allWebSockets.push(ws);\n   294→    expect(ws.readyState).toBe(WebSocket.OPEN);\n   295→\n   296→    ws.close();\n   297→    server.close();\n   298→  });\n   299→});\n   300→\n   301→describe('Rate Limiting', () => {\n   302→  test('if a client hits the rate limit, they will be blocked from queries', async () => {\n   303→    const testPort = 8085;\n   304→    const server = new UseAIServer({\n   305→      port: testPort,\n   306→      anthropicApiKey: 'test-key',\n   307→      rateLimitMaxRequests: 2,\n   308→      rateLimitWindowMs: 1000,\n   309→    });\n   310→    allServers.push(server);\n   311→\n   312→    mockMessagesCreate.mockClear();\n   313→    mockMessagesCreate.mockImplementation((_params?: any): Promise<Anthropic.Message> => {\n   314→      return Promise.resolve(createTextResponse('msg_rate1', 'Response'));\n   315→    });\n   316→\n   317→    const ws = await createTestClient(testPort);\n   318→    allWebSockets.push(ws);\n   319→\n   320→    // Keep connection alive\n   321→    ws.on('message', () => {});\n   322→\n   323→    // Send first prompt (should succeed)\n   324→    sendMessage(ws, {\n   325→      type: 'prompt',\n   326→      data: { prompt: 'First prompt' },\n   327→    });\n   328→\n   329→    const response1 = await waitForMessage(ws);\n   330→    expect(response1.type).toBe('response');\n   331→\n   332→    // Send second prompt (should succeed)\n   333→    sendMessage(ws, {\n   334→      type: 'prompt',\n   335→      data: { prompt: 'Second prompt' },\n   336→    });\n   337→\n   338→    const response2 = await waitForMessage(ws);\n   339→    expect(response2.type).toBe('response');\n   340→\n   341→    // Send third prompt (should be rate limited)\n   342→    sendMessage(ws, {\n   343→      type: 'prompt',\n   344→      data: { prompt: 'Third prompt' },\n   345→    });\n   346→\n   347→    const response3 = await waitForMessage(ws) as ErrorMessage;\n   348→    expect(response3.type).toBe('error');\n   349→    expect(response3.data.message).toContain('Rate limit exceeded');\n   350→\n   351→    ws.close();\n   352→    server.close();\n   353→  });\n   354→\n   355→  test('clients rate limits do not affect other clients', async () => {\n   356→    const testPort = 8086;\n   357→    const server = new UseAIServer({\n   358→      port: testPort,\n   359→      anthropicApiKey: 'test-key',\n   360→      rateLimitMaxRequests: 2,\n   361→      rateLimitWindowMs: 1000,\n   362→    });\n   363→    allServers.push(server);\n   364→\n   365→    mockMessagesCreate.mockClear();\n   366→    mockMessagesCreate.mockImplementation((_params?: any): Promise<Anthropic.Message> => {\n   367→      return Promise.resolve(createTextResponse('msg_rate2', 'Response'));\n   368→    });\n   369→\n   370→    // Connect two clients\n   371→    const ws1 = await createTestClient(testPort);\n   372→    const ws2 = await createTestClient(testPort);\n   373→    allWebSockets.push(ws1, ws2);\n   374→\n   375→    // Keep connections alive\n   376→    ws1.on('message', () => {});\n   377→    ws2.on('message', () => {});\n   378→\n   379→    // Client 1: Send requests until rate limited\n   380→    sendMessage(ws1, {\n   381→      type: 'prompt',\n   382→      data: { prompt: 'Client 1 - First' },\n   383→    });\n   384→    await waitForMessage(ws1);\n   385→\n   386→    sendMessage(ws1, {\n   387→      type: 'prompt',\n   388→      data: { prompt: 'Client 1 - Second' },\n   389→    });\n   390→    await waitForMessage(ws1);\n   391→\n   392→    sendMessage(ws1, {\n   393→      type: 'prompt',\n   394→      data: { prompt: 'Client 1 - Third' },\n   395→    });\n   396→    const ws1Response = await waitForMessage(ws1) as ErrorMessage;\n   397→    expect(ws1Response.type).toBe('error');\n   398→    expect(ws1Response.data.message).toContain('Rate limit exceeded');\n   399→\n   400→    // Client 2: Should still be able to send requests\n   401→    sendMessage(ws2, {\n   402→      type: 'prompt',\n   403→      data: { prompt: 'Client 2 - First' },\n   404→    });\n   405→    const ws2Response = await waitForMessage(ws2) as ResponseMessage;\n   406→    expect(ws2Response.type).toBe('response');\n   407→\n   408→    ws1.close();\n   409→    ws2.close();\n   410→    server.close();\n   411→  });\n   412→});\n   413→\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\n</system-reminder>\n",
+          "timestamp": "2025-11-06T06:56:05.718Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "TodoWrite",
+          "input": {
+            "todos": [
+              {
+                "activeForm": "Reading existing integration test",
+                "content": "Read existing integration test to understand test structure",
+                "status": "completed"
+              },
+              {
+                "activeForm": "Checking for existing server tests",
+                "content": "Check for existing server tests",
+                "status": "completed"
+              },
+              {
+                "activeForm": "Writing integration test for multiple tool calls",
+                "content": "Write integration test that reproduces the multiple tool call bug",
+                "status": "in_progress"
+              },
+              {
+                "activeForm": "Analyzing root cause in server.ts",
+                "content": "Analyze the root cause in server.ts",
+                "status": "pending"
+              },
+              {
+                "activeForm": "Implementing fix for multiple tool calls",
+                "content": "Implement fix to handle multiple tool calls correctly",
+                "status": "pending"
+              },
+              {
+                "activeForm": "Running integration test",
+                "content": "Run the integration test to verify the fix",
+                "status": "pending"
+              }
+            ]
+          },
+          "timestamp": "2025-11-06T06:56:15.223Z"
+        },
+        {
+          "type": "user",
+          "text": "Todos have been modified successfully. Ensure that you continue to use the todo list to track your progress. Please proceed with the current tasks if applicable",
+          "timestamp": "2025-11-06T06:56:15.382Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Edit",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/packages/server/test/test-utils.ts",
+            "new_string": "/**\n * Create a mock text response after tool execution\n */\nexport function createTextAfterToolResponse(id: string, text: string): Anthropic.Message {\n  return createMockAnthropicMessage(id, [\n    {\n      type: 'text',\n      text,\n    },\n  ]);\n}\n\n/**\n * Create a mock response with multiple tool uses\n */\nexport function createMultipleToolUseResponse(\n  id: string,\n  toolCalls: Array<{ id: string; name: string; input: Record<string, unknown> }>\n): Anthropic.Message {\n  return createMockAnthropicMessage(\n    id,\n    toolCalls.map(call => ({\n      type: 'tool_use' as const,\n      id: call.id,\n      name: call.name,\n      input: call.input,\n    }))\n  );\n}",
+            "old_string": "/**\n * Create a mock text response after tool execution\n */\nexport function createTextAfterToolResponse(id: string, text: string): Anthropic.Message {\n  return createMockAnthropicMessage(id, [\n    {\n      type: 'text',\n      text,\n    },\n  ]);\n}"
+          },
+          "timestamp": "2025-11-06T06:56:24.325Z"
+        },
+        {
+          "type": "user",
+          "text": "The file /home/z/Desktop/work/use-ai/packages/server/test/test-utils.ts has been updated. Here's the result of running `cat -n` on a snippet of the edited file:\n   103→    },\n   104→  ]);\n   105→}\n   106→\n   107→/**\n   108→ * Create a mock text response after tool execution\n   109→ */\n   110→export function createTextAfterToolResponse(id: string, text: string): Anthropic.Message {\n   111→  return createMockAnthropicMessage(id, [\n   112→    {\n   113→      type: 'text',\n   114→      text,\n   115→    },\n   116→  ]);\n   117→}\n   118→\n   119→/**\n   120→ * Create a mock response with multiple tool uses\n   121→ */\n   122→export function createMultipleToolUseResponse(\n   123→  id: string,\n   124→  toolCalls: Array<{ id: string; name: string; input: Record<string, unknown> }>\n   125→): Anthropic.Message {\n   126→  return createMockAnthropicMessage(\n   127→    id,\n   128→    toolCalls.map(call => ({\n   129→      type: 'tool_use' as const,\n   130→      id: call.id,\n   131→      name: call.name,\n   132→      input: call.input,\n   133→    }))\n   134→  );\n   135→}\n   136→",
+          "timestamp": "2025-11-06T06:56:24.657Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Edit",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/packages/server/src/server.test.ts",
+            "new_string": "import {\n  waitForMessage,\n  sendMessage,\n  createTestClient,\n  createTextResponse,\n  createToolUseResponse,\n  createMultipleToolUseResponse,\n} from '../test/test-utils';",
+            "old_string": "import {\n  waitForMessage,\n  sendMessage,\n  createTestClient,\n  createTextResponse,\n  createToolUseResponse,\n} from '../test/test-utils';"
+          },
+          "timestamp": "2025-11-06T06:56:30.690Z"
+        },
+        {
+          "type": "user",
+          "text": "The file /home/z/Desktop/work/use-ai/packages/server/src/server.test.ts has been updated. Here's the result of running `cat -n` on a snippet of the edited file:\n     6→  ErrorMessage,\n     7→  ToolDefinition,\n     8→} from './types';\n     9→import type Anthropic from '@anthropic-ai/sdk';\n    10→import {\n    11→  waitForMessage,\n    12→  sendMessage,\n    13→  createTestClient,\n    14→  createTextResponse,\n    15→  createToolUseResponse,\n    16→  createMultipleToolUseResponse,\n    17→} from '../test/test-utils';\n    18→\n    19→// Create mock for Anthropic messages.create\n    20→const mockMessagesCreate = mock((_params?: any): Promise<Anthropic.Message> => Promise.resolve({\n    21→  id: 'msg_default',",
+          "timestamp": "2025-11-06T06:56:30.926Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Edit",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/packages/server/src/server.test.ts",
+            "new_string": "    expect(mockMessagesCreate).toHaveBeenCalledTimes(2);\n\n    ws.close();\n  });\n\n  test('the AI can invoke multiple tools at once', async () => {\n    let callCount = 0;\n    mockMessagesCreate.mockClear();\n    mockMessagesCreate.mockImplementation((params?: any): Promise<Anthropic.Message> => {\n      callCount++;\n\n      if (callCount === 1) {\n        // First call: Claude wants to use two tools at once\n        return Promise.resolve(\n          createMultipleToolUseResponse('msg_multi_tool', [\n            { id: 'toolu_001', name: 'add_todo', input: { text: 'Buy milk' } },\n            { id: 'toolu_002', name: 'add_todo', input: { text: 'Walk dog' } },\n          ])\n        );\n      }\n\n      // Follow-up call: Claude responds after receiving tool results\n      return Promise.resolve(createTextResponse('msg_final_multi', 'I added both todos'));\n    });\n\n    const ws = await createTestClient(testPort);\n    allWebSockets.push(ws);\n\n    // Keep connection alive\n    ws.on('message', () => {});\n\n    const tools: ToolDefinition[] = [\n      {\n        name: 'add_todo',\n        description: 'Add a new todo',\n        input_schema: {\n          type: 'object',\n          properties: {\n            text: { type: 'string' },\n          },\n          required: ['text'],\n        },\n      },\n    ];\n\n    sendMessage(ws, {\n      type: 'register_tools',\n      data: { tools },\n    });\n\n    await new Promise((resolve) => setTimeout(resolve, 50));\n\n    sendMessage(ws, {\n      type: 'prompt',\n      data: { prompt: 'Add two todos: buy milk and walk dog' },\n    });\n\n    // Should receive first tool call\n    const toolCall1 = await waitForMessage(ws) as ToolCallMessage;\n    expect(toolCall1.type).toBe('tool_call');\n    expect(toolCall1.data.name).toBe('add_todo');\n    const toolCallId1 = toolCall1.data.toolCallId;\n\n    // Send response for first tool\n    sendMessage(ws, {\n      type: 'tool_response',\n      data: {\n        toolCallId: toolCallId1,\n        result: { success: true },\n      },\n    });\n\n    // Should receive second tool call\n    const toolCall2 = await waitForMessage(ws) as ToolCallMessage;\n    expect(toolCall2.type).toBe('tool_call');\n    expect(toolCall2.data.name).toBe('add_todo');\n    const toolCallId2 = toolCall2.data.toolCallId;\n\n    // Send response for second tool\n    sendMessage(ws, {\n      type: 'tool_response',\n      data: {\n        toolCallId: toolCallId2,\n        result: { success: true },\n      },\n    });\n\n    // Should receive final response\n    const finalResponse = await waitForMessage(ws) as ResponseMessage;\n    expect(finalResponse.type).toBe('response');\n    expect(finalResponse.data.content).toBe('I added both todos');\n\n    // The mock should only be called twice:\n    // 1. Initial prompt\n    // 2. After BOTH tools complete (not after each tool individually)\n    expect(mockMessagesCreate).toHaveBeenCalledTimes(2);\n\n    ws.close();\n  });\n});",
+            "old_string": "    expect(mockMessagesCreate).toHaveBeenCalledTimes(2);\n\n    ws.close();\n  });\n});"
+          },
+          "timestamp": "2025-11-06T06:56:46.429Z"
+        },
+        {
+          "type": "user",
+          "text": "The file /home/z/Desktop/work/use-ai/packages/server/src/server.test.ts has been updated. Here's the result of running `cat -n` on a snippet of the edited file:\n   236→    const finalResponse = await waitForMessage(ws) as ResponseMessage;\n   237→    expect(finalResponse.type).toBe('response');\n   238→    expect(finalResponse.data.content).toBe('Got the data');\n   239→\n   240→    expect(mockMessagesCreate).toHaveBeenCalledTimes(2);\n   241→\n   242→    ws.close();\n   243→  });\n   244→\n   245→  test('the AI can invoke multiple tools at once', async () => {\n   246→    let callCount = 0;\n   247→    mockMessagesCreate.mockClear();\n   248→    mockMessagesCreate.mockImplementation((params?: any): Promise<Anthropic.Message> => {\n   249→      callCount++;\n   250→\n   251→      if (callCount === 1) {\n   252→        // First call: Claude wants to use two tools at once\n   253→        return Promise.resolve(\n   254→          createMultipleToolUseResponse('msg_multi_tool', [\n   255→            { id: 'toolu_001', name: 'add_todo', input: { text: 'Buy milk' } },\n   256→            { id: 'toolu_002', name: 'add_todo', input: { text: 'Walk dog' } },\n   257→          ])\n   258→        );\n   259→      }\n   260→\n   261→      // Follow-up call: Claude responds after receiving tool results\n   262→      return Promise.resolve(createTextResponse('msg_final_multi', 'I added both todos'));\n   263→    });\n   264→\n   265→    const ws = await createTestClient(testPort);\n   266→    allWebSockets.push(ws);\n   267→\n   268→    // Keep connection alive\n   269→    ws.on('message', () => {});\n   270→\n   271→    const tools: ToolDefinition[] = [\n   272→      {\n   273→        name: 'add_todo',\n   274→        description: 'Add a new todo',\n   275→        input_schema: {\n   276→          type: 'object',\n   277→          properties: {\n   278→            text: { type: 'string' },\n   279→          },\n   280→          required: ['text'],\n   281→        },\n   282→      },\n   283→    ];\n   284→\n   285→    sendMessage(ws, {\n   286→      type: 'register_tools',\n   287→      data: { tools },\n   288→    });\n   289→\n   290→    await new Promise((resolve) => setTimeout(resolve, 50));\n   291→\n   292→    sendMessage(ws, {\n   293→      type: 'prompt',\n   294→      data: { prompt: 'Add two todos: buy milk and walk dog' },\n   295→    });\n   296→\n   297→    // Should receive first tool call\n   298→    const toolCall1 = await waitForMessage(ws) as ToolCallMessage;\n   299→    expect(toolCall1.type).toBe('tool_call');\n   300→    expect(toolCall1.data.name).toBe('add_todo');\n   301→    const toolCallId1 = toolCall1.data.toolCallId;\n   302→\n   303→    // Send response for first tool\n   304→    sendMessage(ws, {\n   305→      type: 'tool_response',\n   306→      data: {\n   307→        toolCallId: toolCallId1,\n   308→        result: { success: true },\n   309→      },\n   310→    });\n   311→\n   312→    // Should receive second tool call\n   313→    const toolCall2 = await waitForMessage(ws) as ToolCallMessage;\n   314→    expect(toolCall2.type).toBe('tool_call');\n   315→    expect(toolCall2.data.name).toBe('add_todo');\n   316→    const toolCallId2 = toolCall2.data.toolCallId;\n   317→\n   318→    // Send response for second tool\n   319→    sendMessage(ws, {\n   320→      type: 'tool_response',\n   321→      data: {\n   322→        toolCallId: toolCallId2,\n   323→        result: { success: true },\n   324→      },\n   325→    });\n   326→\n   327→    // Should receive final response\n   328→    const finalResponse = await waitForMessage(ws) as ResponseMessage;\n   329→    expect(finalResponse.type).toBe('response');\n   330→    expect(finalResponse.data.content).toBe('I added both todos');\n   331→\n   332→    // The mock should only be called twice:\n   333→    // 1. Initial prompt\n   334→    // 2. After BOTH tools complete (not after each tool individually)\n   335→    expect(mockMessagesCreate).toHaveBeenCalledTimes(2);\n   336→\n   337→    ws.close();\n   338→  });\n   339→});\n   340→\n   341→describe('Error Handling', () => {\n   342→  let server: UseAIServer;\n   343→  const testPort = 8083;",
+          "timestamp": "2025-11-06T06:56:46.625Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "TodoWrite",
+          "input": {
+            "todos": [
+              {
+                "activeForm": "Reading existing integration test",
+                "content": "Read existing integration test to understand test structure",
+                "status": "completed"
+              },
+              {
+                "activeForm": "Checking for existing server tests",
+                "content": "Check for existing server tests",
+                "status": "completed"
+              },
+              {
+                "activeForm": "Writing integration test for multiple tool calls",
+                "content": "Write integration test that reproduces the multiple tool call bug",
+                "status": "completed"
+              },
+              {
+                "activeForm": "Running the test to verify it fails",
+                "content": "Run the test to verify it fails (reproducing the bug)",
+                "status": "in_progress"
+              },
+              {
+                "activeForm": "Analyzing root cause in server.ts",
+                "content": "Analyze the root cause in server.ts",
+                "status": "pending"
+              },
+              {
+                "activeForm": "Implementing fix for multiple tool calls",
+                "content": "Implement fix to handle multiple tool calls correctly",
+                "status": "pending"
+              },
+              {
+                "activeForm": "Running integration test",
+                "content": "Run the integration test to verify the fix",
+                "status": "pending"
+              }
+            ]
+          },
+          "timestamp": "2025-11-06T06:56:54.668Z"
+        },
+        {
+          "type": "user",
+          "text": "Todos have been modified successfully. Ensure that you continue to use the todo list to track your progress. Please proceed with the current tasks if applicable",
+          "timestamp": "2025-11-06T06:56:54.760Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Bash",
+          "input": {
+            "command": "cd packages/server && bun test src/server.test.ts",
+            "description": "Run server tests to verify bug",
+            "timeout": 30000
+          },
+          "timestamp": "2025-11-06T06:56:59.356Z"
+        },
+        {
+          "type": "user",
+          "text": "Exit code 1\n\nsrc/server.test.ts:\n(pass) Connection Management > client can connect to the server [3.00ms]\n(pass) Connection Management > server supports multiple clients [2.00ms]\n(pass) Tool Use > tools can be registered and invoked by the AI [54.00ms]\n(pass) Tool Use > the AI can invoke a tool on the client and receive a response [52.00ms]\n309 |       },\n310 |     });\n311 | \n312 |     // Should receive second tool call\n313 |     const toolCall2 = await waitForMessage(ws) as ToolCallMessage;\n314 |     expect(toolCall2.type).toBe('tool_call');\n                                 ^\nerror: expect(received).toBe(expected)\n\nExpected: \"tool_call\"\nReceived: \"response\"\n\n      at /home/z/Desktop/work/use-ai/packages/server/src/server.test.ts:314:28\n(fail) Tool Use > the AI can invoke multiple tools at once [53.00ms]\nError handling message: 105 | \n106 |       this.clients.set(ws, session);\n107 | \n108 |       ws.on('message', async (data: Buffer) => {\n109 |         try {\n110 |           const message: ClientMessage = JSON.parse(data.toString());\n                                                    ^\nSyntaxError: JSON Parse error: Unexpected identifier \"invalid\"\n      at /home/z/Desktop/work/use-ai/packages/server/src/server.ts:110:47\n      at /home/z/Desktop/work/use-ai/packages/server/src/server.ts:108:31\n      at emit (node:events:78:22)\n      at #message (ws:533:14)\n      at message (node:http:362:28)\n\n(pass) Error Handling > bad JSON on websocket [1.00ms]\n(pass) Error Handling > missing API key\n(pass) Server Lifecycle > server starts on configured port [2.00ms]\n(pass) Rate Limiting > if a client hits the rate limit, they will be blocked from queries [1.00ms]\n(pass) Rate Limiting > clients rate limits do not affect other clients [2.00ms]\n\n 9 pass\n 1 fail\n 26 expect() calls\nRan 10 tests across 1 files. [208.00ms]\n\nbun test v1.1.39 (1d485617)\nUseAI server listening on port 8081\nUseAI server listening on port 8082\nUseAI server listening on port 8083\nClient connected: client-1\nClient disconnected: client-1\nClient connected: client-2\nClient connected: client-3\nClient connected: client-4\nClient disconnected: client-2\nClient disconnected: client-3\nClient disconnected: client-4\nClient connected: client-1\nRegistered 1 tools for client\nClient disconnected: client-1\nClient connected: client-2\nRegistered 1 tools for client\nClient disconnected: client-2\nClient connected: client-3\nRegistered 1 tools for client\nClient connected: client-1\nUseAI server listening on port 8084\nClient disconnected: client-1\nClient connected: client-1\nUseAI server listening on port 8085\nRate limiting enabled: 2 requests per 1000ms\nClient disconnected: client-1\nClient connected: client-1\nUseAI server listening on port 8086\nRate limiting enabled: 2 requests per 1000ms\nClient disconnected: client-1\nClient connected: client-1\nClient connected: client-2",
+          "timestamp": "2025-11-06T06:57:00.056Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "TodoWrite",
+          "input": {
+            "todos": [
+              {
+                "activeForm": "Reading existing integration test",
+                "content": "Read existing integration test to understand test structure",
+                "status": "completed"
+              },
+              {
+                "activeForm": "Checking for existing server tests",
+                "content": "Check for existing server tests",
+                "status": "completed"
+              },
+              {
+                "activeForm": "Writing integration test for multiple tool calls",
+                "content": "Write integration test that reproduces the multiple tool call bug",
+                "status": "completed"
+              },
+              {
+                "activeForm": "Running the test to verify it fails",
+                "content": "Run the test to verify it fails (reproducing the bug)",
+                "status": "completed"
+              },
+              {
+                "activeForm": "Analyzing root cause in server.ts",
+                "content": "Analyze the root cause in server.ts",
+                "status": "in_progress"
+              },
+              {
+                "activeForm": "Implementing fix for multiple tool calls",
+                "content": "Implement fix to handle multiple tool calls correctly",
+                "status": "pending"
+              },
+              {
+                "activeForm": "Running integration test",
+                "content": "Run the integration test to verify the fix",
+                "status": "pending"
+              }
+            ]
+          },
+          "timestamp": "2025-11-06T06:57:09.151Z"
+        },
+        {
+          "type": "user",
+          "text": "Todos have been modified successfully. Ensure that you continue to use the todo list to track your progress. Please proceed with the current tasks if applicable",
+          "timestamp": "2025-11-06T06:57:09.230Z"
+        },
+        {
+          "type": "assistant",
+          "text": "Great! The test fails as expected with the error `Expected: \"tool_call\", Received: \"response\"`. This confirms the bug - the server is making an API call after the first tool completes, instead of waiting for all tools to complete.\n\n## Root Cause Analysis\n\nLooking at `packages/server/src/server.ts:223-304`, the problem is:\n\n1. `processResponse()` iterates through content blocks and calls `handleToolUse()` for each tool_use\n2. `handleToolUse()` waits for ONE tool result, then immediately makes ANOTHER API call\n3. When Claude returns multiple tool_use blocks [A, B], the conversation history becomes:\n   - Assistant: [tool_use A, tool_use B]\n   - User: [tool_result A] ← Missing tool_result B!\n   - API call made here with malformed history\n\nThe fix is to collect ALL tool_use blocks, execute them, then make ONE API call with ALL tool_results.",
+          "timestamp": "2025-11-06T06:57:23.836Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "TodoWrite",
+          "input": {
+            "todos": [
+              {
+                "activeForm": "Reading existing integration test",
+                "content": "Read existing integration test to understand test structure",
+                "status": "completed"
+              },
+              {
+                "activeForm": "Checking for existing server tests",
+                "content": "Check for existing server tests",
+                "status": "completed"
+              },
+              {
+                "activeForm": "Writing integration test for multiple tool calls",
+                "content": "Write integration test that reproduces the multiple tool call bug",
+                "status": "completed"
+              },
+              {
+                "activeForm": "Running the test to verify it fails",
+                "content": "Run the test to verify it fails (reproducing the bug)",
+                "status": "completed"
+              },
+              {
+                "activeForm": "Analyzing root cause in server.ts",
+                "content": "Analyze the root cause in server.ts",
+                "status": "completed"
+              },
+              {
+                "activeForm": "Implementing fix for multiple tool calls",
+                "content": "Implement fix to handle multiple tool calls correctly",
+                "status": "in_progress"
+              },
+              {
+                "activeForm": "Running integration test",
+                "content": "Run the integration test to verify the fix",
+                "status": "pending"
+              }
+            ]
+          },
+          "timestamp": "2025-11-06T06:57:25.793Z"
+        },
+        {
+          "type": "user",
+          "text": "Todos have been modified successfully. Ensure that you continue to use the todo list to track your progress. Please proceed with the current tasks if applicable",
+          "timestamp": "2025-11-06T06:57:25.865Z"
+        },
+        {
+          "type": "assistant",
+          "text": "Now I'll implement the fix. The solution is to:\n1. Collect ALL tool_use blocks from the response\n2. Execute them all and gather results\n3. Add a SINGLE user message with ALL tool_result blocks\n4. Make ONE follow-up API call",
+          "timestamp": "2025-11-06T06:57:32.310Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Edit",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/packages/server/src/server.ts",
+            "new_string": "  private async processResponse(session: ClientSession, response: Anthropic.Message) {\n    session.conversationHistory.push({\n      role: 'assistant',\n      content: response.content,\n    });\n\n    const toolUseBlocks: Anthropic.ToolUseBlock[] = [];\n\n    for (const block of response.content) {\n      if (block.type === 'text') {\n        this.sendMessage(session.ws, {\n          type: 'response',\n          data: {\n            content: block.text,\n            conversationId: response.id,\n          },\n        });\n      } else if (block.type === 'tool_use') {\n        toolUseBlocks.push(block);\n      }\n    }\n\n    if (toolUseBlocks.length > 0) {\n      await this.handleMultipleToolUses(session, toolUseBlocks);\n    }\n  }",
+            "old_string": "  private async processResponse(session: ClientSession, response: Anthropic.Message) {\n    session.conversationHistory.push({\n      role: 'assistant',\n      content: response.content,\n    });\n\n    for (const block of response.content) {\n      if (block.type === 'text') {\n        this.sendMessage(session.ws, {\n          type: 'response',\n          data: {\n            content: block.text,\n            conversationId: response.id,\n          },\n        });\n      } else if (block.type === 'tool_use') {\n        await this.handleToolUse(session, block, response.id);\n      }\n    }\n  }"
+          },
+          "timestamp": "2025-11-06T06:57:36.962Z"
+        },
+        {
+          "type": "user",
+          "text": "The file /home/z/Desktop/work/use-ai/packages/server/src/server.ts has been updated. Here's the result of running `cat -n` on a snippet of the edited file:\n   227→      this.sendError(session.ws, error instanceof Error ? error.message : 'Unknown error');\n   228→    }\n   229→  }\n   230→\n   231→  private async processResponse(session: ClientSession, response: Anthropic.Message) {\n   232→    session.conversationHistory.push({\n   233→      role: 'assistant',\n   234→      content: response.content,\n   235→    });\n   236→\n   237→    const toolUseBlocks: Anthropic.ToolUseBlock[] = [];\n   238→\n   239→    for (const block of response.content) {\n   240→      if (block.type === 'text') {\n   241→        this.sendMessage(session.ws, {\n   242→          type: 'response',\n   243→          data: {\n   244→            content: block.text,\n   245→            conversationId: response.id,\n   246→          },\n   247→        });\n   248→      } else if (block.type === 'tool_use') {\n   249→        toolUseBlocks.push(block);\n   250→      }\n   251→    }\n   252→\n   253→    if (toolUseBlocks.length > 0) {\n   254→      await this.handleMultipleToolUses(session, toolUseBlocks);\n   255→    }\n   256→  }\n   257→\n   258→  private async handleToolUse(\n   259→    session: ClientSession,\n   260→    toolUse: Anthropic.ToolUseBlock,",
+          "timestamp": "2025-11-06T06:57:37.212Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Edit",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/packages/server/src/server.ts",
+            "new_string": "  private async handleMultipleToolUses(\n    session: ClientSession,\n    toolUseBlocks: Anthropic.ToolUseBlock[]\n  ) {\n    const toolResults: Array<{\n      tool_use_id: string;\n      content: string;\n    }> = [];\n\n    for (const toolUse of toolUseBlocks) {\n      const toolCallId = toolUse.id;\n\n      const toolResponsePromise = new Promise<{ result: unknown; context?: string }>((resolve) => {\n        session.pendingToolCalls.set(toolCallId, resolve);\n      });\n\n      this.sendMessage(session.ws, {\n        type: 'tool_call',\n        data: {\n          toolCallId,\n          name: toolUse.name,\n          input: toolUse.input,\n        },\n      });\n\n      const { result, context } = await toolResponsePromise;\n\n      if (context) {\n        session.context = context;\n      }\n\n      const toolResultContent = context\n        ? JSON.stringify(result) + '\\n\\nUpdated UI state:\\n' + context\n        : JSON.stringify(result);\n\n      toolResults.push({\n        type: 'tool_result',\n        tool_use_id: toolCallId,\n        content: toolResultContent,\n      });\n    }\n\n    session.conversationHistory.push({\n      role: 'user',\n      content: toolResults,\n    });\n\n    const systemPrompt = this.buildSystemPrompt(session);\n\n    const followUpResponse = await this.anthropic.messages.create({\n      model: this.config.model,\n      max_tokens: 4096,\n      messages: session.conversationHistory,\n      tools: session.tools.length > 0 ? this.sanitizeToolsForAPI(session.tools) : undefined,\n      system: systemPrompt,\n    });\n\n    await this.processResponse(session, followUpResponse);\n  }",
+            "old_string": "  private async handleToolUse(\n    session: ClientSession,\n    toolUse: Anthropic.ToolUseBlock,\n    conversationId: string\n  ) {\n    const toolCallId = toolUse.id;\n\n    const toolResponsePromise = new Promise<{ result: unknown; context?: string }>((resolve) => {\n      session.pendingToolCalls.set(toolCallId, resolve);\n    });\n\n    this.sendMessage(session.ws, {\n      type: 'tool_call',\n      data: {\n        toolCallId,\n        name: toolUse.name,\n        input: toolUse.input,\n      },\n    });\n\n    const { result, context } = await toolResponsePromise;\n\n    if (context) {\n      session.context = context;\n    }\n\n    const toolResultContent = context\n      ? JSON.stringify(result) + '\\n\\nUpdated UI state:\\n' + context\n      : JSON.stringify(result);\n\n    session.conversationHistory.push({\n      role: 'user',\n      content: [\n        {\n          type: 'tool_result',\n          tool_use_id: toolCallId,\n          content: toolResultContent,\n        },\n      ],\n    });\n\n    const systemPrompt = this.buildSystemPrompt(session);\n\n    const followUpResponse = await this.anthropic.messages.create({\n      model: this.config.model,\n      max_tokens: 4096,\n      messages: session.conversationHistory,\n      tools: session.tools.length > 0 ? this.sanitizeToolsForAPI(session.tools) : undefined,\n      system: systemPrompt,\n    });\n\n    await this.processResponse(session, followUpResponse);\n  }"
+          },
+          "timestamp": "2025-11-06T06:57:52.019Z"
+        },
+        {
+          "type": "user",
+          "text": "The file /home/z/Desktop/work/use-ai/packages/server/src/server.ts has been updated. Here's the result of running `cat -n` on a snippet of the edited file:\n   254→      await this.handleMultipleToolUses(session, toolUseBlocks);\n   255→    }\n   256→  }\n   257→\n   258→  private async handleMultipleToolUses(\n   259→    session: ClientSession,\n   260→    toolUseBlocks: Anthropic.ToolUseBlock[]\n   261→  ) {\n   262→    const toolResults: Array<{\n   263→      tool_use_id: string;\n   264→      content: string;\n   265→    }> = [];\n   266→\n   267→    for (const toolUse of toolUseBlocks) {\n   268→      const toolCallId = toolUse.id;\n   269→\n   270→      const toolResponsePromise = new Promise<{ result: unknown; context?: string }>((resolve) => {\n   271→        session.pendingToolCalls.set(toolCallId, resolve);\n   272→      });\n   273→\n   274→      this.sendMessage(session.ws, {\n   275→        type: 'tool_call',\n   276→        data: {\n   277→          toolCallId,\n   278→          name: toolUse.name,\n   279→          input: toolUse.input,\n   280→        },\n   281→      });\n   282→\n   283→      const { result, context } = await toolResponsePromise;\n   284→\n   285→      if (context) {\n   286→        session.context = context;\n   287→      }\n   288→\n   289→      const toolResultContent = context\n   290→        ? JSON.stringify(result) + '\\n\\nUpdated UI state:\\n' + context\n   291→        : JSON.stringify(result);\n   292→\n   293→      toolResults.push({\n   294→        type: 'tool_result',\n   295→        tool_use_id: toolCallId,\n   296→        content: toolResultContent,\n   297→      });\n   298→    }\n   299→\n   300→    session.conversationHistory.push({\n   301→      role: 'user',\n   302→      content: toolResults,\n   303→    });\n   304→\n   305→    const systemPrompt = this.buildSystemPrompt(session);\n   306→\n   307→    const followUpResponse = await this.anthropic.messages.create({\n   308→      model: this.config.model,\n   309→      max_tokens: 4096,\n   310→      messages: session.conversationHistory,\n   311→      tools: session.tools.length > 0 ? this.sanitizeToolsForAPI(session.tools) : undefined,\n   312→      system: systemPrompt,\n   313→    });\n   314→\n   315→    await this.processResponse(session, followUpResponse);\n   316→  }\n   317→\n   318→  private handleToolResponse(session: ClientSession, message: ToolResponseMessage) {\n   319→    const { toolCallId, result, context } = message.data;\n   320→    const resolver = session.pendingToolCalls.get(toolCallId);",
+          "timestamp": "2025-11-06T06:57:52.210Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Edit",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/packages/server/src/server.ts",
+            "new_string": "  private async handleMultipleToolUses(\n    session: ClientSession,\n    toolUseBlocks: Anthropic.ToolUseBlock[]\n  ) {\n    const toolResults: Anthropic.ToolResultBlockParam[] = [];",
+            "old_string": "  private async handleMultipleToolUses(\n    session: ClientSession,\n    toolUseBlocks: Anthropic.ToolUseBlock[]\n  ) {\n    const toolResults: Array<{\n      tool_use_id: string;\n      content: string;\n    }> = [];"
+          },
+          "timestamp": "2025-11-06T06:57:58.842Z"
+        }
+      ],
+      "total_additions": 581,
+      "total_deletions": 78,
+      "accepted_lines": 574,
+      "overriden_lines": 0
+    }
+  }
+}
