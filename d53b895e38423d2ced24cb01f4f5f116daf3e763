@@ -1,0 +1,311 @@
+packages/server/package.json
+  51486b3 22,24-25
+  ee4fb0d 20
+packages/server/src/server.ts
+  77f145a 422
+  51486b3 6,41,72,98,250-251,281,283,286-289,292,301,306-308,311-312,317-318,327,341-342,344-346,348-352,392-394,396-399,401-408,413-417,419-420,435,446,449-452,459,467,470,472-473,480,486,508,511-514,518,520,522,527-528,532-533,536
+  human 3
+  ee4fb0d 2,343,418,425,444-445
+  8fbd440 424,432,440
+  f73c814 310,531
+packages/server/src/server.test.ts
+  5a00199 20-22,25,28-29,44,46,49
+  51486b3 17,23-24,26,31-43,45,47-48,134-135,177-178,227-228,281-282,393-394,431-432,474-475,504-505,530-531,562-563
+packages/server/test/test-utils.ts
+  51486b3 12-15,17-21,180,182-185,187-189,191-193,201-202,213-214,218,226-227,236-238,240-242
+  5a00199 16,199,206,216-217
+packages/server/src/edge-cases.test.ts
+  c5fb46f 12-14,17-18,20-21,36,38,41
+  51486b3 4-10,15-16,23-31,33-35,37,39-40
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.18",
+  "base_commit_sha": "d53b895e38423d2ced24cb01f4f5f116daf3e763",
+  "prompts": {
+    "51486b3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e568bee2-94b9-470b-81e5-09004e935db9",
+        "model": "claude-sonnet-4-5-20250929"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [
+        {
+          "type": "user",
+          "text": "migrate this project to use https://ai-sdk.dev/ instead of calling anthropic APIs directly",
+          "timestamp": "2025-11-12T14:49:54.854Z"
+        },
+        {
+          "type": "assistant",
+          "text": "I'll help you migrate from the Anthropic SDK to the Vercel AI SDK. Let me first gather information about the AI SDK and explore your current implementation.",
+          "timestamp": "2025-11-12T14:50:02.195Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "WebFetch",
+          "input": {
+            "prompt": "Provide a comprehensive overview of the Vercel AI SDK, focusing on: 1) How to use it with Anthropic/Claude models, 2) How to handle streaming responses, 3) How to handle tool calls and tool results, 4) Key differences from using the Anthropic SDK directly, 5) Installation and setup instructions",
+            "url": "https://sdk.vercel.ai/docs"
+          },
+          "timestamp": "2025-11-12T14:50:05.200Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Task",
+          "input": {
+            "description": "Find Anthropic SDK usage",
+            "prompt": "I need to understand how the Anthropic SDK is currently being used in this codebase. Please find all files that import or use the @anthropic-ai/sdk package, and provide a summary of:\n1. Where the Anthropic client is initialized\n2. How API calls are made (streaming, tool calls, etc.)\n3. How tool calls and tool results are handled\n4. Any conversation history management\n5. Error handling patterns\n\nUse a \"medium\" thoroughness level.",
+            "subagent_type": "Explore"
+          },
+          "timestamp": "2025-11-12T14:50:10.638Z"
+        },
+        {
+          "type": "user",
+          "text": "The user doesn't want to proceed with this tool use. The tool use was rejected (eg. if it was a file edit, the new_string was NOT written to the file). STOP what you are doing and wait for the user to tell you how to proceed.",
+          "timestamp": "2025-11-12T14:50:36.167Z"
+        },
+        {
+          "type": "user",
+          "text": "[Request interrupted by user for tool use]",
+          "timestamp": "2025-11-12T14:50:41.351Z"
+        },
+        {
+          "type": "user",
+          "text": "here are the docs: https://ai-sdk.dev/docs/introduction",
+          "timestamp": "2025-11-12T14:50:52.906Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "WebFetch",
+          "input": {
+            "prompt": "Provide a comprehensive overview of the Vercel AI SDK, focusing on: 1) How to use it with Anthropic/Claude models, 2) How to handle streaming responses, 3) How to handle tool calls and tool results, 4) Key differences from using the Anthropic SDK directly, 5) Installation and setup instructions",
+            "url": "https://ai-sdk.dev/docs/introduction"
+          },
+          "timestamp": "2025-11-12T14:50:59.596Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Task",
+          "input": {
+            "description": "Find Anthropic SDK usage",
+            "prompt": "I need to understand how the Anthropic SDK is currently being used in this codebase. Please find all files that import or use the @anthropic-ai/sdk package, and provide a summary of:\n1. Where the Anthropic client is initialized\n2. How API calls are made (streaming, tool calls, etc.)\n3. How tool calls and tool results are handled\n4. Any conversation history management\n5. Error handling patterns\n\nUse a \"medium\" thoroughness level.",
+            "subagent_type": "Explore"
+          },
+          "timestamp": "2025-11-12T14:51:01.550Z"
+        },
+        {
+          "type": "user",
+          "text": "# Vercel AI SDK Overview\n\n## 1. Using with Anthropic/Claude Models\n\nThe AI SDK provides a unified interface for working with multiple LLM providers, including Anthropic. Rather than using the Anthropic SDK directly, you import from the AI SDK:\n\n```typescript\nimport { generateText } from \"ai\"\nimport { anthropic } from \"@ai-sdk/anthropic\"\n\nconst { text } = await generateText({\n  model: anthropic(\"claude-3-5-sonnet-20241022\"),\n  prompt: \"Your prompt here\"\n})\n```\n\n## 2. Handling Streaming Responses\n\nThe SDK abstracts away provider-specific streaming differences. Use `streamText` for streaming outputs:\n\n```typescript\nimport { streamText } from \"ai\"\n\nconst stream = await streamText({\n  model: anthropic(\"claude-3-5-sonnet-20241022\"),\n  prompt: \"Your prompt\"\n})\n```\n\nThis provides a consistent API regardless of whether you're using Claude, OpenAI, Google, or other supported providers.\n\n## 3. Tool Calls and Results\n\nThe AI SDK includes built-in support for tool calling. Define tools and let the SDK handle the orchestration automatically, managing the back-and-forth between model requests and tool execution.\n\n## 4. Key Differences from Anthropic SDK\n\nThe primary advantage is **standardization**: \"The AI SDK standardizes integrating artificial intelligence models across supported providers.\" This means identical code patterns work across different models and providers, reducing provider lock-in and simplifying multi-model deployments.\n\n## 5. Installation and Setup\n\nInstall via npm:\n```bash\nnpm install ai @ai-sdk/anthropic\n```\n\nSet your API key as an environment variable (`ANTHROPIC_API_KEY`), then import and use as shown above.\n\nThe framework-agnostic approach supports React, Next.js, Vue, Svelte, Node.js, and more.",
+          "timestamp": "2025-11-12T14:51:18.677Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "WebFetch",
+          "input": {
+            "prompt": "Explain how to use generateText and streamText functions, including all parameters, options, and return values. Focus on: messages format, system prompts, tools, maxTokens, and how to handle the responses.",
+            "url": "https://ai-sdk.dev/docs/ai-sdk-core/generating-text"
+          },
+          "timestamp": "2025-11-12T14:52:02.162Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "WebFetch",
+          "input": {
+            "prompt": "Explain in detail how to handle tool calling with the AI SDK. Include: 1) How to define tools, 2) How tool execution works (automatic vs manual), 3) How to get tool results, 4) The maxSteps/maxToolRoundtrips parameter, 5) How to handle tool calls manually if needed",
+            "url": "https://ai-sdk.dev/docs/ai-sdk-core/tools-and-tool-calling"
+          },
+          "timestamp": "2025-11-12T14:52:04.210Z"
+        },
+        {
+          "type": "user",
+          "text": "# Using generateText and streamText in AI SDK Core\n\n## generateText Function\n\n**Purpose**: Generates complete text responses for non-interactive use cases like email drafting or document summarization.\n\n**Basic Usage**:\n```javascript\nconst { text } = await generateText({\n  model: 'openai/gpt-4.1',\n  prompt: 'Write a vegetarian lasagna recipe for 4 people.',\n});\n```\n\n**Key Parameters**:\n- `model`: The LLM to use\n- `prompt`: Your text request\n- `system`: Optional instructions defining behavior (e.g., \"You are a professional writer\")\n- `maxTokens`: Limit response length\n- `tools`: Define available functions for the model to call\n\n**Return Values**:\nThe result object provides access to `text`, `toolCalls`, `usage`, `finishReason`, and `response` properties containing metadata and generated content.\n\n## streamText Function\n\n**Purpose**: Streams text progressively, ideal for interactive applications where immediate feedback matters.\n\n**Basic Usage**:\n```javascript\nconst result = streamText({\n  model: 'openai/gpt-4.1',\n  prompt: 'Invent a new holiday and describe its traditions.',\n});\n\nfor await (const textPart of result.textStream) {\n  console.log(textPart);\n}\n```\n\n**Key Features**:\n- `result.textStream` works as both a `ReadableStream` and `AsyncIterable`\n- Uses backpressure—tokens generate only when consumed\n- `onError` callback captures errors without crashing servers\n- `onFinish` callback triggers upon completion with final metrics\n\n**Callbacks Available**:\n- `onChunk`: Processes individual stream events (text, tool-calls, reasoning)\n- `onFinish`: Executes when streaming completes with aggregated data\n\nBoth functions support tool integration and structured outputs for advanced LLM capabilities.",
+          "timestamp": "2025-11-12T14:52:11.290Z"
+        },
+        {
+          "type": "user",
+          "text": "# Tool Calling with AI SDK: A Comprehensive Guide\n\n## 1. Defining Tools\n\nTools are created using the `tool()` helper function with three key components:\n\n- **Description**: Explains what the tool does to influence model selection\n- **inputSchema**: A Zod schema defining parameters that the LLM consumes and validates\n- **execute**: An optional async function processing inputs and returning results\n\n```typescript\nconst weatherTool = tool({\n  description: 'Get the weather in a location',\n  inputSchema: z.object({\n    location: z.string().describe('The location to get the weather for'),\n  }),\n  execute: async ({ location }) => ({\n    location,\n    temperature: 72 + Math.floor(Math.random() * 21) - 10,\n  }),\n});\n```\n\n## 2. Tool Execution: Automatic vs Manual\n\nBy default, tools execute automatically when called by the model. However, you can skip execution by omitting the `execute` function to forward calls elsewhere (client, queue, etc.).\n\nTools receive execution context as a second parameter:\n- **toolCallId**: Identifier for tracking\n- **messages**: Full conversation history\n- **abortSignal**: Cancellation token\n- **experimental_context**: Arbitrary context passed from parent call\n\n## 3. Getting Tool Results\n\nAccess results via the `response.messages` property, which contains \"all the text, tool calls, tool results\" \nfrom generation. Add these to conversation history for multi-turn interactions.\n\nFor streaming, use `onFinish` callbacks or `steps` property to access intermediate results from each generation step.\n\n## 4. Multi-Step Control: stopWhen Parameter\n\nUse `stopWhen` to enable agentic loops. The model generates text after tool execution, potentially using multiple tools sequentially. Common condition: `stepCountIs(5)` limits to 5 maximum steps.\n\nThe `stopWhen` conditions evaluate only \"when the last step contains tool results.\"\n\n## 5. Manual Tool Call Handling\n\nFor custom workflows, implement the `onStepFinish` callback triggered when \"all text deltas, tool calls, and tool results for the step are available.\"\n\nAccess intermediate calls via `steps.flatMap(step => step.toolCalls)` to inspect and process results before deciding whether to continue generation or handle tool calls yourself.",
+          "timestamp": "2025-11-12T14:52:15.078Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/packages/server/src/server.ts"
+          },
+          "timestamp": "2025-11-12T14:52:19.712Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/packages/server/package.json"
+          },
+          "timestamp": "2025-11-12T14:52:20.098Z"
+        },
+        {
+          "type": "user",
+          "text": "     1→import { Server as SocketIOServer, Socket } from 'socket.io';\n     2→import Anthropic from '@anthropic-ai/sdk';\n     3→import { createServer } from 'http';\n     4→import { EventType } from '@use-ai/core';\n     5→import type {\n     6→  UseAIServerConfig,\n     7→  ToolDefinition,\n     8→  ClientMessage,\n     9→  RunAgentMessage,\n    10→  ToolResultMessage,\n    11→  AbortRunMessage,\n    12→  RunAgentInput,\n    13→  Message,\n    14→  Tool,\n    15→  TextMessageStartEvent,\n    16→  TextMessageContentEvent,\n    17→  TextMessageEndEvent,\n    18→  ToolCallStartEvent,\n    19→  ToolCallArgsEvent,\n    20→  ToolCallEndEvent,\n    21→  RunStartedEvent,\n    22→  RunFinishedEvent,\n    23→  RunErrorEvent,\n    24→  StateSnapshotEvent,\n    25→  MessagesSnapshotEvent,\n    26→} from './types';\n    27→import { RateLimiter } from './rateLimiter';\n    28→import { logger } from './logger';\n    29→import { v4 as uuidv4 } from 'uuid';\n    30→\n    31→interface ClientSession {\n    32→  clientId: string;\n    33→  socket: Socket;\n    34→  threadId: string;\n    35→  currentRunId?: string;\n    36→  tools: ToolDefinition[];\n    37→  state: unknown;\n    38→  messages: Message[];\n    39→  conversationHistory: Anthropic.MessageParam[];\n    40→  pendingToolCalls: Map<string, (content: string) => void>;\n    41→}\n    42→\n    43→/**\n    44→ * WebSocket server that coordinates between client applications and the Claude API.\n    45→ * Now emits AG-UI standard events for interoperability.\n    46→ *\n    47→ * Responsibilities:\n    48→ * - Manages WebSocket connections from clients\n    49→ * - Accepts RunAgentInput messages\n    50→ * - Forwards to Claude API with tool definitions\n    51→ * - Emits AG-UI events (TEXT_MESSAGE_*, TOOL_CALL_*, etc.)\n    52→ * - Routes tool execution requests back to clients\n    53→ * - Maintains conversation history and state per session\n    54→ * - Handles rate limiting\n    55→ *\n    56→ * @example\n    57→ * ```typescript\n    58→ * import { UseAIServer } from '@use-ai/server';\n    59→ *\n    60→ * const server = new UseAIServer({\n    61→ *   port: 8080,\n    62→ *   anthropicApiKey: process.env.ANTHROPIC_API_KEY,\n    63→ *   model: 'claude-sonnet-4-20250514'\n    64→ * });\n    65→ * ```\n    66→ */\n    67→export class UseAIServer {\n    68→  private io: SocketIOServer;\n    69→  private httpServer: ReturnType<typeof createServer>;\n    70→  private anthropic: Anthropic;\n    71→  private clients: Map<string, ClientSession> = new Map();\n    72→  private config: Required<UseAIServerConfig>;\n    73→  private rateLimiter: RateLimiter;\n    74→  private cleanupInterval: NodeJS.Timeout;\n    75→  private clientIdCounter = 0;\n    76→\n    77→  /**\n    78→   * Creates a new UseAI server instance.\n    79→   *\n    80→   * @param config - Server configuration options\n    81→   * @throws Error if Anthropic API key is not provided via config or environment variable\n    82→   */\n    83→  constructor(config: UseAIServerConfig = {}) {\n    84→    this.config = {\n    85→      port: config.port ?? 8080,\n    86→      anthropicApiKey: config.anthropicApiKey ?? process.env.ANTHROPIC_API_KEY ?? '',\n    87→      model: config.model ?? 'claude-sonnet-4-20250514',\n    88→      rateLimitMaxRequests: config.rateLimitMaxRequests ?? 0,\n    89→      rateLimitWindowMs: config.rateLimitWindowMs ?? 60000,\n    90→    };\n    91→\n    92→    if (!this.config.anthropicApiKey) {\n    93→      throw new Error('Anthropic API key is required');\n    94→    }\n    95→\n    96→    this.anthropic = new Anthropic({\n    97→      apiKey: this.config.anthropicApiKey,\n    98→    });\n    99→\n   100→    this.rateLimiter = new RateLimiter({\n   101→      maxRequests: this.config.rateLimitMaxRequests,\n   102→      windowMs: this.config.rateLimitWindowMs,\n   103→    });\n   104→\n   105→    this.cleanupInterval = setInterval(() => {\n   106→      this.rateLimiter.cleanup();\n   107→    }, this.config.rateLimitWindowMs);\n   108→\n   109→    // Create HTTP server for health checks\n   110→    this.httpServer = createServer((req, res) => {\n   111→      if (req.url === '/health') {\n   112→        res.writeHead(200, { 'Content-Type': 'application/json' });\n   113→        res.end(JSON.stringify({ status: 'ok' }));\n   114→      } else {\n   115→        res.writeHead(404);\n   116→        res.end();\n   117→      }\n   118→    });\n   119→\n   120→    // Attach Socket.IO server to HTTP server\n   121→    this.io = new SocketIOServer(this.httpServer, {\n   122→      cors: {\n   123→        origin: '*',\n   124→        methods: ['GET', 'POST']\n   125→      }\n   126→    });\n   127→    this.httpServer.listen(this.config.port);\n   128→    this.setupSocketIOServer();\n   129→\n   130→    if (this.rateLimiter.isEnabled()) {\n   131→      logger.info('Rate limiting enabled', {\n   132→        maxRequests: this.config.rateLimitMaxRequests,\n   133→        windowMs: this.config.rateLimitWindowMs,\n   134→      });\n   135→    }\n   136→  }\n   137→\n   138→  private setupSocketIOServer() {\n   139→    this.io.on('connection', (socket: Socket) => {\n   140→      const clientId = `client-${++this.clientIdCounter}`;\n   141→      const threadId = uuidv4();\n   142→      logger.info('Client connected', { clientId, threadId });\n   143→\n   144→      const session: ClientSession = {\n   145→        clientId,\n   146→        socket,\n   147→        threadId,\n   148→        tools: [],\n   149→        state: null,\n   150→        messages: [],\n   151→        conversationHistory: [],\n   152→        pendingToolCalls: new Map(),\n   153→      };\n   154→\n   155→      this.clients.set(socket.id, session);\n   156→\n   157→      socket.on('message', async (message: ClientMessage) => {\n   158→        try {\n   159→          await this.handleClientMessage(socket, message);\n   160→        } catch (error) {\n   161→          logger.error('Error handling message', {\n   162→            error: error instanceof Error ? error.message : 'Unknown error',\n   163→            clientId,\n   164→          });\n   165→          this.sendEvent(socket, {\n   166→            type: EventType.RUN_ERROR,\n   167→            message: error instanceof Error ? error.message : 'Unknown error',\n   168→            timestamp: Date.now(),\n   169→          });\n   170→        }\n   171→      });\n   172→\n   173→      socket.on('disconnect', () => {\n   174→        logger.info('Client disconnected', { clientId });\n   175→        this.rateLimiter.removeClient(clientId);\n   176→        this.clients.delete(socket.id);\n   177→      });\n   178→    });\n   179→\n   180→    logger.info('UseAI server listening', { port: this.config.port });\n   181→  }\n   182→\n   183→  private async handleClientMessage(socket: Socket, message: ClientMessage) {\n   184→    const session = this.clients.get(socket.id);\n   185→    if (!session) return;\n   186→\n   187→    switch (message.type) {\n   188→      case 'run_agent':\n   189→        await this.handleRunAgent(session, message as RunAgentMessage);\n   190→        break;\n   191→      case 'tool_result':\n   192→        this.handleToolResult(session, message as ToolResultMessage);\n   193→        break;\n   194→      case 'abort_run':\n   195→        this.handleAbortRun(session, message as AbortRunMessage);\n   196→        break;\n   197→    }\n   198→  }\n   199→\n   200→  private async handleRunAgent(session: ClientSession, message: RunAgentMessage) {\n   201→    const { threadId, runId, messages, tools, state, context } = message.data;\n   202→\n   203→    // Rate limiting\n   204→    const rateLimitCheck = this.rateLimiter.checkLimit(session.clientId);\n   205→    if (!rateLimitCheck.allowed) {\n   206→      const retryAfterSeconds = Math.ceil((rateLimitCheck.retryAfterMs || 0) / 1000);\n   207→      this.sendEvent(session.socket, {\n   208→        type: EventType.RUN_ERROR,\n   209→        message: `Rate limit exceeded. Please try again in ${retryAfterSeconds} seconds.`,\n   210→        timestamp: Date.now(),\n   211→      });\n   212→      return;\n   213→    }\n   214→\n   215→    // Update session\n   216→    session.threadId = threadId;\n   217→    session.currentRunId = runId;\n   218→    session.tools = tools.map(t => ({\n   219→      ...t,\n   220→      parameters: t.parameters || { type: 'object', properties: {}, required: [] },\n   221→    })) as ToolDefinition[];\n   222→    session.state = state;\n   223→    session.messages = messages;\n   224→\n   225→    // Emit RUN_STARTED event\n   226→    this.sendEvent<RunStartedEvent>(session.socket, {\n   227→      type: EventType.RUN_STARTED,\n   228→      threadId,\n   229→      runId,\n   230→      input: message.data,\n   231→      timestamp: Date.now(),\n   232→    });\n   233→\n   234→    // Emit MESSAGES_SNAPSHOT event\n   235→    this.sendEvent<MessagesSnapshotEvent>(session.socket, {\n   236→      type: EventType.MESSAGES_SNAPSHOT,\n   237→      messages,\n   238→      timestamp: Date.now(),\n   239→    });\n   240→\n   241→    // Emit STATE_SNAPSHOT event\n   242→    this.sendEvent<StateSnapshotEvent>(session.socket, {\n   243→      type: EventType.STATE_SNAPSHOT,\n   244→      snapshot: state,\n   245→      timestamp: Date.now(),\n   246→    });\n   247→\n   248→    // Convert AG-UI messages to Anthropic format\n   249→    const anthropicMessages: Anthropic.MessageParam[] = messages.map(msg => {\n   250→      // Helper to convert content to string if it's an array (AG-UI format)\n   251→      const getStringContent = (content: string | any[] | Record<string, any> | undefined): string => {\n   252→        if (!content) return '';\n   253→        if (typeof content === 'string') return content;\n   254→        // If it's an array, extract text from text blocks\n   255→        if (Array.isArray(content)) {\n   256→          return content\n   257→            .filter((block: any) => block.type === 'text')\n   258→            .map((block: any) => block.text)\n   259→            .join('');\n   260→        }\n   261→        // If it's an object (Record), convert to JSON string\n   262→        if (typeof content === 'object') {\n   263→          return JSON.stringify(content);\n   264→        }\n   265→        return '';\n   266→      };\n   267→\n   268→      if (msg.role === 'user') {\n   269→        return {\n   270→          role: 'user' as const,\n   271→          content: getStringContent(msg.content),\n   272→        };\n   273→      } else if (msg.role === 'assistant') {\n   274→        return {\n   275→          role: 'assistant' as const,\n   276→          content: getStringContent(msg.content),\n   277→        };\n   278→      } else if (msg.role === 'tool') {\n   279→        // Tool messages need to be in a specific format\n   280→        return {\n   281→          role: 'user' as const,\n   282→          content: [\n   283→            {\n   284→              type: 'tool_result' as const,\n   285→              tool_use_id: (msg as any).tool_call_id || uuidv4(),\n   286→              content: getStringContent(msg.content),\n   287→            },\n   288→          ],\n   289→        };\n   290→      }\n   291→      // Default fallback\n   292→      return {\n   293→        role: 'user' as const,\n   294→        content: getStringContent(msg.content),\n   295→      };\n   296→    });\n   297→\n   298→    session.conversationHistory = anthropicMessages;\n   299→\n   300→    try {\n   301→      const systemPrompt = this.buildSystemPrompt(session, state);\n   302→\n   303→      const response = await this.anthropic.messages.create({\n   304→        model: this.config.model,\n   305→        max_tokens: 4096,\n   306→        messages: anthropicMessages,\n   307→        tools: session.tools.length > 0 ? this.sanitizeToolsForAPI(session.tools) : undefined,\n   308→        system: systemPrompt,\n   309→      });\n   310→\n   311→      logger.apiRequest({\n   312→        tools: session.tools.map(t => t.name),\n   313→        messageCount: anthropicMessages.length,\n   314→        messages: anthropicMessages.map((msg: any) => ({\n   315→          role: msg.role,\n   316→          preview: typeof msg.content === 'string'\n   317→            ? msg.content.substring(0, 80) + (msg.content.length > 80 ? '...' : '')\n   318→            : `${msg.content.length} content blocks`,\n   319→        })),\n   320→        systemPrompt,\n   321→      });\n   322→\n   323→      await this.processResponse(session, response, runId);\n   324→    } catch (error) {\n   325→      logger.error('Error calling Anthropic API', {\n   326→        error: error instanceof Error ? error.message : 'Unknown error',\n   327→        clientId: session.clientId,\n   328→      });\n   329→      this.sendEvent<RunErrorEvent>(session.socket, {\n   330→        type: EventType.RUN_ERROR,\n   331→        message: error instanceof Error ? error.message : 'Unknown error',\n   332→        timestamp: Date.now(),\n   333→      });\n   334→    }\n   335→  }\n   336→\n   337→  private sanitizeToolsForAPI(tools: ToolDefinition[]): Anthropic.Tool[] {\n   338→    return tools.map(tool => ({\n   339→      name: tool.name,\n   340→      description: tool.description,\n   341→      input_schema: tool.parameters,\n   342→    }));\n   343→  }\n   344→\n   345→  private buildSystemPrompt(session: ClientSession, state: unknown): string | undefined {\n   346→    const parts: string[] = [];\n   347→\n   348→    // Add state context if available\n   349→    if (state) {\n   350→      parts.push('You are interacting with a web application. Here is the current state:');\n   351→      parts.push('');\n   352→      parts.push(JSON.stringify(state, null, 2));\n   353→      parts.push('');\n   354→      parts.push('Use the available tools to interact with and modify the UI based on user requests.');\n   355→    }\n   356→\n   357→    const confirmationTools = session.tools.filter(tool => tool.confirmationRequired);\n   358→    if (confirmationTools.length > 0) {\n   359→      if (parts.length > 0) {\n   360→        parts.push('');\n   361→      }\n   362→      parts.push('CRITICAL: The following tools require user confirmation EVERY TIME before execution:');\n   363→      parts.push('');\n   364→      confirmationTools.forEach(tool => {\n   365→        parts.push(`- ${tool.name}`);\n   366→      });\n   367→      parts.push('');\n   368→      parts.push('MANDATORY CONFIRMATION WORKFLOW:');\n   369→      parts.push('1. First, explain to the user exactly what changes will be made');\n   370→      parts.push('2. Then, explicitly ask: \"Do you want me to proceed?\" or similar confirmation question');\n   371→      parts.push('3. STOP and WAIT for the user to respond with explicit confirmation');\n   372→      parts.push('4. ONLY after receiving confirmation, call the tool');\n   373→      parts.push('');\n   374→      parts.push('NEVER ASSUME CONFIRMATION:');\n   375→      parts.push('- Do NOT call these tools without receiving explicit confirmation');\n   376→      parts.push('- Each destructive operation requires its own separate confirmation');\n   377→    }\n   378→\n   379→    return parts.length > 0 ? parts.join('\\n') : undefined;\n   380→  }\n   381→\n   382→  private async processResponse(session: ClientSession, response: Anthropic.Message, runId: string) {\n   383→    session.conversationHistory.push({\n   384→      role: 'assistant',\n   385→      content: response.content,\n   386→    });\n   387→\n   388→    const toolUseBlocks: Anthropic.ToolUseBlock[] = [];\n   389→    const textBlocks: string[] = [];\n   390→\n   391→    for (const block of response.content) {\n   392→      if (block.type === 'text') {\n   393→        const messageId = uuidv4();\n   394→        textBlocks.push(block.text);\n   395→\n   396→        // Emit TEXT_MESSAGE_START\n   397→        this.sendEvent<TextMessageStartEvent>(session.socket, {\n   398→          type: EventType.TEXT_MESSAGE_START,\n   399→          messageId,\n   400→          role: 'assistant',\n   401→          timestamp: Date.now(),\n   402→        });\n   403→\n   404→        // Emit TEXT_MESSAGE_CONTENT\n   405→        this.sendEvent<TextMessageContentEvent>(session.socket, {\n   406→          type: EventType.TEXT_MESSAGE_CONTENT,\n   407→          messageId,\n   408→          delta: block.text,\n   409→          timestamp: Date.now(),\n   410→        });\n   411→\n   412→        // Emit TEXT_MESSAGE_END\n   413→        this.sendEvent<TextMessageEndEvent>(session.socket, {\n   414→          type: EventType.TEXT_MESSAGE_END,\n   415→          messageId,\n   416→          timestamp: Date.now(),\n   417→        });\n   418→      } else if (block.type === 'tool_use') {\n   419→        toolUseBlocks.push(block);\n   420→      }\n   421→    }\n   422→\n   423→    if (textBlocks.length > 0) {\n   424→      logger.aiResponse(textBlocks);\n   425→    }\n   426→\n   427→    if (toolUseBlocks.length > 0) {\n   428→      logger.toolCalls(toolUseBlocks.map(t => ({ name: t.name, input: t.input })));\n   429→      await this.handleMultipleToolUses(session, toolUseBlocks, runId);\n   430→    } else {\n   431→      // No tool calls, run is finished\n   432→      this.sendEvent<RunFinishedEvent>(session.socket, {\n   433→        type: EventType.RUN_FINISHED,\n   434→        threadId: session.threadId,\n   435→        runId,\n   436→        result: textBlocks.join('\\n'),\n   437→        timestamp: Date.now(),\n   438→      });\n   439→    }\n   440→  }\n   441→\n   442→  private async handleMultipleToolUses(\n   443→    session: ClientSession,\n   444→    toolUseBlocks: Anthropic.ToolUseBlock[],\n   445→    runId: string\n   446→  ) {\n   447→    const toolResults: Anthropic.ToolResultBlockParam[] = [];\n   448→\n   449→    for (const toolUse of toolUseBlocks) {\n   450→      const toolCallId = toolUse.id;\n   451→      const parentMessageId = uuidv4();\n   452→\n   453→      // Emit TOOL_CALL_START\n   454→      this.sendEvent<ToolCallStartEvent>(session.socket, {\n   455→        type: EventType.TOOL_CALL_START,\n   456→        toolCallId,\n   457→        toolCallName: toolUse.name,\n   458→        parentMessageId,\n   459→        timestamp: Date.now(),\n   460→      });\n   461→\n   462→      // Emit TOOL_CALL_ARGS (stream the arguments)\n   463→      const argsStr = JSON.stringify(toolUse.input);\n   464→      this.sendEvent<ToolCallArgsEvent>(session.socket, {\n   465→        type: EventType.TOOL_CALL_ARGS,\n   466→        toolCallId,\n   467→        delta: argsStr,\n   468→        timestamp: Date.now(),\n   469→      });\n   470→\n   471→      // Emit TOOL_CALL_END\n   472→      this.sendEvent<ToolCallEndEvent>(session.socket, {\n   473→        type: EventType.TOOL_CALL_END,\n   474→        toolCallId,\n   475→        timestamp: Date.now(),\n   476→      });\n   477→\n   478→      // Wait for tool result from client\n   479→      const toolResponsePromise = new Promise<string>((resolve) => {\n   480→        session.pendingToolCalls.set(toolCallId, resolve);\n   481→      });\n   482→\n   483→      const content = await toolResponsePromise;\n   484→\n   485→      logger.toolResult(toolUse.name, content);\n   486→\n   487→      toolResults.push({\n   488→        type: 'tool_result',\n   489→        tool_use_id: toolCallId,\n   490→        content,\n   491→      });\n   492→    }\n   493→\n   494→    // Add tool results to conversation\n   495→    session.conversationHistory.push({\n   496→      role: 'user',\n   497→      content: toolResults,\n   498→    });\n   499→\n   500→    // Call Claude again with tool results\n   501→    const systemPrompt = this.buildSystemPrompt(session, session.state);\n   502→\n   503→    const followUpResponse = await this.anthropic.messages.create({\n   504→      model: this.config.model,\n   505→      max_tokens: 4096,\n   506→      messages: session.conversationHistory,\n   507→      tools: session.tools.length > 0 ? this.sanitizeToolsForAPI(session.tools) : undefined,\n   508→      system: systemPrompt,\n   509→    });\n   510→\n   511→    await this.processResponse(session, followUpResponse, runId);\n   512→  }\n   513→\n   514→  private handleToolResult(session: ClientSession, message: ToolResultMessage) {\n   515→    const { toolCallId, content } = message.data;\n   516→    const resolver = session.pendingToolCalls.get(toolCallId);\n   517→\n   518→    if (resolver) {\n   519→      resolver(content);\n   520→      session.pendingToolCalls.delete(toolCallId);\n   521→    }\n   522→  }\n   523→\n   524→  private handleAbortRun(session: ClientSession, message: AbortRunMessage) {\n   525→    const { runId } = message.data;\n   526→    // Clear pending tool calls for this run\n   527→    session.pendingToolCalls.clear();\n   528→    session.currentRunId = undefined;\n   529→\n   530→    logger.info('Run aborted', { clientId: session.clientId, runId });\n   531→  }\n   532→\n   533→  private sendEvent<T = unknown>(socket: Socket, event: T) {\n   534→    if (socket.connected) {\n   535→      socket.emit('event', event);\n   536→    }\n   537→  }\n   538→\n   539→  /**\n   540→   * Closes the server and cleans up resources.\n   541→   * Stops accepting new connections and terminates all existing connections.\n   542→   */\n   543→  public close() {\n   544→    clearInterval(this.cleanupInterval);\n   545→    this.io.close();\n   546→    this.httpServer.close();\n   547→  }\n   548→}\n   549→\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\n</system-reminder>\n",
+          "timestamp": "2025-11-12T14:52:20.261Z"
+        },
+        {
+          "type": "user",
+          "text": "     1→{\n     2→  \"name\": \"@use-ai/server\",\n     3→  \"version\": \"0.0.1\",\n     4→  \"type\": \"module\",\n     5→  \"main\": \"./dist/index.js\",\n     6→  \"types\": \"./dist/index.d.ts\",\n     7→  \"exports\": {\n     8→    \".\": {\n     9→      \"import\": \"./dist/index.js\",\n    10→      \"types\": \"./dist/index.d.ts\"\n    11→    }\n    12→  },\n    13→  \"scripts\": {\n    14→    \"build\": \"bun build ./src/index.ts --outdir ./dist --target node --format esm && tsc --emitDeclarationOnly --declaration --declarationMap\",\n    15→    \"dev\": \"bun --watch src/start.ts\",\n    16→    \"start\": \"bun src/start.ts\",\n    17→    \"test\": \"bun test\"\n    18→  },\n    19→  \"dependencies\": {\n    20→    \"@anthropic-ai/sdk\": \"^0.32.1\",\n    21→    \"@use-ai/core\": \"workspace:*\",\n    22→    \"socket.io\": \"^4.8.1\",\n    23→    \"uuid\": \"^11.1.0\"\n    24→  },\n    25→  \"devDependencies\": {\n    26→    \"@types/bun\": \"latest\",\n    27→    \"@types/uuid\": \"^10.0.0\",\n    28→    \"typescript\": \"^5.3.3\"\n    29→  }\n    30→}\n    31→\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\n</system-reminder>\n",
+          "timestamp": "2025-11-12T14:52:20.265Z"
+        },
+        {
+          "type": "assistant",
+          "text": "Now I have a complete understanding of the codebase and the AI SDK. Let me create a migration plan.",
+          "timestamp": "2025-11-12T14:52:30.592Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "TodoWrite",
+          "input": {
+            "todos": [
+              {
+                "activeForm": "Updating server package.json dependencies",
+                "content": "Update server package.json dependencies (remove @anthropic-ai/sdk, add ai and @ai-sdk/anthropic)",
+                "status": "pending"
+              },
+              {
+                "activeForm": "Updating imports in server.ts",
+                "content": "Update imports in server.ts to use AI SDK",
+                "status": "pending"
+              },
+              {
+                "activeForm": "Replacing Anthropic client initialization",
+                "content": "Replace Anthropic client initialization with AI SDK model setup",
+                "status": "pending"
+              },
+              {
+                "activeForm": "Converting message format",
+                "content": "Convert message format from Anthropic.MessageParam[] to AI SDK CoreMessage[]",
+                "status": "pending"
+              },
+              {
+                "activeForm": "Replacing API calls with streamText",
+                "content": "Replace anthropic.messages.create() calls with AI SDK streamText()",
+                "status": "pending"
+              },
+              {
+                "activeForm": "Updating tool definition format",
+                "content": "Update tool definition format for AI SDK",
+                "status": "pending"
+              },
+              {
+                "activeForm": "Updating tool call handling",
+                "content": "Update tool call handling to use AI SDK's onStepFinish callback",
+                "status": "pending"
+              },
+              {
+                "activeForm": "Updating TypeScript types",
+                "content": "Update TypeScript types to remove Anthropic.* references",
+                "status": "pending"
+              },
+              {
+                "activeForm": "Testing the migration",
+                "content": "Test the migration with the example app",
+                "status": "pending"
+              },
+              {
+                "activeForm": "Updating tests",
+                "content": "Update tests to work with AI SDK",
+                "status": "pending"
+              }
+            ]
+          },
+          "timestamp": "2025-11-12T14:52:36.486Z"
+        },
+        {
+          "type": "user",
+          "text": "Todos have been modified successfully. Ensure that you continue to use the todo list to track your progress. Please proceed with the current tasks if applicable",
+          "timestamp": "2025-11-12T14:52:36.620Z"
+        },
+        {
+          "type": "assistant",
+          "text": "Let me start by updating the server package dependencies:",
+          "timestamp": "2025-11-12T14:52:40.049Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "TodoWrite",
+          "input": {
+            "todos": [
+              {
+                "activeForm": "Updating server package.json dependencies",
+                "content": "Update server package.json dependencies (remove @anthropic-ai/sdk, add ai and @ai-sdk/anthropic)",
+                "status": "in_progress"
+              },
+              {
+                "activeForm": "Updating imports in server.ts",
+                "content": "Update imports in server.ts to use AI SDK",
+                "status": "pending"
+              },
+              {
+                "activeForm": "Replacing Anthropic client initialization",
+                "content": "Replace Anthropic client initialization with AI SDK model setup",
+                "status": "pending"
+              },
+              {
+                "activeForm": "Converting message format",
+                "content": "Convert message format from Anthropic.MessageParam[] to AI SDK CoreMessage[]",
+                "status": "pending"
+              },
+              {
+                "activeForm": "Replacing API calls with streamText",
+                "content": "Replace anthropic.messages.create() calls with AI SDK streamText()",
+                "status": "pending"
+              },
+              {
+                "activeForm": "Updating tool definition format",
+                "content": "Update tool definition format for AI SDK",
+                "status": "pending"
+              },
+              {
+                "activeForm": "Updating tool call handling",
+                "content": "Update tool call handling to use AI SDK's onStepFinish callback",
+                "status": "pending"
+              },
+              {
+                "activeForm": "Updating TypeScript types",
+                "content": "Update TypeScript types to remove Anthropic.* references",
+                "status": "pending"
+              },
+              {
+                "activeForm": "Testing the migration",
+                "content": "Test the migration with the example app",
+                "status": "pending"
+              },
+              {
+                "activeForm": "Updating tests",
+                "content": "Update tests to work with AI SDK",
+                "status": "pending"
+              }
+            ]
+          },
+          "timestamp": "2025-11-12T14:52:42.912Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Edit",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/packages/server/package.json",
+            "new_string": "  \"dependencies\": {\n    \"@ai-sdk/anthropic\": \"^1.0.6\",\n    \"@use-ai/core\": \"workspace:*\",\n    \"ai\": \"^4.0.0\",\n    \"socket.io\": \"^4.8.1\",\n    \"uuid\": \"^11.1.0\"\n  },",
+            "old_string": "  \"dependencies\": {\n    \"@anthropic-ai/sdk\": \"^0.32.1\",\n    \"@use-ai/core\": \"workspace:*\",\n    \"socket.io\": \"^4.8.1\",\n    \"uuid\": \"^11.1.0\"\n  },"
+          },
+          "timestamp": "2025-11-12T14:52:45.289Z"
+        },
+        {
+          "type": "user",
+          "text": "Todos have been modified successfully. Ensure that you continue to use the todo list to track your progress. Please proceed with the current tasks if applicable",
+          "timestamp": "2025-11-12T14:52:45.478Z"
+        }
+      ],
+      "total_additions": 247,
+      "total_deletions": 208,
+      "accepted_lines": 191,
+      "overriden_lines": 0
+    }
+  }
+}
