@@ -1,0 +1,124 @@
+apps/example/test/dynamic-tool-registration.e2e.test.ts
+  eefcba1 1-172
+apps/example/src/components/ListItem.tsx
+  e93ce33 12,64,85,213
+  eefcba1 1,9,17,55-59,76-80,114,128-136,187-189,197-212
+packages/server/src/server.ts
+  eefcba1 318-320,322-323,369-379
+apps/example/src/pages/MultiListPage.tsx
+  eefcba1 1,3,6-11,19-85,100-101,107,110-114,123,170-186
+  e93ce33 2,13,18,88,106
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.18",
+  "base_commit_sha": "3dfbc356b806d728c31f23af9e906cc83d6d347b",
+  "prompts": {
+    "eefcba1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fd0846e4-7c22-4239-afb1-5984aaafdeca",
+        "model": "claude-sonnet-4-5-20250929"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [
+        {
+          "type": "user",
+          "text": "we want to test something\nadd the capability (via an X button and useAI tool) to delete and create new elements on the multi-list item page\nour goal is to test that if we create a component on the page that has a useAI hook, its tools are immediately available in the chat next time we send a message\n\n",
+          "timestamp": "2025-11-13T12:16:42.285Z"
+        },
+        {
+          "type": "assistant",
+          "text": "I'll help you add the capability to delete and create new elements on the multi-list item page, so you can test dynamic tool registration. Let me first explore the current structure of the multi-list item page.",
+          "timestamp": "2025-11-13T12:16:49.406Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Glob",
+          "input": {
+            "pattern": "**/multi-list*"
+          },
+          "timestamp": "2025-11-13T12:16:49.517Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Glob",
+          "input": {
+            "pattern": "**/MultiList*"
+          },
+          "timestamp": "2025-11-13T12:16:49.700Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Grep",
+          "input": {
+            "-i": true,
+            "output_mode": "files_with_matches",
+            "pattern": "multi.*list"
+          },
+          "timestamp": "2025-11-13T12:16:50.786Z"
+        },
+        {
+          "type": "user",
+          "text": "Found 3 files\napps/example/test/latest-message-only.e2e.test.ts\napps/example/src/App.tsx\napps/example/src/pages/MultiListPage.tsx",
+          "timestamp": "2025-11-13T12:16:51.172Z"
+        },
+        {
+          "type": "user",
+          "text": "No files found",
+          "timestamp": "2025-11-13T12:16:51.431Z"
+        },
+        {
+          "type": "user",
+          "text": "/home/z/Desktop/work/use-ai/apps/example/src/pages/MultiListPage.tsx",
+          "timestamp": "2025-11-13T12:16:51.471Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/apps/example/src/pages/MultiListPage.tsx"
+          },
+          "timestamp": "2025-11-13T12:16:54.907Z"
+        },
+        {
+          "type": "user",
+          "text": "     1→import React from 'react';\n     2→import ListItem from '../components/ListItem';\n     3→\n     4→export default function MultiListPage() {\n     5→  const items = [\n     6→    { id: 'Item-A', initialLabel: 'First Item', initialColor: '#ffebee' },\n     7→    { id: 'Item-B', initialLabel: 'Second Item', initialColor: '#e3f2fd' },\n     8→    { id: 'Item-C', initialLabel: 'Third Item', initialColor: '#e8f5e9' },\n     9→    { id: 'Item-D', initialLabel: 'Fourth Item', initialColor: '#fff3e0' },\n    10→  ];\n    11→\n    12→  return (\n    13→    <div style={styles.container}>\n    14→      <div style={styles.card}>\n    15→        <h1 style={styles.title}>Multiple List Items Test</h1>\n    16→        <p style={styles.subtitle}>\n    17→          Each item below has its own useAI hook with tools. Try asking the AI to:\n    18→        </p>\n    19→        <ul style={styles.instructions}>\n    20→          <li>Change the label of Item-A</li>\n    21→          <li>Increment the counter on all items</li>\n    22→          <li>Change Item-B's color to blue</li>\n    23→          <li>Get the state of all items</li>\n    24→          <li>Reset counters for items A and C</li>\n    25→        </ul>\n    26→        <p style={styles.note}>\n    27→          <strong>Note:</strong> This page tests what happens when multiple components\n    28→          with similar tools are mounted. Each list item registers its own set of tools\n    29→          with unique descriptions that include the item ID.\n    30→        </p>\n    31→\n    32→        <div style={styles.itemsContainer}>\n    33→          {items.map(item => (\n    34→            <ListItem\n    35→              key={item.id}\n    36→              id={item.id}\n    37→              initialLabel={item.initialLabel}\n    38→              initialColor={item.initialColor}\n    39→            />\n    40→          ))}\n    41→        </div>\n    42→      </div>\n    43→    </div>\n    44→  );\n    45→}\n    46→\n    47→const styles: Record<string, React.CSSProperties> = {\n    48→  container: {\n    49→    maxWidth: '900px',\n    50→    margin: '0 auto',\n    51→    padding: '20px',\n    52→  },\n    53→  card: {\n    54→    background: 'white',\n    55→    borderRadius: '8px',\n    56→    padding: '24px',\n    57→    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',\n    58→  },\n    59→  title: {\n    60→    fontSize: '28px',\n    61→    fontWeight: 'bold',\n    62→    marginBottom: '8px',\n    63→    color: '#333',\n    64→  },\n    65→  subtitle: {\n    66→    fontSize: '14px',\n    67→    color: '#666',\n    68→    marginBottom: '12px',\n    69→  },\n    70→  instructions: {\n    71→    fontSize: '14px',\n    72→    color: '#555',\n    73→    marginBottom: '16px',\n    74→    paddingLeft: '20px',\n    75→  },\n    76→  note: {\n    77→    fontSize: '13px',\n    78→    color: '#666',\n    79→    padding: '12px',\n    80→    background: '#f8f9fa',\n    81→    borderRadius: '4px',\n    82→    marginBottom: '24px',\n    83→    borderLeft: '3px solid #007bff',\n    84→  },\n    85→  itemsContainer: {\n    86→    display: 'grid',\n    87→    gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',\n    88→    gap: '16px',\n    89→  },\n    90→};\n    91→\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\n</system-reminder>\n",
+          "timestamp": "2025-11-13T12:16:55.082Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/apps/example/src/components/ListItem.tsx"
+          },
+          "timestamp": "2025-11-13T12:16:59.113Z"
+        },
+        {
+          "type": "user",
+          "text": "     1→import React, { useState } from 'react';\n     2→import { useAI, defineTool } from '@use-ai/client';\n     3→import { z } from 'zod';\n     4→\n     5→interface ListItemProps {\n     6→  id: string;\n     7→  initialLabel: string;\n     8→  initialColor: string;\n     9→}\n    10→\n    11→export default function ListItem({ id, initialLabel, initialColor }: ListItemProps) {\n    12→  const [label, setLabel] = useState(initialLabel);\n    13→  const [counter, setCounter] = useState(0);\n    14→  const [color, setColor] = useState(initialColor);\n    15→\n    16→  const tools = {\n    17→    updateLabel: defineTool(\n    18→      `Update the label text for ${id}`,\n    19→      z.object({\n    20→        text: z.string().describe('The new label text')\n    21→      }),\n    22→      (input) => {\n    23→        setLabel(input.text);\n    24→        return {\n    25→          success: true,\n    26→          message: `Updated ${id} label to: ${input.text}`,\n    27→          itemId: id\n    28→        };\n    29→      }\n    30→    ),\n    31→\n    32→    setColor: defineTool(\n    33→      `Change the background color for ${id}`,\n    34→      z.object({\n    35→        color: z.string().describe('The new color (e.g., red, blue, #ff0000)')\n    36→      }),\n    37→      (input) => {\n    38→        setColor(input.color);\n    39→        return {\n    40→          success: true,\n    41→          message: `Changed ${id} color to: ${input.color}`,\n    42→          itemId: id\n    43→        };\n    44→      }\n    45→    ),\n    46→\n    47→    incrementCounter: defineTool(\n    48→      `Increment the counter for ${id}`,\n    49→      z.object({\n    50→        amount: z.number().optional().describe('Amount to increment by (default: 1)')\n    51→      }),\n    52→      (input) => {\n    53→        const amount = input.amount ?? 1;\n    54→        setCounter(prev => prev + amount);\n    55→        return {\n    56→          success: true,\n    57→          message: `Incremented ${id} counter by ${amount}`,\n    58→          itemId: id,\n    59→          newValue: counter + amount\n    60→        };\n    61→      }\n    62→    ),\n    63→\n    64→    decrementCounter: defineTool(\n    65→      `Decrement the counter for ${id}`,\n    66→      z.object({\n    67→        amount: z.number().optional().describe('Amount to decrement by (default: 1)')\n    68→      }),\n    69→      (input: { amount?: number }) => {\n    70→        const amount = input.amount ?? 1;\n    71→        setCounter(prev => prev - amount);\n    72→        return {\n    73→          success: true,\n    74→          message: `Decremented ${id} counter by ${amount}`,\n    75→          itemId: id,\n    76→          newValue: counter - amount\n    77→        };\n    78→      }\n    79→    ),\n    80→\n    81→    resetCounter: defineTool(\n    82→      `Reset the counter for ${id} to zero`,\n    83→      () => {\n    84→        setCounter(0);\n    85→        return {\n    86→          success: true,\n    87→          message: `Reset ${id} counter to 0`,\n    88→          itemId: id\n    89→        };\n    90→      }\n    91→    ),\n    92→\n    93→    getState: defineTool(\n    94→      `Get the current state of ${id}`,\n    95→      () => {\n    96→        return {\n    97→          itemId: id,\n    98→          label,\n    99→          counter,\n   100→          color,\n   101→          timestamp: new Date().toISOString()\n   102→        };\n   103→      }\n   104→    ),\n   105→  };\n   106→\n   107→  const { ref } = useAI({\n   108→    tools,\n   109→    prompt: `This is ${id}. Current state - Label: \"${label}\", Counter: ${counter}, Color: \"${color}\".`,\n   110→  });\n   111→\n   112→  return (\n   113→    <div ref={ref} id={id} style={{\n   114→      ...styles.container,\n   115→      backgroundColor: color,\n   116→    }}>\n   117→      <div style={styles.header}>\n   118→        <h3 style={styles.id}>{id}</h3>\n   119→      </div>\n   120→\n   121→      <div style={styles.content}>\n   122→        <div style={styles.labelContainer}>\n   123→          <span style={styles.labelKey}>Label:</span>\n   124→          <span style={styles.labelValue}>{label}</span>\n   125→        </div>\n   126→\n   127→        <div style={styles.counterContainer}>\n   128→          <span style={styles.counterLabel}>Counter:</span>\n   129→          <span style={styles.counterValue}>{counter}</span>\n   130→        </div>\n   131→      </div>\n   132→\n   133→      <div style={styles.manualControls}>\n   134→        <button\n   135→          onClick={() => setCounter(prev => prev - 1)}\n   136→          style={styles.button}\n   137→        >\n   138→          -\n   139→        </button>\n   140→        <button\n   141→          onClick={() => setCounter(prev => prev + 1)}\n   142→          style={styles.button}\n   143→        >\n   144→          +\n   145→        </button>\n   146→        <button\n   147→          onClick={() => setCounter(0)}\n   148→          style={styles.buttonReset}\n   149→        >\n   150→          Reset\n   151→        </button>\n   152→      </div>\n   153→    </div>\n   154→  );\n   155→}\n   156→\n   157→const styles: Record<string, React.CSSProperties> = {\n   158→  container: {\n   159→    border: '2px solid #ddd',\n   160→    borderRadius: '8px',\n   161→    padding: '16px',\n   162→    marginBottom: '12px',\n   163→    transition: 'all 0.3s ease',\n   164→  },\n   165→  header: {\n   166→    marginBottom: '12px',\n   167→    borderBottom: '1px solid rgba(0, 0, 0, 0.1)',\n   168→    paddingBottom: '8px',\n   169→  },\n   170→  id: {\n   171→    margin: 0,\n   172→    fontSize: '18px',\n   173→    fontWeight: 'bold',\n   174→    color: '#333',\n   175→  },\n   176→  content: {\n   177→    marginBottom: '12px',\n   178→  },\n   179→  labelContainer: {\n   180→    marginBottom: '8px',\n   181→  },\n   182→  labelKey: {\n   183→    fontWeight: '600',\n   184→    marginRight: '8px',\n   185→    color: '#555',\n   186→  },\n   187→  labelValue: {\n   188→    color: '#333',\n   189→  },\n   190→  counterContainer: {\n   191→    display: 'flex',\n   192→    alignItems: 'center',\n   193→    gap: '8px',\n   194→  },\n   195→  counterLabel: {\n   196→    fontWeight: '600',\n   197→    color: '#555',\n   198→  },\n   199→  counterValue: {\n   200→    fontSize: '24px',\n   201→    fontWeight: 'bold',\n   202→    color: '#007bff',\n   203→  },\n   204→  manualControls: {\n   205→    display: 'flex',\n   206→    gap: '8px',\n   207→  },\n   208→  button: {\n   209→    padding: '6px 12px',\n   210→    background: '#007bff',\n   211→    color: 'white',\n   212→    border: 'none',\n   213→    borderRadius: '4px',\n   214→    cursor: 'pointer',\n   215→    fontSize: '14px',\n   216→    fontWeight: '600',\n   217→  },\n   218→  buttonReset: {\n   219→    padding: '6px 12px',\n   220→    background: '#6c757d',\n   221→    color: 'white',\n   222→    border: 'none',\n   223→    borderRadius: '4px',\n   224→    cursor: 'pointer',\n   225→    fontSize: '12px',\n   226→  },\n   227→};\n   228→\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\n</system-reminder>\n",
+          "timestamp": "2025-11-13T12:16:59.661Z"
+        },
+        {
+          "type": "assistant",
+          "text": "Perfect! I can see the structure. Now I'll add the ability to delete and create items dynamically to test that tools are immediately available when new components mount. Let me implement this:",
+          "timestamp": "2025-11-13T12:17:07.868Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Edit",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/apps/example/src/pages/MultiListPage.tsx",
+            "new_string": "import React, { useState } from 'react';\nimport { useAI, defineTool } from '@use-ai/client';\nimport { z } from 'zod';\nimport ListItem from '../components/ListItem';\n\ninterface Item {\n  id: string;\n  initialLabel: string;\n  initialColor: string;\n}\n\nexport default function MultiListPage() {\n  const [items, setItems] = useState<Item[]>([\n    { id: 'Item-A', initialLabel: 'First Item', initialColor: '#ffebee' },\n    { id: 'Item-B', initialLabel: 'Second Item', initialColor: '#e3f2fd' },\n    { id: 'Item-C', initialLabel: 'Third Item', initialColor: '#e8f5e9' },\n    { id: 'Item-D', initialLabel: 'Fourth Item', initialColor: '#fff3e0' },\n  ]);\n\n  const handleDeleteItem = (itemId: string) => {\n    setItems(prevItems => prevItems.filter(item => item.id !== itemId));\n  };\n\n  const handleCreateItem = () => {\n    const nextLetter = String.fromCharCode(65 + items.length); // A, B, C, D, E, ...\n    const colors = ['#ffebee', '#e3f2fd', '#e8f5e9', '#fff3e0', '#f3e5f5', '#fce4ec'];\n    const newItem: Item = {\n      id: `Item-${nextLetter}`,\n      initialLabel: `New Item ${nextLetter}`,\n      initialColor: colors[items.length % colors.length],\n    };\n    setItems(prevItems => [...prevItems, newItem]);\n  };\n\n  const tools = {\n    createNewItem: defineTool(\n      'Create a new list item with specified properties',\n      z.object({\n        label: z.string().describe('The label for the new item'),\n        color: z.string().optional().describe('The background color for the new item (optional)'),\n      }),\n      (input) => {\n        const nextLetter = String.fromCharCode(65 + items.length);\n        const defaultColors = ['#ffebee', '#e3f2fd', '#e8f5e9', '#fff3e0', '#f3e5f5', '#fce4ec'];\n        const newItem: Item = {\n          id: `Item-${nextLetter}`,\n          initialLabel: input.label,\n          initialColor: input.color || defaultColors[items.length % defaultColors.length],\n        };\n        setItems(prevItems => [...prevItems, newItem]);\n        return {\n          success: true,\n          message: `Created new item ${newItem.id}`,\n          itemId: newItem.id,\n        };\n      }\n    ),\n\n    deleteItem: defineTool(\n      'Delete a specific list item',\n      z.object({\n        itemId: z.string().describe('The ID of the item to delete (e.g., Item-A)'),\n      }),\n      (input) => {\n        const itemExists = items.some(item => item.id === input.itemId);\n        if (!itemExists) {\n          return {\n            success: false,\n            message: `Item ${input.itemId} not found`,\n          };\n        }\n        setItems(prevItems => prevItems.filter(item => item.id !== input.itemId));\n        return {\n          success: true,\n          message: `Deleted item ${input.itemId}`,\n        };\n      }\n    ),\n  };\n\n  const { ref } = useAI({\n    tools,\n    prompt: `This is the Multi-List Page. Current items: ${items.map(item => item.id).join(', ')}. Total items: ${items.length}.`,\n    invisible: true,\n  });\n\n  return (\n    <div ref={ref} style={styles.container}>\n      <div style={styles.card}>\n        <h1 style={styles.title}>Multiple List Items Test</h1>\n        <p style={styles.subtitle}>\n          Each item below has its own useAI hook with tools. Try asking the AI to:\n        </p>\n        <ul style={styles.instructions}>\n          <li>Change the label of Item-A</li>\n          <li>Increment the counter on all items</li>\n          <li>Change Item-B's color to blue</li>\n          <li>Get the state of all items</li>\n          <li>Reset counters for items A and C</li>\n          <li><strong>Create a new item</strong> (tests dynamic tool registration)</li>\n          <li><strong>Delete Item-C</strong> (tests tool deregistration)</li>\n        </ul>\n        <p style={styles.note}>\n          <strong>Note:</strong> This page tests what happens when multiple components\n          with similar tools are mounted. Each list item registers its own set of tools\n          with unique descriptions that include the item ID. You can also create and delete\n          items to test that tools are immediately available when components mount.\n        </p>\n\n        <div style={styles.createButtonContainer}>\n          <button onClick={handleCreateItem} style={styles.createButton}>\n            + Create New Item\n          </button>\n        </div>\n\n        <div style={styles.itemsContainer}>\n          {items.map(item => (\n            <ListItem\n              key={item.id}\n              id={item.id}\n              initialLabel={item.initialLabel}\n              initialColor={item.initialColor}\n              onDelete={handleDeleteItem}\n            />\n          ))}\n        </div>\n      </div>\n    </div>\n  );\n}",
+            "old_string": "import React from 'react';\nimport ListItem from '../components/ListItem';\n\nexport default function MultiListPage() {\n  const items = [\n    { id: 'Item-A', initialLabel: 'First Item', initialColor: '#ffebee' },\n    { id: 'Item-B', initialLabel: 'Second Item', initialColor: '#e3f2fd' },\n    { id: 'Item-C', initialLabel: 'Third Item', initialColor: '#e8f5e9' },\n    { id: 'Item-D', initialLabel: 'Fourth Item', initialColor: '#fff3e0' },\n  ];\n\n  return (\n    <div style={styles.container}>\n      <div style={styles.card}>\n        <h1 style={styles.title}>Multiple List Items Test</h1>\n        <p style={styles.subtitle}>\n          Each item below has its own useAI hook with tools. Try asking the AI to:\n        </p>\n        <ul style={styles.instructions}>\n          <li>Change the label of Item-A</li>\n          <li>Increment the counter on all items</li>\n          <li>Change Item-B's color to blue</li>\n          <li>Get the state of all items</li>\n          <li>Reset counters for items A and C</li>\n        </ul>\n        <p style={styles.note}>\n          <strong>Note:</strong> This page tests what happens when multiple components\n          with similar tools are mounted. Each list item registers its own set of tools\n          with unique descriptions that include the item ID.\n        </p>\n\n        <div style={styles.itemsContainer}>\n          {items.map(item => (\n            <ListItem\n              key={item.id}\n              id={item.id}\n              initialLabel={item.initialLabel}\n              initialColor={item.initialColor}\n            />\n          ))}\n        </div>\n      </div>\n    </div>\n  );\n}"
+          },
+          "timestamp": "2025-11-13T12:17:25.442Z"
+        }
+      ],
+      "total_additions": 403,
+      "total_deletions": 82,
+      "accepted_lines": 335,
+      "overriden_lines": 0
+    }
+  }
+}
