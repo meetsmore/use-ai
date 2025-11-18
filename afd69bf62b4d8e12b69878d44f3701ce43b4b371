@@ -1,0 +1,266 @@
+packages/client/package.json
+  human 14-15
+turbo.json
+  ac00391 1-25
+packages/plugin-workflows/package.json
+  ac00391 16,27
+packages/server/package.json
+  abac8a1 23
+  ac00391 38
+packages/core/package.json
+  abac8a1 14
+packages/server/src/start.ts
+  ee4fb0d 41
+  fb30aac 4,6,8-9,16-26,28-40,42-59,61-95,98-106,110-111,114
+packages/plugin-workflows/src/runners/FlowiseWorkflowRunner.ts
+  human 76,80,82,85-86,141,147-148,153,158,235
+  ac00391 243
+  fb30aac 1-69,72-75,87-140,149,155,159-202,204-213,234,236-242,244-248,250-264,270-335
+apps/example/src/pages/WorkflowDemoPage.tsx
+  human 13,18,105,109,147,149,161,163,197,199,289,373
+  cabefbb 19,102,108,148,290,374
+  fb30aac 24-26,31-32,35-36,38,41-43,51,67,69-70,104,112,196,314-317
+docker/flowise/CREATE_CHATFLOW.md
+  human 47,59,61,63-66,92-93,95
+  fb30aac 1-46,48-58,60,62,67-91,94,96-100
+docker/flowise/docker-compose.yml
+  fb30aac 1-25
+packages/plugin-workflows/src/index.ts
+  fb30aac 8
+packages/client/src/index.ts
+  human 10
+packages/client/tsconfig.json
+  ac00391 9
+  fb30aac 5,12
+  6cae45e 11
+packages/server/src/index.ts
+  fb30aac 11-13
+packages/server/tsconfig.json
+  ac00391 8
+packages/plugin-workflows/src/WorkflowsPlugin.ts
+  fb30aac 2
+package.json
+  ac00391 5,10-12,15-17,20-21
+packages/client/src/useAIWorkflow.ts
+  ac00391 2-3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.20",
+  "base_commit_sha": "afd69bf62b4d8e12b69878d44f3701ce43b4b371",
+  "prompts": {
+    "ac00391": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "84506397-4720-4e9f-aaaa-0e805c491c82",
+        "model": "claude-sonnet-4-5-20250929"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [
+        {
+          "type": "user",
+          "text": "when we trigger the Flowise workflow, it just times out:\n\nthis is the chatflow : \nhttp://localhost:3001/api/v1/chatflows/caf85408-e53f-4eab-96f0-200ec17a78ee\n\nserver logs:\nℹ️ [09:58:38] Running workflow\n   runner: flowise\n   workflowId: caf85408-e53f-4eab-96f0-200ec17a78ee\n   toolCount: 1\nFlowise response status: 200, streaming: true\n❌ [09:58:42] Workflow failed\n   runner: flowise\n   workflowId: caf85408-e53f-4eab-96f0-200ec17a78ee\n   error: Streaming error: No response received from Flowise chatflow. Check that the chatflow is properly con...\n\nclient logs:\n[useAIWorkflow] Sending run_workflow message: Object\nindex.js:31509 [Client] Received event: RUN_STARTED\nindex.js:31509 [Client] Received event: TEXT_MESSAGE_START\nindex.js:31509 [Client] Received event: RUN_ERROR\nindex.js:44632 [Provider] Run error: Streaming error: No response received from Flowise chatflow. Check that the chatflow is properly configured with an LLM model.",
+          "timestamp": "2025-11-18T10:01:27.032Z"
+        },
+        {
+          "type": "assistant",
+          "text": "I need to investigate the FlowiseWorkflowRunner implementation to understand why it's timing out despite getting a 200 response. Let me examine the code.",
+          "timestamp": "2025-11-18T10:01:34.997Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Glob",
+          "input": {
+            "pattern": "**/FlowiseWorkflowRunner.ts"
+          },
+          "timestamp": "2025-11-18T10:01:35.358Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Glob",
+          "input": {
+            "pattern": "**/flowise*.ts"
+          },
+          "timestamp": "2025-11-18T10:01:35.575Z"
+        },
+        {
+          "type": "user",
+          "text": "/home/z/Desktop/work/use-ai/packages/plugin-workflows/src/runners/FlowiseWorkflowRunner.ts",
+          "timestamp": "2025-11-18T10:01:35.920Z"
+        },
+        {
+          "type": "user",
+          "text": "/home/z/Desktop/work/use-ai/packages/plugin-workflows/dist/runners/FlowiseWorkflowRunner.d.ts\n/home/z/Desktop/work/use-ai/packages/plugin-workflows/src/runners/FlowiseWorkflowRunner.ts",
+          "timestamp": "2025-11-18T10:01:35.941Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/packages/plugin-workflows/src/runners/FlowiseWorkflowRunner.ts"
+          },
+          "timestamp": "2025-11-18T10:01:39.020Z"
+        },
+        {
+          "type": "user",
+          "text": "     1→import type { WorkflowRunner, WorkflowInput, WorkflowResult, EventEmitter } from '../types';\n     2→import { EventType } from '@use-ai/core';\n     3→import { v4 as uuidv4 } from 'uuid';\n     4→\n     5→/**\n     6→ * Configuration for FlowiseWorkflowRunner.\n     7→ */\n     8→export interface FlowiseWorkflowRunnerConfig {\n     9→  /**\n    10→   * Base URL of the Flowise instance (e.g., 'http://localhost:3000').\n    11→   */\n    12→  baseUrl: string;\n    13→\n    14→  /**\n    15→   * Optional API key for authenticated chatflows.\n    16→   * If not provided, assumes public access is enabled.\n    17→   */\n    18→  apiKey?: string;\n    19→}\n    20→\n    21→/**\n    22→ * Workflow runner for Flowise AI chatflows.\n    23→ *\n    24→ * Integrates with Flowise (https://flowiseai.com) to execute chatflows\n    25→ * as headless workflows. Flowise is a low-code/no-code platform for building\n    26→ * AI applications with visual workflow builders.\n    27→ *\n    28→ * Features:\n    29→ * - Triggers Flowise chatflows via Prediction API\n    30→ * - Supports streaming responses\n    31→ * - Passes workflow inputs as form data or questions\n    32→ * - Emits AG-UI events for text responses\n    33→ *\n    34→ * Note: This runner currently does not support tool calls back to the client.\n    35→ * Flowise workflows execute independently and return text results.\n    36→ *\n    37→ * @example\n    38→ * ```typescript\n    39→ * const runner = new FlowiseWorkflowRunner({\n    40→ *   baseUrl: 'http://localhost:3000',\n    41→ *   apiKey: process.env.FLOWISE_API_KEY, // Optional\n    42→ * });\n    43→ *\n    44→ * // Use with WorkflowsPlugin\n    45→ * new WorkflowsPlugin({\n    46→ *   runners: new Map([\n    47→ *     ['flowise', runner],\n    48→ *   ]),\n    49→ * });\n    50→ * ```\n    51→ */\n    52→export class FlowiseWorkflowRunner implements WorkflowRunner {\n    53→  private baseUrl: string;\n    54→  private apiKey?: string;\n    55→\n    56→  constructor(config: FlowiseWorkflowRunnerConfig) {\n    57→    this.baseUrl = config.baseUrl.replace(/\\/$/, ''); // Remove trailing slash\n    58→    this.apiKey = config.apiKey;\n    59→  }\n    60→\n    61→  getName(): string {\n    62→    return 'flowise';\n    63→  }\n    64→\n    65→  async execute(input: WorkflowInput, events: EventEmitter): Promise<WorkflowResult> {\n    66→    const { session, runId, threadId, workflowId, inputs } = input;\n    67→\n    68→    try {\n    69→      // Emit RUN_STARTED\n    70→      // Note: RunAgentInput expects a specific format from AG-UI protocol\n    71→      // For workflows, we construct a minimal valid input\n    72→      events.emit({\n    73→        type: EventType.RUN_STARTED,\n    74→        threadId,\n    75→        runId,\n    76→        input: {\n    77→          threadId,\n    78→          runId,\n    79→          messages: [],\n    80→          tools: input.tools.map((t) => ({\n    81→            name: t.name,\n    82→            description: t.description,\n    83→            parameters: t.parameters,\n    84→          })),\n    85→          state: inputs,\n    86→        } as any,\n    87→        timestamp: Date.now(),\n    88→      });\n    89→\n    90→      // Prepare request to Flowise Prediction API\n    91→      const url = `${this.baseUrl}/api/v1/prediction/${workflowId}`;\n    92→      const headers: Record<string, string> = {\n    93→        'Content-Type': 'application/json',\n    94→      };\n    95→\n    96→      if (this.apiKey) {\n    97→        headers['Authorization'] = `Bearer ${this.apiKey}`;\n    98→      }\n    99→\n   100→      // Build request body\n   101→      // If inputs contains a 'question' field, use it directly\n   102→      // Otherwise, pass all inputs as 'form' data\n   103→      const requestBody: Record<string, any> = {\n   104→        streaming: true, // Enable streaming for better UX\n   105→      };\n   106→\n   107→      if (inputs.question) {\n   108→        requestBody.question = inputs.question;\n   109→        // Remove question from form data\n   110→        const { question, ...restInputs } = inputs;\n   111→        if (Object.keys(restInputs).length > 0) {\n   112→          requestBody.overrideConfig = { vars: restInputs };\n   113→        }\n   114→      } else {\n   115→        requestBody.form = inputs;\n   116→      }\n   117→\n   118→      // Make request to Flowise with timeout\n   119→      const controller = new AbortController();\n   120→      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout\n   121→\n   122→      let response: Response;\n   123→      try {\n   124→        response = await fetch(url, {\n   125→          method: 'POST',\n   126→          headers,\n   127→          body: JSON.stringify(requestBody),\n   128→          signal: controller.signal,\n   129→        });\n   130→      } catch (fetchError) {\n   131→        if (fetchError instanceof Error && fetchError.name === 'AbortError') {\n   132→          throw new Error(`Request to Flowise timed out after 30 seconds. Check that Flowise is running at ${this.baseUrl}`);\n   133→        }\n   134→        throw new Error(`Failed to connect to Flowise at ${this.baseUrl}: ${fetchError instanceof Error ? fetchError.message : 'Unknown error'}`);\n   135→      } finally {\n   136→        clearTimeout(timeoutId);\n   137→      }\n   138→\n   139→      if (!response.ok) {\n   140→        const errorText = await response.text();\n   141→        let errorMessage = `Flowise API error: ${response.status}`;\n   142→\n   143→        // Parse error details if available\n   144→        try {\n   145→          const errorJson = JSON.parse(errorText);\n   146→          errorMessage = errorJson.message || errorJson.error || errorText;\n   147→        } catch {\n   148→          errorMessage = errorText || errorMessage;\n   149→        }\n   150→\n   151→        // Add helpful context for common errors\n   152→        if (response.status === 404) {\n   153→          errorMessage = `Chatflow '${workflowId}' not found. Please create it in Flowise first (http://localhost:3001)`;\n   154→        } else if (response.status === 500) {\n   155→          errorMessage = `Flowise internal error: ${errorMessage}. Check chatflow configuration and Flowise logs: docker logs flowise`;\n   156→        }\n   157→\n   158→        throw new Error(errorMessage);\n   159→      }\n   160→\n   161→      // Log successful response\n   162→      console.log(`Flowise response status: ${response.status}, streaming: ${!!response.body}`);\n   163→\n   164→      // Handle streaming response\n   165→      if (requestBody.streaming && response.body) {\n   166→        await this.handleStreamingResponse(response.body, events, threadId, runId);\n   167→      } else {\n   168→        // Handle non-streaming response\n   169→        const result = await response.json();\n   170→        await this.handleNonStreamingResponse(result, events, threadId, runId);\n   171→      }\n   172→\n   173→      return {\n   174→        success: true,\n   175→        output: {},\n   176→      };\n   177→    } catch (error) {\n   178→      const errorMessage = error instanceof Error ? error.message : 'Unknown error';\n   179→\n   180→      events.emit({\n   181→        type: EventType.RUN_ERROR,\n   182→        message: errorMessage,\n   183→        timestamp: Date.now(),\n   184→      });\n   185→\n   186→      return {\n   187→        success: false,\n   188→        error: errorMessage,\n   189→      };\n   190→    }\n   191→  }\n   192→\n   193→  private async handleStreamingResponse(\n   194→    body: ReadableStream<Uint8Array>,\n   195→    events: EventEmitter,\n   196→    threadId: string,\n   197→    runId: string\n   198→  ): Promise<void> {\n   199→    const reader = body.getReader();\n   200→    const decoder = new TextDecoder();\n   201→    const messageId = uuidv4();\n   202→    let fullText = '';\n   203→    let hasReceivedData = false;\n   204→\n   205→    // Emit TEXT_MESSAGE_START\n   206→    events.emit({\n   207→      type: EventType.TEXT_MESSAGE_START,\n   208→      messageId,\n   209→      role: 'assistant',\n   210→      timestamp: Date.now(),\n   211→    });\n   212→\n   213→    try {\n   214→      // Add timeout for inactivity (30 seconds)\n   215→      const timeout = 30000;\n   216→      let timeoutId: ReturnType<typeof setTimeout> | null = null;\n   217→\n   218→      const readWithTimeout = async () => {\n   219→        return new Promise<{ done: boolean; value?: Uint8Array }>((resolve, reject) => {\n   220→          timeoutId = setTimeout(() => {\n   221→            reject(new Error('Streaming timeout: No data received from Flowise in 30 seconds'));\n   222→          }, timeout);\n   223→\n   224→          reader.read().then((result) => {\n   225→            if (timeoutId) clearTimeout(timeoutId);\n   226→            resolve(result);\n   227→          }).catch((error) => {\n   228→            if (timeoutId) clearTimeout(timeoutId);\n   229→            reject(error);\n   230→          });\n   231→        });\n   232→      };\n   233→\n   234→      while (true) {\n   235→        const { done, value } = await readWithTimeout();\n   236→        if (done) break;\n   237→\n   238→        const chunk = decoder.decode(value, { stream: true });\n   239→        const lines = chunk.split('\\n');\n   240→\n   241→        for (const line of lines) {\n   242→          if (line.startsWith('data: ')) {\n   243→            const data = line.slice(6).trim();\n   244→            if (data === '[DONE]') continue;\n   245→\n   246→            try {\n   247→              const parsed = JSON.parse(data);\n   248→              if (parsed.event === 'token' && parsed.data) {\n   249→                hasReceivedData = true;\n   250→                fullText += parsed.data;\n   251→                // Emit TEXT_MESSAGE_CONTENT for each chunk\n   252→                events.emit({\n   253→                  type: EventType.TEXT_MESSAGE_CONTENT,\n   254→                  messageId,\n   255→                  delta: parsed.data,\n   256→                  timestamp: Date.now(),\n   257→                });\n   258→              }\n   259→            } catch (e) {\n   260→              // Skip invalid JSON chunks\n   261→              continue;\n   262→            }\n   263→          }\n   264→        }\n   265→      }\n   266→\n   267→      // Check if we received any data\n   268→      if (!hasReceivedData) {\n   269→        throw new Error('No response received from Flowise chatflow. Check that the chatflow is properly configured with an LLM model.');\n   270→      }\n   271→\n   272→      // Emit TEXT_MESSAGE_END\n   273→      events.emit({\n   274→        type: EventType.TEXT_MESSAGE_END,\n   275→        messageId,\n   276→        timestamp: Date.now(),\n   277→      });\n   278→\n   279→      // Emit RUN_FINISHED\n   280→      events.emit({\n   281→        type: EventType.RUN_FINISHED,\n   282→        threadId,\n   283→        runId,\n   284→        result: fullText,\n   285→        timestamp: Date.now(),\n   286→      });\n   287→    } catch (error) {\n   288→      throw new Error(`Streaming error: ${error instanceof Error ? error.message : 'Unknown error'}`);\n   289→    } finally {\n   290→      reader.releaseLock();\n   291→    }\n   292→  }\n   293→\n   294→  private async handleNonStreamingResponse(\n   295→    result: any,\n   296→    events: EventEmitter,\n   297→    threadId: string,\n   298→    runId: string\n   299→  ): Promise<void> {\n   300→    const messageId = uuidv4();\n   301→    const text = result.text || result.response || JSON.stringify(result);\n   302→\n   303→    // Emit TEXT_MESSAGE_START\n   304→    events.emit({\n   305→      type: EventType.TEXT_MESSAGE_START,\n   306→      messageId,\n   307→      role: 'assistant',\n   308→      timestamp: Date.now(),\n   309→    });\n   310→\n   311→    // Emit TEXT_MESSAGE_CONTENT\n   312→    events.emit({\n   313→      type: EventType.TEXT_MESSAGE_CONTENT,\n   314→      messageId,\n   315→      delta: text,\n   316→      timestamp: Date.now(),\n   317→    });\n   318→\n   319→    // Emit TEXT_MESSAGE_END\n   320→    events.emit({\n   321→      type: EventType.TEXT_MESSAGE_END,\n   322→      messageId,\n   323→      timestamp: Date.now(),\n   324→    });\n   325→\n   326→    // Emit RUN_FINISHED\n   327→    events.emit({\n   328→      type: EventType.RUN_FINISHED,\n   329→      threadId,\n   330→      runId,\n   331→      result: text,\n   332→      timestamp: Date.now(),\n   333→    });\n   334→  }\n   335→}\n   336→\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\n</system-reminder>\n",
+          "timestamp": "2025-11-18T10:01:39.139Z"
+        },
+        {
+          "type": "assistant",
+          "text": "Looking at the code, I can see the issue. The `FlowiseWorkflowRunner` is expecting a specific streaming format from Flowise - it's looking for Server-Sent Events (SSE) with the format:\n\n```\ndata: {\"event\": \"token\", \"data\": \"...\"}\n```\n\nHowever, if Flowise returns a different streaming format or no data at all, it will timeout with the error you're seeing.\n\nLet me add some debug logging to see what Flowise is actually returning:",
+          "timestamp": "2025-11-18T10:01:52.366Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Edit",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/packages/plugin-workflows/src/runners/FlowiseWorkflowRunner.ts",
+            "new_string": "      while (true) {\n        const { done, value } = await readWithTimeout();\n        if (done) break;\n\n        const chunk = decoder.decode(value, { stream: true });\n        console.log('[FlowiseWorkflowRunner] Received chunk:', chunk);\n        const lines = chunk.split('\\n');\n\n        for (const line of lines) {\n          console.log('[FlowiseWorkflowRunner] Processing line:', line);\n          if (line.startsWith('data: ')) {\n            const data = line.slice(6).trim();\n            console.log('[FlowiseWorkflowRunner] SSE data:', data);\n            if (data === '[DONE]') continue;\n\n            try {\n              const parsed = JSON.parse(data);\n              console.log('[FlowiseWorkflowRunner] Parsed SSE:', parsed);\n              if (parsed.event === 'token' && parsed.data) {\n                hasReceivedData = true;\n                fullText += parsed.data;\n                // Emit TEXT_MESSAGE_CONTENT for each chunk\n                events.emit({\n                  type: EventType.TEXT_MESSAGE_CONTENT,\n                  messageId,\n                  delta: parsed.data,\n                  timestamp: Date.now(),\n                });\n              }\n            } catch (e) {\n              console.log('[FlowiseWorkflowRunner] Failed to parse SSE data:', e);\n              // Skip invalid JSON chunks\n              continue;\n            }\n          }\n        }\n      }",
+            "old_string": "      while (true) {\n        const { done, value } = await readWithTimeout();\n        if (done) break;\n\n        const chunk = decoder.decode(value, { stream: true });\n        const lines = chunk.split('\\n');\n\n        for (const line of lines) {\n          if (line.startsWith('data: ')) {\n            const data = line.slice(6).trim();\n            if (data === '[DONE]') continue;\n\n            try {\n              const parsed = JSON.parse(data);\n              if (parsed.event === 'token' && parsed.data) {\n                hasReceivedData = true;\n                fullText += parsed.data;\n                // Emit TEXT_MESSAGE_CONTENT for each chunk\n                events.emit({\n                  type: EventType.TEXT_MESSAGE_CONTENT,\n                  messageId,\n                  delta: parsed.data,\n                  timestamp: Date.now(),\n                });\n              }\n            } catch (e) {\n              // Skip invalid JSON chunks\n              continue;\n            }\n          }\n        }\n      }"
+          },
+          "timestamp": "2025-11-18T10:01:59.271Z"
+        }
+      ],
+      "total_additions": 72,
+      "total_deletions": 43,
+      "accepted_lines": 47,
+      "overriden_lines": 0
+    },
+    "fb30aac": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b203c489-f18d-4e4f-95df-53dee28830a0",
+        "model": "claude-sonnet-4-5-20250929"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [
+        {
+          "type": "user",
+          "text": "we want to implement a simple AI workflow engine as an example (e.g. user can define AI workflows in a UI editor)\nwhat's the simplest we can self-host, like Dify, Flowise, etc, we want something that's simple to get up and running locally, for testing",
+          "timestamp": "2025-11-14T13:53:10.688Z"
+        },
+        {
+          "type": "assistant",
+          "text": "I'll help you find the simplest self-hosted AI workflow engine for local testing. Let me research the current options.",
+          "timestamp": "2025-11-14T13:53:16.741Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "WebSearch",
+          "input": {
+            "query": "Dify Flowise n8n docker compose self-host comparison 2025 simplest setup"
+          },
+          "timestamp": "2025-11-14T13:53:17.717Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "WebSearch",
+          "input": {
+            "query": "Dify docker compose quickstart local development 2025"
+          },
+          "timestamp": "2025-11-14T13:53:18.259Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "WebSearch",
+          "input": {
+            "query": "Flowise docker setup local installation 2025"
+          },
+          "timestamp": "2025-11-14T13:53:18.539Z"
+        },
+        {
+          "type": "user",
+          "text": "Web search results for query: \"Flowise docker setup local installation 2025\"\n\nLinks: [{\"title\":\"Get Started | FlowiseAI\",\"url\":\"https://docs.flowiseai.com/getting-started\"},{\"title\":\"How to Install FlowiseAI with Docker Compose\",\"url\":\"https://www.bitdoze.com/flowiseai-install/\"},{\"title\":\"Digital Ocean | FlowiseAI\",\"url\":\"https://docs.flowiseai.com/configuration/deployment/digital-ocean\"},{\"title\":\"Install FlowiseAI Inside Docker Container on Linux | Lindevs\",\"url\":\"https://lindevs.com/install-flowiseai-inside-docker-container-on-linux\"},{\"title\":\"How to use Flowise locally. A Comprehensive Guide | by Research Graph | Medium\",\"url\":\"https://medium.com/@researchgraph/how-to-use-flowise-locally-0bf21fc68b66\"},{\"title\":\"Flowise/Dockerfile at main · FlowiseAI/Flowise\",\"url\":\"https://github.com/FlowiseAI/Flowise/blob/main/Dockerfile\"},{\"title\":\"GitHub - FlowiseAI/Flowise: Build AI Agents, Visually\",\"url\":\"https://github.com/FlowiseAI/Flowise\"},{\"title\":\"Flowise/README.md at main · FlowiseAI/Flowise\",\"url\":\"https://github.com/FlowiseAI/Flowise/blob/main/README.md\"},{\"title\":\"How to Install FlowiseAI on Your Synology NAS – Marius Hosting\",\"url\":\"https://mariushosting.com/how-to-install-flowiseai-on-your-synology-nas/\"},{\"title\":\"AWS | FlowiseAI\",\"url\":\"https://docs.flowiseai.com/configuration/deployment/aws\"}]\n\nI found comprehensive information about setting up Flowise with Docker locally. Here's what I found:\n\n## Docker Installation Methods\n\nFlowise offers Docker setup by cloning the project, going to the docker folder at the root, copying the .env.example file and renaming it to .env, then running `docker compose up -d`. You can access the application at http://localhost:3000.\n\n## Quick Docker Commands\n\nFor a simpler approach, you can create a container using: `docker run -d --name=flowiseai --restart=always --network=host -v /opt/flowiseai/data:/root/.flowise elestio/flowiseai`.\n\nAlternatively, you can build the image locally with `docker build --no-cache -t flowise .` and run it with `docker run -d --name flowise -p 3000:3000 flowise`.\n\n## Docker Compose Setup\n\nThe flowise service uses the flowiseai/flowise:latest Docker image, exposes port 3000, and mounts a volume at /root/.flowise to persist data.\n\n## Environment Configuration\n\nKey environment variables include PORT=3000, DATABASE_PATH=/root/.flowise, SECRETKEY_PATH=/root/.flowise, LOG_PATH=/root/.flowise/logs, and BLOB_STORAGE_PATH=/root/.flowise/storage.\n\n## Prerequisites\n\nMake sure you have Docker installed on your system, and NodeJS >= 18.15.0 is required for development setups.\n\nThe official documentation and GitHub repository provide the most up-to-date installation instructions, with recent guides from February 2025 confirming these methods are current.",
+          "timestamp": "2025-11-14T13:53:37.479Z"
+        },
+        {
+          "type": "user",
+          "text": "Web search results for query: \"Dify docker compose quickstart local development 2025\"\n\nLinks: [{\"title\":\"Deploy with Docker Compose - Dify Docs\",\"url\":\"https://docs.dify.ai/en/getting-started/install-self-hosted/docker-compose\"},{\"title\":\"will dify optimise docker compose to local development · Issue #13011 · langgenius/dify\",\"url\":\"https://github.com/langgenius/dify/issues/13011\"},{\"title\":\"dify/docker/docker-compose.yaml at main · langgenius/dify\",\"url\":\"https://github.com/langgenius/dify/blob/main/docker/docker-compose.yaml\"},{\"title\":\"dify/docker/README.md at main · langgenius/dify\",\"url\":\"https://github.com/langgenius/dify/blob/main/docker/README.md\"},{\"title\":\"Docker Deployment | langgenius/dify | DeepWiki\",\"url\":\"https://deepwiki.com/langgenius/dify/3.1-docker-deployment\"},{\"title\":\"docker-compose · langgenius/dify · Discussion #23497\",\"url\":\"https://github.com/langgenius/dify/discussions/23497\"},{\"title\":\"A Comprehensive Guide to Installing Dify on Ubuntu with Docker Compose - addROM\",\"url\":\"https://addrom.com/a-comprehensive-guide-to-installing-dify-on-ubuntu-with-docker-compose/\"},{\"title\":\"Docker Compose and Self-Hosting | langgenius/dify-docs | DeepWiki\",\"url\":\"https://deepwiki.com/langgenius/dify-docs/3.2-start-node-and-file-upload\"},{\"title\":\"Guide to Dify, an open-source platform for developing large language model (LLM) applications | by Gen. Devin DL. | Medium\",\"url\":\"https://medium.com/@tubelwj/guide-to-dify-an-open-source-platform-for-developing-large-language-model-llm-applications-e6cc2d39ecdf\"},{\"title\":\"Dify Enterprise Release - Docker Compose\",\"url\":\"https://langgenius.github.io/dify-enterprise-docker-compose/\"}]\n\nBased on the search results, here's what I found about Dify Docker Compose quickstart for local development in 2025:\n\n## Quick Start Steps\n\nTo get started, navigate to the dify/docker directory, copy .env.example to .env and customize it as needed, then run docker compose up -d from within the dify/docker directory.(no content)This is the recommended and supported workflow, as the compose file uses relative paths and is intended to be run from its own directory.\n\n## System Architecture\n\nDocker Compose is the recommended method for self-hosted installations, orchestrating multiple containerized services that comprise the complete Dify platform.(no content)The deployment includes 3 core services: api / worker / web, and 6 dependent components: weaviate / db / redis / nginx / ssrf_proxy / sandbox.\n\n## Configuration Requirements\n\nA .env file is now required to run docker compose up, as this file is crucial for configuring your deployment and for any custom settings to persist through upgrades.(no content)You can switch between different vector databases by setting the VECTOR_STORE environment variable in your .env file.\n\n## Access After Startup\n\nAfter deployment, you can access the local environment at http://localhost/install.\n\n## Recent Development Discussions\n\nThere was a discussion opened on January 24, 2025 about optimizing docker compose for local development, noting that the current compose includes 26 services which can be too heavy for individual developers.",
+          "timestamp": "2025-11-14T13:53:39.697Z"
+        },
+        {
+          "type": "user",
+          "text": "Web search results for query: \"Dify Flowise n8n docker compose self-host comparison 2025 simplest setup\"\n\nLinks: [{\"title\":\"Dify vs. n8n vs. Flowise: LLM Application Low-Code Platform Workflow Comparison. - Developer Technology Blog Website\",\"url\":\"https://www.api2o.com/en/blog/lowcode-platform-compare-dify-n8n-flowise\"},{\"title\":\"Dify vs n8n Review (2025) – Which Platform Wins?\",\"url\":\"https://hostadvice.com/blog/ai/automation/n8n-vs-dify/\"},{\"title\":\"Docker Compose for LangFlow, Flowise, n8n // Michal Kups\",\"url\":\"https://michalkups.com/post/5/docker-n8n-langflow-flowise/\"},{\"title\":\"Top 7 Open-Source AI Low/No-Code Tools in 2025: A Comprehensive Analysis of Leading Platforms\",\"url\":\"https://htdocs.dev/posts/top-7-open-source-ai-lowno-code-tools-in-2025-a-comprehensive-analysis-of-leading-platforms/\"},{\"title\":\"n8n vs Dify for AI | Cyprien Guillemot\",\"url\":\"https://www.cyprien.io/posts/n8n-vs-dify/\"},{\"title\":\"n8n vs Flowise (2025): Which Automation Tool Is Better?\",\"url\":\"https://hostadvice.com/blog/ai/automation/n8n-vs-flowise/\"},{\"title\":\"GitHub - kossakovsky/n8n-install: One-command installer for self-hosted n8n automation + 20+ AI tools (Ollama, Flowise, RAG, vector DBs) with automatic HTTPS\",\"url\":\"https://github.com/kossakovsky/n8n-install\"},{\"title\":\"Dify Flowise Vs N8N Comparison | Restackio\",\"url\":\"https://www.restack.io/p/dify-answer-flowise-vs-n8n-cat-ai\"},{\"title\":\"🔍 n8n vs Dify.ai & Other LLMOps Platforms - AiX Society 人工智能應用研究學會\",\"url\":\"https://aixsociety.com/🔍-n8n-vs-dify-ai-other-llmops-platforms/\"},{\"title\":\"How to Self-Host n8n with Docker Compose - DEV Community\",\"url\":\"https://dev.to/pavel-hostim/how-to-self-host-n8n-with-docker-compose-mjl\"}]\n\nBased on the search results, here's a comprehensive comparison of Dify, Flowise, and n8n for Docker Compose self-hosting in 2025, focusing on setup simplicity:\n\n## Simplest Setup\n\n**n8n** has the simplest setup among the three platforms. n8n is very lightweight: only one container is needed, with possibly a second one if you need to externalize the database on PostgreSQL (by default, n8n uses SQLite). n8n also launches very easily locally for testing and consumes very few resources.\n\n**Flowise** also offers a relatively simple setup and is included in minimal deployment configurations. For a minimal setup with only n8n and Flowise: 4 GB Memory / 2 CPU Cores / 30 GB Disk Space.\n\n**Dify** is the most complex to set up. Dify is slightly more complex to set up. A docker-compose.yml file is provided and allows you to launch the dozen or so necessary containers. However, it will be more complex to self-host, due to its microservices approach compared to n8n's monolithic approach.\n\n## Target Use Cases\n\n**Dify**: If you are a non-software professional, Dify is the best choice. Dify is more AI-focused and this is reflected in its management of this part, which is more intuitive and advanced than n8n's.\n\n**Flowise**: Flowise was built from the ground up for AI orchestration, focusing specifically on LLM-powered applications with quick chatbot development.\n\n**n8n**: n8n's core business remains automation with hundreds of \"out of the box\" connectors, features that are almost absent from Dify. This allows having a single solution to combine automation and AI.\n\n## Key Differences\n\nFlowise offers ease of use and quick setup, while n8n provides flexibility and extensive customization options. For Docker Compose templates combining multiple tools, there are docker compose templates available for spinning these up and having a quick look, though they're meant for testing and not secured for production use.",
+          "timestamp": "2025-11-14T13:53:44.776Z"
+        },
+        {
+          "type": "assistant",
+          "text": "Based on my research, **Flowise** is the simplest option for local testing. Here's a quick comparison:\n\n## Recommendation: Flowise\n\n**Simplest setup** - literally one command:\n```bash\ndocker run -d \\\n  --name flowise \\\n  -p 3000:3000 \\\n  -v flowise_data:/root/.flowise \\\n  flowiseai/flowise\n```\n\nThen access at `http://localhost:3000`\n\n**Why Flowise:**\n- ✅ Single container (vs Dify's 26+ services)\n- ✅ Built specifically for AI/LLM workflows\n- ✅ Visual workflow builder\n- ✅ Minimal resource usage (~2GB RAM)\n- ✅ Quick to test and iterate\n\n## Alternative: n8n\n\nIf you need more general automation beyond AI:\n```bash\ndocker run -d \\\n  --name n8n \\\n  -p 5678:5678 \\\n  -v n8n_data:/home/node/.n8n \\\n  n8nio/n8n\n```\n\n**Why n8n:**\n- ✅ Also lightweight (1-2 containers)\n- ✅ Hundreds of pre-built connectors\n- ✅ Good for combining automation + AI\n- ⚠️ Less AI-focused than Flowise\n\n## Don't use Dify (for testing)\n\n- ❌ 26+ microservices to run\n- ❌ Complex docker-compose setup\n- ❌ Overkill for local testing\n- ✅ Better for production deployments\n\n## Integration with your project\n\nYour codebase already has the `WorkflowRunner` interface ready (as mentioned in CLAUDE.md). You'd implement:\n\n```typescript\n// packages/plugin-workflows-flowise/src/FlowiseWorkflowRunner.ts\nexport class FlowiseWorkflowRunner implements WorkflowRunner {\n  constructor(private config: { \n    apiUrl: string;  // http://localhost:3000\n  }) {}\n  \n  getName(): string {\n    return 'flowise';\n  }\n  \n  async execute(input: WorkflowInput, events: EventEmitter): Promise<WorkflowResult> {\n    // Call Flowise API to trigger workflow\n    // Emit TEXT_MESSAGE_* and TOOL_CALL_* events\n    // Return workflow outputs\n  }\n}\n```\n\n**My recommendation:** Start with **Flowise** for the simplest local testing experience.",
+          "timestamp": "2025-11-14T13:54:04.597Z"
+        },
+        {
+          "type": "user",
+          "text": "ok, lets do Flowise:\n\n1. Create a local docker-compose with flowise \n2. Create a FlowiseWorkflowRunner (in packages/plugin-workflows)\n3. set up an example flow in Flowise so we can run it in our example app\n4. Use it in our server start.ts and implement it in the apps/example/src/pages/WorkflowDemoPage.tsx",
+          "timestamp": "2025-11-14T13:55:40.074Z"
+        },
+        {
+          "type": "assistant",
+          "text": "I'll help you set up Flowise integration. Let me create a todo list and get started.",
+          "timestamp": "2025-11-14T13:55:45.822Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "TodoWrite",
+          "input": {
+            "todos": [
+              {
+                "activeForm": "Creating docker-compose.yml for Flowise",
+                "content": "Create docker-compose.yml for Flowise in docker/ directory",
+                "status": "in_progress"
+              },
+              {
+                "activeForm": "Creating FlowiseWorkflowRunner implementation",
+                "content": "Create FlowiseWorkflowRunner implementation in packages/plugin-workflows/src/runners/",
+                "status": "pending"
+              },
+              {
+                "activeForm": "Updating server start.ts",
+                "content": "Update server start.ts to register FlowiseWorkflowRunner",
+                "status": "pending"
+              },
+              {
+                "activeForm": "Updating WorkflowDemoPage.tsx",
+                "content": "Update WorkflowDemoPage.tsx to use Flowise workflow",
+                "status": "pending"
+              },
+              {
+                "activeForm": "Creating README with setup instructions",
+                "content": "Create README with instructions for setting up Flowise workflow",
+                "status": "pending"
+              }
+            ]
+          },
+          "timestamp": "2025-11-14T13:55:49.103Z"
+        },
+        {
+          "type": "user",
+          "text": "Todos have been modified successfully. Ensure that you continue to use the todo list to track your progress. Please proceed with the current tasks if applicable",
+          "timestamp": "2025-11-14T13:55:49.248Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Bash",
+          "input": {
+            "command": "mkdir -p docker/flowise",
+            "description": "Create docker/flowise directory"
+          },
+          "timestamp": "2025-11-14T13:55:52.935Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Write",
+          "input": {
+            "content": "version: '3.8'\n\nservices:\n  flowise:\n    image: flowiseai/flowise:latest\n    container_name: flowise\n    restart: always\n    environment:\n      - PORT=3000\n      - DATABASE_PATH=/root/.flowise\n      - APIKEY_PATH=/root/.flowise\n      - SECRETKEY_PATH=/root/.flowise\n      - LOG_PATH=/root/.flowise/logs\n      - BLOB_STORAGE_PATH=/root/.flowise/storage\n      # Disable authentication for local development\n      - FLOWISE_USERNAME=\n      - FLOWISE_PASSWORD=\n    ports:\n      - \"3000:3000\"\n    volumes:\n      - flowise_data:/root/.flowise\n    command: /bin/sh -c \"sleep 3; flowise start\"\n\nvolumes:\n  flowise_data:\n    driver: local\n",
+            "file_path": "/home/z/Desktop/work/use-ai/docker/flowise/docker-compose.yml"
+          },
+          "timestamp": "2025-11-14T13:56:00.380Z"
+        }
+      ],
+      "total_additions": 945,
+      "total_deletions": 219,
+      "accepted_lines": 788,
+      "overriden_lines": 101
+    }
+  }
+}
