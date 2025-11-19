@@ -1,0 +1,171 @@
+apps/example/src/index.tsx
+  550cce1 15-19
+packages/server/src/mcp/RemoteMcpToolsProvider.ts
+  550cce1 115-116,119,121,231-236,238-239,241,243-244,246,248,250
+  human 118,240,249
+apps/example/src/pages/RemoteMcpToolsPage.tsx
+  550cce1 20-23,47,51-73,130-137,180-201
+apps/a-nest-mcp-server/package.json
+  14f2725 17
+apps/a-nest-mcp-server/src/tools.service.ts
+  550cce1 1-2,7,9,89-131
+  human 5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.20",
+  "base_commit_sha": "916280a0e4667f5b7ca41863cbe0f1778dfc155c",
+  "prompts": {
+    "550cce1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3b3b10e3-c1ab-474c-baa9-517279f15984",
+        "model": "claude-sonnet-4-5-20250929"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [
+        {
+          "type": "user",
+          "text": "We want to add an example of the mcpHeadersProvider feature of `UseAIProvider`\n\nupdate the remote mcp example page:\n\n1. create an endpoint that requires some specific api key header to function in the a-nest-mcp-server app\n2. setup the `UseAIProvider` mcpHeadersProvider hook to set that api key correctly\n3. use that endpoint in the remote mcp example page",
+          "timestamp": "2025-11-19T13:21:15.639Z"
+        },
+        {
+          "type": "assistant",
+          "text": "I'll help you add an example of the `mcpHeadersProvider` feature to the remote MCP example page. Let me first explore the codebase to understand the current setup.",
+          "timestamp": "2025-11-19T13:21:20.791Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Task",
+          "input": {
+            "description": "Find remote MCP example files",
+            "model": "haiku",
+            "prompt": "Find the following:\n1. The remote MCP example page in the example app\n2. The a-nest-mcp-server app location\n3. The UseAIProvider component and mcpHeadersProvider implementation\n4. Any existing MCP-related code\n\nLook for files related to \"remote\", \"mcp\", \"nest\", and \"mcpHeadersProvider\".",
+            "subagent_type": "Explore"
+          },
+          "timestamp": "2025-11-19T13:21:23.197Z"
+        },
+        {
+          "type": "assistant",
+          "text": "Perfect! Now I understand the architecture. Let me create a plan and implement this feature.",
+          "timestamp": "2025-11-19T13:23:01.055Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "TodoWrite",
+          "input": {
+            "todos": [
+              {
+                "activeForm": "Adding authenticated endpoint to a-nest-mcp-server",
+                "content": "Add authenticated endpoint to a-nest-mcp-server requiring API key",
+                "status": "in_progress"
+              },
+              {
+                "activeForm": "Setting up mcpHeadersProvider in RemoteMcpToolsPage",
+                "content": "Setup mcpHeadersProvider in RemoteMcpToolsPage",
+                "status": "pending"
+              },
+              {
+                "activeForm": "Updating example page to demonstrate authenticated endpoint",
+                "content": "Update example page to demonstrate the authenticated endpoint",
+                "status": "pending"
+              },
+              {
+                "activeForm": "Testing the implementation",
+                "content": "Test the implementation",
+                "status": "pending"
+              }
+            ]
+          },
+          "timestamp": "2025-11-19T13:23:03.733Z"
+        },
+        {
+          "type": "user",
+          "text": "Todos have been modified successfully. Ensure that you continue to use the todo list to track your progress. Please proceed with the current tasks if applicable",
+          "timestamp": "2025-11-19T13:23:03.927Z"
+        },
+        {
+          "type": "assistant",
+          "text": "Let me read the current files to understand the structure:",
+          "timestamp": "2025-11-19T13:23:07.152Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/apps/a-nest-mcp-server/src/tools.service.ts"
+          },
+          "timestamp": "2025-11-19T13:23:07.715Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/apps/example/src/pages/RemoteMcpToolsPage.tsx"
+          },
+          "timestamp": "2025-11-19T13:23:08.295Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/apps/a-nest-mcp-server/src/main.ts"
+          },
+          "timestamp": "2025-11-19T13:23:08.897Z"
+        },
+        {
+          "type": "user",
+          "text": "     1→import { Injectable } from '@nestjs/common';\n     2→import { Tool } from '@rekog/mcp-nest';\n     3→import { z } from 'zod';\n     4→\n     5→@Injectable()\n     6→export class ToolsService {\n     7→  @Tool({\n     8→    name: 'add',\n     9→    description: 'Add two numbers together',\n    10→    parameters: z.object({\n    11→      a: z.number().describe('The first number'),\n    12→      b: z.number().describe('The second number'),\n    13→    }),\n    14→  })\n    15→  async add({ a, b }: { a: number; b: number }) {\n    16→    return {\n    17→      content: [\n    18→        {\n    19→          type: 'text',\n    20→          text: JSON.stringify({ result: a + b }),\n    21→        },\n    22→      ],\n    23→    };\n    24→  }\n    25→\n    26→  @Tool({\n    27→    name: 'multiply',\n    28→    description: 'Multiply two numbers together',\n    29→    parameters: z.object({\n    30→      a: z.number().describe('The first number'),\n    31→      b: z.number().describe('The second number'),\n    32→    }),\n    33→  })\n    34→  async multiply({ a, b }: { a: number; b: number }) {\n    35→    return {\n    36→      content: [\n    37→        {\n    38→          type: 'text',\n    39→          text: JSON.stringify({ result: a * b }),\n    40→        },\n    41→      ],\n    42→    };\n    43→  }\n    44→\n    45→  @Tool({\n    46→    name: 'greet',\n    47→    description: 'Greet a person by name',\n    48→    parameters: z.object({\n    49→      name: z.string().describe('The name of the person to greet'),\n    50→    }),\n    51→  })\n    52→  async greet({ name }: { name: string }) {\n    53→    return {\n    54→      content: [\n    55→        {\n    56→          type: 'text',\n    57→          text: `Hello, ${name}! Welcome to the MCP server.`,\n    58→        },\n    59→      ],\n    60→    };\n    61→  }\n    62→\n    63→  @Tool({\n    64→    name: 'get_weather',\n    65→    description: 'Get the current weather for a location (mock data)',\n    66→    parameters: z.object({\n    67→      location: z.string().describe('The location to get weather for'),\n    68→    }),\n    69→  })\n    70→  async getWeather({ location }: { location: string }) {\n    71→    const weatherData = {\n    72→      location,\n    73→      temperature: 72,\n    74→      condition: 'Sunny',\n    75→      humidity: 45,\n    76→    };\n    77→    return {\n    78→      content: [\n    79→        {\n    80→          type: 'text',\n    81→          text: JSON.stringify(weatherData),\n    82→        },\n    83→      ],\n    84→    };\n    85→  }\n    86→}\n    87→\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\n</system-reminder>\n",
+          "timestamp": "2025-11-19T13:23:09.167Z"
+        },
+        {
+          "type": "user",
+          "text": "     1→import React, { useState } from 'react';\n     2→import { useAI } from '@use-ai/client';\n     3→\n     4→export default function RemoteMcpToolsPage() {\n     5→  const [result, setResult] = useState<string>('');\n     6→\n     7→  // Register the page with useAI - no local tools, just relying on remote MCP tools\n     8→  useAI({\n     9→    tools: {},\n    10→    prompt: `Remote MCP Tools Test Page\n    11→\n    12→Current result: ${result}\n    13→\n    14→This page demonstrates remote MCP tools from the MCP server.\n    15→The following tools are available remotely from the MCP server:\n    16→- mcp_add: Add two numbers together\n    17→- mcp_multiply: Multiply two numbers\n    18→- mcp_greet: Greet a person by name\n    19→- mcp_get_weather: Get weather information for a location\n    20→\n    21→You can help the user test these tools by calling them with various inputs.`,\n    22→  });\n    23→\n    24→  return (\n    25→    <div style={styles.container}>\n    26→      <h1 style={styles.title}>Remote MCP Tools Test</h1>\n    27→\n    28→      <div style={styles.infoCard}>\n    29→        <h2 style={styles.subtitle}>About This Page</h2>\n    30→        <p style={styles.text}>\n    31→          This page demonstrates remote MCP tool execution. The tools are provided\n    32→          by an external NestJS MCP server (running on port 3002) and are\n    33→          automatically discovered and made available to the AI.\n    34→        </p>\n    35→        <p style={styles.text}>\n    36→          Try asking the AI to:\n    37→        </p>\n    38→        <ul style={styles.list}>\n    39→          <li>Add two numbers (e.g., \"What is 15 plus 27?\")</li>\n    40→          <li>Multiply numbers (e.g., \"Multiply 6 by 8\")</li>\n    41→          <li>Greet someone (e.g., \"Greet Alice\")</li>\n    42→          <li>Get weather (e.g., \"What's the weather in London?\")</li>\n    43→        </ul>\n    44→      </div>\n    45→\n    46→      <div style={styles.resultCard}>\n    47→        <h2 style={styles.subtitle}>Result Display</h2>\n    48→        <div style={styles.resultBox}>\n    49→          <input\n    50→            type=\"text\"\n    51→            value={result}\n    52→            onChange={(e) => setResult(e.target.value)}\n    53→            placeholder=\"Results will appear here (you can also type manually)\"\n    54→            style={styles.input}\n    55→          />\n    56→        </div>\n    57→        <p style={styles.helpText}>\n    58→          The AI can update this result by setting it to the output of remote tool calls.\n    59→        </p>\n    60→      </div>\n    61→\n    62→      <div style={styles.statusCard}>\n    63→        <h3 style={styles.subtitle}>MCP Server Status</h3>\n    64→        <p style={styles.text}>\n    65→          Remote tools are namespaced with \"mcp_\" prefix to avoid conflicts.\n    66→        </p>\n    67→        <p style={styles.text}>\n    68→          <strong>MCP Server:</strong> http://localhost:3002\n    69→        </p>\n    70→      </div>\n    71→    </div>\n    72→  );\n    73→}\n    74→\n    75→const styles: Record<string, React.CSSProperties> = {\n    76→  container: {\n    77→    maxWidth: '800px',\n    78→    margin: '0 auto',\n    79→    padding: '20px',\n    80→  },\n    81→  title: {\n    82→    fontSize: '32px',\n    83→    fontWeight: 'bold',\n    84→    color: '#333',\n    85→    marginBottom: '24px',\n    86→  },\n    87→  subtitle: {\n    88→    fontSize: '20px',\n    89→    fontWeight: '600',\n    90→    color: '#444',\n    91→    marginBottom: '12px',\n    92→  },\n    93→  infoCard: {\n    94→    background: 'white',\n    95→    borderRadius: '8px',\n    96→    padding: '24px',\n    97→    marginBottom: '20px',\n    98→    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',\n    99→  },\n   100→  resultCard: {\n   101→    background: 'white',\n   102→    borderRadius: '8px',\n   103→    padding: '24px',\n   104→    marginBottom: '20px',\n   105→    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',\n   106→  },\n   107→  statusCard: {\n   108→    background: '#f8f9fa',\n   109→    borderRadius: '8px',\n   110→    padding: '20px',\n   111→    border: '1px solid #e0e0e0',\n   112→  },\n   113→  text: {\n   114→    fontSize: '14px',\n   115→    color: '#666',\n   116→    lineHeight: '1.6',\n   117→    marginBottom: '8px',\n   118→  },\n   119→  list: {\n   120→    fontSize: '14px',\n   121→    color: '#666',\n   122→    lineHeight: '1.8',\n   123→    paddingLeft: '20px',\n   124→  },\n   125→  resultBox: {\n   126→    marginBottom: '12px',\n   127→  },\n   128→  input: {\n   129→    width: '100%',\n   130→    padding: '12px',\n   131→    fontSize: '14px',\n   132→    border: '1px solid #ddd',\n   133→    borderRadius: '4px',\n   134→    boxSizing: 'border-box',\n   135→    fontFamily: 'monospace',\n   136→  },\n   137→  helpText: {\n   138→    fontSize: '12px',\n   139→    color: '#999',\n   140→    fontStyle: 'italic',\n   141→  },\n   142→};\n   143→\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\n</system-reminder>\n",
+          "timestamp": "2025-11-19T13:23:09.172Z"
+        },
+        {
+          "type": "user",
+          "text": "     1→#!/usr/bin/env bun\n     2→import 'reflect-metadata';\n     3→import { NestFactory } from '@nestjs/core';\n     4→import { AppModule } from './app.module';\n     5→\n     6→async function bootstrap() {\n     7→  const app = await NestFactory.create(AppModule, {\n     8→    logger: ['error', 'warn', 'log'],\n     9→  });\n    10→\n    11→  // Enable CORS for development\n    12→  app.enableCors({\n    13→    origin: '*',\n    14→    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',\n    15→  });\n    16→\n    17→  const port = Number(process.env.MCP_PORT) || 3002;\n    18→  await app.listen(port);\n    19→\n    20→  console.log(`MCP server is running on http://localhost:${port}`);\n    21→  console.log(`MCP JSON-RPC endpoint: http://localhost:${port}/mcp`);\n    22→  console.log(`SSE endpoint: http://localhost:${port}/sse`);\n    23→}\n    24→\n    25→bootstrap();\n    26→\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\n</system-reminder>\n",
+          "timestamp": "2025-11-19T13:23:09.177Z"
+        },
+        {
+          "type": "assistant",
+          "text": "Let me check the app module to understand how to implement header validation:",
+          "timestamp": "2025-11-19T13:23:14.557Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/apps/a-nest-mcp-server/src/app.module.ts"
+          },
+          "timestamp": "2025-11-19T13:23:14.916Z"
+        },
+        {
+          "type": "user",
+          "text": "     1→import { Module } from '@nestjs/common';\n     2→import { McpModule } from '@rekog/mcp-nest';\n     3→import { ToolsService } from './tools.service';\n     4→\n     5→@Module({\n     6→  imports: [\n     7→    McpModule.forRoot({\n     8→      name: 'test-mcp-server',\n     9→      version: '1.0.0',\n    10→      streamableHttp: {\n    11→        enableJsonResponse: true,\n    12→        statelessMode: true,\n    13→      },\n    14→    }),\n    15→  ],\n    16→  controllers: [],\n    17→  providers: [ToolsService],\n    18→})\n    19→export class AppModule {}\n    20→\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\n</system-reminder>\n",
+          "timestamp": "2025-11-19T13:23:15.061Z"
+        },
+        {
+          "type": "assistant",
+          "text": "Now let me implement the authenticated endpoint. First, I'll add a new tool that requires an API key header:",
+          "timestamp": "2025-11-19T13:23:23.656Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Edit",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/apps/a-nest-mcp-server/src/tools.service.ts",
+            "new_string": "import { Injectable, Inject, Scope } from '@nestjs/common';\nimport { REQUEST } from '@nestjs/core';\nimport { Tool } from '@rekog/mcp-nest';\nimport { z } from 'zod';\nimport { Request } from 'express';\n\n@Injectable({ scope: Scope.REQUEST })\nexport class ToolsService {\n  constructor(@Inject(REQUEST) private readonly request: Request) {}",
+            "old_string": "import { Injectable } from '@nestjs/common';\nimport { Tool } from '@rekog/mcp-nest';\nimport { z } from 'zod';\n\n@Injectable()\nexport class ToolsService {"
+          },
+          "timestamp": "2025-11-19T13:23:25.974Z"
+        }
+      ],
+      "total_additions": 137,
+      "total_deletions": 4,
+      "accepted_lines": 135,
+      "overriden_lines": 4
+    }
+  }
+}
