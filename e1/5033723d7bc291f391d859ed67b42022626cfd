@@ -1,0 +1,19 @@
+apps/example/package.json
+  868bcf6 3
+packages/server/package.json
+  868bcf6 3
+packages/core/package.json
+  abac8a1 3
+apps/use-ai-server-app/package.json
+  868bcf6 3
+packages/client/package.json
+  868bcf6 3
+package.json
+  868bcf6 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.20",
+  "base_commit_sha": "e15033723d7bc291f391d859ed67b42022626cfd",
+  "prompts": {}
+}
