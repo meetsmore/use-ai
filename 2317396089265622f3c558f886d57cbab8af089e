@@ -1,0 +1,277 @@
+packages/core/package.json
+  abac8a1 3
+package.json
+  868bcf6 3
+apps/a-nest-mcp-server/package.json
+  14f2725 3
+packages/server/package.json
+  868bcf6 3
+publish.sh
+  868bcf6 1-8,12-286
+apps/example/package.json
+  868bcf6 3
+packages/client/package.json
+  868bcf6 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.20",
+  "base_commit_sha": "2317396089265622f3c558f886d57cbab8af089e",
+  "prompts": {
+    "868bcf6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e230b01c-d8e3-4b03-a425-dbc65792cf22",
+        "model": "claude-sonnet-4-5-20250929"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [
+        {
+          "type": "user",
+          "text": "we're ready to release the package\n\nset all version numbers in the package.json files to 0.1.0",
+          "timestamp": "2025-11-21T09:02:05.808Z"
+        },
+        {
+          "type": "assistant",
+          "text": "I'll help you set all version numbers to 0.1.0 across the monorepo. Let me first find all the package.json files.",
+          "timestamp": "2025-11-21T09:02:12.453Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Glob",
+          "input": {
+            "pattern": "**/package.json"
+          },
+          "timestamp": "2025-11-21T09:02:12.740Z"
+        },
+        {
+          "type": "user",
+          "text": "/home/z/Desktop/work/use-ai/node_modules/.bun/jsondiffpatch@0.6.0/node_modules/jsondiffpatch/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/@opentelemetry+api@1.9.0/node_modules/@opentelemetry/api/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/ai@4.3.19+5b569f185b41cfba/node_modules/ai/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/diff-match-patch@1.0.5/node_modules/diff-match-patch/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/@types+diff-match-patch@1.0.36/node_modules/@types/diff-match-patch/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/@ai-sdk+anthropic@1.2.12+27912429049419a2/node_modules/@ai-sdk/anthropic/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/nanoid@3.3.11/node_modules/nanoid/async/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/nanoid@3.3.11/node_modules/nanoid/non-secure/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/nanoid@3.3.11/node_modules/nanoid/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/nanoid@3.3.11/node_modules/nanoid/url-alphabet/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/secure-json-parse@2.7.0/node_modules/secure-json-parse/benchmarks/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/secure-json-parse@2.7.0/node_modules/secure-json-parse/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/json-schema@0.4.0/node_modules/json-schema/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/@ai-sdk+react@1.2.12+5b569f185b41cfba/node_modules/@ai-sdk/react/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/throttleit@2.1.0/node_modules/throttleit/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/@ai-sdk+provider-utils@2.2.8+27912429049419a2/node_modules/@ai-sdk/provider-utils/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/dequal@2.0.3/node_modules/dequal/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/swr@2.3.6+f4eacebf2041cd4f/node_modules/swr/_internal/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/swr@2.3.6+f4eacebf2041cd4f/node_modules/swr/immutable/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/swr@2.3.6+f4eacebf2041cd4f/node_modules/swr/infinite/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/swr@2.3.6+f4eacebf2041cd4f/node_modules/swr/mutation/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/swr@2.3.6+f4eacebf2041cd4f/node_modules/swr/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/swr@2.3.6+f4eacebf2041cd4f/node_modules/swr/subscription/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/@ai-sdk+provider@1.1.3/node_modules/@ai-sdk/provider/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/use-sync-external-store@1.6.0+f4eacebf2041cd4f/node_modules/use-sync-external-store/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/@ai-sdk+ui-utils@1.2.11+27912429049419a2/node_modules/@ai-sdk/ui-utils/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/zod-to-json-schema@3.24.6+5954958163efbb2a/node_modules/zod-to-json-schema/dist/cjs/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/zod-to-json-schema@3.24.6+27912429049419a2/node_modules/zod-to-json-schema/dist/cjs/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/zod-to-json-schema@3.24.6+5954958163efbb2a/node_modules/zod-to-json-schema/dist/esm/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/zod-to-json-schema@3.24.6+27912429049419a2/node_modules/zod-to-json-schema/dist/esm/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/zod-to-json-schema@3.24.6+5954958163efbb2a/node_modules/zod-to-json-schema/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/zod-to-json-schema@3.24.6+27912429049419a2/node_modules/zod-to-json-schema/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/zod@3.25.76/node_modules/zod/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/qs@6.13.0/node_modules/qs/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/chalk@5.6.2/node_modules/chalk/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/qs@6.14.0/node_modules/qs/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/minimatch@9.0.5/node_modules/minimatch/dist/commonjs/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/minimatch@9.0.5/node_modules/minimatch/dist/esm/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/minimatch@9.0.5/node_modules/minimatch/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/turbo@2.6.1/node_modules/turbo/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/reflect-metadata@0.2.2/node_modules/reflect-metadata/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/@nestjs+config@4.0.2+f8887f4879efaec3/node_modules/@nestjs/config/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/@nestjs+config@4.0.2+a8c3609e14ae1638/node_modules/@nestjs/config/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/@nestjs+platform-express@10.4.20+0d719a4d8c21b040/node_modules/@nestjs/platform-express/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/@nestjs+platform-express@10.4.20+9c1c78d70df45f9f/node_modules/@nestjs/platform-express/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/@nestjs+platform-express@10.4.20+6ad9727be07add4a/node_modules/@nestjs/platform-express/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/@nestjs+common@10.4.20+212bbb5ae4fde332/node_modules/@nestjs/common/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/@nestjs+common@10.4.20+a499bb12aa6bd3f2/node_modules/@nestjs/common/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/@nestjs+core@10.4.20+6ad9727be07add4a/node_modules/@nestjs/core/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/@nestjs+core@10.4.20+da18a321d0a32f01/node_modules/@nestjs/core/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/@nestjs+core@10.4.20+e6828d8716a0e83a/node_modules/@nestjs/core/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/chalk@4.1.2/node_modules/chalk/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/@types+body-parser@1.19.6/node_modules/@types/body-parser/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/tslib@2.8.1/node_modules/tslib/modules/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/tslib@2.8.1/node_modules/tslib/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/abort-controller@3.0.0/node_modules/abort-controller/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/buffer-from@1.1.2/node_modules/buffer-from/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/uid@2.0.2/node_modules/uid/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/protobufjs@7.5.4/node_modules/protobufjs/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/fast-safe-stringify@2.1.1/node_modules/fast-safe-stringify/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/@types+serve-static@1.15.10/node_modules/@types/serve-static/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/@types+qs@6.14.0/node_modules/@types/qs/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/iterare@1.2.1/node_modules/iterare/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/path-to-regexp@3.3.0/node_modules/path-to-regexp/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/rxjs@7.8.2/node_modules/rxjs/ajax/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/rxjs@7.8.2/node_modules/rxjs/fetch/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/rxjs@7.8.2/node_modules/rxjs/operators/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/rxjs@7.8.2/node_modules/rxjs/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/rxjs@7.8.2/node_modules/rxjs/testing/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/rxjs@7.8.2/node_modules/rxjs/webSocket/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/undici-types@6.21.0/node_modules/undici-types/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/file-type@20.4.1/node_modules/file-type/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/package-json-from-dist@1.0.1/node_modules/package-json-from-dist/dist/commonjs/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/package-json-from-dist@1.0.1/node_modules/package-json-from-dist/dist/esm/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/package-json-from-dist@1.0.1/node_modules/package-json-from-dist/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/minimist@1.2.8/node_modules/minimist/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/dotenv@16.4.7/node_modules/dotenv/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/uint8array-extras@1.5.0/node_modules/uint8array-extras/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/multer@2.0.2/node_modules/multer/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/node-fetch@2.7.0/node_modules/node-fetch/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/body-parser@1.20.3/node_modules/body-parser/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/uuid@11.1.0/node_modules/uuid/dist/cjs-browser/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/uuid@11.1.0/node_modules/uuid/dist/cjs/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/uuid@11.1.0/node_modules/uuid/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/semver@7.7.3/node_modules/semver/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/long@5.3.2/node_modules/long/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/long@5.3.2/node_modules/long/umd/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/token-types@6.1.1/node_modules/token-types/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/@js-sdsl+ordered-map@4.4.2/node_modules/@js-sdsl/ordered-map/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/@grpc+proto-loader@0.8.0/node_modules/@grpc/proto-loader/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/minipass@7.1.2/node_modules/minipass/dist/commonjs/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/minipass@7.1.2/node_modules/minipass/dist/esm/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/minipass@7.1.2/node_modules/minipass/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/jackspeak@3.4.3/node_modules/jackspeak/dist/commonjs/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/jackspeak@3.4.3/node_modules/jackspeak/dist/esm/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/jackspeak@3.4.3/node_modules/jackspeak/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/express@4.21.2/node_modules/express/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/strtok3@10.3.4/node_modules/strtok3/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/cors@2.8.5/node_modules/cors/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/@tokenizer+inflate@0.2.7/node_modules/@tokenizer/inflate/package.json\n(Results are truncated. Consider using a more specific path or pattern.)",
+          "timestamp": "2025-11-21T09:02:13.145Z"
+        },
+        {
+          "type": "assistant",
+          "text": "Let me find the package.json files in the monorepo, excluding node_modules:",
+          "timestamp": "2025-11-21T09:02:18.389Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Bash",
+          "input": {
+            "command": "find /home/z/Desktop/work/use-ai -name \"package.json\" -not -path \"*/node_modules/*\" -type f",
+            "description": "Find all package.json files excluding node_modules"
+          },
+          "timestamp": "2025-11-21T09:02:19.262Z"
+        },
+        {
+          "type": "user",
+          "text": "/home/z/Desktop/work/use-ai/package.json\n/home/z/Desktop/work/use-ai/apps/example/package.json\n/home/z/Desktop/work/use-ai/apps/a-nest-mcp-server/package.json\n/home/z/Desktop/work/use-ai/packages/server/package.json\n/home/z/Desktop/work/use-ai/packages/core/package.json\n/home/z/Desktop/work/use-ai/packages/client/package.json\n/home/z/Desktop/work/use-ai/packages/plugin-workflows/package.json",
+          "timestamp": "2025-11-21T09:02:20.800Z"
+        },
+        {
+          "type": "assistant",
+          "text": "Now let me read all these package.json files to understand the current versions and dependencies:",
+          "timestamp": "2025-11-21T09:02:25.678Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/package.json"
+          },
+          "timestamp": "2025-11-21T09:02:26.071Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/apps/example/package.json"
+          },
+          "timestamp": "2025-11-21T09:02:26.468Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/apps/a-nest-mcp-server/package.json"
+          },
+          "timestamp": "2025-11-21T09:02:26.929Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/packages/server/package.json"
+          },
+          "timestamp": "2025-11-21T09:02:27.336Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/packages/core/package.json"
+          },
+          "timestamp": "2025-11-21T09:02:27.745Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/packages/client/package.json"
+          },
+          "timestamp": "2025-11-21T09:02:28.154Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/packages/plugin-workflows/package.json"
+          },
+          "timestamp": "2025-11-21T09:02:28.485Z"
+        },
+        {
+          "type": "user",
+          "text": "     1→{\n     2→  \"name\": \"use-ai-monorepo\",\n     3→  \"version\": \"0.0.0\",\n     4→  \"private\": true,\n     5→  \"packageManager\": \"bun@1.3.2\",\n     6→  \"workspaces\": [\n     7→    \"packages/*\",\n     8→    \"apps/*\"\n     9→  ],\n    10→  \"overrides\": {\n    11→    \"cpu-features\": \"npm:empty-module@^1.0.0\"\n    12→  },\n    13→  \"scripts\": {\n    14→    \"build\": \"turbo run build\",\n    15→    \"dev\": \"turbo run dev\",\n    16→    \"test\": \"turbo run test\",\n    17→    \"test:e2e\": \"turbo run test:e2e\",\n    18→    \"test:e2e:ui\": \"cd apps/example && bun run test:e2e:ui\",\n    19→    \"test:e2e:headed\": \"cd apps/example && bun run test:e2e:headed\",\n    20→    \"test:e2e:debug\": \"cd apps/example && bun run test:e2e:debug\",\n    21→    \"clean\": \"turbo run clean && rm -rf .cache/turbo\"\n    22→  },\n    23→  \"devDependencies\": {\n    24→    \"@types/bun\": \"latest\",\n    25→    \"turbo\": \"^2.6.1\",\n    26→    \"typescript\": \"^5.3.3\"\n    27→  }\n    28→}\n    29→\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\n</system-reminder>\n",
+          "timestamp": "2025-11-21T09:02:28.904Z"
+        },
+        {
+          "type": "user",
+          "text": "     1→{\n     2→  \"name\": \"example\",\n     3→  \"version\": \"0.0.1\",\n     4→  \"private\": true,\n     5→  \"type\": \"module\",\n     6→  \"scripts\": {\n     7→    \"clean\": \"rm -rf dist\",\n     8→    \"dev\": \"bun --watch server.ts\",\n     9→    \"build\": \"bun build ./src/index.tsx --outdir ./dist --target browser --minify\",\n    10→    \"preview\": \"bun server.ts\",\n    11→    \"test:e2e\": \"playwright test\",\n    12→    \"test:e2e:ui\": \"playwright test --ui\",\n    13→    \"test:e2e:headed\": \"playwright test --headed\",\n    14→    \"test:e2e:debug\": \"playwright test --debug\"\n    15→  },\n    16→  \"dependencies\": {\n    17→    \"@use-ai/client\": \"workspace:*\",\n    18→    \"react\": \"^18.2.0\",\n    19→    \"react-dom\": \"^18.2.0\",\n    20→    \"zod\": \"^4.1.12\"\n    21→  },\n    22→  \"devDependencies\": {\n    23→    \"@playwright/test\": \"^1.56.1\",\n    24→    \"@types/bun\": \"latest\",\n    25→    \"@types/react\": \"^18.2.0\",\n    26→    \"@types/react-dom\": \"^18.2.0\",\n    27→    \"playwright\": \"^1.56.1\",\n    28→    \"typescript\": \"^5.3.3\"\n    29→  }\n    30→}\n    31→\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\n</system-reminder>\n",
+          "timestamp": "2025-11-21T09:02:28.909Z"
+        },
+        {
+          "type": "user",
+          "text": "     1→{\n     2→  \"name\": \"a-nest-mcp-server\",\n     3→  \"version\": \"0.0.1\",\n     4→  \"private\": true,\n     5→  \"type\": \"module\",\n     6→  \"scripts\": {\n     7→    \"clean\": \"rm -rf dist\",\n     8→    \"dev\": \"bun --watch src/main.ts\",\n     9→    \"start\": \"bun src/main.ts\",\n    10→    \"build\": \"tsc\"\n    11→  },\n    12→  \"dependencies\": {\n    13→    \"@modelcontextprotocol/sdk\": \"^1.0.4\",\n    14→    \"@nestjs/common\": \"^11.0.0\",\n    15→    \"@nestjs/core\": \"^11.0.0\",\n    16→    \"@nestjs/platform-express\": \"^11.0.0\",\n    17→    \"@rekog/mcp-nest\": \"^1.8.4\",\n    18→    \"express\": \"^5.1.0\",\n    19→    \"reflect-metadata\": \"^0.2.2\",\n    20→    \"rxjs\": \"^7.8.1\",\n    21→    \"zod\": \"^3.24.1\"\n    22→  },\n    23→  \"devDependencies\": {\n    24→    \"@types/bun\": \"latest\",\n    25→    \"@types/express\": \"^5.0.5\",\n    26→    \"@types/node\": \"^22.10.2\",\n    27→    \"typescript\": \"^5.3.3\"\n    28→  }\n    29→}\n    30→\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\n</system-reminder>\n",
+          "timestamp": "2025-11-21T09:02:28.915Z"
+        },
+        {
+          "type": "user",
+          "text": "     1→{\n     2→  \"name\": \"@use-ai/server\",\n     3→  \"version\": \"0.0.1\",\n     4→  \"type\": \"module\",\n     5→  \"main\": \"./dist/index.js\",\n     6→  \"types\": \"./dist/index.d.ts\",\n     7→  \"exports\": {\n     8→    \".\": {\n     9→      \"import\": \"./dist/index.js\",\n    10→      \"types\": \"./dist/index.d.ts\"\n    11→    }\n    12→  },\n    13→  \"scripts\": {\n    14→    \"clean\": \"rm -rf dist\",\n    15→    \"build\": \"bun build ./src/index.ts --outdir ./dist --target node --format esm && tsc --emitDeclarationOnly --declaration --declarationMap && cp -r dist/src/* dist/\",\n    16→    \"dev\": \"bun --watch src/start.ts\",\n    17→    \"start\": \"bun src/start.ts\",\n    18→    \"test\": \"bun test $(find src -name '*.test.ts' -not -name '*.e2e.test.ts' -type f)\",\n    19→    \"test:e2e\": \"bun test langfuse.e2e.test.ts\"\n    20→  },\n    21→  \"dependencies\": {\n    22→    \"@ai-sdk/anthropic\": \"^1.0.6\",\n    23→    \"@ai-sdk/openai\": \"1\",\n    24→    \"@use-ai/core\": \"workspace:*\",\n    25→    \"ai\": \"^4.0.0\",\n    26→    \"picomatch\": \"^4.0.3\",\n    27→    \"socket.io\": \"^4.8.1\",\n    28→    \"uuid\": \"^11.1.0\",\n    29→    \"zod\": \"^3.24.1\"\n    30→  },\n    31→  \"optionalDependencies\": {\n    32→    \"@langfuse/otel\": \"^4.0.0\",\n    33→    \"@opentelemetry/sdk-trace-node\": \"^2.2.0\"\n    34→  },\n    35→  \"devDependencies\": {\n    36→    \"@types/bun\": \"latest\",\n    37→    \"@types/picomatch\": \"^4.0.2\",\n    38→    \"@types/uuid\": \"^10.0.0\",\n    39→    \"langfuse\": \"^3.38.6\",\n    40→    \"socket.io-client\": \"^4.8.1\",\n    41→    \"testcontainers\": \"^11.8.1\",\n    42→    \"typescript\": \"^5.3.3\"\n    43→  }\n    44→}\n    45→\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\n</system-reminder>\n",
+          "timestamp": "2025-11-21T09:02:28.920Z"
+        },
+        {
+          "type": "user",
+          "text": "     1→{\n     2→  \"name\": \"@use-ai/core\",\n     3→  \"version\": \"0.0.1\",\n     4→  \"type\": \"module\",\n     5→  \"main\": \"./dist/index.js\",\n     6→  \"types\": \"./dist/index.d.ts\",\n     7→  \"exports\": {\n     8→    \".\": {\n     9→      \"import\": \"./dist/index.js\",\n    10→      \"types\": \"./dist/index.d.ts\"\n    11→    }\n    12→  },\n    13→  \"scripts\": {\n    14→    \"clean\": \"rm -rf dist\",\n    15→    \"build\": \"bun build ./src/index.ts --outdir ./dist --target node --format esm && tsc --emitDeclarationOnly --declaration --declarationMap\"\n    16→  },\n    17→  \"dependencies\": {\n    18→    \"@ag-ui/core\": \"^0.0.41\"\n    19→  },\n    20→  \"devDependencies\": {\n    21→    \"@types/bun\": \"latest\",\n    22→    \"typescript\": \"^5.3.3\"\n    23→  }\n    24→}\n    25→\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\n</system-reminder>\n",
+          "timestamp": "2025-11-21T09:02:28.925Z"
+        },
+        {
+          "type": "user",
+          "text": "     1→{\n     2→  \"name\": \"@use-ai/client\",\n     3→  \"version\": \"0.0.1\",\n     4→  \"type\": \"module\",\n     5→  \"main\": \"./dist/index.js\",\n     6→  \"types\": \"./dist/index.d.ts\",\n     7→  \"exports\": {\n     8→    \".\": {\n     9→      \"import\": \"./dist/index.js\",\n    10→      \"types\": \"./dist/index.d.ts\"\n    11→    }\n    12→  },\n    13→  \"scripts\": {\n    14→    \"clean\": \"rm -rf dist\",\n    15→    \"build\": \"tsc\",\n    16→    \"test\": \"bun test\"\n    17→  },\n    18→  \"dependencies\": {\n    19→    \"@use-ai/core\": \"workspace:*\",\n    20→    \"socket.io-client\": \"^4.8.1\",\n    21→    \"uuid\": \"^11.1.0\",\n    22→    \"zod\": \"^4.1.12\",\n    23→    \"zod-to-json-schema\": \"^3.24.6\"\n    24→  },\n    25→  \"devDependencies\": {\n    26→    \"@testing-library/jest-dom\": \"^6.9.1\",\n    27→    \"@testing-library/react\": \"^16.3.0\",\n    28→    \"@types/bun\": \"latest\",\n    29→    \"@types/jsdom\": \"^27.0.0\",\n    30→    \"@types/react\": \"^18.2.0\",\n    31→    \"@types/uuid\": \"^10.0.0\",\n    32→    \"jsdom\": \"^27.1.0\",\n    33→    \"socket.io-mock-ts\": \"^1.0.2\",\n    34→    \"typescript\": \"^5.3.3\"\n    35→  },\n    36→  \"peerDependencies\": {\n    37→    \"react\": \"^18.0.0\"\n    38→  }\n    39→}\n    40→\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\n</system-reminder>\n",
+          "timestamp": "2025-11-21T09:02:28.930Z"
+        },
+        {
+          "type": "user",
+          "text": "     1→{\n     2→  \"name\": \"@use-ai/plugin-workflows\",\n     3→  \"version\": \"0.1.0\",\n     4→  \"description\": \"Workflow execution plugin for @use-ai/server\",\n     5→  \"type\": \"module\",\n     6→  \"main\": \"./dist/index.js\",\n     7→  \"types\": \"./dist/index.d.ts\",\n     8→  \"exports\": {\n     9→    \".\": {\n    10→      \"types\": \"./dist/index.d.ts\",\n    11→      \"default\": \"./dist/index.js\"\n    12→    }\n    13→  },\n    14→  \"scripts\": {\n    15→    \"clean\": \"rm -rf dist\",\n    16→    \"build\": \"bun build src/index.ts --outdir dist --target node --format esm --external @use-ai/server && tsc --emitDeclarationOnly --skipLibCheck\",\n    17→    \"dev\": \"bun --watch src/index.ts\",\n    18→    \"test\": \"bun test\"\n    19→  },\n    20→  \"dependencies\": {\n    21→    \"@use-ai/core\": \"workspace:*\",\n    22→    \"ai\": \"^4.0.38\",\n    23→    \"uuid\": \"^11.0.3\"\n    24→  },\n    25→  \"devDependencies\": {\n    26→    \"@types/uuid\": \"^10.0.0\",\n    27→    \"@use-ai/server\": \"workspace:*\",\n    28→    \"typescript\": \"^5.7.2\"\n    29→  },\n    30→  \"peerDependencies\": {\n    31→    \"@use-ai/server\": \"workspace:*\"\n    32→  }\n    33→}\n    34→\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\n</system-reminder>\n",
+          "timestamp": "2025-11-21T09:02:28.936Z"
+        },
+        {
+          "type": "assistant",
+          "text": "I'll update all the version numbers to 0.1.0. Let me create a todo list and then make the updates:",
+          "timestamp": "2025-11-21T09:02:40.377Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "TodoWrite",
+          "input": {
+            "todos": [
+              {
+                "activeForm": "Updating root package.json version to 0.1.0",
+                "content": "Update root package.json version to 0.1.0",
+                "status": "pending"
+              },
+              {
+                "activeForm": "Updating packages/core/package.json version to 0.1.0",
+                "content": "Update packages/core/package.json version to 0.1.0",
+                "status": "pending"
+              },
+              {
+                "activeForm": "Updating packages/client/package.json version to 0.1.0",
+                "content": "Update packages/client/package.json version to 0.1.0",
+                "status": "pending"
+              },
+              {
+                "activeForm": "Updating packages/server/package.json version to 0.1.0",
+                "content": "Update packages/server/package.json version to 0.1.0",
+                "status": "pending"
+              },
+              {
+                "activeForm": "Updating apps/example/package.json version to 0.1.0",
+                "content": "Update apps/example/package.json version to 0.1.0",
+                "status": "pending"
+              },
+              {
+                "activeForm": "Updating apps/a-nest-mcp-server/package.json version to 0.1.0",
+                "content": "Update apps/a-nest-mcp-server/package.json version to 0.1.0",
+                "status": "pending"
+              }
+            ]
+          },
+          "timestamp": "2025-11-21T09:02:43.272Z"
+        },
+        {
+          "type": "user",
+          "text": "Todos have been modified successfully. Ensure that you continue to use the todo list to track your progress. Please proceed with the current tasks if applicable",
+          "timestamp": "2025-11-21T09:02:43.450Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "TodoWrite",
+          "input": {
+            "todos": [
+              {
+                "activeForm": "Updating root package.json version to 0.1.0",
+                "content": "Update root package.json version to 0.1.0",
+                "status": "in_progress"
+              },
+              {
+                "activeForm": "Updating packages/core/package.json version to 0.1.0",
+                "content": "Update packages/core/package.json version to 0.1.0",
+                "status": "pending"
+              },
+              {
+                "activeForm": "Updating packages/client/package.json version to 0.1.0",
+                "content": "Update packages/client/package.json version to 0.1.0",
+                "status": "pending"
+              },
+              {
+                "activeForm": "Updating packages/server/package.json version to 0.1.0",
+                "content": "Update packages/server/package.json version to 0.1.0",
+                "status": "pending"
+              },
+              {
+                "activeForm": "Updating apps/example/package.json version to 0.1.0",
+                "content": "Update apps/example/package.json version to 0.1.0",
+                "status": "pending"
+              },
+              {
+                "activeForm": "Updating apps/a-nest-mcp-server/package.json version to 0.1.0",
+                "content": "Update apps/a-nest-mcp-server/package.json version to 0.1.0",
+                "status": "pending"
+              }
+            ]
+          },
+          "timestamp": "2025-11-21T09:02:50.610Z"
+        },
+        {
+          "type": "user",
+          "text": "Todos have been modified successfully. Ensure that you continue to use the todo list to track your progress. Please proceed with the current tasks if applicable",
+          "timestamp": "2025-11-21T09:02:50.880Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Edit",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/package.json",
+            "new_string": "  \"name\": \"use-ai-monorepo\",\n  \"version\": \"0.1.0\",\n  \"private\": true,",
+            "old_string": "  \"name\": \"use-ai-monorepo\",\n  \"version\": \"0.0.0\",\n  \"private\": true,"
+          },
+          "timestamp": "2025-11-21T09:02:56.039Z"
+        }
+      ],
+      "total_additions": 289,
+      "total_deletions": 6,
+      "accepted_lines": 287,
+      "overriden_lines": 0
+    }
+  }
+}
