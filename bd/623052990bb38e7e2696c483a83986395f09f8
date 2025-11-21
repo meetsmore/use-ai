@@ -1,0 +1,268 @@
+apps/use-ai-server-app/Dockerfile
+  e8b3c36 9-10,13,17-18,20-22,34
+.dockerignore
+  e8b3c36 56-60
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.20",
+  "base_commit_sha": "bd623052990bb38e7e2696c483a83986395f09f8",
+  "prompts": {
+    "e8b3c36": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b32d9576-d2b5-4b82-ba00-3ab2d34e748f",
+        "model": "claude-sonnet-4-5-20250929"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [
+        {
+          "type": "user",
+          "text": "when we build the docker image:\n\n./scripts/publish.sh --only-docker --docker-registry ghcr.io/meetsmore \n\n => ERROR [install 6/6] RUN bun install --frozen-lockfile --production                                                                                          1.6s\n------                                                                                                                                                               \n > [install 6/6] RUN bun install --frozen-lockfile --production:                                                                                                     \n0.185 bun install v1.3.2 (b131639c)                                                                                                                                  \n0.191 Resolving dependencies\n1.477 Resolved, downloaded and extracted [34]\n1.478 error: lockfile had changes, but lockfile is frozen\n1.478 note: try re-running without --frozen-lockfile and commit the updated lockfile",
+          "timestamp": "2025-11-21T13:04:04.816Z"
+        },
+        {
+          "type": "assistant",
+          "text": "I'll help you fix this Docker build issue. The error indicates that the lockfile is out of sync with your dependencies. Let me investigate the build setup and fix it.",
+          "timestamp": "2025-11-21T13:04:11.475Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/scripts/publish.sh"
+          },
+          "timestamp": "2025-11-21T13:04:12.486Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/Dockerfile"
+          },
+          "timestamp": "2025-11-21T13:04:12.947Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Bash",
+          "input": {
+            "command": "git status",
+            "description": "Check git status for uncommitted changes"
+          },
+          "timestamp": "2025-11-21T13:04:13.561Z"
+        },
+        {
+          "type": "user",
+          "text": "<tool_use_error>File does not exist.</tool_use_error>",
+          "timestamp": "2025-11-21T13:04:13.700Z"
+        },
+        {
+          "type": "user",
+          "text": "     1→#!/usr/bin/env bash\n     2→\n     3→set -euo pipefail\n     4→\n     5→DRY_RUN=false\n     6→REGISTRY=\"\"\n     7→PUBLISH_DOCKER=false\n     8→DOCKER_REGISTRY=\"\"\n     9→DOCKER_PLATFORMS=\"linux/amd64\"\n    10→ONLY_NPM=false\n    11→ONLY_DOCKER=false\n    12→PACKAGES=(\"packages/core\" \"packages/client\" \"packages/server\" \"packages/plugin-workflows\")\n    13→PACKAGE_NAMES=(\"@meetsmore/use-ai-core\" \"@meetsmore/use-ai-client\" \"@meetsmore/use-ai-server\" \"@meetsmore/use-ai-plugin-workflows\")\n    14→\n    15→SCRIPT_DIR=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd)\"\n    16→PROJECT_ROOT=\"$(cd \"$SCRIPT_DIR/..\" && pwd)\"\n    17→cd \"$PROJECT_ROOT\" || exit 1\n    18→\n    19→print_usage() {\n    20→  echo \"Usage: $0 [options]\"\n    21→  echo \"\"\n    22→  echo \"Publish @use-ai packages to npm and optionally Docker\"\n    23→  echo \"\"\n    24→  echo \"Options:\"\n    25→  echo \"  --dry-run                      Show what would be published without actually publishing\"\n    26→  echo \"  --registry <url>               Specify npm registry URL (default: public npm registry)\"\n    27→  echo \"  --docker                       Build and publish Docker image (in addition to npm)\"\n    28→  echo \"  --docker-registry <registry>   Docker registry (e.g., ghcr.io/org, docker.io/username)\"\n    29→  echo \"  --docker-platforms <platforms> Docker platforms (default: linux/amd64)\"\n    30→  echo \"  --only-npm                     Only publish npm packages, skip Docker\"\n    31→  echo \"  --only-docker                  Only build and publish Docker image, skip npm\"\n    32→  echo \"\"\n    33→  echo \"Examples:\"\n    34→  echo \"  $0                                           # Publish npm packages (will prompt)\"\n    35→  echo \"  $0 --registry https://npm.pkg.github.com     # Publish to GitHub Packages\"\n    36→  echo \"  $0 --dry-run                                 # Preview publish actions\"\n    37→  echo \"  $0 --docker --docker-registry ghcr.io/org    # Publish npm + Docker to GHCR\"\n    38→  echo \"  $0 --docker --docker-platforms linux/amd64,linux/arm64  # Multi-arch build\"\n    39→  echo \"  $0 --only-npm                                # Only publish npm packages\"\n    40→  echo \"  $0 --only-docker --docker-registry ghcr.io/org  # Only build and push Docker\"\n    41→  echo \"\"\n    42→  echo \"This script will:\"\n    43→  echo \"  1. Optionally bump version numbers across all packages (unless --only-docker is used)\"\n    44→  echo \"  2. Build all packages (unless --only-docker is used)\"\n    45→  echo \"  3. Publish packages in dependency order (unless --only-docker is used)\"\n    46→  echo \"  4. Optionally build and publish Docker image (unless --only-npm is used)\"\n    47→}\n    48→\n    49→while [[ $# -gt 0 ]]; do\n    50→  case $1 in\n    51→    --dry-run)\n    52→      DRY_RUN=true\n    53→      shift\n    54→      ;;\n    55→    --registry)\n    56→      REGISTRY=\"$2\"\n    57→      shift 2\n    58→      ;;\n    59→    --docker)\n    60→      PUBLISH_DOCKER=true\n    61→      shift\n    62→      ;;\n    63→    --docker-registry)\n    64→      DOCKER_REGISTRY=\"$2\"\n    65→      shift 2\n    66→      ;;\n    67→    --docker-platforms)\n    68→      DOCKER_PLATFORMS=\"$2\"\n    69→      shift 2\n    70→      ;;\n    71→    --only-npm)\n    72→      ONLY_NPM=true\n    73→      shift\n    74→      ;;\n    75→    --only-docker)\n    76→      ONLY_DOCKER=true\n    77→      PUBLISH_DOCKER=true\n    78→      shift\n    79→      ;;\n    80→    -h|--help)\n    81→      print_usage\n    82→      exit 0\n    83→      ;;\n    84→    *)\n    85→      echo \"Unknown option: $1\"\n    86→      print_usage\n    87→      exit 1\n    88→      ;;\n    89→  esac\n    90→done\n    91→\n    92→# Validate flags\n    93→if [ \"$ONLY_NPM\" = true ] && [ \"$ONLY_DOCKER\" = true ]; then\n    94→  echo \"❌ Error: --only-npm and --only-docker are mutually exclusive\"\n    95→  exit 1\n    96→fi\n    97→\n    98→if [ \"$ONLY_NPM\" = true ]; then\n    99→  PUBLISH_DOCKER=false\n   100→fi\n   101→\n   102→if [ \"$DRY_RUN\" = true ]; then\n   103→  echo \"🔍 DRY RUN MODE - No actual changes will be made\"\n   104→  echo \"\"\n   105→fi\n   106→\n   107→# Check Docker availability if publishing Docker images\n   108→if [ \"$PUBLISH_DOCKER\" = true ]; then\n   109→  if ! command -v docker &> /dev/null; then\n   110→    echo \"❌ Error: Docker is not installed or not in PATH\"\n   111→    echo \"Install Docker or run without --docker flag\"\n   112→    exit 1\n   113→  fi\n   114→\n   115→  # Check for multi-platform support if needed\n   116→  if [[ \"$DOCKER_PLATFORMS\" == *\",\"* ]]; then\n   117→    if ! docker buildx version > /dev/null 2>&1; then\n   118→      echo \"❌ Error: docker buildx is required for multi-platform builds\"\n   119→      echo \"Install docker buildx or use a single platform (--docker-platforms linux/amd64)\"\n   120→      exit 1\n   121→    fi\n   122→  fi\n   123→fi\n   124→\n   125→echo \"📦 use-ai Package Publisher\"\n   126→echo \"━━━━━━━━━━━━━━━━━━━━━━━━━━━\"\n   127→if [ \"$ONLY_DOCKER\" = true ]; then\n   128→  echo \"Publishing: Docker image only\"\n   129→elif [ \"$PUBLISH_DOCKER\" = true ]; then\n   130→  echo \"Publishing: npm packages + Docker image\"\n   131→else\n   132→  echo \"Publishing: npm packages only\"\n   133→fi\n   134→echo \"\"\n   135→\n   136→get_current_version() {\n   137→  local package_dir=$1\n   138→  grep -oP '(?<=\"version\": \")[^\"]*' \"$package_dir/package.json\"\n   139→}\n   140→\n   141→bump_version() {\n   142→  local version=$1\n   143→  local bump_type=$2\n   144→\n   145→  IFS='.' read -r major minor patch <<< \"$version\"\n   146→\n   147→  case $bump_type in\n   148→    major)\n   149→      echo \"$((major + 1)).0.0\"\n   150→      ;;\n   151→    minor)\n   152→      echo \"$major.$((minor + 1)).0\"\n   153→      ;;\n   154→    patch)\n   155→      echo \"$major.$minor.$((patch + 1))\"\n   156→      ;;\n   157→    *)\n   158→      echo \"$version\"\n   159→      ;;\n   160→  esac\n   161→}\n   162→\n   163→update_version_in_file() {\n   164→  local file=$1\n   165→  local old_version=$2\n   166→  local new_version=$3\n   167→\n   168→  if [ \"$DRY_RUN\" = true ]; then\n   169→    echo \"  [DRY RUN] Would update $file: $old_version → $new_version\"\n   170→  else\n   171→    sed -i \"s/\\\"version\\\": \\\"$old_version\\\"/\\\"version\\\": \\\"$new_version\\\"/\" \"$file\"\n   172→    echo \"  ✓ Updated $file: $old_version → $new_version\"\n   173→  fi\n   174→}\n   175→\n   176→update_dockerfile_version() {\n   177→  local old_version=$1\n   178→  local new_version=$2\n   179→  local dockerfile=\"apps/use-ai-server-app/Dockerfile\"\n   180→\n   181→  if [ \"$DRY_RUN\" = true ]; then\n   182→    echo \"  [DRY RUN] Would update $dockerfile OCI label: $old_version → $new_version\"\n   183→  else\n   184→    sed -i \"s/org.opencontainers.image.version=\\\"$old_version\\\"/org.opencontainers.image.version=\\\"$new_version\\\"/\" \"$dockerfile\"\n   185→    echo \"  ✓ Updated $dockerfile OCI label: $old_version → $new_version\"\n   186→  fi\n   187→}\n   188→\n   189→current_version=$(get_current_version \"packages/core\")\n   190→\n   191→if [ \"$ONLY_DOCKER\" = true ]; then\n   192→  # Skip version bumping for Docker-only builds\n   193→  echo \"Current version: $current_version (from package.json)\"\n   194→  echo \"\"\n   195→  echo \"Building Docker image for version $current_version\"\n   196→  echo \"\"\n   197→  NEW_VERSION=\"$current_version\"\n   198→else\n   199→  echo \"Step 1: Version Management\"\n   200→  echo \"━━━━━━━━━━━━━━━━━━━━━━━━━━\"\n   201→  echo \"\"\n   202→  echo \"Current version: $current_version\"\n   203→  echo \"\"\n   204→  echo \"Bump version before publishing? [y/N]\"\n   205→  read -r bump_response\n   206→\n   207→  NEW_VERSION=\"$current_version\"\n   208→\n   209→  if [[ \"$bump_response\" =~ ^[Yy]$ ]]; then\n   210→  echo \"\"\n   211→  echo \"Select version bump type:\"\n   212→  echo \"  1) patch ($current_version → $(bump_version \"$current_version\" patch))\"\n   213→  echo \"  2) minor ($current_version → $(bump_version \"$current_version\" minor))\"\n   214→  echo \"  3) major ($current_version → $(bump_version \"$current_version\" major))\"\n   215→  echo \"\"\n   216→  echo \"Enter choice [1-3]:\"\n   217→  read -r bump_choice\n   218→\n   219→  case $bump_choice in\n   220→    1)\n   221→      NEW_VERSION=$(bump_version \"$current_version\" patch)\n   222→      ;;\n   223→    2)\n   224→      NEW_VERSION=$(bump_version \"$current_version\" minor)\n   225→      ;;\n   226→    3)\n   227→      NEW_VERSION=$(bump_version \"$current_version\" major)\n   228→      ;;\n   229→    *)\n   230→      echo \"Invalid choice. Keeping current version.\"\n   231→      ;;\n   232→  esac\n   233→\n   234→  if [ \"$NEW_VERSION\" != \"$current_version\" ]; then\n   235→    echo \"\"\n   236→    echo \"Updating version to $NEW_VERSION in all packages...\"\n   237→    echo \"\"\n   238→\n   239→    update_version_in_file \"package.json\" \"$current_version\" \"$NEW_VERSION\"\n   240→\n   241→    for pkg_dir in \"${PACKAGES[@]}\"; do\n   242→      update_version_in_file \"$pkg_dir/package.json\" \"$current_version\" \"$NEW_VERSION\"\n   243→    done\n   244→\n   245→    update_version_in_file \"apps/example/package.json\" \"$current_version\" \"$NEW_VERSION\"\n   246→    update_version_in_file \"apps/example-nest-mcp-server/package.json\" \"$current_version\" \"$NEW_VERSION\"\n   247→    update_version_in_file \"apps/use-ai-server-app/package.json\" \"$current_version\" \"$NEW_VERSION\"\n   248→    update_dockerfile_version \"$current_version\" \"$NEW_VERSION\"\n   249→\n   250→    echo \"\"\n   251→  fi\n   252→  else\n   253→    echo \"Keeping current version: $current_version\"\n   254→  fi\n   255→\n   256→  echo \"\"\n   257→fi\n   258→\n   259→if [ \"$ONLY_DOCKER\" = true ]; then\n   260→  # Skip npm registry selection for Docker-only builds\n   261→  REGISTRY=\"https://registry.npmjs.org\"\n   262→elif [ -z \"$REGISTRY\" ]; then\n   263→  echo \"Select publish target:\"\n   264→  echo \"  1) Public npm registry (https://registry.npmjs.org)\"\n   265→  echo \"  2) GitHub Packages (https://npm.pkg.github.com)\"\n   266→  echo \"  3) Custom registry\"\n   267→  echo \"\"\n   268→  echo \"Enter choice [1-3] (default: 1):\"\n   269→  read -r registry_choice\n   270→\n   271→  case $registry_choice in\n   272→    2)\n   273→      REGISTRY=\"https://npm.pkg.github.com\"\n   274→      ;;\n   275→    3)\n   276→      echo \"Enter custom registry URL:\"\n   277→      read -r REGISTRY\n   278→      ;;\n   279→    1|\"\")\n   280→      REGISTRY=\"https://registry.npmjs.org\"\n   281→      ;;\n   282→    *)\n   283→      echo \"Invalid choice. Using public npm registry.\"\n   284→      REGISTRY=\"https://registry.npmjs.org\"\n   285→      ;;\n   286→  esac\n   287→fi\n   288→\n   289→if [ \"$ONLY_DOCKER\" = false ]; then\n   290→  if [ \"$REGISTRY\" = \"https://registry.npmjs.org\" ]; then\n   291→    echo \"Publishing to: Public npm registry\"\n   292→  else\n   293→    echo \"Publishing to: $REGISTRY\"\n   294→  fi\n   295→fi\n   296→\n   297→echo \"\"\n   298→if [ \"$ONLY_DOCKER\" = true ]; then\n   299→  echo \"Building Packages for Docker\"\n   300→else\n   301→  echo \"Step 2: Building Packages\"\n   302→fi\n   303→echo \"━━━━━━━━━━━━━━━━━━━━━━━━━━\"\n   304→echo \"\"\n   305→\n   306→if [ \"$DRY_RUN\" = true ]; then\n   307→  echo \"[DRY RUN] Would run: bun run build\"\n   308→  echo \"\"\n   309→else\n   310→  echo \"Building all packages...\"\n   311→  bun run build\n   312→  echo \"\"\n   313→  echo \"✓ Build completed successfully\"\n   314→  echo \"\"\n   315→fi\n   316→\n   317→verify_build() {\n   318→  local package_dir=$1\n   319→  local package_name=$2\n   320→\n   321→  if [ ! -d \"$package_dir/dist\" ]; then\n   322→    echo \"❌ Error: $package_name build output not found at $package_dir/dist\"\n   323→    return 1\n   324→  fi\n   325→\n   326→  if [ ! -f \"$package_dir/dist/index.js\" ]; then\n   327→    echo \"❌ Error: $package_name missing dist/index.js\"\n   328→    return 1\n   329→  fi\n   330→\n   331→  if [ ! -f \"$package_dir/dist/index.d.ts\" ]; then\n   332→    echo \"❌ Error: $package_name missing dist/index.d.ts\"\n   333→    return 1\n   334→  fi\n   335→\n   336→  echo \"  ✓ $package_name build verified\"\n   337→  return 0\n   338→}\n   339→\n   340→echo \"Verifying builds...\"\n   341→echo \"\"\n   342→\n   343→all_builds_verified=true\n   344→for i in \"${!PACKAGES[@]}\"; do\n   345→  if ! verify_build \"${PACKAGES[$i]}\" \"${PACKAGE_NAMES[$i]}\"; then\n   346→    all_builds_verified=false\n   347→  fi\n   348→done\n   349→\n   350→echo \"\"\n   351→\n   352→if [ \"$all_builds_verified\" = false ]; then\n   353→  echo \"❌ Build verification failed. Please fix the issues and try again.\"\n   354→  exit 1\n   355→fi\n   356→\n   357→if [ \"$ONLY_DOCKER\" = false ]; then\n   358→  echo \"\"\n   359→  echo \"Step 3: Publishing to npm\"\n   360→  echo \"━━━━━━━━━━━━━━━━━━━━━━━━━━\"\n   361→  echo \"\"\n   362→fi\n   363→\n   364→if [ \"$ONLY_DOCKER\" = true ]; then\n   365→  # Skip npm publishing for Docker-only builds\n   366→  if [ \"$DRY_RUN\" = true ]; then\n   367→    echo \"\"\n   368→    echo \"[DRY RUN] Skipping npm publishing (--only-docker flag)\"\n   369→    echo \"[DRY RUN] Would build and publish Docker image:\"\n   370→    if [ -n \"$DOCKER_REGISTRY\" ]; then\n   371→      echo \"  Registry: $DOCKER_REGISTRY\"\n   372→    else\n   373→      echo \"  Registry: (will prompt)\"\n   374→    fi\n   375→    echo \"  Image: use-ai-server-app\"\n   376→    echo \"  Tags: $NEW_VERSION, latest\"\n   377→    echo \"  Platforms: $DOCKER_PLATFORMS\"\n   378→    echo \"\"\n   379→    echo \"Run without --dry-run to actually publish.\"\n   380→    exit 0\n   381→  fi\n   382→elif [ \"$DRY_RUN\" = true ]; then\n   383→  echo \"[DRY RUN] Would publish the following packages to $REGISTRY:\"\n   384→  echo \"\"\n   385→  for i in \"${!PACKAGES[@]}\"; do\n   386→    echo \"  ${PACKAGE_NAMES[$i]}@$NEW_VERSION\"\n   387→  done\n   388→  echo \"\"\n   389→  if [ \"$PUBLISH_DOCKER\" = true ]; then\n   390→    echo \"[DRY RUN] Would also build and publish Docker image:\"\n   391→    if [ -n \"$DOCKER_REGISTRY\" ]; then\n   392→      echo \"  Registry: $DOCKER_REGISTRY\"\n   393→    else\n   394→      echo \"  Registry: (will prompt)\"\n   395→    fi\n   396→    echo \"  Image: use-ai-server-app\"\n   397→    echo \"  Tags: $NEW_VERSION, latest\"\n   398→    echo \"  Platforms: $DOCKER_PLATFORMS\"\n   399→    echo \"\"\n   400→  fi\n   401→  echo \"Run without --dry-run to actually publish.\"\n   402→  exit 0\n   403→fi\n   404→\n   405→if [ \"$ONLY_DOCKER\" = false ]; then\n   406→  echo \"⚠️  About to publish the following packages:\"\n   407→  echo \"\"\n   408→  for i in \"${!PACKAGES[@]}\"; do\n   409→    echo \"  ${PACKAGE_NAMES[$i]}@$NEW_VERSION\"\n   410→  done\n   411→  echo \"\"\n   412→  echo \"Registry: $REGISTRY\"\n   413→  echo \"\"\n   414→  echo \"Continue? [y/N]\"\n   415→  read -r publish_response\n   416→\n   417→  if [[ ! \"$publish_response\" =~ ^[Yy]$ ]]; then\n   418→    echo \"Publish cancelled.\"\n   419→    exit 0\n   420→  fi\n   421→\n   422→  echo \"\"\n   423→  echo \"Publishing packages...\"\n   424→  echo \"\"\n   425→fi\n   426→\n   427→publish_package() {\n   428→  local package_dir=$1\n   429→  local package_name=$2\n   430→\n   431→  echo \"Publishing $package_name to $REGISTRY...\"\n   432→\n   433→  cd \"$package_dir\"\n   434→\n   435→  if bun publish --registry \"$REGISTRY\" --access public; then\n   436→    echo \"  ✓ $package_name published successfully\"\n   437→    cd - > /dev/null\n   438→    return 0\n   439→  else\n   440→    echo \"  ❌ Failed to publish $package_name\"\n   441→    cd - > /dev/null\n   442→    return 1\n   443→  fi\n   444→}\n   445→\n   446→if [ \"$ONLY_DOCKER\" = false ]; then\n   447→  echo \"Publishing @use-ai/core first (dependency for other packages)...\"\n   448→  if ! publish_package \"packages/core\" \"@use-ai/core\"; then\n   449→    echo \"\"\n   450→    echo \"❌ Failed to publish @use-ai/core. Stopping.\"\n   451→    exit 1\n   452→  fi\n   453→  echo \"\"\n   454→\n   455→  echo \"Publishing remaining packages...\"\n   456→  for i in 1 2 3; do\n   457→    if ! publish_package \"${PACKAGES[$i]}\" \"${PACKAGE_NAMES[$i]}\"; then\n   458→      echo \"\"\n   459→      echo \"⚠️  Warning: Failed to publish ${PACKAGE_NAMES[$i]}\"\n   460→    fi\n   461→  done\n   462→\n   463→  echo \"\"\n   464→  echo \"━━━━━━━━━━━━━━━━━━━━━━━━━━\"\n   465→  echo \"✅ npm publishing complete!\"\n   466→  echo \"\"\n   467→fi\n   468→\n   469→if [ \"$PUBLISH_DOCKER\" = true ]; then\n   470→  echo \"\"\n   471→  if [ \"$ONLY_DOCKER\" = true ]; then\n   472→    echo \"Docker Image Build and Publish\"\n   473→  else\n   474→    echo \"Step 4: Docker Image\"\n   475→  fi\n   476→  echo \"━━━━━━━━━━━━━━━━━━━━━━━━━━\"\n   477→  echo \"\"\n   478→\n   479→  # Prompt for Docker registry if not provided\n   480→  if [ -z \"$DOCKER_REGISTRY\" ]; then\n   481→    echo \"Docker registry options:\"\n   482→    echo \"  1) Docker Hub (docker.io/username)\"\n   483→    echo \"  2) GitHub Container Registry (ghcr.io/org)\"\n   484→    echo \"  3) Custom registry\"\n   485→    echo \"\"\n   486→    echo \"Enter choice [1-3] (or leave empty to skip Docker publishing):\"\n   487→    read -r docker_choice\n   488→\n   489→    case $docker_choice in\n   490→      1)\n   491→        echo \"Enter Docker Hub username:\"\n   492→        read -r docker_username\n   493→        DOCKER_REGISTRY=\"docker.io/$docker_username\"\n   494→        ;;\n   495→      2)\n   496→        echo \"Enter GitHub organization/username:\"\n   497→        read -r github_org\n   498→        DOCKER_REGISTRY=\"ghcr.io/$github_org\"\n   499→        ;;\n   500→      3)\n   501→        echo \"Enter custom registry (e.g., registry.example.com/org):\"\n   502→        read -r DOCKER_REGISTRY\n   503→        ;;\n   504→      \"\")\n   505→        echo \"Skipping Docker publishing.\"\n   506→        PUBLISH_DOCKER=false\n   507→        ;;\n   508→      *)\n   509→        echo \"Invalid choice. Skipping Docker publishing.\"\n   510→        PUBLISH_DOCKER=false\n   511→        ;;\n   512→    esac\n   513→    echo \"\"\n   514→  fi\n   515→\n   516→  if [ \"$PUBLISH_DOCKER\" = true ]; then\n   517→    IMAGE_NAME=\"use-ai-server-app\"\n   518→    FULL_IMAGE=\"$DOCKER_REGISTRY/$IMAGE_NAME\"\n   519→\n   520→    echo \"Docker build configuration:\"\n   521→    echo \"  Registry: $DOCKER_REGISTRY\"\n   522→    echo \"  Image: $IMAGE_NAME\"\n   523→    echo \"  Tags: $NEW_VERSION, latest\"\n   524→    echo \"  Platforms: $DOCKER_PLATFORMS\"\n   525→    echo \"\"\n   526→\n   527→    if [ \"$DRY_RUN\" = true ]; then\n   528→      echo \"[DRY RUN] Would build and push Docker image:\"\n   529→      echo \"  docker buildx build \\\\\"\n   530→      echo \"    --platform $DOCKER_PLATFORMS \\\\\"\n   531→      echo \"    -f apps/use-ai-server-app/Dockerfile \\\\\"\n   532→      echo \"    -t $FULL_IMAGE:$NEW_VERSION \\\\\"\n   533→      echo \"    -t $FULL_IMAGE:latest \\\\\"\n   534→      echo \"    --push \\\\\"\n   535→      echo \"    .\"\n   536→      echo \"\"\n   537→    else\n   538→      echo \"Build and push Docker image? [y/N]\"\n   539→      read -r docker_confirm\n   540→\n   541→      if [[ \"$docker_confirm\" =~ ^[Yy]$ ]]; then\n   542→        echo \"\"\n   543→        echo \"Building and pushing Docker image...\"\n   544→        echo \"\"\n   545→\n   546→        # Check if buildx is available for multi-platform builds\n   547→        if [[ \"$DOCKER_PLATFORMS\" == *\",\"* ]]; then\n   548→          if ! docker buildx version > /dev/null 2>&1; then\n   549→            echo \"❌ Error: docker buildx is required for multi-platform builds\"\n   550→            echo \"Please install docker buildx or use a single platform (--docker-platforms linux/amd64)\"\n   551→            exit 1\n   552→          fi\n   553→\n   554→          # Create and use a new builder instance if needed\n   555→          if ! docker buildx inspect multiplatform-builder > /dev/null 2>&1; then\n   556→            echo \"Creating buildx builder...\"\n   557→            docker buildx create --name multiplatform-builder --use\n   558→          else\n   559→            docker buildx use multiplatform-builder\n   560→          fi\n   561→\n   562→          if docker buildx build \\\n   563→            --platform \"$DOCKER_PLATFORMS\" \\\n   564→            -f apps/use-ai-server-app/Dockerfile \\\n   565→            -t \"$FULL_IMAGE:$NEW_VERSION\" \\\n   566→            -t \"$FULL_IMAGE:latest\" \\\n   567→            --push \\\n   568→            .; then\n   569→            echo \"\"\n   570→            echo \"✅ Docker image built and pushed successfully!\"\n   571→            echo \"\"\n   572→            echo \"Published images:\"\n   573→            echo \"  • $FULL_IMAGE:$NEW_VERSION\"\n   574→            echo \"  • $FULL_IMAGE:latest\"\n   575→          else\n   576→            echo \"\"\n   577→            echo \"❌ Failed to build and push Docker image\"\n   578→            exit 1\n   579→          fi\n   580→        else\n   581→          # Single platform build\n   582→          if docker build \\\n   583→            --platform \"$DOCKER_PLATFORMS\" \\\n   584→            -f apps/use-ai-server-app/Dockerfile \\\n   585→            -t \"$FULL_IMAGE:$NEW_VERSION\" \\\n   586→            -t \"$FULL_IMAGE:latest\" \\\n   587→            .; then\n   588→            echo \"\"\n   589→            echo \"✅ Docker image built successfully!\"\n   590→            echo \"\"\n   591→            echo \"Pushing to registry...\"\n   592→            if docker push \"$FULL_IMAGE:$NEW_VERSION\" && docker push \"$FULL_IMAGE:latest\"; then\n   593→              echo \"\"\n   594→              echo \"✅ Docker image pushed successfully!\"\n   595→              echo \"\"\n   596→              echo \"Published images:\"\n   597→              echo \"  • $FULL_IMAGE:$NEW_VERSION\"\n   598→              echo \"  • $FULL_IMAGE:latest\"\n   599→            else\n   600→              echo \"\"\n   601→              echo \"❌ Failed to push Docker image\"\n   602→              exit 1\n   603→            fi\n   604→          else\n   605→            echo \"\"\n   606→            echo \"❌ Failed to build Docker image\"\n   607→            exit 1\n   608→          fi\n   609→        fi\n   610→      else\n   611→        echo \"Docker publishing skipped.\"\n   612→      fi\n   613→    fi\n   614→  fi\n   615→fi\n   616→\n   617→echo \"\"\n   618→echo \"━━━━━━━━━━━━━━━━━━━━━━━━━━\"\n   619→echo \"✅ Publishing complete!\"\n   620→echo \"\"\n   621→echo \"Published version: $NEW_VERSION\"\n   622→echo \"\"\n   623→echo \"Next steps:\"\n   624→echo \"  • Create a git tag: git tag v$NEW_VERSION && git push origin v$NEW_VERSION\"\n   625→echo \"  • Update CHANGELOG.md\"\n   626→if [ \"$PUBLISH_DOCKER\" = false ]; then\n   627→  echo \"  • Build and publish Docker image:\"\n   628→  echo \"    ./scripts/publish.sh --docker --docker-registry your-registry/org\"\n   629→fi\n   630→\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\n</system-reminder>\n",
+          "timestamp": "2025-11-21T13:04:13.765Z"
+        },
+        {
+          "type": "user",
+          "text": "On branch main\nnothing to commit, working tree clean",
+          "timestamp": "2025-11-21T13:04:14.516Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/apps/use-ai-server-app/Dockerfile"
+          },
+          "timestamp": "2025-11-21T13:04:18.922Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Glob",
+          "input": {
+            "pattern": "**/bun.lockb"
+          },
+          "timestamp": "2025-11-21T13:04:19.272Z"
+        },
+        {
+          "type": "user",
+          "text": "     1→# Multi-stage build for use-ai-server-app\n     2→# This Dockerfile is designed to run from the monorepo root\n     3→\n     4→FROM oven/bun:1.3.2-slim AS base\n     5→WORKDIR /app\n     6→\n     7→# Install dependencies stage\n     8→FROM base AS install\n     9→# Copy package files for dependency installation\n    10→COPY package.json bun.lock ./\n    11→COPY packages/core/package.json ./packages/core/\n    12→COPY packages/server/package.json ./packages/server/\n    13→COPY packages/plugin-workflows/package.json ./packages/plugin-workflows/\n    14→COPY apps/use-ai-server-app/package.json ./apps/use-ai-server-app/\n    15→\n    16→# Install all dependencies\n    17→RUN bun install --frozen-lockfile --production\n    18→\n    19→# Build stage\n    20→FROM base AS build\n    21→# Copy installed dependencies from install stage\n    22→COPY --from=install /app/node_modules ./node_modules\n    23→COPY --from=install /app/packages/core/node_modules ./packages/core/node_modules\n    24→COPY --from=install /app/packages/server/node_modules ./packages/server/node_modules\n    25→COPY --from=install /app/packages/plugin-workflows/node_modules ./packages/plugin-workflows/node_modules\n    26→COPY --from=install /app/apps/use-ai-server-app/node_modules ./apps/use-ai-server-app/node_modules\n    27→\n    28→# Copy source files\n    29→COPY package.json bun.lock turbo.json ./\n    30→COPY packages/core ./packages/core\n    31→COPY packages/server ./packages/server\n    32→COPY packages/plugin-workflows ./packages/plugin-workflows\n    33→COPY apps/use-ai-server-app ./apps/use-ai-server-app\n    34→\n    35→# Build all packages\n    36→RUN bun run build\n    37→\n    38→# Production stage\n    39→FROM oven/bun:1.3.2-slim AS production\n    40→WORKDIR /app\n    41→\n    42→# Copy only necessary runtime files\n    43→COPY --from=build /app/package.json ./\n    44→COPY --from=build /app/node_modules ./node_modules\n    45→\n    46→# Copy built core package\n    47→COPY --from=build /app/packages/core/dist ./packages/core/dist\n    48→COPY --from=build /app/packages/core/package.json ./packages/core/\n    49→COPY --from=build /app/packages/core/node_modules ./packages/core/node_modules\n    50→\n    51→# Copy built server package\n    52→COPY --from=build /app/packages/server/dist ./packages/server/dist\n    53→COPY --from=build /app/packages/server/package.json ./packages/server/\n    54→COPY --from=build /app/packages/server/node_modules ./packages/server/node_modules\n    55→\n    56→# Copy built plugin-workflows package\n    57→COPY --from=build /app/packages/plugin-workflows/dist ./packages/plugin-workflows/dist\n    58→COPY --from=build /app/packages/plugin-workflows/package.json ./packages/plugin-workflows/\n    59→COPY --from=build /app/packages/plugin-workflows/node_modules ./packages/plugin-workflows/node_modules\n    60→\n    61→# Copy built server app\n    62→COPY --from=build /app/apps/use-ai-server-app/dist ./apps/use-ai-server-app/dist\n    63→COPY --from=build /app/apps/use-ai-server-app/package.json ./apps/use-ai-server-app/\n    64→\n    65→# Set up non-root user for security\n    66→RUN addgroup --system --gid 1001 nodejs && \\\n    67→    adduser --system --uid 1001 bunuser && \\\n    68→    chown -R bunuser:nodejs /app\n    69→\n    70→USER bunuser\n    71→\n    72→# Expose default port\n    73→EXPOSE 8081\n    74→\n    75→# ============================================================================\n    76→# IMAGE METADATA (OCI Labels)\n    77→# ============================================================================\n    78→LABEL org.opencontainers.image.title=\"UseAI Server\" \\\n    79→      org.opencontainers.image.description=\"Batteries-included server for use with `use-ai` framework.\" \\\n    80→      org.opencontainers.image.vendor=\"Meetsmore\" \\\n    81→      org.opencontainers.image.version=\"0.1.1\" \\\n    82→      org.opencontainers.image.documentation=\"https://github.com/meetsmore/use-ai/blob/main/README.md\" \\\n    83→      maintainer=\"zachary.davison@meetsmore.com\"\n    84→\n    85→# Configuration documentation labels\n    86→LABEL config.env.required.anthropic_api_key=\"Anthropic Claude API key (required if openai_api_key not set)\" \\\n    87→      config.env.required.openai_api_key=\"OpenAI GPT API key (required if anthropic_api_key not set)\" \\\n    88→      config.env.optional.anthropic_model=\"Claude model (default: claude-sonnet-4-20250514)\" \\\n    89→      config.env.optional.openai_model=\"OpenAI model (default: gpt-4-turbo)\" \\\n    90→      config.env.optional.port=\"Server port (default: 8081)\" \\\n    91→      config.env.optional.log_format=\"Log format: pretty|json (default: json)\" \\\n    92→      config.env.optional.rate_limit_max_requests=\"Max requests per window, 0=unlimited (default: 0)\" \\\n    93→      config.env.optional.rate_limit_window_ms=\"Rate limit window in ms (default: 60000)\" \\\n    94→      config.env.optional.langfuse_public_key=\"Langfuse public key for observability\" \\\n    95→      config.env.optional.langfuse_secret_key=\"Langfuse secret key for observability\" \\\n    96→      config.env.optional.langfuse_base_url=\"Langfuse base URL (default: https://cloud.langfuse.com)\" \\\n    97→      config.env.optional.dify_api_url=\"Dify API base URL for workflow integration\" \\\n    98→      config.env.pattern.dify_workflow_keys=\"DIFY_<WORKFLOW>_KEY for workflow-specific API keys\" \\\n    99→      config.env.pattern.mcp_endpoints=\"MCP_ENDPOINT_<NAME>_URL/NAMESPACE/TIMEOUT for MCP servers\"\n   100→\n   101→# --- Server Configuration ---\n   102→ENV NODE_ENV=production\n   103→ENV PORT=8081\n   104→ENV LOG_FORMAT=json\n   105→\n   106→# Health check - verify Socket.IO server is responding\n   107→HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \\\n   108→    CMD bun -e \"import {connect} from 'socket.io-client'; const socket = connect('http://localhost:' + (process.env.PORT || 8081)); socket.on('connect', () => { socket.close(); process.exit(0); }); socket.on('connect_error', () => { socket.close(); process.exit(1); }); setTimeout(() => { socket.close(); process.exit(1); }, 2000);\"\n   109→\n   110→# Run the server\n   111→CMD [\"bun\", \"run\", \"/app/apps/use-ai-server-app/dist/index.js\"]\n   112→\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\n</system-reminder>\n",
+          "timestamp": "2025-11-21T13:04:19.388Z"
+        },
+        {
+          "type": "user",
+          "text": "No files found",
+          "timestamp": "2025-11-21T13:04:19.442Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Bash",
+          "input": {
+            "command": "ls -la | grep -E '(lock|bun)'",
+            "description": "Check for lockfiles in root directory"
+          },
+          "timestamp": "2025-11-21T13:04:25.887Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Bash",
+          "input": {
+            "command": "find . -maxdepth 2 -name \"*.lock*\" -o -name \"bun.lock*\" 2>/dev/null | head -20",
+            "description": "Find all lockfiles in project"
+          },
+          "timestamp": "2025-11-21T13:04:26.982Z"
+        },
+        {
+          "type": "user",
+          "text": "./bun.lock",
+          "timestamp": "2025-11-21T13:04:27.885Z"
+        },
+        {
+          "type": "user",
+          "text": "-rw-r--r--  1 z z 114393 Nov 21 14:04 bun.lock\n-rw-rw-r--  1 z z     89 Nov 19 18:19 bunfig.toml",
+          "timestamp": "2025-11-21T13:04:27.934Z"
+        },
+        {
+          "type": "assistant",
+          "text": "Now I can see the issue. The Dockerfile references `bun.lock`, which exists. The problem is that your lockfile is out of sync with your `package.json` files. Let me check if regenerating the lockfile would help:",
+          "timestamp": "2025-11-21T13:04:34.276Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Bash",
+          "input": {
+            "command": "bun install",
+            "description": "Regenerate bun.lock to update dependencies"
+          },
+          "timestamp": "2025-11-21T13:04:34.847Z"
+        },
+        {
+          "type": "user",
+          "text": "bun install v1.3.2 (b131639c)\n✓ .env file already exists\nCreating .env symlinks in apps...\n✓ Created symlink in example\n✓ Created symlink in example-nest-mcp-server\n✓ Created symlink in use-ai-server-app\n✓ Environment setup complete\n\nChecked 469 installs across 468 packages (no changes) [36.00ms]\n[0.04ms] \".env\"\nSaved lockfile\n\n$ ./scripts/setup-env.sh",
+          "timestamp": "2025-11-21T13:04:35.712Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Bash",
+          "input": {
+            "command": "git status",
+            "description": "Check if lockfile was modified"
+          },
+          "timestamp": "2025-11-21T13:04:39.443Z"
+        },
+        {
+          "type": "user",
+          "text": "On branch main\nnothing to commit, working tree clean",
+          "timestamp": "2025-11-21T13:04:40.332Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Bash",
+          "input": {
+            "command": "bun --version",
+            "description": "Check local bun version"
+          },
+          "timestamp": "2025-11-21T13:04:48.419Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Bash",
+          "input": {
+            "command": "bun install --frozen-lockfile --production 2>&1 | head -20",
+            "description": "Test frozen lockfile install with production flag"
+          },
+          "timestamp": "2025-11-21T13:04:49.154Z"
+        },
+        {
+          "type": "user",
+          "text": "1.3.2",
+          "timestamp": "2025-11-21T13:04:49.975Z"
+        },
+        {
+          "type": "user",
+          "text": "[0.03ms] \".env\"\nbun install v1.3.2 (b131639c)\n\n$ ./scripts/setup-env.sh\n✓ .env file already exists\nCreating .env symlinks in apps...\n✓ Created symlink in example\n✓ Created symlink in example-nest-mcp-server\n✓ Created symlink in use-ai-server-app\n✓ Environment setup complete\n\nChecked 252 installs across 468 packages (no changes) [31.00ms]",
+          "timestamp": "2025-11-21T13:04:50.810Z"
+        },
+        {
+          "type": "user",
+          "text": "i cant figure out at all why the lockfile is different when we do the docker build vs the one on my machine",
+          "timestamp": "2025-11-21T13:07:27.468Z"
+        },
+        {
+          "type": "assistant",
+          "text": "Let me investigate why the lockfile resolves differently in Docker. This is typically caused by missing workspace packages in the Docker context.",
+          "timestamp": "2025-11-21T13:07:37.061Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/package.json"
+          },
+          "timestamp": "2025-11-21T13:07:37.710Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Bash",
+          "input": {
+            "command": "find packages apps -maxdepth 2 -name \"package.json\" -type f | sort",
+            "description": "List all package.json files in monorepo"
+          },
+          "timestamp": "2025-11-21T13:07:38.646Z"
+        },
+        {
+          "type": "user",
+          "text": "     1→{\n     2→  \"name\": \"use-ai-monorepo\",\n     3→  \"version\": \"0.1.1\",\n     4→  \"private\": true,\n     5→  \"packageManager\": \"bun@1.3.2\",\n     6→  \"workspaces\": [\n     7→    \"packages/*\",\n     8→    \"apps/*\"\n     9→  ],\n    10→  \"overrides\": {\n    11→    \"cpu-features\": \"npm:empty-module@^1.0.0\"\n    12→  },\n    13→  \"scripts\": {\n    14→    \"postinstall\": \"./scripts/setup-env.sh\",\n    15→    \"build\": \"turbo run build\",\n    16→    \"dev\": \"turbo run dev\",\n    17→    \"test\": \"turbo run test\",\n    18→    \"test:e2e\": \"turbo run test:e2e\",\n    19→    \"test:e2e:ui\": \"cd apps/example && bun run test:e2e:ui\",\n    20→    \"test:e2e:headed\": \"cd apps/example && bun run test:e2e:headed\",\n    21→    \"test:e2e:debug\": \"cd apps/example && bun run test:e2e:debug\",\n    22→    \"clean\": \"turbo run clean && rm -rf .cache/turbo\",\n    23→    \"kill\": \"(lsof -ti:3000 2>/dev/null | xargs -r kill; lsof -ti:3002 2>/dev/null | xargs -r kill; lsof -ti:8081 2>/dev/null | xargs -r kill) && echo 'Killed processes on ports 3000, 3002, 8081' || echo 'No processes to kill'\"\n    24→  },\n    25→  \"devDependencies\": {\n    26→    \"@types/bun\": \"latest\",\n    27→    \"turbo\": \"^2.6.1\",\n    28→    \"typescript\": \"^5.3.3\"\n    29→  }\n    30→}\n    31→\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\n</system-reminder>\n",
+          "timestamp": "2025-11-21T13:07:38.812Z"
+        },
+        {
+          "type": "user",
+          "text": "apps/example-nest-mcp-server/package.json\napps/example/package.json\napps/use-ai-server-app/package.json\npackages/client/package.json\npackages/core/package.json\npackages/plugin-workflows/package.json\npackages/server/package.json",
+          "timestamp": "2025-11-21T13:07:39.570Z"
+        },
+        {
+          "type": "assistant",
+          "text": "Found it! The Dockerfile is **missing workspace packages**. Your monorepo has 7 packages but the Dockerfile only copies 4:\n\n**Missing from Dockerfile:**\n- `packages/client/package.json`\n- `apps/example/package.json`\n- `apps/example-nest-mcp-server/package.json`\n\nWhen Bun resolves dependencies in a workspace, it needs to see **all** workspace `package.json` files to resolve correctly, even for `--production` installs. The missing packages cause different dependency resolution.\n\n**Fix:** Add the missing package.json files to the Dockerfile:",
+          "timestamp": "2025-11-21T13:07:52.186Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Edit",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/apps/use-ai-server-app/Dockerfile",
+            "new_string": "# Install dependencies stage\nFROM base AS install\n# Copy package files for dependency installation\nCOPY package.json bun.lock ./\nCOPY packages/core/package.json ./packages/core/\nCOPY packages/client/package.json ./packages/client/\nCOPY packages/server/package.json ./packages/server/\nCOPY packages/plugin-workflows/package.json ./packages/plugin-workflows/\nCOPY apps/use-ai-server-app/package.json ./apps/use-ai-server-app/\nCOPY apps/example/package.json ./apps/example/\nCOPY apps/example-nest-mcp-server/package.json ./apps/example-nest-mcp-server/\n\n# Install all dependencies\nRUN bun install --frozen-lockfile --production",
+            "old_string": "# Install dependencies stage\nFROM base AS install\n# Copy package files for dependency installation\nCOPY package.json bun.lock ./\nCOPY packages/core/package.json ./packages/core/\nCOPY packages/server/package.json ./packages/server/\nCOPY packages/plugin-workflows/package.json ./packages/plugin-workflows/\nCOPY apps/use-ai-server-app/package.json ./apps/use-ai-server-app/\n\n# Install all dependencies\nRUN bun install --frozen-lockfile --production"
+          },
+          "timestamp": "2025-11-21T13:07:56.182Z"
+        },
+        {
+          "type": "user",
+          "text": "The user doesn't want to proceed with this tool use. The tool use was rejected (eg. if it was a file edit, the new_string was NOT written to the file). STOP what you are doing and wait for the user to tell you how to proceed.",
+          "timestamp": "2025-11-21T13:08:03.319Z"
+        },
+        {
+          "type": "user",
+          "text": "okay, this is fine, but we dont want the example app and the frontend client in the final docker image",
+          "timestamp": "2025-11-21T13:08:15.642Z"
+        },
+        {
+          "type": "assistant",
+          "text": "Right! You only need those `package.json` files in the **install stage** for correct dependency resolution. They won't be in the final image since the production stage only copies what it needs. Let me show you the proper fix:",
+          "timestamp": "2025-11-21T13:08:23.837Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Edit",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/apps/use-ai-server-app/Dockerfile",
+            "new_string": "# Install dependencies stage\nFROM base AS install\n# Copy ALL workspace package.json files for correct dependency resolution\n# (these won't be in the final image - only needed for lockfile resolution)\nCOPY package.json bun.lock ./\nCOPY packages/core/package.json ./packages/core/\nCOPY packages/client/package.json ./packages/client/\nCOPY packages/server/package.json ./packages/server/\nCOPY packages/plugin-workflows/package.json ./packages/plugin-workflows/\nCOPY apps/use-ai-server-app/package.json ./apps/use-ai-server-app/\nCOPY apps/example/package.json ./apps/example/\nCOPY apps/example-nest-mcp-server/package.json ./apps/example-nest-mcp-server/\n\n# Install all dependencies\nRUN bun install --frozen-lockfile --production",
+            "old_string": "# Install dependencies stage\nFROM base AS install\n# Copy package files for dependency installation\nCOPY package.json bun.lock ./\nCOPY packages/core/package.json ./packages/core/\nCOPY packages/server/package.json ./packages/server/\nCOPY packages/plugin-workflows/package.json ./packages/plugin-workflows/\nCOPY apps/use-ai-server-app/package.json ./apps/use-ai-server-app/\n\n# Install all dependencies\nRUN bun install --frozen-lockfile --production"
+          },
+          "timestamp": "2025-11-21T13:08:27.119Z"
+        }
+      ],
+      "total_additions": 16,
+      "total_deletions": 6,
+      "accepted_lines": 15,
+      "overriden_lines": 0
+    }
+  }
+}
