@@ -1,0 +1,672 @@
+scripts/setup-env.sh
+  066aa86 1,10-47
+package.json
+  066aa86 14
+apps/example/playwright.config.ts
+  d72aead 49-50
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.20",
+  "base_commit_sha": "617b730af80d61108ceb147bec9a91c55fc814b3",
+  "prompts": {
+    "066aa86": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "17871ad9-5c0e-4333-8584-6a7ddb19c0e2",
+        "model": "claude-sonnet-4-5-20250929"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [
+        {
+          "type": "user",
+          "text": "these env vars are not being passed through to the apps/use-ai-server-app when we run 'bun dev'\n\n# Local MCP Server Configuration\nMCP_ENDPOINT_LOCALDEV_URL=http://localhost:3002\nMCP_ENDPOINT_LOCALDEV_NAMESPACE=mcp",
+          "timestamp": "2025-11-21T12:06:18.005Z"
+        },
+        {
+          "type": "assistant",
+          "text": "I'll help you debug why those environment variables aren't being passed to `apps/use-ai-server-app`. Let me check the setup.",
+          "timestamp": "2025-11-21T12:06:24.292Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/package.json"
+          },
+          "timestamp": "2025-11-21T12:06:25.310Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Glob",
+          "input": {
+            "pattern": "**/.env"
+          },
+          "timestamp": "2025-11-21T12:06:25.643Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Glob",
+          "input": {
+            "pattern": "**/use-ai-server-app/**"
+          },
+          "timestamp": "2025-11-21T12:06:26.012Z"
+        },
+        {
+          "type": "user",
+          "text": "     1→{\n     2→  \"name\": \"use-ai-monorepo\",\n     3→  \"version\": \"0.1.0\",\n     4→  \"private\": true,\n     5→  \"packageManager\": \"bun@1.3.2\",\n     6→  \"workspaces\": [\n     7→    \"packages/*\",\n     8→    \"apps/*\"\n     9→  ],\n    10→  \"overrides\": {\n    11→    \"cpu-features\": \"npm:empty-module@^1.0.0\"\n    12→  },\n    13→  \"scripts\": {\n    14→    \"build\": \"turbo run build\",\n    15→    \"dev\": \"turbo run dev\",\n    16→    \"test\": \"turbo run test\",\n    17→    \"test:e2e\": \"turbo run test:e2e\",\n    18→    \"test:e2e:ui\": \"cd apps/example && bun run test:e2e:ui\",\n    19→    \"test:e2e:headed\": \"cd apps/example && bun run test:e2e:headed\",\n    20→    \"test:e2e:debug\": \"cd apps/example && bun run test:e2e:debug\",\n    21→    \"clean\": \"turbo run clean && rm -rf .cache/turbo\",\n    22→    \"kill\": \"(lsof -ti:3000 2>/dev/null | xargs -r kill; lsof -ti:3002 2>/dev/null | xargs -r kill; lsof -ti:8081 2>/dev/null | xargs -r kill) && echo 'Killed processes on ports 3000, 3002, 8081' || echo 'No processes to kill'\"\n    23→  },\n    24→  \"devDependencies\": {\n    25→    \"@types/bun\": \"latest\",\n    26→    \"turbo\": \"^2.6.1\",\n    27→    \"typescript\": \"^5.3.3\"\n    28→  }\n    29→}\n    30→\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\n</system-reminder>\n",
+          "timestamp": "2025-11-21T12:06:26.229Z"
+        },
+        {
+          "type": "user",
+          "text": "/home/z/Desktop/work/use-ai/apps/use-ai-server-app/package.json\n/home/z/Desktop/work/use-ai/apps/use-ai-server-app/dist/index.js\n/home/z/Desktop/work/use-ai/apps/use-ai-server-app/src/index.ts",
+          "timestamp": "2025-11-21T12:06:26.288Z"
+        },
+        {
+          "type": "user",
+          "text": "/home/z/Desktop/work/use-ai/.env",
+          "timestamp": "2025-11-21T12:06:26.329Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/.env"
+          },
+          "timestamp": "2025-11-21T12:06:32.335Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/apps/use-ai-server-app/package.json"
+          },
+          "timestamp": "2025-11-21T12:06:32.839Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Glob",
+          "input": {
+            "pattern": "turbo.json"
+          },
+          "timestamp": "2025-11-21T12:06:33.146Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/apps/use-ai-server-app/src/index.ts"
+          },
+          "timestamp": "2025-11-21T12:06:33.596Z"
+        },
+        {
+          "type": "user",
+          "text": "     1→ANTHROPIC_API_KEY=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\n     2→DIFY_API_URL=http://localhost:3001/v1\n     3→DIFY_GREETING_WORKFLOW_KEY=app-eKhXT7fgTdslsgROh1dcYCUR\n     4→\n     5→# Local MCP Server Configuration\n     6→MCP_ENDPOINT_LOCALDEV_URL=http://localhost:3002\n     7→MCP_ENDPOINT_LOCALDEV_NAMESPACE=mcp\n     8→\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\n</system-reminder>\n",
+          "timestamp": "2025-11-21T12:06:33.888Z"
+        },
+        {
+          "type": "user",
+          "text": "     1→{\n     2→  \"name\": \"@meetsmore/use-ai-server-app\",\n     3→  \"version\": \"0.1.0\",\n     4→  \"private\": true,\n     5→  \"type\": \"module\",\n     6→  \"scripts\": {\n     7→    \"clean\": \"rm -rf dist *.tsbuildinfo\",\n     8→    \"build\": \"bun build src/index.ts --outdir dist --target node --format esm\",\n     9→    \"start\": \"bun src/index.ts\",\n    10→    \"dev\": \"bun --watch src/index.ts\"\n    11→  },\n    12→  \"dependencies\": {\n    13→    \"@ai-sdk/anthropic\": \"^1.0.6\",\n    14→    \"@ai-sdk/openai\": \"1\",\n    15→    \"@meetsmore/use-ai-server\": \"workspace:*\",\n    16→    \"@meetsmore/use-ai-plugin-workflows\": \"workspace:*\"\n    17→  },\n    18→  \"devDependencies\": {\n    19→    \"@types/bun\": \"latest\",\n    20→    \"typescript\": \"^5.3.3\"\n    21→  }\n    22→}\n    23→\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\n</system-reminder>\n",
+          "timestamp": "2025-11-21T12:06:33.894Z"
+        },
+        {
+          "type": "user",
+          "text": "     1→#!/usr/bin/env bun\n     2→import { UseAIServer, AISDKAgent, logger } from '@meetsmore/use-ai-server';\n     3→import type { Agent, McpEndpointConfig } from '@meetsmore/use-ai-server';\n     4→import { createAnthropic } from '@ai-sdk/anthropic';\n     5→import { createOpenAI } from '@ai-sdk/openai';\n     6→import { WorkflowsPlugin, DifyWorkflowRunner } from '@meetsmore/use-ai-plugin-workflows';\n     7→import type { WorkflowRunner } from '@meetsmore/use-ai-plugin-workflows';\n     8→\n     9→const port = Number(process.env.PORT) || 8081;\n    10→const rateLimitMaxRequests = Number(process.env.RATE_LIMIT_MAX_REQUESTS) || 0;\n    11→const rateLimitWindowMs = Number(process.env.RATE_LIMIT_WINDOW_MS) || 60000;\n    12→const logFormat = process.env.LOG_FORMAT || 'pretty';\n    13→\n    14→/**\n    15→ * Create agents based on available API keys.\n    16→ * Returns a map of agent names to agent instances.\n    17→ */\n    18→function createAgents(): { agents: Record<string, Agent>; defaultAgent: string } {\n    19→  const agents: Record<string, Agent> = {};\n    20→  const enabledAgents: string[] = [];\n    21→\n    22→  // Check for Anthropic API key\n    23→  const anthropicApiKey = process.env.ANTHROPIC_API_KEY;\n    24→  if (anthropicApiKey) {\n    25→    const model = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-20250514';\n    26→    const anthropic = createAnthropic({ apiKey: anthropicApiKey });\n    27→    agents.claude = new AISDKAgent({ model: anthropic(model) });\n    28→    enabledAgents.push(`claude (${model})`);\n    29→  }\n    30→\n    31→  // Check for OpenAI API key\n    32→  const openaiApiKey = process.env.OPENAI_API_KEY;\n    33→  if (openaiApiKey) {\n    34→    const model = process.env.OPENAI_MODEL || 'gpt-4-turbo';\n    35→    const openai = createOpenAI({ apiKey: openaiApiKey });\n    36→    agents.gpt = new AISDKAgent({ model: openai(model) });\n    37→    enabledAgents.push(`gpt (${model})`);\n    38→  }\n    39→\n    40→  // Require at least one agent\n    41→  if (Object.keys(agents).length === 0) {\n    42→    console.error('Error: At least one AI provider API key is required');\n    43→    console.error('Please set one of the following:');\n    44→    console.error('  - ANTHROPIC_API_KEY (for Claude)');\n    45→    console.error('  - OPENAI_API_KEY (for GPT)');\n    46→    process.exit(1);\n    47→  }\n    48→\n    49→  // Default to Claude if available, otherwise use the first available agent\n    50→  const defaultAgent = agents.claude ? 'claude' : Object.keys(agents)[0];\n    51→\n    52→  if (logFormat === 'pretty') {\n    53→    console.log(`✓ Enabled agents: ${enabledAgents.join(', ')}`);\n    54→    console.log(`  Default agent: ${defaultAgent}`);\n    55→  } else {\n    56→    logger.info('Agents configured', { enabledAgents, defaultAgent });\n    57→  }\n    58→\n    59→  return { agents, defaultAgent };\n    60→}\n    61→\n    62→/**\n    63→ * Create workflow runners based on available configuration.\n    64→ * Returns a map of runner names to runner instances.\n    65→ */\n    66→function createWorkflowRunners(): Map<string, WorkflowRunner> {\n    67→  const runners = new Map<string, WorkflowRunner>();\n    68→  const enabledRunners: string[] = [];\n    69→\n    70→  // Check for Dify configuration\n    71→  const difyUrl = process.env.DIFY_API_URL;\n    72→  if (difyUrl) {\n    73→    // Build workflows mapping from environment variables\n    74→    // Convention: DIFY_<WORKFLOW_NAME>_KEY maps to workflow name\n    75→    const workflows: Record<string, string> = {};\n    76→\n    77→    // Example: DIFY_GREETING_WORKFLOW_KEY -> 'greeting-workflow'\n    78→    // Example: DIFY_PDF_PROCESSOR_KEY -> 'pdf-processor'\n    79→    Object.keys(process.env).forEach((key) => {\n    80→      if (key.startsWith('DIFY_') && key.endsWith('_KEY')) {\n    81→        const workflowName = key\n    82→          .slice(5, -4) // Remove 'DIFY_' prefix and '_KEY' suffix\n    83→          .toLowerCase()\n    84→          .replace(/_/g, '-'); // Convert underscores to hyphens\n    85→        workflows[workflowName] = process.env[key]!;\n    86→      }\n    87→    });\n    88→\n    89→    runners.set(\n    90→      'dify',\n    91→      new DifyWorkflowRunner({\n    92→        apiBaseUrl: difyUrl,\n    93→        workflows,\n    94→      })\n    95→    );\n    96→\n    97→    const workflowNames = Object.keys(workflows).join(', ');\n    98→    enabledRunners.push(\n    99→      `dify (${difyUrl}${workflowNames ? `, workflows: ${workflowNames}` : ''})`\n   100→    );\n   101→  }\n   102→\n   103→  if (logFormat === 'pretty' && enabledRunners.length > 0) {\n   104→    console.log(`✓ Enabled workflow runners: ${enabledRunners.join(', ')}`);\n   105→  } else if (enabledRunners.length > 0) {\n   106→    logger.info('Workflow runners configured', { enabledRunners });\n   107→  }\n   108→\n   109→  return runners;\n   110→}\n   111→\n   112→/**\n   113→ * Create MCP endpoint configurations from environment variables.\n   114→ * Returns an array of MCP endpoint configs.\n   115→ */\n   116→function createMcpEndpoints(): McpEndpointConfig[] {\n   117→  const endpoints: McpEndpointConfig[] = [];\n   118→\n   119→  console.log('ENV:', process.env)\n   120→\n   121→  // Collect all MCP_ENDPOINT_*_URL environment variables\n   122→  Object.keys(process.env).forEach((key) => {\n   123→    if (key.startsWith('MCP_ENDPOINT_') && key.endsWith('_URL')) {\n   124→      const url = process.env[key];\n   125→      if (!url) return;\n   126→\n   127→      // Extract the name (e.g., 'MYNAME' from 'MCP_ENDPOINT_MYNAME_URL')\n   128→      const name = key.slice(13, -4); // Remove 'MCP_ENDPOINT_' prefix and '_URL' suffix\n   129→\n   130→      // Look for corresponding namespace and timeout\n   131→      const namespaceKey = `MCP_ENDPOINT_${name}_NAMESPACE`;\n   132→      const timeoutKey = `MCP_ENDPOINT_${name}_TIMEOUT`;\n   133→\n   134→      const namespace = process.env[namespaceKey] || name.toLowerCase().replace(/_/g, '-');\n   135→      const timeout = Number(process.env[timeoutKey]) || 30000;\n   136→\n   137→      endpoints.push({\n   138→        url,\n   139→        namespace,\n   140→        timeout,\n   141→      });\n   142→\n   143→      if (logFormat === 'pretty') {\n   144→        console.log(`✓ MCP endpoint configured: ${url} (namespace: ${namespace})`);\n   145→      } else {\n   146→        logger.info('MCP endpoint configured', { url, namespace, timeout });\n   147→      }\n   148→    }\n   149→  });\n   150→\n   151→  return endpoints;\n   152→}\n   153→\n   154→logger.info('Starting UseAI server', { logFormat });\n   155→\n   156→(async () => {\n   157→  try {\n   158→    // Create agents and workflow runners\n   159→    const { agents, defaultAgent } = createAgents();\n   160→    const workflowRunners = createWorkflowRunners();\n   161→    const mcpEndpoints = createMcpEndpoints();\n   162→\n   163→    // Build plugins array\n   164→    const plugins = [];\n   165→    if (workflowRunners.size > 0) {\n   166→      plugins.push(new WorkflowsPlugin({ runners: workflowRunners }));\n   167→    }\n   168→\n   169→    const server = new UseAIServer({\n   170→      port,\n   171→      agents,\n   172→      defaultAgent,\n   173→      rateLimitMaxRequests,\n   174→      rateLimitWindowMs,\n   175→      plugins: plugins.length > 0 ? plugins : undefined,\n   176→      mcpEndpoints: mcpEndpoints.length > 0 ? mcpEndpoints : undefined,\n   177→    });\n   178→\n   179→    // Initialize MCP endpoints\n   180→    if (mcpEndpoints.length > 0) {\n   181→      await server.initialize();\n   182→    }\n   183→\n   184→    // Server will log when it's actually listening via the callback in the constructor\n   185→    if (logFormat === 'pretty') {\n   186→      console.log(`✓ UseAI server is running on port ${port}`);\n   187→      console.log(`  WebSocket URL: ws://localhost:${port}`);\n   188→      console.log(`  Log format: ${logFormat} (set LOG_FORMAT=json for structured logs)`);\n   189→      console.log('  Press Ctrl+C to stop');\n   190→    }\n   191→  } catch (error) {\n   192→    logger.error('Failed to start server', {\n   193→      error: error instanceof Error ? error.message : 'Unknown error',\n   194→    });\n   195→    process.exit(1);\n   196→  }\n   197→})();\n   198→\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\n</system-reminder>\n",
+          "timestamp": "2025-11-21T12:06:33.899Z"
+        },
+        {
+          "type": "user",
+          "text": "/home/z/Desktop/work/use-ai/turbo.json",
+          "timestamp": "2025-11-21T12:06:34.013Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/turbo.json"
+          },
+          "timestamp": "2025-11-21T12:06:42.368Z"
+        },
+        {
+          "type": "user",
+          "text": "     1→{\n     2→  \"$schema\": \"https://turbo.build/schema.json\",\n     3→  \"tasks\": {\n     4→    \"build\": {\n     5→      \"dependsOn\": [\"^build\"],\n     6→      \"outputs\": [\"dist/**\"],\n     7→      \"cache\": false\n     8→    },\n     9→    \"dev\": {\n    10→      \"cache\": false,\n    11→      \"persistent\": true,\n    12→      \"env\": [\"ANTHROPIC_API_KEY\", \"OPENAI_API_KEY\", \"MCP_ENDPOINT_LOCALDEV_URL\", \"MCP_ENDPOINT_LOCALDEV_NAMESPACE\"]\n    13→    },\n    14→    \"test\": {\n    15→      \"dependsOn\": [\"build\"],\n    16→      \"outputs\": [],\n    17→      \"cache\": false\n    18→    },\n    19→    \"test:e2e\": {\n    20→      \"dependsOn\": [\"build\"],\n    21→      \"outputs\": [],\n    22→      \"cache\": false,\n    23→      \"env\": [\"ANTHROPIC_API_KEY\"]\n    24→    },\n    25→    \"clean\": {\n    26→      \"cache\": false\n    27→    }\n    28→  }\n    29→}\n    30→\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\n</system-reminder>\n",
+          "timestamp": "2025-11-21T12:06:42.531Z"
+        },
+        {
+          "type": "assistant",
+          "text": "I found the issue! Looking at your `turbo.json` (line 12), the `dev` task has an `env` array that lists the environment variables that Turbo should pass through:\n\n```json\n\"env\": [\"ANTHROPIC_API_KEY\", \"OPENAI_API_KEY\", \"MCP_ENDPOINT_LOCALDEV_URL\", \"MCP_ENDPOINT_LOCALDEV_NAMESPACE\"]\n```\n\nThe two MCP environment variables you mentioned are actually **already configured** in `turbo.json`. However, let me verify if they're being loaded correctly:",
+          "timestamp": "2025-11-21T12:06:55.729Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Bash",
+          "input": {
+            "command": "bun --cwd apps/use-ai-server-app src/index.ts 2>&1 | head -20",
+            "description": "Test env vars by running server directly",
+            "timeout": 5000
+          },
+          "timestamp": "2025-11-21T12:06:57.142Z"
+        },
+        {
+          "type": "user",
+          "text": "ℹ️ [12:06:58] Starting UseAI server\n   logFormat: pretty\n✓ Enabled agents: claude (claude-sonnet-4-20250514), gpt (gpt-4-turbo)\n  Default agent: claude\nENV: {\n  SHELL: \"/bin/bash\",\n  COREPACK_ENABLE_AUTO_PIN: \"0\",\n  SESSION_MANAGER: \"local/autism-ubuntu:@/tmp/.ICE-unix/5425,unix/autism-ubuntu:/tmp/.ICE-unix/5425\",\n  GITHUB_NPM_TOKEN: \"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\",\n  QT_ACCESSIBILITY: \"1\",\n  COLORTERM: \"truecolor\",\n  XDG_CONFIG_DIRS: \"/etc/xdg/xdg-plasma:/home/z/.config/kdedefaults:/etc/xdg\",\n  NVM_INC: \"/home/z/.nvm/versions/node/v20.11.1/include/node\",\n  XDG_MENU_PREFIX: \"plasma-\",\n  GTK_IM_MODULE: \"ibus\",\n  ICEAUTHORITY: \"/run/user/1000/iceauth_sByoLl\",\n  AIDER_MODEL: \"claude-3-5-sonnet-20240620\",\n  LC_ADDRESS: \"en_IE.UTF-8\",\n  LC_NAME: \"en_IE.UTF-8\",\n  SSH_AUTH_SOCK: \"/run/user/1000/gcr/ssh\",",
+          "timestamp": "2025-11-21T12:06:58.162Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Bash",
+          "input": {
+            "command": "cd apps/use-ai-server-app && bun src/index.ts 2>&1 | grep -A 5 \"MCP_ENDPOINT\"",
+            "description": "Check if MCP env vars are loaded",
+            "timeout": 5000
+          },
+          "timestamp": "2025-11-21T12:07:05.489Z"
+        },
+        {
+          "type": "assistant",
+          "text": "The issue is that Bun doesn't automatically load `.env` files from parent directories when running from a workspace subdirectory. When you run `bun dev` from the root, Turbo runs the dev script in `apps/use-ai-server-app`, but that script (`bun --watch src/index.ts`) doesn't know about the root `.env` file.\n\nHere are two solutions:\n\n## Option 1: Use `--env-file` flag (Recommended)\n\nUpdate the dev script in `apps/use-ai-server-app/package.json` to explicitly load the root `.env` file:",
+          "timestamp": "2025-11-21T12:07:16.656Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Edit",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/apps/use-ai-server-app/package.json",
+            "new_string": "  \"scripts\": {\n    \"clean\": \"rm -rf dist *.tsbuildinfo\",\n    \"build\": \"bun build src/index.ts --outdir dist --target node --format esm\",\n    \"start\": \"bun --env-file=../../.env src/index.ts\",\n    \"dev\": \"bun --env-file=../../.env --watch src/index.ts\"\n  },",
+            "old_string": "  \"scripts\": {\n    \"clean\": \"rm -rf dist *.tsbuildinfo\",\n    \"build\": \"bun build src/index.ts --outdir dist --target node --format esm\",\n    \"start\": \"bun src/index.ts\",\n    \"dev\": \"bun --watch src/index.ts\"\n  },"
+          },
+          "timestamp": "2025-11-21T12:07:19.374Z"
+        },
+        {
+          "type": "user",
+          "text": "The user doesn't want to proceed with this tool use. The tool use was rejected (eg. if it was a file edit, the new_string was NOT written to the file). STOP what you are doing and wait for the user to tell you how to proceed.",
+          "timestamp": "2025-11-21T12:07:27.983Z"
+        },
+        {
+          "type": "user",
+          "text": "no, turbo should load the env var and pass it through",
+          "timestamp": "2025-11-21T12:07:55.271Z"
+        },
+        {
+          "type": "assistant",
+          "text": "You're right! Turbo should be loading the `.env` file and passing those variables through. Let me verify what's happening when running via Turbo:",
+          "timestamp": "2025-11-21T12:08:03.145Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Bash",
+          "input": {
+            "command": "turbo run dev --filter=@meetsmore/use-ai-server-app 2>&1 | head -40",
+            "description": "Test turbo dev with env vars",
+            "timeout": 5000
+          },
+          "timestamp": "2025-11-21T12:08:04.474Z"
+        },
+        {
+          "type": "user",
+          "text": "/bin/bash: line 1: turbo: command not found",
+          "timestamp": "2025-11-21T12:08:10.092Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Bash",
+          "input": {
+            "command": "bunx turbo run dev --filter=@meetsmore/use-ai-server-app 2>&1 | head -50",
+            "description": "Test turbo dev via bunx",
+            "timeout": 5000
+          },
+          "timestamp": "2025-11-21T12:08:14.689Z"
+        },
+        {
+          "type": "user",
+          "text": "turbo 2.6.1\n\n• Packages in scope: @meetsmore/use-ai-server-app\n• Running dev in 1 packages\n• Remote caching disabled\n@meetsmore/use-ai-server-app:dev: cache bypass, force executing ad3531e5672dbdfe\n@meetsmore/use-ai-server-app:dev: $ bun --watch src/index.ts\n@meetsmore/use-ai-server-app:dev: ℹ️ [12:08:15] Starting UseAI server\n@meetsmore/use-ai-server-app:dev:    logFormat: pretty\n@meetsmore/use-ai-server-app:dev: ✓ Enabled agents: claude (claude-sonnet-4-20250514), gpt (gpt-4-turbo)\n@meetsmore/use-ai-server-app:dev:   Default agent: claude\n@meetsmore/use-ai-server-app:dev: ENV: {\n@meetsmore/use-ai-server-app:dev:   SHELL: \"/bin/bash\",\n@meetsmore/use-ai-server-app:dev:   npm_command: \"run-script\",\n@meetsmore/use-ai-server-app:dev:   COLORTERM: \"truecolor\",\n@meetsmore/use-ai-server-app:dev:   NODE: \"/usr/bin/node\",\n@meetsmore/use-ai-server-app:dev:   ANTHROPIC_API_KEY: \"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\",\n@meetsmore/use-ai-server-app:dev:   OPENAI_API_KEY: \"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\",\n@meetsmore/use-ai-server-app:dev:   npm_config_local_prefix: \"/home/z/Desktop/work/use-ai/apps/use-ai-server-app\",\n@meetsmore/use-ai-server-app:dev:   PWD: \"/home/z/Desktop/work/use-ai/apps/use-ai-server-app\",\n@meetsmore/use-ai-server-app:dev:   PNPM_HOME: \"/home/z/.local/share/pnpm\",\n@meetsmore/use-ai-server-app:dev:   XAUTHORITY: \"/run/user/1000/xauth_rbSKqu\",\n@meetsmore/use-ai-server-app:dev:   HOME: \"/home/z\",\n@meetsmore/use-ai-server-app:dev:   LANG: \"en_US.UTF-8\",\n@meetsmore/use-ai-server-app:dev:   npm_package_version: \"0.1.0\",\n@meetsmore/use-ai-server-app:dev:   npm_lifecycle_script: \"bun --watch src/index.ts\",\n@meetsmore/use-ai-server-app:dev:   TURBO_HASH: \"ad3531e5672dbdfe\",\n@meetsmore/use-ai-server-app:dev:   TERM: \"xterm-kitty\",\n@meetsmore/use-ai-server-app:dev:   npm_package_name: \"@meetsmore/use-ai-server-app\",\n@meetsmore/use-ai-server-app:dev:   USER: \"z\",\n@meetsmore/use-ai-server-app:dev:   DISPLAY: \":0\",\n@meetsmore/use-ai-server-app:dev:   npm_lifecycle_event: \"dev\",\n@meetsmore/use-ai-server-app:dev:   SHLVL: \"0\",\n@meetsmore/use-ai-server-app:dev:   npm_config_user_agent: \"bun/1.3.2 npm/? node/v24.3.0 linux x64\",\n@meetsmore/use-ai-server-app:dev:   npm_execpath: \"/home/z/.bun/bin/bun\",\n@meetsmore/use-ai-server-app:dev:   XDG_RUNTIME_DIR: \"/run/user/1000\",\n@meetsmore/use-ai-server-app:dev:   npm_package_json: \"/home/z/Desktop/work/use-ai/apps/use-ai-server-app/package.json\",\n@meetsmore/use-ai-server-app:dev:   PATH: \"/home/z/Desktop/work/use-ai/apps/use-ai-server-app/node_modules/.bin:/home/z/Desktop/work/use-ai/apps/use-ai-server-app/node_modules/.bin:/home/z/Desktop/work/use-ai/apps/node_modules/.bin:/home/z/Desktop/work/use-ai/node_modules/.bin:/home/z/Desktop/work/node_modules/.bin:/home/z/Desktop/node_modules/.bin:/home/z/node_modules/.bin:/home/node_modules/.bin:/node_modules/.bin:/tmp/bunx-1000-turbo@latest/node_modules/.bin:/home/z/Desktop/work/use-ai/node_modules/.bin:/home/z/Desktop/work/use-ai/node_modules/.bin:/home/z/Desktop/work/node_modules/.bin:/home/z/Desktop/node_modules/.bin:/home/z/node_modules/.bin:/home/node_modules/.bin:/node_modules/.bin:/home/z/.git-ai/bin:/home/z/.local/share/pnpm:/home/z/.maestro/bin:/home/z/.volta/bin:/home/z/.bun/bin:/home/z/.go/bin:/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:/home/z/.config/venv/bin:/home/z/usr/local/go/bin:/home/z/.pulumi/bin:/home/z/.local/bin:/home/z/.config/venv/bin:/home/z/.autojump/bin:/home/z/.cargo/bin:/home/z/.local/kitty.app/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/z/.krew/bin\",\n@meetsmore/use-ai-server-app:dev:   DBUS_SESSION_BUS_ADDRESS: \"unix:path=/run/user/1000/bus\",\n@meetsmore/use-ai-server-app:dev:   npm_node_execpath: \"/usr/bin/node\",\n@meetsmore/use-ai-server-app:dev:   _: \"/home/z/.bun/bin/bun\",\n@meetsmore/use-ai-server-app:dev:   TZ: undefined,\n@meetsmore/use-ai-server-app:dev:   NODE_TLS_REJECT_UNAUTHORIZED: undefined,\n@meetsmore/use-ai-server-app:dev:   BUN_CONFIG_VERBOSE_FETCH: undefined,\n@meetsmore/use-ai-server-app:dev: }\n@meetsmore/use-ai-server-app:dev: ℹ️ [12:08:15] UseAI server listening\n@meetsmore/use-ai-server-app:dev:    port: 8081\n@meetsmore/use-ai-server-app:dev: ✓ UseAI server is running on port 8081\n@meetsmore/use-ai-server-app:dev:   WebSocket URL: ws://localhost:8081\n@meetsmore/use-ai-server-app:dev:   Log format: pretty (set LOG_FORMAT=json for structured logs)",
+          "timestamp": "2025-11-21T12:08:17.000Z"
+        },
+        {
+          "type": "user",
+          "text": "\nUsing environment variables\nCopy page\nEnvironment variable inputs are a vital part of your applications that you'll need to account for in your Turborepo configuration.\n\nThere are three important questions when working with environment variables in Turborepo:\n\nAre my environment variables accounted for in the task hash?\nWhich Environment Mode will turbo use?\nHave I handled my .env files?\nFailing to account for environment variables in your configuration can result in shipping your application with the wrong configuration. This can cause serious issues like shipping your preview deployments to production.\nGood to know: Turborepo also uses System Environment Variables to configure its own behavior. Below, you'll find information about environment variables for your task's runtime and how they affect task hashing.\nAdding environment variables to task hashes\nTurborepo needs to be aware of your environment variables to account for changes in application behavior. To do this, use the env and globalEnv keys in your turbo.json file.\n\nTurborepo logo\n./turbo.json\n\n{\n  \"globalEnv\": [\"IMPORTANT_GLOBAL_VARIABLE\"],\n  \"tasks\": {\n    \"build\": {\n      \"env\": [\"MY_API_URL\", \"MY_API_KEY\"]\n    }\n  }\n}\nglobalEnv: Changes to the values of any environment variables in this list will change the hash for all tasks.\nenv: Includes changes to the values of environment variables that affect the task, allowing for better granularity. For example, a lint task probably doesn't need to miss cache when the value of API_KEY changes, but a build task likely should.\nGood to know: Turborepo supports wildcards for environment variables so you can easily account for all environment variables with a given prefix. Visit the API reference for env for more.\nFramework Inference\nTurborepo automatically adds prefix wildcards to your env key for common frameworks. If you're using one of the frameworks below in a package, you don't need to specify environment variables with these prefixes:\n\nFramework    \nenv wildcards\n\nAstro    PUBLIC_*\nBlitz    NEXT_PUBLIC_*\nCreate React App    REACT_APP_*\nExpo    EXPO_PUBLIC_*\nGatsby    GATSBY_*\nNext.js    NEXT_PUBLIC_*\nNitro    NITRO_*, SERVER_*, AWS_APP_ID, INPUT_AZURE_STATIC_WEB_APPS_API_TOKEN, CLEAVR, CF_PAGES, FIREBASE_APP_HOSTING, NETLIFY, STORMKIT, NOW_BUILDER, ZEABUR, RENDER\nNuxt.js    NUXT_*, NITRO_*, SERVER_*, AWS_APP_ID, INPUT_AZURE_STATIC_WEB_APPS_API_TOKEN, CLEAVR, CF_PAGES, FIREBASE_APP_HOSTING, NETLIFY, STORMKIT, NOW_BUILDER, ZEABUR, RENDER, LAUNCH_EDITOR\nRedwoodJS    REDWOOD_ENV_*\nSanity Studio    SANITY_STUDIO_*\nSolid    VITE_*\nSvelteKit    VITE_*, PUBLIC_*\nVite    VITE_*\nVue    VUE_APP_*, LAUNCH_EDITOR\nGood to know: Framework inference is per-package.\nIf you'd like to opt out of Framework Inference, you can do so by:\n\nRunning your tasks with --framework-inference=false\nAdding a negative wildcard to the env key (for example, \"env\": [\"!NEXT_PUBLIC_*\"])\nEnvironment Modes\nTurborepo's Environment Modes allow you to control which environment variables are available to a task at runtime:\n\nStrict Mode (Default): Filter environment variables to only those that are specified in the env and globalEnv keys in turbo.json.\nLoose Mode: Allow all environment variables for the process to be available.\nStrict Mode\nStrict Mode filters the environment variables available to a task's runtime to only those that are specified in the globalEnv and env keys in turbo.json.\n\nThis means that tasks that do not account for all of the environment variables that they need are likely to fail. This is a good thing, since you don't want to cache a task that can potentially have different behavior in a different environment.\n\nCache safety with Strict Mode\n\nWhile Strict Mode makes it much more likely for your task to fail when you haven't accounted for all of your environment variables, it doesn't guarantee task failure. If your application is able to gracefully handle a missing environment variable, you could still successfully complete tasks and get unintended cache hits.\nPassthrough variables\nIn advanced use cases, you may want to make some environment variables available to a task without including them in the hash. Changes to these variables don't affect task outputs but still need to be available for the task to run successfully.\n\nFor these cases, add those environment variables to globalPassThroughEnv and passThroughEnv.\n\nCI vendor compatibility\nStrict Mode will filter out environment variables that come from your CI vendors until you've accounted for them using env, globalEnv, passThroughEnv, or globalPassThroughEnv.\n\nIf any of these variables are important to your tasks and aren't included by Framework Inference, make sure they are in your turbo.json configuration.\n\nLoose Mode\nLoose Mode does not filter your environment variables according to your globalEnv and env keys. This makes it easier to get started with incrementally migrating to Strict Mode.\n\nUse the --env-mode flag to enable Loose Mode on any invocation where you're seeing environment variables cannot be found by your scripts:\n\nTerminal\n\nturbo run build --env-mode=loose\nAs long as the environment variable is available when turbo is ran, your script will be able to use it. However, this also lets you accidentally forget to account for an environment variable in your configuration much more easily, allowing the task to hit cache when it shouldn't.\n\nFor example, you may have some code in your application that fetches data from an API, using an environment variable for the base URL:\n\n./apps/web/data-fetcher.ts\n\nconst data = fetch(`${process.env.MY_API_URL}/resource/1`);\nYou then build your application using a value for MY_API_URL that targets your preview environment. When you're ready to ship your application, you build for production and see a cache hit - even though the value of the MY_API_URL variable has changed! MY_API_URL changed - but Turborepo restored a version of your application from cache that uses the preview environment's MY_API_URL rather than production's.\n\nWhen you're using Loose Mode, MY_API_URL is available in the task runtime even though it isn't accounted for in the task hash. To make this task more likely to fail and protect you from this misconfiguration, we encourage you to opt for Strict Mode.\n\nPlatform Environment Variables\nWhen deploying your application to Vercel, you likely already have environment variables configured on your project. Turborepo will automatically check these variables against your turbo.json configuration to ensure that you've accounted for them, and will warn you about any missing variables.\n\nThis functionality can be disabled by setting TURBO_PLATFORM_ENV_DISABLED=false\n\nHandling .env files\n.env files are great for working on an application locally. Turborepo does not load .env files into your task's runtime, leaving them to be handled by your framework, or tools like dotenv.\n\nok, turbo doesn't do it\n",
+          "timestamp": "2025-11-21T12:08:36.991Z"
+        },
+        {
+          "type": "assistant",
+          "text": "Ah, you're right! Turbo doesn't load `.env` files - it leaves that to your framework or tools. From the docs: *\"Turborepo does not load .env files into your task's runtime, leaving them to be handled by your framework, or tools like dotenv.\"*\n\nSo we need to handle loading the `.env` file ourselves. Here are the options:\n\n**Option 1: Use Bun's `--env-file` flag** (cleanest for monorepo)\nUpdate the dev script in `apps/use-ai-server-app/package.json` to load the root `.env`:\n```json\n\"dev\": \"bun --env-file=../../.env --watch src/index.ts\"\n```\n\n**Option 2: Create a symlink**\n```bash\nln -s ../../.env apps/use-ai-server-app/.env\n```\n\n**Option 3: Use dotenv package**\nInstall and use dotenv to explicitly load the root `.env` file in the server code.\n\nI recommend **Option 1** since it's explicit, doesn't require extra dependencies, and makes it clear where the env vars come from. The `turbo.json` `env` array is still useful - it tells Turbo which variables affect the cache key, but it doesn't load them.\n\nWhich approach would you prefer?",
+          "timestamp": "2025-11-21T12:08:50.591Z"
+        },
+        {
+          "type": "user",
+          "text": "use symlinks\nadd a postinstall script in the repo root that will setup:\n- create an .env file if one doesnt exist (copy .env.example)\n- symlink it into all the apps in 'apps/'",
+          "timestamp": "2025-11-21T12:10:31.332Z"
+        },
+        {
+          "type": "assistant",
+          "text": "I'll create a postinstall script that sets up the `.env` file and symlinks. Let me first check if there's an `.env.example` file:",
+          "timestamp": "2025-11-21T12:10:37.114Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Glob",
+          "input": {
+            "pattern": ".env.example"
+          },
+          "timestamp": "2025-11-21T12:10:37.490Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Glob",
+          "input": {
+            "pattern": "apps/*"
+          },
+          "timestamp": "2025-11-21T12:10:37.783Z"
+        },
+        {
+          "type": "user",
+          "text": "No files found",
+          "timestamp": "2025-11-21T12:10:38.062Z"
+        },
+        {
+          "type": "user",
+          "text": "/home/z/Desktop/work/use-ai/.env.example",
+          "timestamp": "2025-11-21T12:10:38.098Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Bash",
+          "input": {
+            "command": "ls -d apps/*/",
+            "description": "List apps directories"
+          },
+          "timestamp": "2025-11-21T12:10:42.205Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/.env.example"
+          },
+          "timestamp": "2025-11-21T12:10:42.615Z"
+        },
+        {
+          "type": "user",
+          "text": "     1→# AI Provider (at least one required)\n     2→ANTHROPIC_API_KEY=sk-ant-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n     3→# ANTHROPIC_MODEL=claude-sonnet-4-20250514\n     4→# OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n     5→# OPENAI_MODEL=gpt-4-turbo\n     6→\n     7→# Dify Workflow Runner (optional)\n     8→DIFY_API_URL=http://localhost:3001/v1\n     9→\n    10→# Local MCP Server Configuration\n    11→MCP_ENDPOINT_LOCALDEV_URL=http://localhost:3002\n    12→MCP_ENDPOINT_LOCALDEV_NAMESPACE=mcp\n    13→\n    14→# Server Configuration (optional)\n    15→# PORT=8081\n    16→# LOG_FORMAT=pretty\n    17→\n    18→# Rate Limiting (optional)\n    19→# RATE_LIMIT_MAX_REQUESTS=0\n    20→# RATE_LIMIT_WINDOW_MS=60000\n    21→\n    22→# Langfuse Observability (optional)\n    23→# LANGFUSE_PUBLIC_KEY=pk-lf-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n    24→# LANGFUSE_SECRET_KEY=sk-lf-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n    25→# LANGFUSE_BASE_URL=https://cloud.langfuse.com\n    26→\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\n</system-reminder>\n",
+          "timestamp": "2025-11-21T12:10:42.798Z"
+        },
+        {
+          "type": "user",
+          "text": "apps/example-nest-mcp-server/\napps/example/\napps/use-ai-server-app/",
+          "timestamp": "2025-11-21T12:10:43.552Z"
+        },
+        {
+          "type": "assistant",
+          "text": "Now I'll create a postinstall script and add it to the root package.json:",
+          "timestamp": "2025-11-21T12:10:48.700Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Write",
+          "input": {
+            "content": "#!/usr/bin/env bash\nset -e\n\nROOT_DIR=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")/..\" && pwd)\"\nENV_FILE=\"$ROOT_DIR/.env\"\nENV_EXAMPLE=\"$ROOT_DIR/.env.example\"\n\n# Create .env from .env.example if it doesn't exist\nif [ ! -f \"$ENV_FILE\" ]; then\n  echo \"Creating .env from .env.example...\"\n  cp \"$ENV_EXAMPLE\" \"$ENV_FILE\"\n  echo \"✓ Created .env file\"\nelse\n  echo \"✓ .env file already exists\"\nfi\n\n# Create symlinks in all apps\necho \"Creating .env symlinks in apps...\"\nfor app_dir in \"$ROOT_DIR\"/apps/*/; do\n  if [ -d \"$app_dir\" ]; then\n    app_name=$(basename \"$app_dir\")\n    app_env=\"$app_dir/.env\"\n\n    # Remove existing symlink or file\n    if [ -L \"$app_env\" ]; then\n      rm \"$app_env\"\n    elif [ -f \"$app_env\" ]; then\n      echo \"Warning: $app_name/.env exists as a regular file. Skipping to avoid data loss.\"\n      echo \"         Remove it manually if you want to use the symlink.\"\n      continue\n    fi\n\n    # Create symlink (relative path)\n    ln -s \"../../.env\" \"$app_env\"\n    echo \"✓ Created symlink in $app_name\"\n  fi\ndone\n\necho \"✓ Environment setup complete\"\n",
+            "file_path": "/home/z/Desktop/work/use-ai/scripts/setup-env.sh"
+          },
+          "timestamp": "2025-11-21T12:10:54.602Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Bash",
+          "input": {
+            "command": "chmod +x /home/z/Desktop/work/use-ai/scripts/setup-env.sh",
+            "description": "Make setup script executable"
+          },
+          "timestamp": "2025-11-21T12:10:55.240Z"
+        }
+      ],
+      "total_additions": 40,
+      "total_deletions": 5,
+      "accepted_lines": 42,
+      "overriden_lines": 0
+    },
+    "d72aead": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "de4988fd-930a-4b4b-8134-fc535e467869",
+        "model": "claude-sonnet-4-5-20250929"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [
+        {
+          "type": "user",
+          "text": "it seems like when running the example app, we can no longer use the remote MCP tools\nmake sure the example-nest-mcp-server is running before the use-ai-server",
+          "timestamp": "2025-11-21T11:57:24.644Z"
+        },
+        {
+          "type": "assistant",
+          "text": "I'll help you investigate the MCP tools issue and ensure the example-nest-mcp-server starts before the use-ai-server. Let me explore the codebase to understand the startup sequence and dependencies.",
+          "timestamp": "2025-11-21T11:57:31.450Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "TodoWrite",
+          "input": {
+            "todos": [
+              {
+                "activeForm": "Exploring codebase to understand MCP server integration",
+                "content": "Explore codebase to understand MCP server integration",
+                "status": "in_progress"
+              },
+              {
+                "activeForm": "Finding example-nest-mcp-server location and startup configuration",
+                "content": "Find example-nest-mcp-server location and startup configuration",
+                "status": "pending"
+              },
+              {
+                "activeForm": "Checking use-ai-server startup and MCP dependencies",
+                "content": "Check use-ai-server startup and MCP dependencies",
+                "status": "pending"
+              },
+              {
+                "activeForm": "Fixing startup order to ensure MCP server runs first",
+                "content": "Fix startup order to ensure MCP server runs first",
+                "status": "pending"
+              }
+            ]
+          },
+          "timestamp": "2025-11-21T11:57:34.474Z"
+        },
+        {
+          "type": "user",
+          "text": "Todos have been modified successfully. Ensure that you continue to use the todo list to track your progress. Please proceed with the current tasks if applicable",
+          "timestamp": "2025-11-21T11:57:34.675Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Grep",
+          "input": {
+            "output_mode": "files_with_matches",
+            "pattern": "example-nest-mcp-server"
+          },
+          "timestamp": "2025-11-21T11:57:38.757Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Grep",
+          "input": {
+            "-i": true,
+            "output_mode": "files_with_matches",
+            "pattern": "mcp.*server|MCP.*server"
+          },
+          "timestamp": "2025-11-21T11:57:39.631Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Glob",
+          "input": {
+            "pattern": "**/package.json"
+          },
+          "timestamp": "2025-11-21T11:57:40.057Z"
+        },
+        {
+          "type": "user",
+          "text": "Found 17 files\npackages/server/src/types.ts\nbun.lock\napps/use-ai-server-app/src/index.ts\napps/example/playwright.config.ts\nREADME.md\n.env.example\npublish.sh\napps/example-nest-mcp-server/package.json\napps/example-nest-mcp-server/src/app.module.ts\napps/example-nest-mcp-server/src/main.ts\napps/example-nest-mcp-server/src/tools.service.ts\napps/example/src/pages/RemoteMcpToolsPage.tsx\napps/example/test/remote-mcp-tools.e2e.test.ts\npackages/server/src/configuration.integration.test.ts\npackages/server/src/mcp.integration.test.ts\nREQUIREMENTS.md\napps/example-nest-mcp-server/README.md",
+          "timestamp": "2025-11-21T11:57:40.351Z"
+        },
+        {
+          "type": "user",
+          "text": "Found 4 files\nbun.lock\napps/example/playwright.config.ts\npublish.sh\napps/example-nest-mcp-server/package.json",
+          "timestamp": "2025-11-21T11:57:40.382Z"
+        },
+        {
+          "type": "user",
+          "text": "/home/z/Desktop/work/use-ai/node_modules/.bun/jsondiffpatch@0.6.0/node_modules/jsondiffpatch/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/@opentelemetry+api@1.9.0/node_modules/@opentelemetry/api/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/ai@4.3.19+5b569f185b41cfba/node_modules/ai/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/diff-match-patch@1.0.5/node_modules/diff-match-patch/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/@types+diff-match-patch@1.0.36/node_modules/@types/diff-match-patch/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/@ai-sdk+anthropic@1.2.12+27912429049419a2/node_modules/@ai-sdk/anthropic/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/nanoid@3.3.11/node_modules/nanoid/async/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/nanoid@3.3.11/node_modules/nanoid/non-secure/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/nanoid@3.3.11/node_modules/nanoid/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/nanoid@3.3.11/node_modules/nanoid/url-alphabet/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/secure-json-parse@2.7.0/node_modules/secure-json-parse/benchmarks/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/secure-json-parse@2.7.0/node_modules/secure-json-parse/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/json-schema@0.4.0/node_modules/json-schema/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/@ai-sdk+react@1.2.12+5b569f185b41cfba/node_modules/@ai-sdk/react/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/throttleit@2.1.0/node_modules/throttleit/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/@ai-sdk+provider-utils@2.2.8+27912429049419a2/node_modules/@ai-sdk/provider-utils/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/dequal@2.0.3/node_modules/dequal/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/swr@2.3.6+f4eacebf2041cd4f/node_modules/swr/_internal/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/swr@2.3.6+f4eacebf2041cd4f/node_modules/swr/immutable/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/swr@2.3.6+f4eacebf2041cd4f/node_modules/swr/infinite/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/swr@2.3.6+f4eacebf2041cd4f/node_modules/swr/mutation/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/swr@2.3.6+f4eacebf2041cd4f/node_modules/swr/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/swr@2.3.6+f4eacebf2041cd4f/node_modules/swr/subscription/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/@ai-sdk+provider@1.1.3/node_modules/@ai-sdk/provider/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/use-sync-external-store@1.6.0+f4eacebf2041cd4f/node_modules/use-sync-external-store/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/@ai-sdk+ui-utils@1.2.11+27912429049419a2/node_modules/@ai-sdk/ui-utils/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/zod-to-json-schema@3.24.6+5954958163efbb2a/node_modules/zod-to-json-schema/dist/cjs/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/zod-to-json-schema@3.24.6+27912429049419a2/node_modules/zod-to-json-schema/dist/cjs/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/zod-to-json-schema@3.24.6+5954958163efbb2a/node_modules/zod-to-json-schema/dist/esm/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/zod-to-json-schema@3.24.6+27912429049419a2/node_modules/zod-to-json-schema/dist/esm/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/zod-to-json-schema@3.24.6+5954958163efbb2a/node_modules/zod-to-json-schema/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/zod-to-json-schema@3.24.6+27912429049419a2/node_modules/zod-to-json-schema/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/zod@3.25.76/node_modules/zod/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/chalk@5.6.2/node_modules/chalk/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/qs@6.14.0/node_modules/qs/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/minimatch@9.0.5/node_modules/minimatch/dist/commonjs/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/minimatch@9.0.5/node_modules/minimatch/dist/esm/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/minimatch@9.0.5/node_modules/minimatch/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/turbo@2.6.1/node_modules/turbo/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/reflect-metadata@0.2.2/node_modules/reflect-metadata/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/@nestjs+config@4.0.2+a8c3609e14ae1638/node_modules/@nestjs/config/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/@types+body-parser@1.19.6/node_modules/@types/body-parser/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/tslib@2.8.1/node_modules/tslib/modules/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/tslib@2.8.1/node_modules/tslib/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/abort-controller@3.0.0/node_modules/abort-controller/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/buffer-from@1.1.2/node_modules/buffer-from/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/uid@2.0.2/node_modules/uid/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/protobufjs@7.5.4/node_modules/protobufjs/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/fast-safe-stringify@2.1.1/node_modules/fast-safe-stringify/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/@types+serve-static@1.15.10/node_modules/@types/serve-static/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/@types+qs@6.14.0/node_modules/@types/qs/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/iterare@1.2.1/node_modules/iterare/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/rxjs@7.8.2/node_modules/rxjs/ajax/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/rxjs@7.8.2/node_modules/rxjs/fetch/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/rxjs@7.8.2/node_modules/rxjs/operators/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/rxjs@7.8.2/node_modules/rxjs/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/rxjs@7.8.2/node_modules/rxjs/testing/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/rxjs@7.8.2/node_modules/rxjs/webSocket/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/undici-types@6.21.0/node_modules/undici-types/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/package-json-from-dist@1.0.1/node_modules/package-json-from-dist/dist/commonjs/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/package-json-from-dist@1.0.1/node_modules/package-json-from-dist/dist/esm/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/package-json-from-dist@1.0.1/node_modules/package-json-from-dist/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/minimist@1.2.8/node_modules/minimist/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/dotenv@16.4.7/node_modules/dotenv/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/uint8array-extras@1.5.0/node_modules/uint8array-extras/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/multer@2.0.2/node_modules/multer/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/uuid@11.1.0/node_modules/uuid/dist/cjs-browser/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/uuid@11.1.0/node_modules/uuid/dist/cjs/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/uuid@11.1.0/node_modules/uuid/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/semver@7.7.3/node_modules/semver/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/long@5.3.2/node_modules/long/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/long@5.3.2/node_modules/long/umd/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/token-types@6.1.1/node_modules/token-types/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/@js-sdsl+ordered-map@4.4.2/node_modules/@js-sdsl/ordered-map/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/@grpc+proto-loader@0.8.0/node_modules/@grpc/proto-loader/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/minipass@7.1.2/node_modules/minipass/dist/commonjs/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/minipass@7.1.2/node_modules/minipass/dist/esm/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/minipass@7.1.2/node_modules/minipass/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/jackspeak@3.4.3/node_modules/jackspeak/dist/commonjs/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/jackspeak@3.4.3/node_modules/jackspeak/dist/esm/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/jackspeak@3.4.3/node_modules/jackspeak/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/strtok3@10.3.4/node_modules/strtok3/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/cors@2.8.5/node_modules/cors/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/debug@4.4.3/node_modules/debug/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/event-target-shim@5.0.1/node_modules/event-target-shim/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/path-scurry@1.11.1/node_modules/path-scurry/dist/commonjs/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/path-scurry@1.11.1/node_modules/path-scurry/dist/esm/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/path-scurry@1.11.1/node_modules/path-scurry/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/@lukeed+csprng@1.1.0/node_modules/@lukeed/csprng/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/lodash@4.17.21/node_modules/lodash/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/@protobufjs+eventemitter@1.1.0/node_modules/@protobufjs/eventemitter/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/@protobufjs+utf8@1.1.0/node_modules/@protobufjs/utf8/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/@protobufjs+codegen@2.0.4/node_modules/@protobufjs/codegen/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/@protobufjs+path@1.1.2/node_modules/@protobufjs/path/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/source-map-js@1.2.1/node_modules/source-map-js/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/events@3.3.0/node_modules/events/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/@protobufjs+float@1.0.2/node_modules/@protobufjs/float/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/@protobufjs+base64@1.1.2/node_modules/@protobufjs/base64/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/@protobufjs+pool@1.1.0/node_modules/@protobufjs/pool/package.json\n/home/z/Desktop/work/use-ai/node_modules/.bun/mime-types@2.1.35/node_modules/mime-types/package.json\n(Results are truncated. Consider using a more specific path or pattern.)",
+          "timestamp": "2025-11-21T11:57:40.432Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/package.json"
+          },
+          "timestamp": "2025-11-21T11:57:44.948Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/apps/example-nest-mcp-server/package.json"
+          },
+          "timestamp": "2025-11-21T11:57:45.473Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/apps/use-ai-server-app/package.json"
+          },
+          "timestamp": "2025-11-21T11:57:45.948Z"
+        },
+        {
+          "type": "user",
+          "text": "     1→{\n     2→  \"name\": \"use-ai-monorepo\",\n     3→  \"version\": \"0.1.0\",\n     4→  \"private\": true,\n     5→  \"packageManager\": \"bun@1.3.2\",\n     6→  \"workspaces\": [\n     7→    \"packages/*\",\n     8→    \"apps/*\"\n     9→  ],\n    10→  \"overrides\": {\n    11→    \"cpu-features\": \"npm:empty-module@^1.0.0\"\n    12→  },\n    13→  \"scripts\": {\n    14→    \"build\": \"turbo run build\",\n    15→    \"dev\": \"turbo run dev\",\n    16→    \"test\": \"turbo run test\",\n    17→    \"test:e2e\": \"turbo run test:e2e\",\n    18→    \"test:e2e:ui\": \"cd apps/example && bun run test:e2e:ui\",\n    19→    \"test:e2e:headed\": \"cd apps/example && bun run test:e2e:headed\",\n    20→    \"test:e2e:debug\": \"cd apps/example && bun run test:e2e:debug\",\n    21→    \"clean\": \"turbo run clean && rm -rf .cache/turbo\",\n    22→    \"kill\": \"(lsof -ti:3000 2>/dev/null | xargs -r kill; lsof -ti:3002 2>/dev/null | xargs -r kill; lsof -ti:8081 2>/dev/null | xargs -r kill) && echo 'Killed processes on ports 3000, 3002, 8081' || echo 'No processes to kill'\"\n    23→  },\n    24→  \"devDependencies\": {\n    25→    \"@types/bun\": \"latest\",\n    26→    \"turbo\": \"^2.6.1\",\n    27→    \"typescript\": \"^5.3.3\"\n    28→  }\n    29→}\n    30→\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\n</system-reminder>\n",
+          "timestamp": "2025-11-21T11:57:46.180Z"
+        },
+        {
+          "type": "user",
+          "text": "     1→{\n     2→  \"name\": \"example-nest-mcp-server\",\n     3→  \"version\": \"0.1.0\",\n     4→  \"private\": true,\n     5→  \"type\": \"module\",\n     6→  \"scripts\": {\n     7→    \"clean\": \"rm -rf dist\",\n     8→    \"dev\": \"bun --watch src/main.ts\",\n     9→    \"start\": \"bun src/main.ts\",\n    10→    \"build\": \"tsc\"\n    11→  },\n    12→  \"dependencies\": {\n    13→    \"@modelcontextprotocol/sdk\": \"^1.0.4\",\n    14→    \"@nestjs/common\": \"^11.0.0\",\n    15→    \"@nestjs/core\": \"^11.0.0\",\n    16→    \"@nestjs/platform-express\": \"^11.0.0\",\n    17→    \"@rekog/mcp-nest\": \"^1.8.4\",\n    18→    \"express\": \"^5.1.0\",\n    19→    \"reflect-metadata\": \"^0.2.2\",\n    20→    \"rxjs\": \"^7.8.1\",\n    21→    \"zod\": \"^3.24.1\"\n    22→  },\n    23→  \"devDependencies\": {\n    24→    \"@types/bun\": \"latest\",\n    25→    \"@types/express\": \"^5.0.5\",\n    26→    \"@types/node\": \"^22.10.2\",\n    27→    \"typescript\": \"^5.3.3\"\n    28→  }\n    29→}\n    30→\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\n</system-reminder>\n",
+          "timestamp": "2025-11-21T11:57:46.187Z"
+        },
+        {
+          "type": "user",
+          "text": "     1→{\n     2→  \"name\": \"@meetsmore/use-ai-server-app\",\n     3→  \"version\": \"0.1.0\",\n     4→  \"private\": true,\n     5→  \"type\": \"module\",\n     6→  \"scripts\": {\n     7→    \"clean\": \"rm -rf dist *.tsbuildinfo\",\n     8→    \"build\": \"bun build src/index.ts --outdir dist --target node --format esm\",\n     9→    \"start\": \"bun src/index.ts\",\n    10→    \"dev\": \"bun --watch src/index.ts\"\n    11→  },\n    12→  \"dependencies\": {\n    13→    \"@ai-sdk/anthropic\": \"^1.0.6\",\n    14→    \"@ai-sdk/openai\": \"1\",\n    15→    \"@meetsmore/use-ai-server\": \"workspace:*\",\n    16→    \"@meetsmore/use-ai-plugin-workflows\": \"workspace:*\"\n    17→  },\n    18→  \"devDependencies\": {\n    19→    \"@types/bun\": \"latest\",\n    20→    \"typescript\": \"^5.3.3\"\n    21→  }\n    22→}\n    23→\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\n</system-reminder>\n",
+          "timestamp": "2025-11-21T11:57:46.192Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/apps/use-ai-server-app/src/index.ts"
+          },
+          "timestamp": "2025-11-21T11:57:50.418Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/.env.example"
+          },
+          "timestamp": "2025-11-21T11:57:50.965Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/apps/example/playwright.config.ts"
+          },
+          "timestamp": "2025-11-21T11:57:51.466Z"
+        },
+        {
+          "type": "user",
+          "text": "     1→#!/usr/bin/env bun\n     2→import { UseAIServer, AISDKAgent, logger } from '@meetsmore/use-ai-server';\n     3→import type { Agent, McpEndpointConfig } from '@meetsmore/use-ai-server';\n     4→import { createAnthropic } from '@ai-sdk/anthropic';\n     5→import { createOpenAI } from '@ai-sdk/openai';\n     6→import { WorkflowsPlugin, DifyWorkflowRunner } from '@meetsmore/use-ai-plugin-workflows';\n     7→import type { WorkflowRunner } from '@meetsmore/use-ai-plugin-workflows';\n     8→\n     9→const port = Number(process.env.PORT) || 8081;\n    10→const rateLimitMaxRequests = Number(process.env.RATE_LIMIT_MAX_REQUESTS) || 0;\n    11→const rateLimitWindowMs = Number(process.env.RATE_LIMIT_WINDOW_MS) || 60000;\n    12→const logFormat = process.env.LOG_FORMAT || 'pretty';\n    13→\n    14→/**\n    15→ * Create agents based on available API keys.\n    16→ * Returns a map of agent names to agent instances.\n    17→ */\n    18→function createAgents(): { agents: Record<string, Agent>; defaultAgent: string } {\n    19→  const agents: Record<string, Agent> = {};\n    20→  const enabledAgents: string[] = [];\n    21→\n    22→  // Check for Anthropic API key\n    23→  const anthropicApiKey = process.env.ANTHROPIC_API_KEY;\n    24→  if (anthropicApiKey) {\n    25→    const model = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-20250514';\n    26→    const anthropic = createAnthropic({ apiKey: anthropicApiKey });\n    27→    agents.claude = new AISDKAgent({ model: anthropic(model) });\n    28→    enabledAgents.push(`claude (${model})`);\n    29→  }\n    30→\n    31→  // Check for OpenAI API key\n    32→  const openaiApiKey = process.env.OPENAI_API_KEY;\n    33→  if (openaiApiKey) {\n    34→    const model = process.env.OPENAI_MODEL || 'gpt-4-turbo';\n    35→    const openai = createOpenAI({ apiKey: openaiApiKey });\n    36→    agents.gpt = new AISDKAgent({ model: openai(model) });\n    37→    enabledAgents.push(`gpt (${model})`);\n    38→  }\n    39→\n    40→  // Require at least one agent\n    41→  if (Object.keys(agents).length === 0) {\n    42→    console.error('Error: At least one AI provider API key is required');\n    43→    console.error('Please set one of the following:');\n    44→    console.error('  - ANTHROPIC_API_KEY (for Claude)');\n    45→    console.error('  - OPENAI_API_KEY (for GPT)');\n    46→    process.exit(1);\n    47→  }\n    48→\n    49→  // Default to Claude if available, otherwise use the first available agent\n    50→  const defaultAgent = agents.claude ? 'claude' : Object.keys(agents)[0];\n    51→\n    52→  if (logFormat === 'pretty') {\n    53→    console.log(`✓ Enabled agents: ${enabledAgents.join(', ')}`);\n    54→    console.log(`  Default agent: ${defaultAgent}`);\n    55→  } else {\n    56→    logger.info('Agents configured', { enabledAgents, defaultAgent });\n    57→  }\n    58→\n    59→  return { agents, defaultAgent };\n    60→}\n    61→\n    62→/**\n    63→ * Create workflow runners based on available configuration.\n    64→ * Returns a map of runner names to runner instances.\n    65→ */\n    66→function createWorkflowRunners(): Map<string, WorkflowRunner> {\n    67→  const runners = new Map<string, WorkflowRunner>();\n    68→  const enabledRunners: string[] = [];\n    69→\n    70→  // Check for Dify configuration\n    71→  const difyUrl = process.env.DIFY_API_URL;\n    72→  if (difyUrl) {\n    73→    // Build workflows mapping from environment variables\n    74→    // Convention: DIFY_<WORKFLOW_NAME>_KEY maps to workflow name\n    75→    const workflows: Record<string, string> = {};\n    76→\n    77→    // Example: DIFY_GREETING_WORKFLOW_KEY -> 'greeting-workflow'\n    78→    // Example: DIFY_PDF_PROCESSOR_KEY -> 'pdf-processor'\n    79→    Object.keys(process.env).forEach((key) => {\n    80→      if (key.startsWith('DIFY_') && key.endsWith('_KEY')) {\n    81→        const workflowName = key\n    82→          .slice(5, -4) // Remove 'DIFY_' prefix and '_KEY' suffix\n    83→          .toLowerCase()\n    84→          .replace(/_/g, '-'); // Convert underscores to hyphens\n    85→        workflows[workflowName] = process.env[key]!;\n    86→      }\n    87→    });\n    88→\n    89→    runners.set(\n    90→      'dify',\n    91→      new DifyWorkflowRunner({\n    92→        apiBaseUrl: difyUrl,\n    93→        workflows,\n    94→      })\n    95→    );\n    96→\n    97→    const workflowNames = Object.keys(workflows).join(', ');\n    98→    enabledRunners.push(\n    99→      `dify (${difyUrl}${workflowNames ? `, workflows: ${workflowNames}` : ''})`\n   100→    );\n   101→  }\n   102→\n   103→  if (logFormat === 'pretty' && enabledRunners.length > 0) {\n   104→    console.log(`✓ Enabled workflow runners: ${enabledRunners.join(', ')}`);\n   105→  } else if (enabledRunners.length > 0) {\n   106→    logger.info('Workflow runners configured', { enabledRunners });\n   107→  }\n   108→\n   109→  return runners;\n   110→}\n   111→\n   112→/**\n   113→ * Create MCP endpoint configurations from environment variables.\n   114→ * Returns an array of MCP endpoint configs.\n   115→ */\n   116→function createMcpEndpoints(): McpEndpointConfig[] {\n   117→  const endpoints: McpEndpointConfig[] = [];\n   118→\n   119→  // Collect all MCP_ENDPOINT_*_URL environment variables\n   120→  Object.keys(process.env).forEach((key) => {\n   121→    if (key.startsWith('MCP_ENDPOINT_') && key.endsWith('_URL')) {\n   122→      const url = process.env[key];\n   123→      if (!url) return;\n   124→\n   125→      // Extract the name (e.g., 'MYNAME' from 'MCP_ENDPOINT_MYNAME_URL')\n   126→      const name = key.slice(13, -4); // Remove 'MCP_ENDPOINT_' prefix and '_URL' suffix\n   127→\n   128→      // Look for corresponding namespace and timeout\n   129→      const namespaceKey = `MCP_ENDPOINT_${name}_NAMESPACE`;\n   130→      const timeoutKey = `MCP_ENDPOINT_${name}_TIMEOUT`;\n   131→\n   132→      const namespace = process.env[namespaceKey] || name.toLowerCase().replace(/_/g, '-');\n   133→      const timeout = Number(process.env[timeoutKey]) || 30000;\n   134→\n   135→      endpoints.push({\n   136→        url,\n   137→        namespace,\n   138→        timeout,\n   139→      });\n   140→\n   141→      if (logFormat === 'pretty') {\n   142→        console.log(`✓ MCP endpoint configured: ${url} (namespace: ${namespace})`);\n   143→      } else {\n   144→        logger.info('MCP endpoint configured', { url, namespace, timeout });\n   145→      }\n   146→    }\n   147→  });\n   148→\n   149→  return endpoints;\n   150→}\n   151→\n   152→logger.info('Starting UseAI server', { logFormat });\n   153→\n   154→(async () => {\n   155→  try {\n   156→    // Create agents and workflow runners\n   157→    const { agents, defaultAgent } = createAgents();\n   158→    const workflowRunners = createWorkflowRunners();\n   159→    const mcpEndpoints = createMcpEndpoints();\n   160→\n   161→    // Build plugins array\n   162→    const plugins = [];\n   163→    if (workflowRunners.size > 0) {\n   164→      plugins.push(new WorkflowsPlugin({ runners: workflowRunners }));\n   165→    }\n   166→\n   167→    const server = new UseAIServer({\n   168→      port,\n   169→      agents,\n   170→      defaultAgent,\n   171→      rateLimitMaxRequests,\n   172→      rateLimitWindowMs,\n   173→      plugins: plugins.length > 0 ? plugins : undefined,\n   174→      mcpEndpoints: mcpEndpoints.length > 0 ? mcpEndpoints : undefined,\n   175→    });\n   176→\n   177→    // Initialize MCP endpoints\n   178→    if (mcpEndpoints.length > 0) {\n   179→      await server.initialize();\n   180→    }\n   181→\n   182→    // Server will log when it's actually listening via the callback in the constructor\n   183→    if (logFormat === 'pretty') {\n   184→      console.log(`✓ UseAI server is running on port ${port}`);\n   185→      console.log(`  WebSocket URL: ws://localhost:${port}`);\n   186→      console.log(`  Log format: ${logFormat} (set LOG_FORMAT=json for structured logs)`);\n   187→      console.log('  Press Ctrl+C to stop');\n   188→    }\n   189→  } catch (error) {\n   190→    logger.error('Failed to start server', {\n   191→      error: error instanceof Error ? error.message : 'Unknown error',\n   192→    });\n   193→    process.exit(1);\n   194→  }\n   195→})();\n   196→\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\n</system-reminder>\n",
+          "timestamp": "2025-11-21T11:57:51.695Z"
+        },
+        {
+          "type": "user",
+          "text": "     1→# AI Provider (at least one required)\n     2→ANTHROPIC_API_KEY=sk-ant-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n     3→# ANTHROPIC_MODEL=claude-sonnet-4-20250514\n     4→# OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n     5→# OPENAI_MODEL=gpt-4-turbo\n     6→\n     7→# Dify Workflow Runner (optional)\n     8→DIFY_API_URL=http://localhost:3001/v1\n     9→\n    10→# Local MCP Server Configuration\n    11→MCP_ENDPOINT_LOCALDEV_URL=http://localhost:3002\n    12→MCP_ENDPOINT_LOCALDEV_NAMESPACE=mcp\n    13→\n    14→# Server Configuration (optional)\n    15→# PORT=8081\n    16→# LOG_FORMAT=pretty\n    17→\n    18→# Rate Limiting (optional)\n    19→# RATE_LIMIT_MAX_REQUESTS=0\n    20→# RATE_LIMIT_WINDOW_MS=60000\n    21→\n    22→# Langfuse Observability (optional)\n    23→# LANGFUSE_PUBLIC_KEY=pk-lf-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n    24→# LANGFUSE_SECRET_KEY=sk-lf-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n    25→# LANGFUSE_BASE_URL=https://cloud.langfuse.com\n    26→\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\n</system-reminder>\n",
+          "timestamp": "2025-11-21T11:57:51.701Z"
+        },
+        {
+          "type": "user",
+          "text": "     1→import { defineConfig, devices } from '@playwright/test';\n     2→\n     3→// Ensure ANTHROPIC_API_KEY is set before running tests\n     4→if (!process.env.ANTHROPIC_API_KEY) {\n     5→  throw new Error(\n     6→    'ANTHROPIC_API_KEY environment variable is required to run E2E tests.\\n' +\n     7→    'Set it with: export ANTHROPIC_API_KEY=your_key_here'\n     8→  );\n     9→}\n    10→\n    11→export default defineConfig({\n    12→  testDir: './test',\n    13→  fullyParallel: false,\n    14→  forbidOnly: !!process.env.CI,\n    15→  retries: process.env.CI ? 2 : 0,\n    16→  workers: 1,\n    17→  reporter: [['html', { open: 'never' }]],\n    18→  use: {\n    19→    baseURL: 'http://localhost:3000',\n    20→    trace: 'on-first-retry',\n    21→    video: 'retain-on-failure',\n    22→  },\n    23→\n    24→  projects: [\n    25→    {\n    26→      name: 'chromium',\n    27→      use: { ...devices['Desktop Chrome'] },\n    28→    },\n    29→  ],\n    30→\n    31→  webServer: [\n    32→    {\n    33→      command: 'cd ../../apps/example-nest-mcp-server && MCP_PORT=3002 bun start',\n    34→      url: 'http://localhost:3002/health',\n    35→      reuseExistingServer: !process.env.CI,\n    36→      timeout: 30000,\n    37→      stdout: 'pipe',\n    38→      stderr: 'pipe',\n    39→    },\n    40→    {\n    41→      command: 'cd ../../apps/use-ai-server-app && bun run start',\n    42→      url: 'http://localhost:8081/health',\n    43→      reuseExistingServer: !process.env.CI,\n    44→      timeout: 30000,\n    45→      stdout: 'pipe',\n    46→      stderr: 'pipe',\n    47→      env: {\n    48→        ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY!,\n    49→        MCP_ENDPOINT_URL: 'http://localhost:3002',\n    50→        MCP_NAMESPACE: 'mcp',\n    51→      },\n    52→    },\n    53→    {\n    54→      command: 'bun run dev',\n    55→      url: 'http://localhost:3000',\n    56→      reuseExistingServer: !process.env.CI,\n    57→      timeout: 30000,\n    58→      stdout: 'pipe',\n    59→      stderr: 'pipe',\n    60→    },\n    61→  ],\n    62→});\n    63→\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\n</system-reminder>\n",
+          "timestamp": "2025-11-21T11:57:51.706Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "TodoWrite",
+          "input": {
+            "todos": [
+              {
+                "activeForm": "Exploring codebase to understand MCP server integration",
+                "content": "Explore codebase to understand MCP server integration",
+                "status": "completed"
+              },
+              {
+                "activeForm": "Finding example-nest-mcp-server location and startup configuration",
+                "content": "Find example-nest-mcp-server location and startup configuration",
+                "status": "completed"
+              },
+              {
+                "activeForm": "Checking use-ai-server startup and MCP dependencies",
+                "content": "Check use-ai-server startup and MCP dependencies",
+                "status": "in_progress"
+              },
+              {
+                "activeForm": "Fixing startup order to ensure MCP server runs first",
+                "content": "Fix startup order to ensure MCP server runs first",
+                "status": "pending"
+              }
+            ]
+          },
+          "timestamp": "2025-11-21T11:58:04.620Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Bash",
+          "input": {
+            "command": "test -f /home/z/Desktop/work/use-ai/.env && cat /home/z/Desktop/work/use-ai/.env || echo \"No .env file found\"",
+            "description": "Check if .env file exists and show contents"
+          },
+          "timestamp": "2025-11-21T11:58:06.042Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/apps/example/package.json"
+          },
+          "timestamp": "2025-11-21T11:58:06.664Z"
+        },
+        {
+          "type": "user",
+          "text": "Todos have been modified successfully. Ensure that you continue to use the todo list to track your progress. Please proceed with the current tasks if applicable",
+          "timestamp": "2025-11-21T11:58:06.881Z"
+        },
+        {
+          "type": "user",
+          "text": "ANTHROPIC_API_KEY=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\nDIFY_API_URL=http://localhost:3001/v1\nDIFY_GREETING_WORKFLOW_KEY=app-eKhXT7fgTdslsgROh1dcYCUR\n\n# Local MCP Server Configuration\nMCP_ENDPOINT_LOCALDEV_URL=http://localhost:3002\nMCP_ENDPOINT_LOCALDEV_NAMESPACE=mcp",
+          "timestamp": "2025-11-21T11:58:07.703Z"
+        },
+        {
+          "type": "user",
+          "text": "     1→{\n     2→  \"name\": \"example\",\n     3→  \"version\": \"0.1.0\",\n     4→  \"private\": true,\n     5→  \"type\": \"module\",\n     6→  \"scripts\": {\n     7→    \"clean\": \"rm -rf dist\",\n     8→    \"dev\": \"bun --watch server.ts\",\n     9→    \"build\": \"bun build ./src/index.tsx --outdir ./dist --target browser --minify\",\n    10→    \"preview\": \"bun server.ts\",\n    11→    \"test:e2e\": \"playwright test\",\n    12→    \"test:e2e:ui\": \"playwright test --ui\",\n    13→    \"test:e2e:headed\": \"playwright test --headed\",\n    14→    \"test:e2e:debug\": \"playwright test --debug\"\n    15→  },\n    16→  \"dependencies\": {\n    17→    \"@meetsmore/use-ai-client\": \"workspace:*\",\n    18→    \"react\": \"^18.2.0\",\n    19→    \"react-dom\": \"^18.2.0\",\n    20→    \"zod\": \"^4.1.12\"\n    21→  },\n    22→  \"devDependencies\": {\n    23→    \"@playwright/test\": \"^1.56.1\",\n    24→    \"@types/bun\": \"latest\",\n    25→    \"@types/react\": \"^18.2.0\",\n    26→    \"@types/react-dom\": \"^18.2.0\",\n    27→    \"playwright\": \"^1.56.1\",\n    28→    \"typescript\": \"^5.3.3\"\n    29→  }\n    30→}\n    31→\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\n</system-reminder>\n",
+          "timestamp": "2025-11-21T11:58:07.790Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/apps/example-nest-mcp-server/src/main.ts"
+          },
+          "timestamp": "2025-11-21T11:58:15.264Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Grep",
+          "input": {
+            "-n": true,
+            "glob": "package.json",
+            "output_mode": "content",
+            "pattern": "start:server|dev:server|MCP.*3002"
+          },
+          "timestamp": "2025-11-21T11:58:16.850Z"
+        },
+        {
+          "type": "user",
+          "text": "     1→#!/usr/bin/env bun\n     2→import 'reflect-metadata';\n     3→import { NestFactory } from '@nestjs/core';\n     4→import { AppModule } from './app.module';\n     5→\n     6→async function bootstrap() {\n     7→  const app = await NestFactory.create(AppModule, {\n     8→    logger: ['error', 'warn', 'log'],\n     9→  });\n    10→\n    11→  // Enable CORS for development\n    12→  app.enableCors({\n    13→    origin: '*',\n    14→    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',\n    15→  });\n    16→\n    17→  const port = Number(process.env.MCP_PORT) || 3002;\n    18→  await app.listen(port);\n    19→\n    20→  console.log(`MCP server is running on http://localhost:${port}`);\n    21→  console.log(`MCP JSON-RPC endpoint: http://localhost:${port}/mcp`);\n    22→  console.log(`SSE endpoint: http://localhost:${port}/sse`);\n    23→}\n    24→\n    25→bootstrap();\n    26→\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\n</system-reminder>\n",
+          "timestamp": "2025-11-21T11:58:17.090Z"
+        },
+        {
+          "type": "user",
+          "text": "No matches found",
+          "timestamp": "2025-11-21T11:58:17.146Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/README.md",
+            "limit": 100
+          },
+          "timestamp": "2025-11-21T11:58:23.208Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/apps/example-nest-mcp-server/README.md"
+          },
+          "timestamp": "2025-11-21T11:58:23.560Z"
+        },
+        {
+          "type": "user",
+          "text": "     1→# @use-ai\n     2→\n     3→A React client/framework for easily enabling AI to control your users frontend.\n     4→\n     5→![preview video](assets/use-ai-demo.mp4)\n     6→\n     7→## Table of Contents\n     8→\n     9→- [Overview](#overview)\n    10→- [Quick Start](#quick-start)\n    11→- [Example](#example)\n    12→- [How it works](#how-it-works)\n    13→- [Why?](#why)\n    14→- [📦 Structure](#-structure)\n    15→- [Features](#features)\n    16→  - [General](#general)\n    17→    - [AG-UI Protocol](#ag-ui-protocol)\n    18→  - [Client](#client)\n    19→    - [`useAI` hook](#useai-hook)\n    20→    - [`UseAIProvider`](#useaiprovider)\n    21→    - [Component State via `prompt`](#component-state-via-prompt)\n    22→    - [Returning results of a tool to the AI](#returning-results-of-a-tool-to-the-ai)\n    23→    - [Tool Definition with Zod safety](#tool-definition-with-zod-safety)\n    24→    - [MultiTool Use](#multitool-use)\n    25→    - [Multiple Components of the same type](#multiple-components-of-the-same-type)\n    26→    - [Invisible (`Provider`) components](#invisible-provider-components)\n    27→    - [Suggestions](#suggestions)\n    28→    - [`confirmationRequired`](#confirmationrequired)\n    29→    - [Chat History](#chat-history)\n    30→    - [Error Code Mapping](#error-code-mapping)\n    31→    - [Using the AI directly (without chat UI)](#using-the-ai-directly-without-chat-ui)\n    32→    - [Custom UI](#custom-ui)\n    33→  - [Server](#server)\n    34→    - ['Batteries included' server](#batteries-included-server)\n    35→    - [`UseAIServer`](#useaiserver)\n    36→    - [External MCPs](#external-mcps)\n    37→    - [Rate Limiting](#rate-limiting)\n    38→    - [Langfuse](#langfuse)\n    39→  - [Plugins](#plugins)\n    40→    - [`@meetsmore/use-ai-plugin-workflows`](#use-aiplugin-workflows)\n    41→\n    42→## Overview\n    43→\n    44→**TodoList.tsx**\n    45→```typescript\n    46→export default function TodoList() {\n    47→  const { todos, addTodo, deleteTodo, toggleTodo } = useTodoLogic();\n    48→\n    49→  const { ref } = useAI({\n    50→    tools: { addTodo, deleteTodo, toggleTodo },\n    51→    prompt: `Todo List: ${JSON.stringify(todos)}`,\n    52→  });\n    53→}\n    54→```\n    55→\n    56→**index.tsx**\n    57→```typescript\n    58→root.render(\n    59→  <UseAIProvider serverUrl=\"ws://localhost:8081\">\n    60→    <App />\n    61→  </UseAIProvider>\n    62→);\n    63→```\n    64→\n    65→1. Components call `useAI` to declare their tools and state (`prompt`) to `use-ai`.\n    66→2. `UseAIProvider` provides a floating-action-button chat UI and aggregates `useAI` tools + prompts from all child components.\n    67→3. `@meetsmore/use-ai-server` acts as a co-ordinator between your frontend and an LLM.\n    68→4. ✨ The LLM can now call your `tools` functions in the frontend as MCPs.\n    69→\n    70→## Quick Start\n    71→\n    72→Define your component, and call `useAI` with some tools.\n    73→\n    74→```typescript\n    75→function MyTextbox() {\n    76→  const [text, setText] = useState()\n    77→\n    78→  useAI({\n    79→    tools: {\n    80→      setText: defineTool(\n    81→        'Set the text of the textbox.',             // description of the tool\n    82→        z.object({                                  // zod schema for declaring inputs\n    83→          text: z.string().describe('The new text')\n    84→        }),\n    85→        (input) => {                                // the tool callback to run\n    86→          setText(input)                            // <-- your function\n    87→          return { success: true }                  // result to send back to the LLM\n    88→        }\n    89→      )\n    90→    },\n    91→    prompt: `The textbox text is ${text}`           // The state of the component in text form, for the LLM. \n    92→  })\n    93→\n    94→  return (\n    95→    <p>{{text}}</p>\n    96→  )\n    97→}\n    98→\n    99→export default function App() {\n   100→  return (\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\n</system-reminder>\n",
+          "timestamp": "2025-11-21T11:58:23.732Z"
+        },
+        {
+          "type": "user",
+          "text": "     1→# NestJS MCP Server with MCP-Nest\n     2→\n     3→A NestJS-based MCP (Model Context Protocol) server built using **[MCP-Nest](https://github.com/rekog-labs/MCP-Nest)** that exposes tools for testing remote MCP tool integration with use-ai.\n     4→\n     5→## Overview\n     6→\n     7→This server uses **MCP-Nest decorators** (`@Tool`) to define tools in a type-safe, declarative way. It exposes the native MCP protocol over HTTP:\n     8→\n     9→### MCP Protocol Endpoints (JSON-RPC)\n    10→- `POST /mcp` - MCP JSON-RPC endpoint (supports `tools/list`, `tools/call`)\n    11→- `GET /sse` - Server-Sent Events for streaming\n    12→- `GET /mcp` - Session management (GET)\n    13→- `DELETE /mcp` - Session cleanup (DELETE)\n    14→- `POST /messages` - Message handling\n    15→\n    16→## Available Tools\n    17→\n    18→All tools are defined using MCP-Nest's `@Tool` decorator with Zod schemas:\n    19→\n    20→1. **add** - Add two numbers together\n    21→2. **multiply** - Multiply two numbers\n    22→3. **greet** - Greet a person by name\n    23→4. **get_weather** - Get mock weather data for a location\n    24→\n    25→## Usage\n    26→\n    27→### Development\n    28→```bash\n    29→bun run dev\n    30→```\n    31→\n    32→### Production\n    33→```bash\n    34→bun run start\n    35→```\n    36→\n    37→The server runs on port 3002 by default (configurable via `MCP_PORT` environment variable).\n    38→\n    39→## MCP-Nest Integration\n    40→\n    41→Tools are defined using the `@Tool` decorator:\n    42→\n    43→```typescript\n    44→@Tool({\n    45→  name: 'add',\n    46→  description: 'Add two numbers together',\n    47→  parameters: z.object({\n    48→    a: z.number().describe('The first number'),\n    49→    b: z.number().describe('The second number'),\n    50→  }),\n    51→})\n    52→async add({ a, b }: { a: number; b: number }) {\n    53→  return {\n    54→    content: [{ type: 'text', text: JSON.stringify({ result: a + b }) }],\n    55→  };\n    56→}\n    57→```\n    58→\n    59→The `McpModule` is configured with stateless HTTP transport:\n    60→\n    61→```typescript\n    62→McpModule.forRoot({\n    63→  name: 'test-mcp-server',\n    64→  version: '1.0.0',\n    65→  streamableHttp: {\n    66→    enableJsonResponse: true,\n    67→    statelessMode: true,\n    68→  },\n    69→})\n    70→```\n    71→\n    72→## Integration with use-ai\n    73→\n    74→The server is configured in the use-ai example app's playwright config to:\n    75→1. Start automatically before running E2E tests\n    76→2. Provide remote tools to the UseAI server via the `MCP_ENDPOINT_URL` environment variable\n    77→3. Tools are namespaced with \"mcp_\" prefix (e.g., `mcp_add`, `mcp_multiply`)\n    78→\n    79→## Testing\n    80→\n    81→Remote MCP tools can be tested via:\n    82→1. The \"Remote MCP Tools\" page in the example app (http://localhost:3000/remote-mcp-tools)\n    83→2. E2E tests in `apps/example/test/remote-mcp-tools.e2e.test.ts`\n    84→3. Direct curl commands using MCP JSON-RPC:\n    85→   ```bash\n    86→   # List available tools\n    87→   curl -X POST http://localhost:3002/mcp \\\n    88→     -H \"Content-Type: application/json\" \\\n    89→     -H \"Accept: application/json, text/event-stream\" \\\n    90→     -d '{\"jsonrpc\":\"2.0\",\"method\":\"tools/list\",\"id\":1}'\n    91→\n    92→   # Call a tool\n    93→   curl -X POST http://localhost:3002/mcp \\\n    94→     -H \"Content-Type: application/json\" \\\n    95→     -H \"Accept: application/json, text/event-stream\" \\\n    96→     -d '{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"add\",\"arguments\":{\"a\":5,\"b\":3}},\"id\":2}'\n    97→   ```\n    98→\n    99→## Architecture\n   100→\n   101→- **ToolsService**: Contains tool implementations with `@Tool` decorators\n   102→- **McpModule**: Provides native MCP protocol support (JSON-RPC, SSE) via MCP-Nest\n   103→- **RemoteMcpToolsProvider**: UseAI server component that communicates with this server using MCP JSON-RPC\n   104→- Uses **NestJS 11** for dependency injection and modularity\n   105→- Uses **MCP-Nest 1.8.4** for complete MCP protocol implementation\n   106→\n   107→### Communication Flow\n   108→\n   109→1. UseAI server's `RemoteMcpToolsProvider` sends `tools/list` JSON-RPC request to `/mcp`\n   110→2. MCP-Nest discovers tools via `@Tool` decorators and returns tool schemas\n   111→3. When Claude calls a tool, `RemoteMcpToolsProvider` sends `tools/call` JSON-RPC request\n   112→4. MCP-Nest executes the decorated tool method and returns MCP-compliant response\n   113→5. Result is extracted and returned to Claude\n   114→\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\n</system-reminder>\n",
+          "timestamp": "2025-11-21T11:58:23.738Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "TodoWrite",
+          "input": {
+            "todos": [
+              {
+                "activeForm": "Exploring codebase to understand MCP server integration",
+                "content": "Explore codebase to understand MCP server integration",
+                "status": "completed"
+              },
+              {
+                "activeForm": "Finding example-nest-mcp-server location and startup configuration",
+                "content": "Find example-nest-mcp-server location and startup configuration",
+                "status": "completed"
+              },
+              {
+                "activeForm": "Checking use-ai-server startup and MCP dependencies",
+                "content": "Check use-ai-server startup and MCP dependencies",
+                "status": "completed"
+              },
+              {
+                "activeForm": "Fixing playwright config environment variables",
+                "content": "Fix playwright config environment variables",
+                "status": "in_progress"
+              },
+              {
+                "activeForm": "Creating/updating startup scripts for development",
+                "content": "Create/update startup scripts for development",
+                "status": "pending"
+              }
+            ]
+          },
+          "timestamp": "2025-11-21T11:58:32.185Z"
+        },
+        {
+          "type": "user",
+          "text": "Todos have been modified successfully. Ensure that you continue to use the todo list to track your progress. Please proceed with the current tasks if applicable",
+          "timestamp": "2025-11-21T11:58:32.323Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Edit",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/apps/example/playwright.config.ts",
+            "new_string": "      env: {\n        ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY!,\n        MCP_ENDPOINT_LOCALDEV_URL: 'http://localhost:3002',\n        MCP_ENDPOINT_LOCALDEV_NAMESPACE: 'mcp',\n      },",
+            "old_string": "      env: {\n        ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY!,\n        MCP_ENDPOINT_URL: 'http://localhost:3002',\n        MCP_NAMESPACE: 'mcp',\n      },"
+          },
+          "timestamp": "2025-11-21T11:58:39.158Z"
+        }
+      ],
+      "total_additions": 44,
+      "total_deletions": 32,
+      "accepted_lines": 31,
+      "overriden_lines": 0
+    }
+  }
+}
