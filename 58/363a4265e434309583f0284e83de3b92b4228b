@@ -1,0 +1,131 @@
+packages/server/src/types.ts
+  1ca3f54 6
+packages/server/src/mcp.integration.test.ts
+  human 23,64,74,89
+packages/server/src/mcp/RemoteMcpToolsProvider.ts
+  1ca3f54 117,119,126,212,252
+packages/server/src/configuration.integration.test.ts
+  human 77
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "development:1.0.22",
+  "base_commit_sha": "58363a4265e434309583f0284e83de3b92b4228b",
+  "prompts": {
+    "1ca3f54": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cd189437-bbfa-4379-a36c-39cd06d8ee4c",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [
+        {
+          "type": "user",
+          "text": "MCP endpoint should not require /mcp suffix (any endpoint should be allowed)\n\ncurrently we define the root, and the code appends the mcp suffix\ndont do any logic to change the url, and let users pass in whatever they want",
+          "timestamp": "2025-11-26T15:04:19.274Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Grep",
+          "input": {
+            "-n": true,
+            "output_mode": "content",
+            "pattern": "/mcp"
+          },
+          "timestamp": "2025-11-26T15:04:29.622Z"
+        },
+        {
+          "type": "user",
+          "text": "bun.lock:39:        \"@rekog/mcp-nest\": \"^1.8.4\",\nbun.lock:348:[Omitted long matching line]\nbun.lock:1342:    \"@rekog/mcp-nest/zod\": [\"zod@3.25.76\", \"\", {}, \"sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==\"],\nREADME.md:569:      url: 'http://my-app.com/mcp',\napps/example-nest-mcp-server/README.md:10:- `POST /mcp` - MCP JSON-RPC endpoint (supports `tools/list`, `tools/call`)\napps/example-nest-mcp-server/README.md:12:- `GET /mcp` - Session management (GET)\napps/example-nest-mcp-server/README.md:13:- `DELETE /mcp` - Session cleanup (DELETE)\napps/example-nest-mcp-server/README.md:87:   curl -X POST http://localhost:3002/mcp \\\napps/example-nest-mcp-server/README.md:93:   curl -X POST http://localhost:3002/mcp \\\napps/example-nest-mcp-server/README.md:109:1. UseAI server's `RemoteMcpToolsProvider` sends `tools/list` JSON-RPC request to `/mcp`\napps/example-nest-mcp-server/package.json:17:    \"@rekog/mcp-nest\": \"^1.8.4\",\napps/example-nest-mcp-server/src/app.module.ts:2:import { McpModule } from '@rekog/mcp-nest';\napps/example-nest-mcp-server/src/main.ts:21:  console.log(`MCP JSON-RPC endpoint: http://localhost:${port}/mcp`);\napps/example-nest-mcp-server/src/tools.service.ts:3:import { Tool } from '@rekog/mcp-nest';\npackages/server/src/types.ts:6:  /** The HTTP URL of the MCP endpoint (e.g., 'http://backend.com/mcp') */\npackages/server/src/agents/AISDKAgent.ts:7:import type { RemoteToolDefinition } from '../mcp';\npackages/server/src/mcp/RemoteMcpToolsProvider.ts:112:    const url = `${this.url}/mcp`;\npackages/server/src/mcp/RemoteMcpToolsProvider.ts:211:    const url = `${this.url}/mcp`;\npackages/server/src/server.ts:23:import { RemoteMcpToolsProvider, type RemoteToolDefinition } from './mcp';",
+          "timestamp": "2025-11-26T15:04:29.952Z"
+        },
+        {
+          "type": "assistant",
+          "text": "Found the issue. Let me read the `RemoteMcpToolsProvider.ts` file to see the full context:",
+          "timestamp": "2025-11-26T15:04:34.350Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/packages/server/src/mcp/RemoteMcpToolsProvider.ts"
+          },
+          "timestamp": "2025-11-26T15:04:35.012Z"
+        },
+        {
+          "type": "user",
+          "text": "     1→import type { ToolDefinition, McpHeadersMap } from '@meetsmore/use-ai-core';\n     2→import type { McpEndpointConfig } from '../types';\n     3→import { logger } from '../logger';\n     4→import { findMatch } from '../utils/patternMatcher';\n     5→\n     6→/**\n     7→ * Schema format returned by MCP endpoints.\n     8→ * Based on Model Context Protocol specification.\n     9→ */\n    10→interface McpToolSchema {\n    11→  name: string;\n    12→  description: string;\n    13→  inputSchema: {\n    14→    type: 'object';\n    15→    properties: Record<string, unknown>;\n    16→    required?: string[];\n    17→    [key: string]: unknown;\n    18→  };\n    19→}\n    20→\n    21→interface McpSchemaResponse {\n    22→  tools: McpToolSchema[];\n    23→}\n    24→\n    25→/**\n    26→ * Server-only extension of ToolDefinition with remote execution metadata.\n    27→ * This type is used internally by the server and never exposed to the client.\n    28→ * The actual execute function is created in AISDKAgent where EventEmitter is available.\n    29→ */\n    30→export interface RemoteToolDefinition extends ToolDefinition {\n    31→  /** Remote execution metadata for MCP tools */\n    32→  _remote: {\n    33→    /** The provider that manages this tool */\n    34→    provider: RemoteMcpToolsProvider;\n    35→    /** The original tool name (before namespace prefix) */\n    36→    originalName: string;\n    37→  };\n    38→}\n    39→\n    40→/**\n    41→ * Manages fetching and executing tools from a single MCP endpoint.\n    42→ * Each instance handles one endpoint independently, allowing for separate failure handling.\n    43→ */\n    44→export class RemoteMcpToolsProvider {\n    45→  private tools: RemoteToolDefinition[] = [];\n    46→  private refreshTimer?: NodeJS.Timeout;\n    47→  private readonly url: string;\n    48→  private readonly config: McpEndpointConfig;\n    49→\n    50→  constructor(config: McpEndpointConfig) {\n    51→    this.config = config;\n    52→    this.url = config.url;\n    53→  }\n    54→\n    55→  /**\n    56→   * Initializes by fetching tools from the endpoint.\n    57→   * Should be called once during server startup.\n    58→   * Retries up to 3 times with delays to handle race conditions.\n    59→   */\n    60→  async initialize(): Promise<void> {\n    61→    logger.info(`[MCP] Initializing endpoint: ${this.url}`);\n    62→\n    63→    const maxRetries = 3;\n    64→    const retryDelayMs = 1000;\n    65→\n    66→    for (let attempt = 1; attempt <= maxRetries; attempt++) {\n    67→      try {\n    68→        await this.fetchAndRegister();\n    69→        logger.info(`[MCP] Successfully initialized endpoint: ${this.url}`);\n    70→        return;\n    71→      } catch (error) {\n    72→        const message = error instanceof Error ? error.message : String(error);\n    73→\n    74→        if (attempt < maxRetries) {\n    75→          logger.warn(`[MCP] Failed to initialize endpoint ${this.url} (attempt ${attempt}/${maxRetries}): ${message}. Retrying in ${retryDelayMs}ms...`);\n    76→          await new Promise(resolve => setTimeout(resolve, retryDelayMs));\n    77→        } else {\n    78→          logger.error(`[MCP] Failed to initialize endpoint ${this.url} after ${maxRetries} attempts: ${message}`);\n    79→          throw error;\n    80→        }\n    81→      }\n    82→    }\n    83→  }\n    84→\n    85→  /**\n    86→   * Fetches tools from the endpoint and registers them.\n    87→   * Sets up periodic refresh if configured.\n    88→   */\n    89→  private async fetchAndRegister(): Promise<void> {\n    90→    const schema = await this.fetchSchema();\n    91→    this.tools = this.convertToToolDefinitions(schema);\n    92→\n    93→    logger.info(`[MCP] Registered ${this.tools.length} tool(s) from ${this.url}`);\n    94→\n    95→    // Set up periodic refresh if configured\n    96→    if (this.config.refreshInterval && this.config.refreshInterval > 0 && !this.refreshTimer) {\n    97→      this.refreshTimer = setInterval(() => {\n    98→        logger.debug(`[MCP] Refreshing tools from ${this.url}`);\n    99→        this.fetchAndRegister().catch((err) => {\n   100→          logger.error(`[MCP] Failed to refresh tools from ${this.url}:`, err);\n   101→        });\n   102→      }, this.config.refreshInterval);\n   103→\n   104→      logger.debug(`[MCP] Set up refresh timer for ${this.url} (${this.config.refreshInterval}ms)`);\n   105→    }\n   106→  }\n   107→\n   108→  /**\n   109→   * Fetches the tool schema from the MCP endpoint using JSON-RPC.\n   110→   */\n   111→  private async fetchSchema(): Promise<McpSchemaResponse> {\n   112→    const url = `${this.url}/mcp`;\n   113→    const timeout = this.config.timeout || 30000;\n   114→\n   115→    const hasConfigHeaders = this.config.headers && Object.keys(this.config.headers).length > 0;\n   116→    if (hasConfigHeaders) {\n   117→      const headerStr = this.formatHeaders(this.config.headers!);\n   118→      logger.debug(`[MCP] Fetching schema from ${url} (with configured headers: ${headerStr})`);\n   119→    } else {\n   120→      logger.debug(`[MCP] Fetching schema from ${url}`);\n   121→    }\n   122→\n   123→    const controller = new AbortController();\n   124→    const timeoutId = setTimeout(() => controller.abort(), timeout);\n   125→\n   126→    try {\n   127→      const response = await fetch(url, {\n   128→        method: 'POST',\n   129→        headers: {\n   130→          'Content-Type': 'application/json',\n   131→          'Accept': 'application/json, text/event-stream',\n   132→          ...this.config.headers,\n   133→        },\n   134→        body: JSON.stringify({\n   135→          jsonrpc: '2.0',\n   136→          method: 'tools/list',\n   137→          id: 1,\n   138→        }),\n   139→        signal: controller.signal,\n   140→      });\n   141→\n   142→      clearTimeout(timeoutId);\n   143→\n   144→      if (!response.ok) {\n   145→        throw new Error(`HTTP ${response.status}: ${response.statusText}`);\n   146→      }\n   147→\n   148→      const rpcResponse = (await response.json()) as any;\n   149→\n   150→      if (rpcResponse.error) {\n   151→        throw new Error(`MCP error: ${rpcResponse.error.message}`);\n   152→      }\n   153→\n   154→      const tools = rpcResponse.result?.tools || [];\n   155→\n   156→      return { tools };\n   157→    } catch (error) {\n   158→      clearTimeout(timeoutId);\n   159→\n   160→      if (error instanceof Error && error.name === 'AbortError') {\n   161→        throw new Error(`Request timeout after ${timeout}ms`);\n   162→      }\n   163→\n   164→      throw error;\n   165→    }\n   166→  }\n   167→\n   168→  /**\n   169→   * Converts MCP tool schemas to RemoteToolDefinition format.\n   170→   */\n   171→  private convertToToolDefinitions(schema: McpSchemaResponse): RemoteToolDefinition[] {\n   172→    return schema.tools.map((tool) => {\n   173→      // Apply namespace prefix if configured\n   174→      const name = this.config.namespace ? `${this.config.namespace}_${tool.name}` : tool.name;\n   175→\n   176→      // Create tool definition with remote metadata\n   177→      const toolDef: RemoteToolDefinition = {\n   178→        name,\n   179→        description: tool.description,\n   180→        parameters: {\n   181→          type: 'object',\n   182→          properties: tool.inputSchema.properties,\n   183→          required: tool.inputSchema.required,\n   184→        },\n   185→        // Mark with remote execution metadata\n   186→        _remote: {\n   187→          provider: this,\n   188→          originalName: tool.name,\n   189→        },\n   190→      };\n   191→\n   192→      return toolDef;\n   193→    });\n   194→  }\n   195→\n   196→  /**\n   197→   * Gets all tools from this endpoint.\n   198→   */\n   199→  getTools(): RemoteToolDefinition[] {\n   200→    return this.tools;\n   201→  }\n   202→\n   203→  /**\n   204→   * Executes a tool on the remote MCP endpoint using JSON-RPC.\n   205→   *\n   206→   * @param toolName - The name of the tool to execute\n   207→   * @param args - Arguments to pass to the tool\n   208→   * @param mcpHeaders - Optional MCP headers map (per-request headers override)\n   209→   */\n   210→  async executeTool(toolName: string, args: any, mcpHeaders?: McpHeadersMap): Promise<any> {\n   211→    const url = `${this.url}/mcp`;\n   212→    const timeout = this.config.timeout || 30000;\n   213→\n   214→    logger.debug(`[MCP] Executing tool \"${toolName}\" at ${url}`);\n   215→\n   216→    const controller = new AbortController();\n   217→    const timeoutId = setTimeout(() => controller.abort(), timeout);\n   218→\n   219→    // Build headers: server-wide config + per-request headers override\n   220→    const headers: Record<string, string> = {\n   221→      'Content-Type': 'application/json',\n   222→      'Accept': 'application/json, text/event-stream',\n   223→      ...this.config.headers,  // Server-wide configured headers\n   224→    };\n   225→\n   226→    // Apply per-request headers if provided and matches this endpoint\n   227→    if (mcpHeaders) {\n   228→      const matchingConfig = findMatch(this.url, mcpHeaders);\n   229→\n   230→      if (matchingConfig) {\n   231→        const matchedPattern = Object.keys(mcpHeaders).find(pattern => {\n   232→          // Find which pattern matched\n   233→          const match = findMatch(this.url, { [pattern]: mcpHeaders[pattern] });\n   234→          return match !== undefined;\n   235→        });\n   236→\n   237→        const headerStr = this.formatHeaders(matchingConfig.headers);\n   238→        logger.debug(`[MCP] Applying matched headers to ${this.url}`, {\n   239→          pattern: matchedPattern || 'unknown',\n   240→          headers: headerStr,\n   241→        });\n   242→        Object.assign(headers, matchingConfig.headers);\n   243→      } else {\n   244→        logger.debug(`[MCP] No matching headers found for ${this.url}`);\n   245→      }\n   246→    } else if (this.config.headers && Object.keys(this.config.headers).length > 0) {\n   247→      const headerStr = this.formatHeaders(this.config.headers);\n   248→      logger.debug(`[MCP] Using configured headers for ${this.url}`, {\n   249→        headers: headerStr,\n   250→      });\n   251→    }\n   252→\n   253→    try {\n   254→      const response = await fetch(url, {\n   255→        method: 'POST',\n   256→        headers,  // Use merged headers\n   257→        body: JSON.stringify({\n   258→          jsonrpc: '2.0',\n   259→          method: 'tools/call',\n   260→          params: {\n   261→            name: toolName,\n   262→            arguments: args,\n   263→          },\n   264→          id: Date.now(),\n   265→        }),\n   266→        signal: controller.signal,\n   267→      });\n   268→\n   269→      clearTimeout(timeoutId);\n   270→\n   271→      if (!response.ok) {\n   272→        throw new Error(`HTTP ${response.status}: ${response.statusText}`);\n   273→      }\n   274→\n   275→      const rpcResponse = (await response.json()) as any;\n   276→\n   277→      if (rpcResponse.error) {\n   278→        throw new Error(`MCP error: ${rpcResponse.error.message}`);\n   279→      }\n   280→\n   281→      // Extract content from MCP response\n   282→      const content = rpcResponse.result?.content || [];\n   283→\n   284→      // Find text content\n   285→      const textContent = content.find((c: any) => c.type === 'text');\n   286→      if (textContent) {\n   287→        // Try to parse as JSON\n   288→        try {\n   289→          return JSON.parse(textContent.text);\n   290→        } catch {\n   291→          // If not JSON, return as result object\n   292→          return { result: textContent.text };\n   293→        }\n   294→      }\n   295→\n   296→      logger.debug(`[MCP] Tool \"${toolName}\" executed successfully`);\n   297→\n   298→      return {};\n   299→    } catch (error) {\n   300→      clearTimeout(timeoutId);\n   301→\n   302→      if (error instanceof Error && error.name === 'AbortError') {\n   303→        const errorMsg = `Tool execution timeout after ${timeout}ms`;\n   304→        logger.error(`[MCP] ${errorMsg}`);\n   305→        throw new Error(errorMsg);\n   306→      }\n   307→\n   308→      const errorMsg = error instanceof Error ? error.message : String(error);\n   309→      logger.error(`[MCP] Tool execution failed: ${errorMsg}`);\n   310→      throw error;\n   311→    }\n   312→  }\n   313→\n   314→  /**\n   315→   * Cleans up resources (timers).\n   316→   * Should be called when the server shuts down.\n   317→   */\n   318→  destroy(): void {\n   319→    if (this.refreshTimer) {\n   320→      logger.info(`[MCP] Cleaning up refresh timer for ${this.url}`);\n   321→      clearInterval(this.refreshTimer);\n   322→      this.refreshTimer = undefined;\n   323→    }\n   324→  }\n   325→\n   326→  /**\n   327→   * Gets the endpoint URL.\n   328→   */\n   329→  getUrl(): string {\n   330→    return this.url;\n   331→  }\n   332→\n   333→  /**\n   334→   * Formats headers for logging.\n   335→   * By default, redacts all values.\n   336→   * Set DEBUG=1 environment variable to print the values.\n   337→   */\n   338→  private formatHeaders(headers: Record<string, string>): string {\n   339→    const isDebug = process.env.DEBUG === '1';\n   340→    return Object.entries(headers)\n   341→      .map(([key, value]) => `${key}: ${isDebug ? value : '*'.repeat(value.length)}`)\n   342→      .join(', ');\n   343→  }\n   344→}\n   345→\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\n</system-reminder>\n",
+          "timestamp": "2025-11-26T15:04:35.108Z"
+        },
+        {
+          "type": "assistant",
+          "text": "I see the issue. The code appends `/mcp` to the URL on lines 112 and 211. Let me also check the types file to update the documentation:",
+          "timestamp": "2025-11-26T15:04:39.947Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/packages/server/src/types.ts"
+          },
+          "timestamp": "2025-11-26T15:04:41.032Z"
+        },
+        {
+          "type": "user",
+          "text": "     1→/**\n     2→ * Configuration for an MCP (Model Context Protocol) endpoint.\n     3→ * MCP endpoints provide tools that can be discovered and executed server-side.\n     4→ */\n     5→export interface McpEndpointConfig {\n     6→  /** The HTTP URL of the MCP endpoint (e.g., 'http://backend.com/mcp') */\n     7→  url: string;\n     8→  /** Optional HTTP headers for authentication (e.g., { 'Authorization': 'Bearer token' }) */\n     9→  headers?: Record<string, string>;\n    10→  /**\n    11→   * Schema refresh interval in milliseconds.\n    12→   * Set to 0 to fetch only once on startup.\n    13→   * Default: 0 (no auto-refresh)\n    14→   */\n    15→  refreshInterval?: number;\n    16→  /**\n    17→   * Tool execution timeout in milliseconds.\n    18→   * Default: 30000 (30 seconds)\n    19→   */\n    20→  timeout?: number;\n    21→  /**\n    22→   * Optional namespace prefix for tools from this endpoint.\n    23→   * Useful to avoid naming conflicts when using multiple MCP endpoints.\n    24→   * Example: namespace='backend' → tool 'calculator' becomes 'backend_calculator'\n    25→   */\n    26→  namespace?: string;\n    27→}\n    28→\n    29→/**\n    30→ * Configuration options for the UseAI server.\n    31→ *\n    32→ * @template TAgents - Object mapping agent names to agent instances\n    33→ */\n    34→export interface UseAIServerConfig<TAgents extends Record<string, import('./agents/types').Agent> = Record<string, import('./agents/types').Agent>> {\n    35→  /** Object mapping agent names to agent instances. */\n    36→  agents: TAgents;\n    37→  /** Name of the default agent to use for chat (run_agent). Must be a key in agents object. */\n    38→  defaultAgent: keyof TAgents & string;\n    39→  /** The port number for the WebSocket server. Default: 8081 */\n    40→  port?: number;\n    41→  /** Maximum number of requests allowed per time window. Set to 0 to disable rate limiting. Default: 0 */\n    42→  rateLimitMaxRequests?: number;\n    43→  /** Time window in milliseconds for rate limiting. Default: 60000 (1 minute) */\n    44→  rateLimitWindowMs?: number;\n    45→  /** Optional array of plugins to extend server functionality */\n    46→  plugins?: import('./plugins/types').UseAIServerPlugin[];\n    47→  /**\n    48→   * Optional array of MCP endpoints to fetch tools from.\n    49→   * Tools from these endpoints will be automatically available to all agents and workflows.\n    50→   */\n    51→  mcpEndpoints?: McpEndpointConfig[];\n    52→}\n    53→\n    54→// Re-export all types from @meetsmore/use-ai-core\n    55→export type {\n    56→  ToolDefinition,\n    57→  ClientMessage,\n    58→  // AG-UI types\n    59→  Tool,\n    60→  Message,\n    61→  Context,\n    62→  RunAgentInput,\n    63→  State,\n    64→  RunAgentMessage,\n    65→  ToolResultMessage,\n    66→  AbortRunMessage,\n    67→  // AG-UI event types\n    68→  RunStartedEvent,\n    69→  RunFinishedEvent,\n    70→  RunErrorEvent,\n    71→  StepStartedEvent,\n    72→  StepFinishedEvent,\n    73→  TextMessageStartEvent,\n    74→  TextMessageContentEvent,\n    75→  TextMessageEndEvent,\n    76→  TextMessageChunkEvent,\n    77→  ToolCallStartEvent,\n    78→  ToolCallArgsEvent,\n    79→  ToolCallEndEvent,\n    80→  ToolCallChunkEvent,\n    81→  ToolCallResultEvent,\n    82→  StateSnapshotEvent,\n    83→  StateDeltaEvent,\n    84→  MessagesSnapshotEvent,\n    85→  RawEvent,\n    86→  CustomEvent,\n    87→  ActivitySnapshotEvent,\n    88→  ActivityDeltaEvent,\n    89→  AGUIEvent,\n    90→  // use-ai extensions\n    91→  WorkflowStatus,\n    92→  UseAIClientMessage,\n    93→  RunWorkflowMessage,\n    94→} from '@meetsmore/use-ai-core';\n    95→\n    96→export { EventType, ErrorCode } from '@meetsmore/use-ai-core';\n    97→\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\n</system-reminder>\n",
+          "timestamp": "2025-11-26T15:04:41.079Z"
+        },
+        {
+          "type": "assistant",
+          "text": "Now I'll make the changes:",
+          "timestamp": "2025-11-26T15:04:45.316Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Edit",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/packages/server/src/mcp/RemoteMcpToolsProvider.ts",
+            "new_string": "    const timeout = this.config.timeout || 30000;\n\n    const hasConfigHeaders = this.config.headers && Object.keys(this.config.headers).length > 0;",
+            "old_string": "    const url = `${this.url}/mcp`;\n    const timeout = this.config.timeout || 30000;\n\n    const hasConfigHeaders = this.config.headers && Object.keys(this.config.headers).length > 0;"
+          },
+          "timestamp": "2025-11-26T15:04:47.269Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Edit",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/packages/server/src/mcp/RemoteMcpToolsProvider.ts",
+            "new_string": "      logger.debug(`[MCP] Fetching schema from ${this.url} (with configured headers: ${headerStr})`);",
+            "old_string": "      logger.debug(`[MCP] Fetching schema from ${url} (with configured headers: ${headerStr})`);"
+          },
+          "timestamp": "2025-11-26T15:04:48.889Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Edit",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/packages/server/src/mcp/RemoteMcpToolsProvider.ts",
+            "new_string": "      logger.debug(`[MCP] Fetching schema from ${this.url}`);",
+            "old_string": "      logger.debug(`[MCP] Fetching schema from ${url}`);"
+          },
+          "timestamp": "2025-11-26T15:04:49.736Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Edit",
+          "input": {
+            "file_path": "/home/z/Desktop/work/use-ai/packages/server/src/mcp/RemoteMcpToolsProvider.ts",
+            "new_string": "      const response = await fetch(this.url, {\n        method: 'POST',\n        headers: {\n          'Content-Type': 'application/json',\n          'Accept': 'application/json, text/event-stream',\n          ...this.config.headers,\n        },\n        body: JSON.stringify({\n          jsonrpc: '2.0',\n          method: 'tools/list',\n          id: 1,\n        }),\n        signal: controller.signal,\n      });",
+            "old_string": "      const response = await fetch(url, {\n        method: 'POST',\n        headers: {\n          'Content-Type': 'application/json',\n          'Accept': 'application/json, text/event-stream',\n          ...this.config.headers,\n        },\n        body: JSON.stringify({\n          jsonrpc: '2.0',\n          method: 'tools/list',\n          id: 1,\n        }),\n        signal: controller.signal,\n      });"
+          },
+          "timestamp": "2025-11-26T15:04:51.998Z"
+        }
+      ],
+      "total_additions": 6,
+      "total_deletions": 8,
+      "accepted_lines": 6,
+      "overriden_lines": 0
+    }
+  }
+}
