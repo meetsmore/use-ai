@@ -1,0 +1,11 @@
+packages/client/src/components/UseAIChatPanel.tsx
+  human 64,90,123,511-512,516,563,568,609,623,643,654,675,689,727,762,831,950,1020,1071-1072,1171,1180-1181,1185,1188,1298
+packages/client/src/index.ts
+  human 10-12
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.21",
+  "base_commit_sha": "e1577da08569ba360886a1a17d6f5af239198586",
+  "prompts": {}
+}
