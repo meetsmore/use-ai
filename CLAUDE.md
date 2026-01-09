@@ -77,7 +77,7 @@ Use `wss://your-domain.com` for secure WebSocket connections. For local developm
 #### Tool Definition
 
 ```typescript
-import { defineTool } from '@meetsmore/use-ai-client';
+import { defineTool } from '@meetsmore-oss/use-ai-client';
 import { z } from 'zod';
 
 const addTodo = defineTool(
@@ -142,8 +142,8 @@ Server supports plugins for extensibility. All plugins implement `UseAIServerPlu
 **Built-in Plugin:** `WorkflowsPlugin` for headless workflow execution.
 
 ```typescript
-import { UseAIServer, AISDKAgent } from '@meetsmore/use-ai-server';
-import { WorkflowsPlugin, DifyWorkflowRunner } from '@meetsmore/use-ai-plugin-workflows';
+import { UseAIServer, AISDKAgent } from '@meetsmore-oss/use-ai-server';
+import { WorkflowsPlugin, DifyWorkflowRunner } from '@meetsmore-oss/use-ai-plugin-workflows';
 import { anthropic } from '@ai-sdk/anthropic';
 
 const server = new UseAIServer({
@@ -181,7 +181,7 @@ const server = new UseAIServer({
 #### Using Workflows
 
 ```typescript
-import { useAIWorkflow } from '@meetsmore/use-ai-plugin-workflows-client';
+import { useAIWorkflow } from '@meetsmore-oss/use-ai-plugin-workflows-client';
 
 function PDFUploadButton() {
   const { trigger, status, text, error, connected } = useAIWorkflow('dify', 'greeting-workflow');

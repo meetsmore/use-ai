@@ -18,15 +18,15 @@ import { z } from 'zod';
 import { MastraWorkflowAgent } from './MastraWorkflowAgent';
 import { pipeFullStreamWithToolEvents } from './streamHelpers';
 import { mastraWorkflowInputSchema, mastraWorkflowOutputSchema } from './types';
-import { EventType } from '@meetsmore/use-ai-core';
+import { EventType } from '@meetsmore-oss/use-ai-core';
 import type {
   AGUIEvent,
   ToolCallStartEvent,
   ToolCallArgsEvent,
   ToolCallEndEvent,
   TextMessageContentEvent,
-} from '@meetsmore/use-ai-core';
-import type { AgentInput, EventEmitter, ClientSession, ToolDefinition } from '@meetsmore/use-ai-server';
+} from '@meetsmore-oss/use-ai-core';
+import type { AgentInput, EventEmitter, ClientSession, ToolDefinition } from '@meetsmore-oss/use-ai-server';
 import { v4 as uuidv4 } from 'uuid';
 
 // Calculator tool execution logic (shared between server-side and client-side tests)

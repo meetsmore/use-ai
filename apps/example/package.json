@@ -24,7 +24,7 @@
     "test:e2e:react-16": "./scripts/test-react16.sh"
   },
   "dependencies": {
-    "@meetsmore/use-ai-client": "workspace:*",
+    "@meetsmore-oss/use-ai-client": "workspace:*",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "zod": "^4.1.12"

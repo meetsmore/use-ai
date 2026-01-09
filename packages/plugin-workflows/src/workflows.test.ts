@@ -2,9 +2,9 @@ import { describe, expect, test, beforeEach, afterEach, mock } from 'bun:test';
 import { WorkflowsPlugin, type WorkflowsPluginConfig } from './WorkflowsPlugin';
 import { DifyWorkflowRunner, type DifyWorkflowRunnerConfig } from './runners/DifyWorkflowRunner';
 import type { WorkflowRunner, WorkflowInput, WorkflowResult, EventEmitter } from './types';
-import type { ClientSession } from '@meetsmore/use-ai-server';
-import type { UseAIClientMessage, RunWorkflowMessage, AGUIEvent, ToolDefinition } from '@meetsmore/use-ai-core';
-import { EventType } from '@meetsmore/use-ai-core';
+import type { ClientSession } from '@meetsmore-oss/use-ai-server';
+import type { UseAIClientMessage, RunWorkflowMessage, AGUIEvent, ToolDefinition } from '@meetsmore-oss/use-ai-core';
+import { EventType } from '@meetsmore-oss/use-ai-core';
 import { v4 as uuidv4 } from 'uuid';
 
 // Mock fetch for Dify tests

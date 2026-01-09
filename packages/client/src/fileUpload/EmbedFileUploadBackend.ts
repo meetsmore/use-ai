@@ -18,7 +18,7 @@ import type { FileUploadBackend } from './types';
  *
  * @example
  * ```typescript
- * import { UseAIProvider, EmbedFileUploadBackend } from '@meetsmore/use-ai-client';
+ * import { UseAIProvider, EmbedFileUploadBackend } from '@meetsmore-oss/use-ai-client';
  *
  * <UseAIProvider
  *   serverUrl="wss://..."

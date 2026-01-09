@@ -1,5 +1,5 @@
-import type { ClientSession } from '@meetsmore/use-ai-server';
-import type { ToolDefinition, AGUIEvent } from '@meetsmore/use-ai-core';
+import type { ClientSession } from '@meetsmore-oss/use-ai-server';
+import type { ToolDefinition, AGUIEvent } from '@meetsmore-oss/use-ai-core';
 
 /**
  * Interface for emitting AG-UI protocol events.

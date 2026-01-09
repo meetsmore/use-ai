@@ -375,7 +375,7 @@ test('persisted file shows placeholder on reload', async ({ page }) => {
 ## Provider Configuration Example
 
 ```typescript
-import { UseAIProvider, EmbedFileUploadBackend } from '@meetsmore/use-ai-client';
+import { UseAIProvider, EmbedFileUploadBackend } from '@meetsmore-oss/use-ai-client';
 
 <UseAIProvider
   serverUrl="wss://..."

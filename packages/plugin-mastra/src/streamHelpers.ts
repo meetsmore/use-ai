@@ -61,7 +61,7 @@ export interface PipeFullStreamResult {
  * @example
  * ```typescript
  * import { createStep } from '@mastra/core/workflows';
- * import { pipeFullStreamWithToolEvents } from '@meetsmore/use-ai-plugin-mastra';
+ * import { pipeFullStreamWithToolEvents } from '@meetsmore-oss/use-ai-plugin-mastra';
  *
  * const agentStep = createStep({
  *   id: 'agent-step',

@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { defineTool } from '@meetsmore/use-ai-client';
+import { defineTool } from '@meetsmore-oss/use-ai-client';
 import { z } from 'zod';
 
 export interface Todo {

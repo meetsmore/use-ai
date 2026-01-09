@@ -1,10 +1,10 @@
 #!/usr/bin/env bun
-import { UseAIServer, AISDKAgent, logger } from '@meetsmore/use-ai-server';
-import type { Agent, McpEndpointConfig } from '@meetsmore/use-ai-server';
+import { UseAIServer, AISDKAgent, logger } from '@meetsmore-oss/use-ai-server';
+import type { Agent, McpEndpointConfig } from '@meetsmore-oss/use-ai-server';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { createOpenAI } from '@ai-sdk/openai';
-import { WorkflowsPlugin, DifyWorkflowRunner } from '@meetsmore/use-ai-plugin-workflows';
-import type { WorkflowRunner } from '@meetsmore/use-ai-plugin-workflows';
+import { WorkflowsPlugin, DifyWorkflowRunner } from '@meetsmore-oss/use-ai-plugin-workflows';
+import type { WorkflowRunner } from '@meetsmore-oss/use-ai-plugin-workflows';
 
 const port = Number(process.env.PORT) || 8081;
 const rateLimitMaxRequests = Number(process.env.RATE_LIMIT_MAX_REQUESTS) || 0;

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { ToolDefinition } from '@meetsmore/use-ai-core';
+import type { ToolDefinition } from '@meetsmore-oss/use-ai-core';
 
 /**
  * Options for configuring tool behavior.
@@ -78,7 +78,7 @@ export function defineTool<TReturn>(
  *
  * @example
  * ```typescript
- * import { defineTool } from '@meetsmore/use-ai-client';
+ * import { defineTool } from '@meetsmore-oss/use-ai-client';
  * import { z } from 'zod';
  *
  * const addTodo = defineTool(

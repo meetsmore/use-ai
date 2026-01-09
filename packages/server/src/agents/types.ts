@@ -26,7 +26,7 @@ export interface ClientSession {
   /** Map of pending tool calls awaiting results from the client. Key: toolCallId, Value: resolver function */
   pendingToolCalls: Map<string, (content: string) => void>;
   /** MCP headers configuration for the current request (temporary, cleared after request) */
-  currentMcpHeaders?: import('@meetsmore/use-ai-core').McpHeadersMap;
+  currentMcpHeaders?: import('@meetsmore-oss/use-ai-core').McpHeadersMap;
   /** AbortController for cancelling the current run */
   abortController?: AbortController;
   /** Cached MCP tools for this session, keyed by endpoint URL */

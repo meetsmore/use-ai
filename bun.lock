@@ -14,7 +14,7 @@
       "name": "example",
       "version": "0.4.0",
       "dependencies": {
-        "@meetsmore/use-ai-client": "workspace:*",
+        "@meetsmore-oss/use-ai-client": "workspace:*",
         "react": "^18.2.0",
         "react-dom": "^18.2.0",
         "zod": "^4.1.12",
@@ -50,13 +50,13 @@
       },
     },
     "apps/use-ai-server-app": {
-      "name": "@meetsmore/use-ai-server-app",
+      "name": "@meetsmore-oss/use-ai-server-app",
       "version": "1.0.0",
       "dependencies": {
         "@ai-sdk/anthropic": "3.0.0-beta.59",
         "@ai-sdk/openai": "3.0.0-beta.66",
-        "@meetsmore/use-ai-plugin-workflows": "workspace:*",
-        "@meetsmore/use-ai-server": "workspace:*",
+        "@meetsmore-oss/use-ai-plugin-workflows": "workspace:*",
+        "@meetsmore-oss/use-ai-server": "workspace:*",
       },
       "devDependencies": {
         "@types/bun": "latest",
@@ -64,10 +64,10 @@
       },
     },
     "packages/client": {
-      "name": "@meetsmore/use-ai-client",
+      "name": "@meetsmore-oss/use-ai-client",
       "version": "1.2.0",
       "dependencies": {
-        "@meetsmore/use-ai-core": "workspace:*",
+        "@meetsmore-oss/use-ai-core": "workspace:*",
         "react-markdown": "^8.0.0",
         "socket.io-client": "^4.8.1",
         "uuid": "^11.1.0",
@@ -91,7 +91,7 @@
       },
     },
     "packages/core": {
-      "name": "@meetsmore/use-ai-core",
+      "name": "@meetsmore-oss/use-ai-core",
       "version": "1.2.0",
       "dependencies": {
         "@ag-ui/core": "^0.0.41",
@@ -102,10 +102,10 @@
       },
     },
     "packages/plugin-mastra": {
-      "name": "@meetsmore/use-ai-plugin-mastra",
+      "name": "@meetsmore-oss/use-ai-plugin-mastra",
       "version": "1.2.0",
       "dependencies": {
-        "@meetsmore/use-ai-core": "1.2.0",
+        "@meetsmore-oss/use-ai-core": "1.2.0",
         "ai": "6.0.0-beta.116",
         "uuid": "^11.0.3",
         "zod": "^4.1.8",
@@ -113,39 +113,39 @@
       "devDependencies": {
         "@ai-sdk/anthropic": "^2.0.53",
         "@mastra/core": "^1.0.0-beta",
-        "@meetsmore/use-ai-server": "1.2.0",
+        "@meetsmore-oss/use-ai-server": "1.2.0",
         "@types/uuid": "^10.0.0",
         "typescript": "^5.9.3",
       },
       "peerDependencies": {
         "@mastra/core": ">=1.0.0-beta",
-        "@meetsmore/use-ai-server": "1.2.0",
+        "@meetsmore-oss/use-ai-server": "1.2.0",
       },
     },
     "packages/plugin-workflows": {
-      "name": "@meetsmore/use-ai-plugin-workflows",
+      "name": "@meetsmore-oss/use-ai-plugin-workflows",
       "version": "1.2.0",
       "dependencies": {
-        "@meetsmore/use-ai-core": "1.2.0",
+        "@meetsmore-oss/use-ai-core": "1.2.0",
         "ai": "6.0.0-beta.116",
         "uuid": "^11.0.3",
       },
       "devDependencies": {
-        "@meetsmore/use-ai-server": "1.2.0",
+        "@meetsmore-oss/use-ai-server": "1.2.0",
         "@types/uuid": "^10.0.0",
         "typescript": "^5.9.3",
       },
       "peerDependencies": {
-        "@meetsmore/use-ai-server": "1.2.0",
+        "@meetsmore-oss/use-ai-server": "1.2.0",
       },
     },
     "packages/server": {
-      "name": "@meetsmore/use-ai-server",
+      "name": "@meetsmore-oss/use-ai-server",
       "version": "1.2.0",
       "dependencies": {
         "@ai-sdk/anthropic": "3.0.0-beta.59",
         "@ai-sdk/openai": "3.0.0-beta.66",
-        "@meetsmore/use-ai-core": "1.2.0",
+        "@meetsmore-oss/use-ai-core": "1.2.0",
         "ai": "6.0.0-beta.116",
         "picomatch": "^4.0.3",
         "socket.io": "^4.8.1",
@@ -310,17 +310,17 @@
 
     "@mastra/schema-compat": ["@mastra/schema-compat@1.0.0-beta.3", "", { "dependencies": { "json-schema-to-zod": "^2.7.0", "zod-from-json-schema": "^0.5.0", "zod-from-json-schema-v3": "npm:zod-from-json-schema@^0.0.5", "zod-to-json-schema": "^3.24.6" }, "peerDependencies": { "zod": "^3.25.0 || ^4.0.0" } }, "sha512-MmEw6ZZCEC+fnSWNrgAB8vB4sUx8kvJGpl+PONZ43SFlTz+FmMTyaqYhEbvFWpTtEAFyN+MXr/uiqjzhvY3RuA=="],
 
-    "@meetsmore/use-ai-client": ["@meetsmore/use-ai-client@workspace:packages/client"],
+    "@meetsmore-oss/use-ai-client": ["@meetsmore-oss/use-ai-client@workspace:packages/client"],
 
-    "@meetsmore/use-ai-core": ["@meetsmore/use-ai-core@workspace:packages/core"],
+    "@meetsmore-oss/use-ai-core": ["@meetsmore-oss/use-ai-core@workspace:packages/core"],
 
-    "@meetsmore/use-ai-plugin-mastra": ["@meetsmore/use-ai-plugin-mastra@workspace:packages/plugin-mastra"],
+    "@meetsmore-oss/use-ai-plugin-mastra": ["@meetsmore-oss/use-ai-plugin-mastra@workspace:packages/plugin-mastra"],
 
-    "@meetsmore/use-ai-plugin-workflows": ["@meetsmore/use-ai-plugin-workflows@workspace:packages/plugin-workflows"],
+    "@meetsmore-oss/use-ai-plugin-workflows": ["@meetsmore-oss/use-ai-plugin-workflows@workspace:packages/plugin-workflows"],
 
-    "@meetsmore/use-ai-server": ["@meetsmore/use-ai-server@workspace:packages/server"],
+    "@meetsmore-oss/use-ai-server": ["@meetsmore-oss/use-ai-server@workspace:packages/server"],
 
-    "@meetsmore/use-ai-server-app": ["@meetsmore/use-ai-server-app@workspace:apps/use-ai-server-app"],
+    "@meetsmore-oss/use-ai-server-app": ["@meetsmore-oss/use-ai-server-app@workspace:apps/use-ai-server-app"],
 
     "@modelcontextprotocol/sdk": ["@modelcontextprotocol/sdk@1.23.0", "", { "dependencies": { "ajv": "^8.17.1", "ajv-formats": "^3.0.1", "content-type": "^1.0.5", "cors": "^2.8.5", "cross-spawn": "^7.0.5", "eventsource": "^3.0.2", "eventsource-parser": "^3.0.0", "express": "^5.0.1", "express-rate-limit": "^7.5.0", "pkce-challenge": "^5.0.0", "raw-body": "^3.0.0", "zod": "^3.25 || ^4.0", "zod-to-json-schema": "^3.25.0" }, "peerDependencies": { "@cfworker/json-schema": "^4.1.1" }, "optionalPeers": ["@cfworker/json-schema"] }, "sha512-MCGd4K9aZKvuSqdoBkdMvZNcYXCkZRYVs/Gh92mdV5IHbctX9H9uIvd4X93+9g8tBbXv08sxc/QHXTzf8y65bA=="],
 
@@ -1504,15 +1504,15 @@
 
     "@isaacs/cliui/wrap-ansi": ["wrap-ansi@8.1.0", "", { "dependencies": { "ansi-styles": "^6.1.0", "string-width": "^5.0.1", "strip-ansi": "^7.0.1" } }, "sha512-si7QWI6zUMq56bESFvagtmzMdGOtoxfR+Sez11Mobfc7tm+VkUckk9bW2UeffTGVUbOksxmSw0AA2gs8g71NCQ=="],
 
-    "@meetsmore/use-ai-core/@types/bun": ["@types/bun@1.3.5", "", { "dependencies": { "bun-types": "1.3.5" } }, "sha512-RnygCqNrd3srIPEWBd5LFeUYG7plCoH2Yw9WaZGyNmdTEei+gWaHqydbaIRkIkcbXwhBT94q78QljxN0Sk838w=="],
+    "@meetsmore-oss/use-ai-core/@types/bun": ["@types/bun@1.3.5", "", { "dependencies": { "bun-types": "1.3.5" } }, "sha512-RnygCqNrd3srIPEWBd5LFeUYG7plCoH2Yw9WaZGyNmdTEei+gWaHqydbaIRkIkcbXwhBT94q78QljxN0Sk838w=="],
 
-    "@meetsmore/use-ai-server/@ai-sdk/anthropic": ["@ai-sdk/anthropic@3.0.0-beta.59", "", { "dependencies": { "@ai-sdk/provider": "3.0.0-beta.17", "@ai-sdk/provider-utils": "4.0.0-beta.34" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-CDuY+hIvDyGA8fTI7nkJtBqjWSsqaNYf3mkoE/eQ6/MgoPwgzdN2BzfW9ciCrr0bhchj9W9wLib5kGnHT8LX7g=="],
+    "@meetsmore-oss/use-ai-server/@ai-sdk/anthropic": ["@ai-sdk/anthropic@3.0.0-beta.59", "", { "dependencies": { "@ai-sdk/provider": "3.0.0-beta.17", "@ai-sdk/provider-utils": "4.0.0-beta.34" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-CDuY+hIvDyGA8fTI7nkJtBqjWSsqaNYf3mkoE/eQ6/MgoPwgzdN2BzfW9ciCrr0bhchj9W9wLib5kGnHT8LX7g=="],
 
-    "@meetsmore/use-ai-server/@types/bun": ["@types/bun@1.3.5", "", { "dependencies": { "bun-types": "1.3.5" } }, "sha512-RnygCqNrd3srIPEWBd5LFeUYG7plCoH2Yw9WaZGyNmdTEei+gWaHqydbaIRkIkcbXwhBT94q78QljxN0Sk838w=="],
+    "@meetsmore-oss/use-ai-server/@types/bun": ["@types/bun@1.3.5", "", { "dependencies": { "bun-types": "1.3.5" } }, "sha512-RnygCqNrd3srIPEWBd5LFeUYG7plCoH2Yw9WaZGyNmdTEei+gWaHqydbaIRkIkcbXwhBT94q78QljxN0Sk838w=="],
 
-    "@meetsmore/use-ai-server/zod": ["zod@3.25.76", "", {}, "sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ=="],
+    "@meetsmore-oss/use-ai-server/zod": ["zod@3.25.76", "", {}, "sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ=="],
 
-    "@meetsmore/use-ai-server-app/@ai-sdk/anthropic": ["@ai-sdk/anthropic@3.0.0-beta.59", "", { "dependencies": { "@ai-sdk/provider": "3.0.0-beta.17", "@ai-sdk/provider-utils": "4.0.0-beta.34" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-CDuY+hIvDyGA8fTI7nkJtBqjWSsqaNYf3mkoE/eQ6/MgoPwgzdN2BzfW9ciCrr0bhchj9W9wLib5kGnHT8LX7g=="],
+    "@meetsmore-oss/use-ai-server-app/@ai-sdk/anthropic": ["@ai-sdk/anthropic@3.0.0-beta.59", "", { "dependencies": { "@ai-sdk/provider": "3.0.0-beta.17", "@ai-sdk/provider-utils": "4.0.0-beta.34" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-CDuY+hIvDyGA8fTI7nkJtBqjWSsqaNYf3mkoE/eQ6/MgoPwgzdN2BzfW9ciCrr0bhchj9W9wLib5kGnHT8LX7g=="],
 
     "@nestjs/config/dotenv": ["dotenv@16.4.7", "", {}, "sha512-47qPchRCykZC03FhkYAhrvwU4xDBFIj1QPqaarj6mdM/hgUzfPHcpkHJOn3mJAufFeeAxAzeGsr5X0M4k6fLZQ=="],
 
@@ -1646,17 +1646,17 @@
 
     "@isaacs/cliui/wrap-ansi/ansi-styles": ["ansi-styles@6.2.3", "", {}, "sha512-4Dj6M28JB+oAH8kFkTLUo+a2jwOFkuqb3yucU0CANcRRUbxS0cP0nZYCGjcc3BNXwRIsUVmDGgzawme7zvJHvg=="],
 
-    "@meetsmore/use-ai-core/@types/bun/bun-types": ["bun-types@1.3.5", "", { "dependencies": { "@types/node": "*" } }, "sha512-inmAYe2PFLs0SUbFOWSVD24sg1jFlMPxOjOSSCYqUgn4Hsc3rDc7dFvfVYjFPNHtov6kgUeulV4SxbuIV/stPw=="],
+    "@meetsmore-oss/use-ai-core/@types/bun/bun-types": ["bun-types@1.3.5", "", { "dependencies": { "@types/node": "*" } }, "sha512-inmAYe2PFLs0SUbFOWSVD24sg1jFlMPxOjOSSCYqUgn4Hsc3rDc7dFvfVYjFPNHtov6kgUeulV4SxbuIV/stPw=="],
 
-    "@meetsmore/use-ai-server-app/@ai-sdk/anthropic/@ai-sdk/provider": ["@ai-sdk/provider@3.0.0-beta.17", "", { "dependencies": { "json-schema": "^0.4.0" } }, "sha512-1Jek+B4W/8KV48Lcsnl7QBXD22fmwDISz//JRGtPRjexrwr2bSeFJ3yqWpvQo6CYttac9GYf3MTiho4iSl+V2A=="],
+    "@meetsmore-oss/use-ai-server-app/@ai-sdk/anthropic/@ai-sdk/provider": ["@ai-sdk/provider@3.0.0-beta.17", "", { "dependencies": { "json-schema": "^0.4.0" } }, "sha512-1Jek+B4W/8KV48Lcsnl7QBXD22fmwDISz//JRGtPRjexrwr2bSeFJ3yqWpvQo6CYttac9GYf3MTiho4iSl+V2A=="],
 
-    "@meetsmore/use-ai-server-app/@ai-sdk/anthropic/@ai-sdk/provider-utils": ["@ai-sdk/provider-utils@4.0.0-beta.34", "", { "dependencies": { "@ai-sdk/provider": "3.0.0-beta.17", "@standard-schema/spec": "^1.0.0", "eventsource-parser": "^3.0.6" }, "peerDependencies": { "@valibot/to-json-schema": "^1.3.0", "arktype": "^2.1.22", "effect": "^3.18.4", "zod": "^3.25.76 || ^4.1.8" }, "optionalPeers": ["@valibot/to-json-schema", "arktype", "effect"] }, "sha512-GxLNX8xZlf2BPJaXsR39ignBVfHthBsXVqRN+S7iCx503IdJXi+mrgWQElBRbpqHucOR+3CQ6CIk8SDaCeGb/A=="],
+    "@meetsmore-oss/use-ai-server-app/@ai-sdk/anthropic/@ai-sdk/provider-utils": ["@ai-sdk/provider-utils@4.0.0-beta.34", "", { "dependencies": { "@ai-sdk/provider": "3.0.0-beta.17", "@standard-schema/spec": "^1.0.0", "eventsource-parser": "^3.0.6" }, "peerDependencies": { "@valibot/to-json-schema": "^1.3.0", "arktype": "^2.1.22", "effect": "^3.18.4", "zod": "^3.25.76 || ^4.1.8" }, "optionalPeers": ["@valibot/to-json-schema", "arktype", "effect"] }, "sha512-GxLNX8xZlf2BPJaXsR39ignBVfHthBsXVqRN+S7iCx503IdJXi+mrgWQElBRbpqHucOR+3CQ6CIk8SDaCeGb/A=="],
 
-    "@meetsmore/use-ai-server/@ai-sdk/anthropic/@ai-sdk/provider": ["@ai-sdk/provider@3.0.0-beta.17", "", { "dependencies": { "json-schema": "^0.4.0" } }, "sha512-1Jek+B4W/8KV48Lcsnl7QBXD22fmwDISz//JRGtPRjexrwr2bSeFJ3yqWpvQo6CYttac9GYf3MTiho4iSl+V2A=="],
+    "@meetsmore-oss/use-ai-server/@ai-sdk/anthropic/@ai-sdk/provider": ["@ai-sdk/provider@3.0.0-beta.17", "", { "dependencies": { "json-schema": "^0.4.0" } }, "sha512-1Jek+B4W/8KV48Lcsnl7QBXD22fmwDISz//JRGtPRjexrwr2bSeFJ3yqWpvQo6CYttac9GYf3MTiho4iSl+V2A=="],
 
-    "@meetsmore/use-ai-server/@ai-sdk/anthropic/@ai-sdk/provider-utils": ["@ai-sdk/provider-utils@4.0.0-beta.34", "", { "dependencies": { "@ai-sdk/provider": "3.0.0-beta.17", "@standard-schema/spec": "^1.0.0", "eventsource-parser": "^3.0.6" }, "peerDependencies": { "@valibot/to-json-schema": "^1.3.0", "arktype": "^2.1.22", "effect": "^3.18.4", "zod": "^3.25.76 || ^4.1.8" }, "optionalPeers": ["@valibot/to-json-schema", "arktype", "effect"] }, "sha512-GxLNX8xZlf2BPJaXsR39ignBVfHthBsXVqRN+S7iCx503IdJXi+mrgWQElBRbpqHucOR+3CQ6CIk8SDaCeGb/A=="],
+    "@meetsmore-oss/use-ai-server/@ai-sdk/anthropic/@ai-sdk/provider-utils": ["@ai-sdk/provider-utils@4.0.0-beta.34", "", { "dependencies": { "@ai-sdk/provider": "3.0.0-beta.17", "@standard-schema/spec": "^1.0.0", "eventsource-parser": "^3.0.6" }, "peerDependencies": { "@valibot/to-json-schema": "^1.3.0", "arktype": "^2.1.22", "effect": "^3.18.4", "zod": "^3.25.76 || ^4.1.8" }, "optionalPeers": ["@valibot/to-json-schema", "arktype", "effect"] }, "sha512-GxLNX8xZlf2BPJaXsR39ignBVfHthBsXVqRN+S7iCx503IdJXi+mrgWQElBRbpqHucOR+3CQ6CIk8SDaCeGb/A=="],
 
-    "@meetsmore/use-ai-server/@types/bun/bun-types": ["bun-types@1.3.5", "", { "dependencies": { "@types/node": "*" } }, "sha512-inmAYe2PFLs0SUbFOWSVD24sg1jFlMPxOjOSSCYqUgn4Hsc3rDc7dFvfVYjFPNHtov6kgUeulV4SxbuIV/stPw=="],
+    "@meetsmore-oss/use-ai-server/@types/bun/bun-types": ["bun-types@1.3.5", "", { "dependencies": { "@types/node": "*" } }, "sha512-inmAYe2PFLs0SUbFOWSVD24sg1jFlMPxOjOSSCYqUgn4Hsc3rDc7dFvfVYjFPNHtov6kgUeulV4SxbuIV/stPw=="],
 
     "@types/ssh2/@types/node/undici-types": ["undici-types@5.26.5", "", {}, "sha512-JlCMO+ehdEIKqlFxk6IfVoAUVmgz7cU7zD/h9XZ0qzeosSHmUJVOzSQvvYSYWXkFXC+IfLKSIffhv0sVZup6pA=="],
 

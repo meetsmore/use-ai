@@ -26,21 +26,21 @@
   },
   "scripts": {
     "clean": "rm -rf dist *.tsbuildinfo",
-    "build": "bun build src/index.ts --outdir dist --target node --format esm --external @meetsmore/use-ai-server && tsc --emitDeclarationOnly --skipLibCheck",
+    "build": "bun build src/index.ts --outdir dist --target node --format esm --external @meetsmore-oss/use-ai-server && tsc --emitDeclarationOnly --skipLibCheck",
     "dev": "bun --watch src/index.ts",
     "test": "bun test --only-failures"
   },
   "dependencies": {
-    "@meetsmore/use-ai-core": "1.2.0",
+    "@meetsmore-oss/use-ai-core": "1.2.0",
     "ai": "6.0.0-beta.116",
     "uuid": "^11.0.3"
   },
   "devDependencies": {
     "@types/uuid": "^10.0.0",
-    "@meetsmore/use-ai-server": "1.2.0",
+    "@meetsmore-oss/use-ai-server": "1.2.0",
     "typescript": "^5.9.3"
   },
   "peerDependencies": {
-    "@meetsmore/use-ai-server": "1.2.0"
+    "@meetsmore-oss/use-ai-server": "1.2.0"
   }
 }

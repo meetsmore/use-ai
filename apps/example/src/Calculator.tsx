@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useAI } from '@meetsmore/use-ai-client';
+import { useAI } from '@meetsmore-oss/use-ai-client';
 import { useCalculatorLogic } from './useCalculatorLogic';
 
 export default function Calculator() {

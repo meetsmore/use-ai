@@ -6,7 +6,7 @@ export interface UseAIConfig {
   serverUrl: string;
 }
 
-// Re-export all types from @meetsmore/use-ai-core for convenience
+// Re-export all types from @meetsmore-oss/use-ai-core for convenience
 export type {
   ToolDefinition,
   // AG-UI types
@@ -55,6 +55,6 @@ export type {
   FileContent,
   MultimodalContent,
   UserMessageContent,
-} from '@meetsmore/use-ai-core';
+} from '@meetsmore-oss/use-ai-core';
 
-export { EventType, ErrorCode } from '@meetsmore/use-ai-core';
+export { EventType, ErrorCode } from '@meetsmore-oss/use-ai-core';

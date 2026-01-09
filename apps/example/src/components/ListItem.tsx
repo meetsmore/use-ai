@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useAI, defineTool } from '@meetsmore/use-ai-client';
+import { useAI, defineTool } from '@meetsmore-oss/use-ai-client';
 import { z } from 'zod';
 
 interface ListItemProps {

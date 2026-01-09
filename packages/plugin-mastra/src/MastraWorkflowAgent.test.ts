@@ -2,8 +2,8 @@ import { describe, it, expect, mock } from 'bun:test';
 import { createWorkflow, createStep } from '@mastra/core/workflows';
 import { Mastra } from '@mastra/core';
 import { MastraWorkflowAgent } from './MastraWorkflowAgent';
-import type { AgentInput, EventEmitter, ClientSession } from '@meetsmore/use-ai-server';
-import { EventType } from '@meetsmore/use-ai-core';
+import type { AgentInput, EventEmitter, ClientSession } from '@meetsmore-oss/use-ai-server';
+import { EventType } from '@meetsmore-oss/use-ai-core';
 import { v4 as uuidv4 } from 'uuid';
 import { mastraWorkflowInputSchema, mastraWorkflowOutputSchema } from './types';
 

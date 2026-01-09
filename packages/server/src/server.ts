@@ -2,7 +2,7 @@ import { Server as SocketIOServer, Socket } from 'socket.io';
 import { ModelMessage, ToolModelMessage } from 'ai';
 import { createServer } from 'http';
 import { createHash } from 'crypto';
-import { EventType, type McpHeadersMap } from '@meetsmore/use-ai-core';
+import { EventType, type McpHeadersMap } from '@meetsmore-oss/use-ai-core';
 import type {
   UseAIServerConfig,
   McpEndpointConfig,
@@ -43,7 +43,7 @@ export type { ClientSession } from './agents/types';
  *
  * @example
  * ```typescript
- * import { UseAIServer, AISDKAgent } from '@meetsmore/use-ai-server';
+ * import { UseAIServer, AISDKAgent } from '@meetsmore-oss/use-ai-server';
  * import { createAnthropic } from '@ai-sdk/anthropic';
  * import { openai } from '@ai-sdk/openai';
  *

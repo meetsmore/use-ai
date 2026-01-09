@@ -1,8 +1,8 @@
 # @use-ai
 
 [![CI](https://github.com/meetsmore/use-ai/actions/workflows/ci.yml/badge.svg)](https://github.com/meetsmore/use-ai/actions/workflows/ci.yml)
-[![npm](https://img.shields.io/npm/v/@meetsmore/use-ai-client)](https://www.npmjs.com/package/@meetsmore/use-ai-client)
-[![npm](https://img.shields.io/npm/v/@meetsmore/use-ai-server)](https://www.npmjs.com/package/@meetsmore/use-ai-server)
+[![npm](https://img.shields.io/npm/v/@meetsmore-oss/use-ai-client)](https://www.npmjs.com/package/@meetsmore-oss/use-ai-client)
+[![npm](https://img.shields.io/npm/v/@meetsmore-oss/use-ai-server)](https://www.npmjs.com/package/@meetsmore-oss/use-ai-server)
 [![Docker](https://img.shields.io/badge/Docker-ghcr.io%2Fmeetsmore%2Fuse--ai--server-blue?logo=docker)](https://github.com/meetsmore/use-ai/pkgs/container/use-ai-server)
 [![License: BUSL-1.1](https://img.shields.io/badge/License-BUSL--1.1-blue.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
@@ -53,8 +53,8 @@ A React client/framework for easily enabling AI to control your users frontend.
     - [Rate Limiting](#rate-limiting)
     - [Langfuse](#langfuse)
   - [Plugins](#plugins)
-    - [`@meetsmore/use-ai-plugin-workflows`](#meetsmore-use-ai-plugin-workflows)
-    - [`@meetsmore/use-ai-plugin-mastra`](#meetsmore-use-ai-plugin-mastra)
+    - [`@meetsmore-oss/use-ai-plugin-workflows`](#meetsmore-use-ai-plugin-workflows)
+    - [`@meetsmore-oss/use-ai-plugin-mastra`](#meetsmore-use-ai-plugin-mastra)
 
 ## Overview
 
@@ -81,7 +81,7 @@ root.render(
 
 1. Components call `useAI` to declare their tools and state (`prompt`) to `use-ai`.
 2. `UseAIProvider` provides a floating-action-button chat UI and aggregates `useAI` tools + prompts from all child components.
-3. `@meetsmore/use-ai-server` acts as a co-ordinator between your frontend and an LLM.
+3. `@meetsmore-oss/use-ai-server` acts as a co-ordinator between your frontend and an LLM.
 4. ✨ The LLM can now call your `tools` functions in the frontend as MCPs.
 
 ## Installation
@@ -89,7 +89,7 @@ root.render(
 ### Frontend
 
 ```bash
-bun add @meetsmore/use-ai-client
+bun add @meetsmore-oss/use-ai-client
 ```
 
 ### Server
@@ -150,7 +150,7 @@ docker-compose up -d
 If you want to integrate the server into your existing application:
 
 ```bash
-bun add @meetsmore/use-ai-server
+bun add @meetsmore-oss/use-ai-server
 ```
 
 See [Server > UseAIServer](#useaiserver) for programmatic usage.
@@ -279,14 +279,14 @@ Because the tools are all clientside, we don't need to worry about auth for the 
 
 ### AG-UI Protocol
 
-`@use-ai` partially implements the [AG-UI protocol](https://docs.ag-ui.com/introduction) for communication between `@meetsmore/use-ai-client` and `@meetsmore/use-ai-server`.
+`@use-ai` partially implements the [AG-UI protocol](https://docs.ag-ui.com/introduction) for communication between `@meetsmore-oss/use-ai-client` and `@meetsmore-oss/use-ai-server`.
 
 Not all aspects of AG-UI protocol are implemented now, but it feel free to open a PR to add any parts of the protocol you need.
 
 There are some minor extensions to the protocol:
 
 **Message Types**:
-- `run_workflow`: Trigger headless workflow (use-ai extension) [see `@meetsmore/use-ai-plugin-workflows`]
+- `run_workflow`: Trigger headless workflow (use-ai extension) [see `@meetsmore-oss/use-ai-plugin-workflows`]
 
 ## Client
 
@@ -295,7 +295,7 @@ There are some minor extensions to the protocol:
 The fundamental building block for adding AI capabilities to any React component:
 
 ```tsx
-import { useAI, defineTool } from '@meetsmore/use-ai-client';
+import { useAI, defineTool } from '@meetsmore-oss/use-ai-client';
 import { z } from 'zod';
 
 function TodoList() {
@@ -331,7 +331,7 @@ function TodoList() {
 ### `UseAIProvider`
 
 ```tsx
-import { UseAIProvider } from '@meetsmore/use-ai-client';
+import { UseAIProvider } from '@meetsmore-oss/use-ai-client';
 
 root.render(
   <UseAIProvider
@@ -500,7 +500,7 @@ The user can switch between them and resume old chats.
 If you wanted to have chats stored on the server, with the users account, you can provide your own `ChatRepository` implementation to do that:
 
 ```tsx
-import { UseAIProvider } from '@meetsmore/use-ai-client';
+import { UseAIProvider } from '@meetsmore-oss/use-ai-client';
 
 root.render(
   <UseAIProvider
@@ -536,7 +536,7 @@ On the client, you will want to show friendly errors to the user.
 By default, there are reasonable messages in English, but if you needed to localize them to another language, you can pass your own mapping of error codes -> strings:
 
 ```tsx
-import { UseAIProvider } from '@meetsmore/use-ai-client';
+import { UseAIProvider } from '@meetsmore-oss/use-ai-client';
 
 root.render(
   <UseAIProvider
@@ -579,7 +579,7 @@ const {
 If you don't like the default UI, you can customize both the floating-action-button and the chat UI itself.
 
 ```tsx
-import { UseAIProvider } from '@meetsmore/use-ai-client';
+import { UseAIProvider } from '@meetsmore-oss/use-ai-client';
 
 root.render(
   <UseAIProvider
@@ -595,7 +595,7 @@ root.render(
 You can also disable them by passing `null`:
 
 ```tsx
-import { UseAIProvider } from '@meetsmore/use-ai-client';
+import { UseAIProvider } from '@meetsmore-oss/use-ai-client';
 
 root.render(
   <UseAIProvider
@@ -689,7 +689,7 @@ const { selectedAgent, availableAgents, selectAgent } = useAgentSelection();
 
 ### 'Batteries included' server
 
-For most use cases, you can just use `@meetsmore/use-ai-server` as-is, and customize only the environment variables:
+For most use cases, you can just use `@meetsmore-oss/use-ai-server` as-is, and customize only the environment variables:
 
 ```bash
 # AI Provider (at least one required)
@@ -728,10 +728,10 @@ ANTHROPIC_API_KEY=sk-ant-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 ### `UseAIServer`
 
-If you want to integrate the `use-ai` server into your existing server, for example if you don't want to deploy another instance in your infrastructure, or you want to use some capabilities in your existing server, you can use `@meetsmore/use-ai-server` as a library and run an instance of `UseAIServer`:
+If you want to integrate the `use-ai` server into your existing server, for example if you don't want to deploy another instance in your infrastructure, or you want to use some capabilities in your existing server, you can use `@meetsmore-oss/use-ai-server` as a library and run an instance of `UseAIServer`:
 
 ```typescript
-import { UseAIServer, AISDKAgent } from '@meetsmore/use-ai-server';
+import { UseAIServer, AISDKAgent } from '@meetsmore-oss/use-ai-server';
 import { anthropic } from '@ai-sdk/anthropic';
 
 const server = new UseAIServer({
@@ -747,7 +747,7 @@ const server = new UseAIServer({
   rateLimitMaxRequests: 1_000,
   rateLimitWindowMs: 60_000,
   plugins: [              // see 'Plugins'
-    new WorkflowsPlugin({ /** see @meetsmore/use-ai-plugin-workflows */})
+    new WorkflowsPlugin({ /** see @meetsmore-oss/use-ai-plugin-workflows */})
   ],
   mcpEndpoints: [{        // see 'External MCPs'
     url: 'http://my-app.com/mcp',
@@ -765,7 +765,7 @@ These MCP endpoints should follow the MCP protocol to return a set of tools when
 
 The server will invoke these on start, with a refresh interval to reload them periodically.
 
-To configure these in `@meetsmore/use-ai-server`, you can use the environment variables:
+To configure these in `@meetsmore-oss/use-ai-server`, you can use the environment variables:
 
 ```bash
 # MCP_ENDPOINT_YOURMCPNAME_URL=http://localhost:3002
@@ -777,10 +777,10 @@ To configure these in `@meetsmore/use-ai-server`, you can use the environment va
 # MCP_ENDPOINT_ANOTHERMCP_URL=http://localhost:3003
 ```
 
-If your MCP tools need auth (e.g. you want to do things on behalf of the user, in the backend), you can use the `@meetsmore/use-ai-client` `mcpHeadersProvider` prop to do that:
+If your MCP tools need auth (e.g. you want to do things on behalf of the user, in the backend), you can use the `@meetsmore-oss/use-ai-client` `mcpHeadersProvider` prop to do that:
 
 ```tsx
-import { UseAIProvider } from '@meetsmore/use-ai-client';
+import { UseAIProvider } from '@meetsmore-oss/use-ai-client';
 
 root.render(
   <UseAIProvider
@@ -811,7 +811,7 @@ The flow works like this:
 `UseAIServer` supports rate limiting by IP.
 This allows you to implement `use-ai` without auth, and just rely on rate limiting to prevent abuse of your token spend.
 
-You can configure it using environment variables if using `@meetsmore/use-ai-server` directly:
+You can configure it using environment variables if using `@meetsmore-oss/use-ai-server` directly:
 
 ``` bash
 # Rate Limiting (optional)
@@ -845,21 +845,21 @@ LANGFUSE_SECRET_KEY='your-langfuse-secret-key'
 
 ### Bundled Client Library (optional)
 
-If you have dependency conflicts (e.g. `zod 4.0+`), you can use the bundled version of `@meetsmore/use-ai-client` instead:
+If you have dependency conflicts (e.g. `zod 4.0+`), you can use the bundled version of `@meetsmore-oss/use-ai-client` instead:
 
 ```ts
   // Default: tree-shakeable, smaller if you already have deps
-  import { useAI, defineTool } from '@meetsmore/use-ai-client';
+  import { useAI, defineTool } from '@meetsmore-oss/use-ai-client';
 
   // Bundled: self-contained, no zod/socket.io version conflicts
-  import { useAI, defineTool } from '@meetsmore/use-ai-client/bundled';
+  import { useAI, defineTool } from '@meetsmore-oss/use-ai-client/bundled';
 ```
 
 Note that this is much larger (206 KB gzipped) than the unbundled dependency (16 KB gzipped).
 
 ## Plugins
 
-`@meetsmore/use-ai-server` has a plugin architecture allowing you to extend the AG-UI protocol and add more handlers.
+`@meetsmore-oss/use-ai-server` has a plugin architecture allowing you to extend the AG-UI protocol and add more handlers.
 
 ```typescript
 export interface UseAIServerPlugin {
@@ -897,11 +897,11 @@ export interface UseAIServerPlugin {
 }
 ```
 
-This is primarily used to avoid polluting the main library with the code used for providing workflow runners (see `@meetsmore/use-ai-plugin-workflows`)
+This is primarily used to avoid polluting the main library with the code used for providing workflow runners (see `@meetsmore-oss/use-ai-plugin-workflows`)
 
-### `@meetsmore/use-ai-plugin-workflows`
+### `@meetsmore-oss/use-ai-plugin-workflows`
 
-`@meetsmore/use-ai-plugin-workflows` provides the capability for running workflows using AI workflow engines like Dify.
+`@meetsmore-oss/use-ai-plugin-workflows` provides the capability for running workflows using AI workflow engines like Dify.
 
 Only `DifyWorkflowRunner` is supported for now, but you can write your own Runners very easily (feel free to open a PR).
 
@@ -982,12 +982,12 @@ Because it's awkward to get API keys for workflows from Dify, you can use a mapp
   const { trigger, status, text, error, connected } = useAIWorkflow('dify', 'greeting-workflow');
 ```
 
-### `@meetsmore/use-ai-plugin-mastra`
+### `@meetsmore-oss/use-ai-plugin-mastra`
 
-`@meetsmore/use-ai-plugin-mastra` provides a `MastraWorkflowAgent` that runs Mastra workflows as conversational agents.
+`@meetsmore-oss/use-ai-plugin-mastra` provides a `MastraWorkflowAgent` that runs Mastra workflows as conversational agents.
 
 ```typescript
-import { MastraWorkflowAgent } from '@meetsmore/use-ai-plugin-mastra';
+import { MastraWorkflowAgent } from '@meetsmore-oss/use-ai-plugin-mastra';
 
 const server = new UseAIServer({
   agents: {

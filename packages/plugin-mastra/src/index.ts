@@ -6,8 +6,8 @@
  *
  * @example
  * ```typescript
- * import { UseAIServer, AISDKAgent } from '@meetsmore/use-ai-server';
- * import { MastraWorkflowAgent } from '@meetsmore/use-ai-plugin-mastra';
+ * import { UseAIServer, AISDKAgent } from '@meetsmore-oss/use-ai-server';
+ * import { MastraWorkflowAgent } from '@meetsmore-oss/use-ai-plugin-mastra';
  * import { Mastra } from '@mastra/core';
  * import { anthropic } from '@ai-sdk/anthropic';
  *

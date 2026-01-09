@@ -5,13 +5,13 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useAIContext } from './providers/useAIProvider';
 import { type ToolsDefinition, executeDefinedTool, convertToolsToDefinitions } from './defineTool';
-import type { AGUIEvent, RunErrorEvent, TextMessageContentEvent, ToolCallEndEvent, WorkflowStatus } from '@meetsmore/use-ai-core';
-import { EventType } from '@meetsmore/use-ai-core';
-import type { RunWorkflowMessage } from '@meetsmore/use-ai-core';
+import type { AGUIEvent, RunErrorEvent, TextMessageContentEvent, ToolCallEndEvent, WorkflowStatus } from '@meetsmore-oss/use-ai-core';
+import { EventType } from '@meetsmore-oss/use-ai-core';
+import type { RunWorkflowMessage } from '@meetsmore-oss/use-ai-core';
 import { v4 as uuidv4 } from 'uuid';
 
 // Re-export WorkflowStatus for convenience
-export type { WorkflowStatus } from '@meetsmore/use-ai-core';
+export type { WorkflowStatus } from '@meetsmore-oss/use-ai-core';
 
 /**
  * Progress update from a workflow execution.
@@ -83,8 +83,8 @@ export interface UseAIWorkflowResult {
  *
  * @example
  * ```typescript
- * import { useAIWorkflow } from '@meetsmore/use-ai-plugin-workflows-client';
- * import { defineTool, z } from '@meetsmore/use-ai-client';
+ * import { useAIWorkflow } from '@meetsmore-oss/use-ai-plugin-workflows-client';
+ * import { defineTool, z } from '@meetsmore-oss/use-ai-client';
  *
  * function PDFUploadButton() {
  *   const { trigger, status, text } = useAIWorkflow('dify', 'pdf-processor');

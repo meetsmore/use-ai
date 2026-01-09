@@ -1,5 +1,5 @@
 import type { WorkflowRunner, WorkflowInput, WorkflowResult, EventEmitter } from '../types';
-import { EventType, type RunAgentInput } from '@meetsmore/use-ai-core';
+import { EventType, type RunAgentInput } from '@meetsmore-oss/use-ai-core';
 import { v4 as uuidv4 } from 'uuid';
 
 /**

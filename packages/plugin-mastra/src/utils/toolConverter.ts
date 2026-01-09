@@ -4,7 +4,7 @@ import {
     isRemoteTool,
     type ClientSession,
     type ToolDefinition,
-} from '@meetsmore/use-ai-server';
+} from '@meetsmore-oss/use-ai-server';
 
 /**
  * Mastra extends the AI SDK ToolCallOptions by nesting toolCallId under agent.

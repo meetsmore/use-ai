@@ -11,7 +11,7 @@ import type { ModelMessage, Tool } from 'ai';
  * @example
  * ```typescript
  * import { createWorkflow, createStep } from '@mastra/core/workflows';
- * import { mastraWorkflowInputSchema } from '@meetsmore/use-ai-plugin-mastra';
+ * import { mastraWorkflowInputSchema } from '@meetsmore-oss/use-ai-plugin-mastra';
  *
  * const myWorkflow = createWorkflow({
  *   id: 'my-workflow',
@@ -44,7 +44,7 @@ export type MastraWorkflowInput = z.infer<typeof mastraWorkflowInputSchema>;
  * @example
  * ```typescript
  * import { createWorkflow, createStep } from '@mastra/core/workflows';
- * import { mastraWorkflowInputSchema, mastraWorkflowOutputSchema } from '@meetsmore/use-ai-plugin-mastra';
+ * import { mastraWorkflowInputSchema, mastraWorkflowOutputSchema } from '@meetsmore-oss/use-ai-plugin-mastra';
  *
  * const myWorkflow = createWorkflow({
  *   id: 'my-workflow',

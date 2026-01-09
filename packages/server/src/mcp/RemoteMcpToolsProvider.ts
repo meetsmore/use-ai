@@ -1,4 +1,4 @@
-import type { ToolDefinition, McpHeadersMap } from '@meetsmore/use-ai-core';
+import type { ToolDefinition, McpHeadersMap } from '@meetsmore-oss/use-ai-core';
 import type { McpEndpointConfig } from '../types';
 import { logger } from '../logger';
 import { findMatch } from '../utils/patternMatcher';

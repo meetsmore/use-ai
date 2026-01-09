@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
-import { UseAIProvider } from '@meetsmore/use-ai-client';
+import { UseAIProvider } from '@meetsmore-oss/use-ai-client';
 import App from './App';
 import { InvisibleAIProvider } from './providers/InvisibleAIProvider';
 

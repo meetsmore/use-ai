@@ -1,8 +1,8 @@
 import type { Mastra } from '@mastra/core';
-import type { Agent, AgentInput, EventEmitter, AgentResult, ClientSession } from '@meetsmore/use-ai-server';
-import { logger } from '@meetsmore/use-ai-server';
+import type { Agent, AgentInput, EventEmitter, AgentResult, ClientSession } from '@meetsmore-oss/use-ai-server';
+import { logger } from '@meetsmore-oss/use-ai-server';
 import { convertToolsToAISDKFormat } from './utils/toolConverter';
-import { EventType } from '@meetsmore/use-ai-core';
+import { EventType } from '@meetsmore-oss/use-ai-core';
 import { v4 as uuidv4 } from 'uuid';
 import type { MastraWorkflowOutput } from './types';
 
@@ -174,8 +174,8 @@ type WorkflowStreamChunk =
  *
  * @example
  * ```typescript
- * import { UseAIServer, AISDKAgent } from '@meetsmore/use-ai-server';
- * import { MastraWorkflowAgent } from '@meetsmore/use-ai-plugin-mastra';
+ * import { UseAIServer, AISDKAgent } from '@meetsmore-oss/use-ai-server';
+ * import { MastraWorkflowAgent } from '@meetsmore-oss/use-ai-plugin-mastra';
  * import { Mastra } from '@mastra/core';
  * import { anthropic } from '@ai-sdk/anthropic';
  *

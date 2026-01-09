@@ -1,5 +1,5 @@
 import { io, Socket } from 'socket.io-client';
-import { EventType } from '@meetsmore/use-ai-core';
+import { EventType } from '@meetsmore-oss/use-ai-core';
 import type {
   ToolDefinition,
   Message,

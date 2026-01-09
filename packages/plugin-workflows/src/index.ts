@@ -1,5 +1,5 @@
 /**
- * Workflows plugin for @meetsmore/use-ai-server.
+ * Workflows plugin for @meetsmore-oss/use-ai-server.
  * Provides headless workflow execution with pluggable workflow runners.
  */
 

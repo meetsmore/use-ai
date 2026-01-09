@@ -57,7 +57,7 @@ export interface UseAIServerConfig<TAgents extends Record<string, import('./agen
   maxHttpBufferSize?: number;
 }
 
-// Re-export all types from @meetsmore/use-ai-core
+// Re-export all types from @meetsmore-oss/use-ai-core
 export type {
   ToolDefinition,
   ClientMessage,
@@ -97,6 +97,6 @@ export type {
   WorkflowStatus,
   UseAIClientMessage,
   RunWorkflowMessage,
-} from '@meetsmore/use-ai-core';
+} from '@meetsmore-oss/use-ai-core';
 
-export { EventType, ErrorCode } from '@meetsmore/use-ai-core';
+export { EventType, ErrorCode } from '@meetsmore-oss/use-ai-core';

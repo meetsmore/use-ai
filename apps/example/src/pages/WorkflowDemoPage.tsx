@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useAIWorkflow, defineTool, z } from '@meetsmore/use-ai-client';
+import { useAIWorkflow, defineTool, z } from '@meetsmore-oss/use-ai-client';
 
 /**
  * Example page demonstrating headless workflow execution.

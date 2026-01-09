@@ -1,7 +1,7 @@
-import type { UseAIServerPlugin, MessageHandler, ClientSession } from '@meetsmore/use-ai-server';
-import { logger } from '@meetsmore/use-ai-server';
-import type { UseAIClientMessage, RunWorkflowMessage, ToolDefinition } from '@meetsmore/use-ai-core';
-import { EventType } from '@meetsmore/use-ai-core';
+import type { UseAIServerPlugin, MessageHandler, ClientSession } from '@meetsmore-oss/use-ai-server';
+import { logger } from '@meetsmore-oss/use-ai-server';
+import type { UseAIClientMessage, RunWorkflowMessage, ToolDefinition } from '@meetsmore-oss/use-ai-core';
+import { EventType } from '@meetsmore-oss/use-ai-core';
 import type { WorkflowRunner, EventEmitter } from './types';
 
 /**
@@ -35,9 +35,9 @@ export interface WorkflowsPluginConfig {
  *
  * @example
  * ```typescript
- * import { UseAIServer, AISDKAgent } from '@meetsmore/use-ai-server';
- * import { WorkflowsPlugin } from '@meetsmore/use-ai-plugin-workflows';
- * import { DifyWorkflowRunner } from '@meetsmore/use-ai-plugin-workflows'; // Dify workflow runner
+ * import { UseAIServer, AISDKAgent } from '@meetsmore-oss/use-ai-server';
+ * import { WorkflowsPlugin } from '@meetsmore-oss/use-ai-plugin-workflows';
+ * import { DifyWorkflowRunner } from '@meetsmore-oss/use-ai-plugin-workflows'; // Dify workflow runner
  * import { anthropic } from '@ai-sdk/anthropic';
  *
  * const model = anthropic('claude-3-5-sonnet-20241022');
@@ -77,7 +77,7 @@ export class WorkflowsPlugin implements UseAIServerPlugin {
     const { runner: runnerName, workflowId, inputs, tools, runId, threadId, forwardedProps } = workflowMessage.data;
 
     // Extract MCP headers from forwardedProps (AG-UI extension point)
-    const mcpHeaders = forwardedProps?.mcpHeaders as import('@meetsmore/use-ai-core').McpHeadersMap | undefined;
+    const mcpHeaders = forwardedProps?.mcpHeaders as import('@meetsmore-oss/use-ai-core').McpHeadersMap | undefined;
 
     logger.info('Running workflow', {
       runner: runnerName,

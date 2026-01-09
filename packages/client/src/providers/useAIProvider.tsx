@@ -11,7 +11,7 @@ import type { ChatRepository, Chat, PersistedMessageContent, PersistedContentPar
 import { LocalStorageChatRepository } from './chatRepository/LocalStorageChatRepository';
 import type { FileAttachment, FileUploadConfig } from '../fileUpload/types';
 import { EmbedFileUploadBackend } from '../fileUpload/EmbedFileUploadBackend';
-import type { MultimodalContent } from '@meetsmore/use-ai-core';
+import type { MultimodalContent } from '@meetsmore-oss/use-ai-core';
 import type { CommandRepository, SavedCommand } from '../commands/types';
 import { useChatManagement } from '../hooks/useChatManagement';
 import { useAgentSelection } from '../hooks/useAgentSelection';
@@ -246,7 +246,7 @@ export interface UseAIProviderProps extends UseAIConfig {
    * })}
    * ```
    */
-  mcpHeadersProvider?: () => import('@meetsmore/use-ai-core').McpHeadersMap | Promise<import('@meetsmore/use-ai-core').McpHeadersMap>;
+  mcpHeadersProvider?: () => import('@meetsmore-oss/use-ai-core').McpHeadersMap | Promise<import('@meetsmore-oss/use-ai-core').McpHeadersMap>;
   /**
    * Configuration for file uploads.
    * File upload is enabled by default with EmbedFileUploadBackend, 10MB max size,
@@ -335,7 +335,7 @@ const DEFAULT_FILE_UPLOAD_CONFIG: FileUploadConfig = {
  *
  * @example
  * ```typescript
- * import { UseAIProvider } from '@meetsmore/use-ai-client';
+ * import { UseAIProvider } from '@meetsmore-oss/use-ai-client';
  *
  * function App() {
  *   return (

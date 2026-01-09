@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { UseAIProvider, UseAIChat } from '@meetsmore/use-ai-client';
+import { UseAIProvider, UseAIChat } from '@meetsmore-oss/use-ai-client';
 
 type LayoutType = 'sidebar' | 'split' | 'compact';
 
