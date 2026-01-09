@@ -1,0 +1,68 @@
+# Dependencies
+node_modules
+.pnp
+.pnp.js
+
+# Testing
+coverage
+.nyc_output
+*.log
+
+# Build outputs
+dist
+*.tsbuildinfo
+.cache
+.turbo
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Documentation
+*.md
+!CLAUDE.md
+docs
+
+# CI/CD
+.github
+.gitlab-ci.yml
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Examples and tests (exclude from production build)
+apps/example
+!apps/example/package.json
+apps/example-nest-mcp-server
+!apps/example-nest-mcp-server/package.json
+packages/client
+!packages/client/package.json
+*.test.ts
+*.spec.ts
+test
+tests
+__tests__
+
+# Scripts
+scripts

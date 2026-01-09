@@ -1,0 +1,46 @@
+{
+  "name": "@meetsmore/use-ai-plugin-workflows",
+  "version": "1.2.0",
+  "license": "BUSL-1.1",
+  "files": [
+    "dist"
+  ],
+  "author": {
+    "name": "Zachary Davison",
+    "url": "https://github.com/mm-zacharydavison"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/meetsmore/use-ai.git",
+    "directory": "packages/plugin-workflows"
+  },
+  "description": "Workflow execution plugin for @use-ai/server",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "clean": "rm -rf dist *.tsbuildinfo",
+    "build": "bun build src/index.ts --outdir dist --target node --format esm --external @meetsmore/use-ai-server && tsc --emitDeclarationOnly --skipLibCheck",
+    "dev": "bun --watch src/index.ts",
+    "test": "bun test --only-failures"
+  },
+  "dependencies": {
+    "@meetsmore/use-ai-core": "1.2.0",
+    "ai": "6.0.0-beta.116",
+    "uuid": "^11.0.3"
+  },
+  "devDependencies": {
+    "@types/uuid": "^10.0.0",
+    "@meetsmore/use-ai-server": "1.2.0",
+    "typescript": "^5.9.3"
+  },
+  "peerDependencies": {
+    "@meetsmore/use-ai-server": "1.2.0"
+  }
+}

@@ -1,0 +1,85 @@
+---
+title: AI SDK UI
+description: Reference documentation for the AI SDK UI
+collapsed: true
+---
+
+# AI SDK UI
+
+[AI SDK UI](/docs/ai-sdk-ui) is designed to help you build interactive chat, completion, and assistant applications with ease.
+It is framework-agnostic toolkit, streamlining the integration of advanced AI functionalities into your applications.
+
+AI SDK UI contains the following hooks:
+
+<IndexCards
+  cards={[
+    {
+      title: 'useChat',
+      description:
+        'Use a hook to interact with language models in a chat interface.',
+      href: '/docs/reference/ai-sdk-ui/use-chat',
+    },
+    {
+      title: 'useCompletion',
+      description:
+        'Use a hook to interact with language models in a completion interface.',
+      href: '/docs/reference/ai-sdk-ui/use-completion',
+    },
+    {
+      title: 'useObject',
+      description: 'Use a hook for consuming a streamed JSON objects.',
+      href: '/docs/reference/ai-sdk-ui/use-object',
+    },
+    {
+      title: 'convertToModelMessages',
+      description:
+        'Convert useChat messages to ModelMessages for AI functions.',
+      href: '/docs/reference/ai-sdk-ui/convert-to-model-messages',
+    },
+    {
+      title: 'pruneMessages',
+      description: 'Prunes model messages from a list of model messages.',
+      href: '/docs/reference/ai-sdk-ui/prune-messages',
+    },
+    {
+      title: 'createUIMessageStream',
+      description:
+        'Create a UI message stream to stream additional data to the client.',
+      href: '/docs/reference/ai-sdk-ui/create-ui-message-stream',
+    },
+    {
+      title: 'createUIMessageStreamResponse',
+      description:
+        'Create a response object to stream UI messages to the client.',
+      href: '/docs/reference/ai-sdk-ui/create-ui-message-stream-response',
+    },
+    {
+      title: 'pipeUIMessageStreamToResponse',
+      description:
+        'Pipe a UI message stream to a Node.js ServerResponse object.',
+      href: '/docs/reference/ai-sdk-ui/pipe-ui-message-stream-to-response',
+    },
+    {
+      title: 'readUIMessageStream',
+      description:
+        'Transform a stream of UIMessageChunk objects into an AsyncIterableStream of UIMessage objects.',
+      href: '/docs/reference/ai-sdk-ui/read-ui-message-stream',
+    },
+  ]}
+/>
+
+## UI Framework Support
+
+AI SDK UI supports the following frameworks: [React](https://react.dev/), [Svelte](https://svelte.dev/), and [Vue.js](https://vuejs.org/).
+Here is a comparison of the supported functions across these frameworks:
+
+| Function                                                  | React               | Svelte                               | Vue.js              |
+| --------------------------------------------------------- | ------------------- | ------------------------------------ | ------------------- |
+| [useChat](/docs/reference/ai-sdk-ui/use-chat)             | <Check size={18} /> | <Check size={18} /> Chat             | <Check size={18} /> |
+| [useCompletion](/docs/reference/ai-sdk-ui/use-completion) | <Check size={18} /> | <Check size={18} /> Completion       | <Check size={18} /> |
+| [useObject](/docs/reference/ai-sdk-ui/use-object)         | <Check size={18} /> | <Check size={18} /> StructuredObject | <Cross size={18} /> |
+
+<Note>
+  [Contributions](https://github.com/vercel/ai/blob/main/CONTRIBUTING.md) are
+  welcome to implement missing features for non-React frameworks.
+</Note>

@@ -1,0 +1,56 @@
+{
+  "name": "@meetsmore/use-ai-server",
+  "version": "1.2.0",
+  "license": "BUSL-1.1",
+  "files": [
+    "dist"
+  ],
+  "author": {
+    "name": "Zachary Davison",
+    "url": "https://github.com/mm-zacharydavison"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/meetsmore/use-ai.git",
+    "directory": "packages/server"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "clean": "rm -rf dist *.tsbuildinfo",
+    "build": "bun build ./src/index.ts --outdir ./dist --target node --format esm && tsc --emitDeclarationOnly --declaration --declarationMap && cp -r dist/src/* dist/",
+    "test": "bun test --only-failures $(find src -name '*.test.ts' -not -name '*.e2e.test.ts' -type f)",
+    "test:e2e": "bun test $(find src -name '*.e2e.test.ts' -type f)"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "3.0.0-beta.59",
+    "@ai-sdk/openai": "3.0.0-beta.66",
+    "@meetsmore/use-ai-core": "1.2.0",
+    "ai": "6.0.0-beta.116",
+    "picomatch": "^4.0.3",
+    "socket.io": "^4.8.1",
+    "uuid": "^11.1.0",
+    "zod": "^3.24.1"
+  },
+  "optionalDependencies": {
+    "@langfuse/otel": "^4.0.0",
+    "@opentelemetry/sdk-trace-node": "^2.2.0"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/json-schema": "^7.0.15",
+    "@types/picomatch": "^4.0.2",
+    "@types/uuid": "^10.0.0",
+    "langfuse": "^3.38.6",
+    "socket.io-client": "^4.8.1",
+    "testcontainers": "^11.8.1",
+    "typescript": "^5.9.3"
+  }
+}

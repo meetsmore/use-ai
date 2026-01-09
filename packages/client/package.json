@@ -1,0 +1,58 @@
+{
+  "name": "@meetsmore/use-ai-client",
+  "version": "1.2.0",
+  "license": "BUSL-1.1",
+  "files": [
+    "dist"
+  ],
+  "author": {
+    "name": "Zachary Davison",
+    "url": "https://github.com/mm-zacharydavison"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/meetsmore/use-ai.git",
+    "directory": "packages/client"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./bundled": {
+      "import": "./dist/bundled.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "clean": "rm -rf dist *.tsbuildinfo",
+    "build": "tsup",
+    "test": "bun test --only-failures"
+  },
+  "dependencies": {
+    "@meetsmore/use-ai-core": "1.2.0",
+    "react-markdown": "^8.0.0",
+    "socket.io-client": "^4.8.1",
+    "uuid": "^11.1.0",
+    "zod": "^4.0.0",
+    "zod-to-json-schema": ">=3.0.0 <=3.25.0"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.0",
+    "@types/bun": "latest",
+    "@types/jsdom": "^27.0.0",
+    "@types/react": "^18.2.0",
+    "@types/uuid": "^10.0.0",
+    "jsdom": "^27.1.0",
+    "socket.io-mock-ts": "^1.0.2",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3"
+  },
+  "peerDependencies": {
+    "react": "^16.8.0 || ^17.0.0 || ^18.0.0"
+  }
+}

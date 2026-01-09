@@ -1,0 +1,56 @@
+{
+  "name": "@meetsmore/use-ai-plugin-mastra",
+  "version": "1.2.0",
+  "license": "BUSL-1.1",
+  "files": [
+    "dist"
+  ],
+  "author": {
+    "name": "Zachary Davison",
+    "url": "https://github.com/mm-zacharydavison"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/meetsmore/use-ai.git",
+    "directory": "packages/plugin-mastra"
+  },
+  "description": "Mastra workflow agent plugin for @use-ai/server",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "clean": "rm -rf dist *.tsbuildinfo",
+    "build": "bun build src/index.ts --outdir dist --target node --format esm --external @meetsmore/use-ai-server --external @meetsmore/use-ai-core --external @mastra/core && tsc --emitDeclarationOnly --skipLibCheck",
+    "dev": "bun --watch src/index.ts",
+    "test": "bun test --only-failures $(find src -name '*.test.ts' -not -name '*.integration.test.ts' -type f)",
+    "test:e2e": "bun test $(find src -name '*.integration.test.ts' -type f)"
+  },
+  "dependencies": {
+    "@meetsmore/use-ai-core": "1.2.0",
+    "ai": "6.0.0-beta.116",
+    "uuid": "^11.0.3",
+    "zod": "^4.1.8"
+  },
+  "devDependencies": {
+    "@ai-sdk/anthropic": "^2.0.53",
+    "@mastra/core": "^1.0.0-beta",
+    "@meetsmore/use-ai-server": "1.2.0",
+    "@types/uuid": "^10.0.0",
+    "typescript": "^5.9.3"
+  },
+  "peerDependencies": {
+    "@meetsmore/use-ai-server": "1.2.0",
+    "@mastra/core": ">=1.0.0-beta"
+  },
+  "peerDependenciesMeta": {
+    "@mastra/core": {
+      "optional": false
+    }
+  }
+}

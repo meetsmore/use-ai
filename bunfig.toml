@@ -1,0 +1,3 @@
+[install]
+# Allow optional dependencies but don't fail on install errors
+optional = true

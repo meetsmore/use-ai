@@ -1,0 +1,37 @@
+{
+  "name": "@meetsmore/use-ai-core",
+  "version": "1.2.0",
+  "license": "BUSL-1.1",
+  "files": [
+    "dist"
+  ],
+  "author": {
+    "name": "Zachary Davison",
+    "url": "https://github.com/mm-zacharydavison"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/meetsmore/use-ai.git",
+    "directory": "packages/core"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "clean": "rm -rf dist *.tsbuildinfo",
+    "build": "bun build ./src/index.ts --outdir ./dist --target node --format esm && tsc --emitDeclarationOnly --declaration --declarationMap"
+  },
+  "dependencies": {
+    "@ag-ui/core": "^0.0.41"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.9.3"
+  }
+}
