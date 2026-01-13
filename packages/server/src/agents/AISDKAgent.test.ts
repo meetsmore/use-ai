@@ -1092,6 +1092,140 @@ describe('AISDKAgent', () => {
       expect(result.success).toBe(true);
       expect(capturedMessages.values.length).toBe(0);
     });
+
+    test('supports function-based systemPrompt for dynamic resolution', async () => {
+      const capturedMessages = { values: [] as Array<{ role: string; content: string }> };
+      const mockModel = createSystemMessageCapturingMockModel(capturedMessages);
+
+      // Simulate a dynamic prompt that could be fetched from Langfuse or other sources
+      let dynamicPromptValue = 'Initial prompt';
+      const agent = new AISDKAgent({
+        model: mockModel,
+        systemPrompt: () => dynamicPromptValue,
+      });
+
+      const emittedEvents: AGUIEvent[] = [];
+      const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
+
+      // First run with initial prompt
+      const input1 = createTestInput();
+      await agent.run(input1, eventEmitter);
+
+      expect(capturedMessages.values.length).toBe(1);
+      expect(capturedMessages.values[0].content).toBe('Initial prompt');
+
+      // Update the dynamic prompt value (simulating Langfuse update)
+      dynamicPromptValue = 'Updated prompt from Langfuse';
+
+      // Second run should use the updated prompt without server restart
+      const input2 = createTestInput();
+      await agent.run(input2, eventEmitter);
+
+      expect(capturedMessages.values.length).toBe(1);
+      expect(capturedMessages.values[0].content).toBe('Updated prompt from Langfuse');
+    });
+
+    test('function-based systemPrompt returning empty string is skipped', async () => {
+      const capturedMessages = { values: [] as Array<{ role: string; content: string }> };
+      const mockModel = createSystemMessageCapturingMockModel(capturedMessages);
+
+      const agent = new AISDKAgent({
+        model: mockModel,
+        systemPrompt: () => '',
+      });
+
+      const emittedEvents: AGUIEvent[] = [];
+      const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
+
+      const input = createTestInput({
+        systemPrompt: 'Runtime prompt only',
+      });
+      const result = await agent.run(input, eventEmitter);
+
+      expect(result.success).toBe(true);
+      // Only runtime prompt should be present since function returned empty string
+      expect(capturedMessages.values.length).toBe(1);
+      expect(capturedMessages.values[0].content).toBe('Runtime prompt only');
+    });
+
+    test('supports async function-based systemPrompt', async () => {
+      const capturedMessages = { values: [] as Array<{ role: string; content: string }> };
+      const mockModel = createSystemMessageCapturingMockModel(capturedMessages);
+
+      // Simulate fetching from Langfuse or other async source
+      const agent = new AISDKAgent({
+        model: mockModel,
+        systemPrompt: async () => {
+          // Simulate async operation (e.g., Langfuse API call)
+          await new Promise((resolve) => setTimeout(resolve, 10));
+          return 'Async prompt from Langfuse';
+        },
+      });
+
+      const emittedEvents: AGUIEvent[] = [];
+      const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
+
+      const input = createTestInput();
+      const result = await agent.run(input, eventEmitter);
+
+      expect(result.success).toBe(true);
+      expect(capturedMessages.values.length).toBe(1);
+      expect(capturedMessages.values[0].content).toBe('Async prompt from Langfuse');
+    });
+
+    test('async systemPrompt is resolved fresh on each run', async () => {
+      const capturedMessages = { values: [] as Array<{ role: string; content: string }> };
+      const mockModel = createSystemMessageCapturingMockModel(capturedMessages);
+
+      // Simulate a prompt that changes over time (like Langfuse updates)
+      let promptVersion = 1;
+      const agent = new AISDKAgent({
+        model: mockModel,
+        systemPrompt: async () => {
+          await new Promise((resolve) => setTimeout(resolve, 5));
+          return `Prompt version ${promptVersion}`;
+        },
+      });
+
+      const emittedEvents: AGUIEvent[] = [];
+      const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
+
+      // First run
+      await agent.run(createTestInput(), eventEmitter);
+      expect(capturedMessages.values[0].content).toBe('Prompt version 1');
+
+      // Update the prompt (simulating Langfuse update)
+      promptVersion = 2;
+
+      // Second run should get the updated prompt
+      await agent.run(createTestInput(), eventEmitter);
+      expect(capturedMessages.values[0].content).toBe('Prompt version 2');
+    });
+
+    test('async systemPrompt returning empty string is skipped', async () => {
+      const capturedMessages = { values: [] as Array<{ role: string; content: string }> };
+      const mockModel = createSystemMessageCapturingMockModel(capturedMessages);
+
+      const agent = new AISDKAgent({
+        model: mockModel,
+        systemPrompt: async () => {
+          await new Promise((resolve) => setTimeout(resolve, 5));
+          return '';
+        },
+      });
+
+      const emittedEvents: AGUIEvent[] = [];
+      const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
+
+      const input = createTestInput({
+        systemPrompt: 'Runtime prompt only',
+      });
+      const result = await agent.run(input, eventEmitter);
+
+      expect(result.success).toBe(true);
+      expect(capturedMessages.values.length).toBe(1);
+      expect(capturedMessages.values[0].content).toBe('Runtime prompt only');
+    });
   });
 
   describe('Tool filtering', () => {
