@@ -979,8 +979,9 @@ describe('AISDKAgent', () => {
       return new MockLanguageModelV3({
         doStream: async ({ prompt }) => {
           // Find all system messages in the prompt
-          const systemMessages = prompt.filter((msg: { role: string }) => msg.role === 'system');
-          capturedMessages.values = systemMessages.map((msg: { role: string; content: string }) => ({
+          // System messages have content as string, so we can safely cast
+          const systemMessages = prompt.filter((msg) => msg.role === 'system') as Array<{ role: string; content: string }>;
+          capturedMessages.values = systemMessages.map((msg) => ({
             role: msg.role,
             content: msg.content,
           }));
