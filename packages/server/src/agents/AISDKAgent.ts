@@ -776,15 +776,13 @@ export class AISDKAgent implements Agent {
    * Checks if the configured model is an Anthropic model (Claude).
    */
   private isAnthropicModel(): boolean {
-    // Cast to unknown first to safely check properties
     const model = this.model;
-    // Check provider property
-
-    if (model.provider === 'anthropic') {
-      return true;
+    // String format: "anthropic/claude-3-5-sonnet-20241022"
+    if (typeof model === 'string') {
+      return model.startsWith('anthropic/');
     }
-
-    return false;
+    // Object format: { provider: 'anthropic', ... }
+    return (model as { provider?: string }).provider === 'anthropic';
   }
 
   /**
