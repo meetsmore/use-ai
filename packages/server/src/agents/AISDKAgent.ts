@@ -781,8 +781,9 @@ export class AISDKAgent implements Agent {
     if (typeof model === 'string') {
       return model.startsWith('anthropic/');
     }
-    // Object format: { provider: 'anthropic', ... }
-    return (model as { provider?: string }).provider === 'anthropic';
+    // Object format: { provider: 'anthropic' | 'anthropic.messages' | ... }
+    const provider = (model as { provider?: string }).provider;
+    return provider?.startsWith('anthropic') ?? false;
   }
 
   /**
