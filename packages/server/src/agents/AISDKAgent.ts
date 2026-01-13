@@ -1,4 +1,4 @@
-import { streamText, jsonSchema, LanguageModel, stepCountIs, type ModelMessage } from 'ai';
+import { streamText, jsonSchema, LanguageModel, stepCountIs, type ModelMessage, type SystemModelMessage } from 'ai';
 import type { JSONSchema7 } from 'json-schema';
 import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
@@ -92,6 +92,43 @@ export interface AISDKAgentConfig {
    * ```
    */
   annotation?: string;
+
+  /**
+   * Optional system prompt to configure the agent's behavior.
+   * This prompt is set on the backend and not exposed to the frontend,
+   * making it suitable for sensitive instructions.
+   *
+   * Can be a string, a function returning a string, or an async function
+   * returning a Promise<string>. Use a function when the prompt needs to
+   * be dynamically resolved (e.g., fetched from Langfuse or other external
+   * sources) so updates take effect immediately without server restart.
+   *
+   * When both this and the runtime systemPrompt (from AgentInput) are provided,
+   * they are combined with this config prompt coming first.
+   *
+   * @example
+   * ```typescript
+   * // Static prompt
+   * {
+   *   systemPrompt: 'You are a helpful assistant.'
+   * }
+   *
+   * // Sync function (e.g., reading from cache)
+   * {
+   *   systemPrompt: () => promptCache.get('my-prompt')
+   * }
+   *
+   * // Async function (e.g., fetching from Langfuse)
+   * {
+   *   systemPrompt: async () => {
+   *     const prompt = await langfuse.getPrompt('my-prompt');
+   *     return prompt.compile();
+   *   }
+   * }
+   * ```
+   */
+  systemPrompt?: string | (() => string | Promise<string>);
+
   /**
    * Optional filter function for tools.
    * Use this to control which tools are available to this agent.
@@ -166,12 +203,14 @@ export class AISDKAgent implements Agent {
   private annotation?: string;
   private langfuse: LangfuseConfig;
   private toolFilter?: (tool: ToolDefinition) => boolean;
+  private systemPrompt?: string | (() => string | Promise<string>);
 
   constructor(config: AISDKAgentConfig) {
     this.model = config.model;
     this.name = config.name || 'ai-sdk';
     this.annotation = config.annotation;
     this.toolFilter = config.toolFilter;
+    this.systemPrompt = config.systemPrompt;
     // Initialize Langfuse observability (automatically reads env vars)
     this.langfuse = initializeLangfuse();
   }
@@ -195,7 +234,13 @@ export class AISDKAgent implements Agent {
   }
 
   async run(input: AgentInput, events: EventEmitter): Promise<AgentResult> {
-    const { session, runId, messages, tools, state, systemPrompt, originalInput } = input;
+    const { session, runId, messages, tools, state, systemPrompt: runtimeSystemPrompt, originalInput } = input;
+
+    // Resolve config system prompt (may be async, e.g., fetched from Langfuse)
+    const configSystemPrompt = await this.resolveSystemPrompt();
+
+    // Build system messages: config prompt (backend) and runtime prompt as separate messages
+    const systemMessages = this.buildSystemMessages(configSystemPrompt, runtimeSystemPrompt);
 
     // Emit RUN_STARTED event
     events.emit<RunStartedEvent>({
@@ -231,6 +276,13 @@ export class AISDKAgent implements Agent {
       // Sanitize messages before sending to ensure no provider-specific fields leak through (e.g. for Anthropic: 'tool_use_id')
       const sanitizedInputMessages = this.sanitizeMessages(messages);
 
+      // Prepend system messages to the messages array
+      // This allows multiple system messages to be sent as separate messages
+      const messagesWithSystem: ModelMessage[] = [
+        ...(systemMessages || []),
+        ...sanitizedInputMessages,
+      ];
+
       logger.apiRequest({
         tools: tools.map((t) => t.name),
         messageCount: messages.length,
@@ -243,13 +295,12 @@ export class AISDKAgent implements Agent {
               ? `${msg.content.length} content blocks`
               : 'complex content',
         })),
-        systemPrompt,
+        systemMessages: systemMessages?.map(m => m.content.substring(0, 80) + (m.content.length > 80 ? '...' : '')),
       });
 
       const stream = streamText({
         model: this.model,
-        messages: sanitizedInputMessages,
-        system: systemPrompt,
+        messages: messagesWithSystem,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         tools:
           tools.length > 0
@@ -553,6 +604,50 @@ export class AISDKAgent implements Agent {
         conversationHistory: messages,
       };
     }
+  }
+
+  /**
+   * Resolves the systemPrompt configuration value.
+   * Handles string, sync function, and async function cases.
+   *
+   * @returns The resolved system prompt string, or undefined if not configured or empty
+   */
+  private async resolveSystemPrompt(): Promise<string | undefined> {
+    if (!this.systemPrompt) {
+      return undefined;
+    }
+
+    if (typeof this.systemPrompt === 'string') {
+      return this.systemPrompt;
+    }
+
+    // It's a function - call it and await the result (works for both sync and async)
+    const result = await this.systemPrompt();
+    return result || undefined;
+  }
+
+  /**
+   * Builds an array of system messages from config and runtime prompts.
+   * Each prompt becomes a separate SystemModelMessage, preserving their distinct purposes.
+   *
+   * @param configPrompt - Resolved system prompt from agent config (already resolved via resolveSystemPrompt)
+   * @param runtimePrompt - System prompt from AgentInput (generated by server based on state)
+   * @returns Array of SystemModelMessage objects, or undefined if both are empty
+   */
+  private buildSystemMessages(configPrompt?: string, runtimePrompt?: string): SystemModelMessage[] | undefined {
+    const messages: SystemModelMessage[] = [];
+
+    // Config prompt (from backend initialization) comes first
+    if (configPrompt) {
+      messages.push({ role: 'system', content: configPrompt });
+    }
+
+    // Runtime prompt (from server.buildSystemPrompt) is added as separate message
+    if (runtimePrompt) {
+      messages.push({ role: 'system', content: runtimePrompt });
+    }
+
+    return messages.length > 0 ? messages : undefined;
   }
 
   /**

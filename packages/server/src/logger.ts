@@ -89,7 +89,7 @@ class Logger {
     tools: string[];
     messageCount: number;
     messages: Array<{ role: string; preview: string }>;
-    systemPrompt?: string;
+    systemMessages?: string[];
   }) {
     if (this.silent) return;
     if (this.format === 'json') {
@@ -105,8 +105,11 @@ class Logger {
     data.messages.forEach((msg, i) => {
       console.log(`  ${i + 1}. [${msg.role}] ${msg.preview}`);
     });
-    if (data.systemPrompt) {
-      console.log('📋 SYSTEM PROMPT:', data.systemPrompt.substring(0, 150) + '...');
+    if (data.systemMessages && data.systemMessages.length > 0) {
+      console.log('📋 SYSTEM MESSAGES:');
+      data.systemMessages.forEach((msg, i) => {
+        console.log(`  ${i + 1}. ${msg.substring(0, 150)}${msg.length > 150 ? '...' : ''}`);
+      });
     }
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
   }
