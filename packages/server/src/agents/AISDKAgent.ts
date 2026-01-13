@@ -110,7 +110,7 @@ export interface AISDKAgentConfig {
    * ```typescript
    * // Static prompt
    * {
-   *   systemPrompt: 'You are a helpful assistant. Always respond in Japanese.'
+   *   systemPrompt: 'You are a helpful assistant.'
    * }
    *
    * // Sync function (e.g., reading from cache)
