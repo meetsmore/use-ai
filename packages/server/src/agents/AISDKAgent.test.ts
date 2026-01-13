@@ -971,6 +971,263 @@ describe('AISDKAgent', () => {
     });
   });
 
+  describe('System prompt configuration', () => {
+    /**
+     * Helper to create a mock model that captures the system messages passed to it
+     */
+    function createSystemMessageCapturingMockModel(capturedMessages: { values: Array<{ role: string; content: string }> }) {
+      return new MockLanguageModelV3({
+        doStream: async ({ prompt }) => {
+          // Find all system messages in the prompt
+          // System messages have content as string, so we can safely cast
+          const systemMessages = prompt.filter((msg) => msg.role === 'system') as Array<{ role: string; content: string }>;
+          capturedMessages.values = systemMessages.map((msg) => ({
+            role: msg.role,
+            content: msg.content,
+          }));
+
+          return {
+            stream: simulateReadableStream({
+              chunks: [
+                { type: 'text-start', id: 'text-1' },
+                { type: 'text-delta', id: 'text-1', delta: 'Done' },
+                { type: 'text-end', id: 'text-1' },
+                { type: 'finish', finishReason: 'stop', usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 } },
+              ],
+            }),
+            response: {
+              id: 'response-1',
+              timestamp: new Date(),
+              modelId: 'mock-model',
+              headers: {},
+              messages: [{ role: 'assistant', content: 'Done' }],
+            },
+          };
+        },
+      });
+    }
+
+    test('uses config systemPrompt when provided', async () => {
+      const capturedMessages = { values: [] as Array<{ role: string; content: string }> };
+      const mockModel = createSystemMessageCapturingMockModel(capturedMessages);
+
+      const agent = new AISDKAgent({
+        model: mockModel,
+        systemPrompt: 'You are a helpful assistant.',
+      });
+
+      const emittedEvents: AGUIEvent[] = [];
+      const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
+
+      const input = createTestInput();
+      const result = await agent.run(input, eventEmitter);
+
+      expect(result.success).toBe(true);
+      expect(capturedMessages.values.length).toBe(1);
+      expect(capturedMessages.values[0].content).toBe('You are a helpful assistant.');
+    });
+
+    test('sends config and runtime systemPrompts as separate messages', async () => {
+      const capturedMessages = { values: [] as Array<{ role: string; content: string }> };
+      const mockModel = createSystemMessageCapturingMockModel(capturedMessages);
+
+      const agent = new AISDKAgent({
+        model: mockModel,
+        systemPrompt: 'You are a helpful assistant.',
+      });
+
+      const emittedEvents: AGUIEvent[] = [];
+      const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
+
+      const input = createTestInput({
+        systemPrompt: 'Current state: {"todos": []}',
+      });
+      const result = await agent.run(input, eventEmitter);
+
+      expect(result.success).toBe(true);
+      // Config prompt and runtime prompt are sent as separate system messages
+      expect(capturedMessages.values.length).toBe(2);
+      expect(capturedMessages.values[0].role).toBe('system');
+      expect(capturedMessages.values[0].content).toBe('You are a helpful assistant.');
+      expect(capturedMessages.values[1].role).toBe('system');
+      expect(capturedMessages.values[1].content).toBe('Current state: {"todos": []}');
+    });
+
+    test('uses only runtime systemPrompt when config is not set', async () => {
+      const capturedMessages = { values: [] as Array<{ role: string; content: string }> };
+      const mockModel = createSystemMessageCapturingMockModel(capturedMessages);
+
+      const agent = new AISDKAgent({
+        model: mockModel,
+        // No systemPrompt in config
+      });
+
+      const emittedEvents: AGUIEvent[] = [];
+      const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
+
+      const input = createTestInput({
+        systemPrompt: 'Current state: {"todos": []}',
+      });
+      const result = await agent.run(input, eventEmitter);
+
+      expect(result.success).toBe(true);
+      expect(capturedMessages.values.length).toBe(1);
+      expect(capturedMessages.values[0].content).toBe('Current state: {"todos": []}');
+    });
+
+    test('no systemPrompt when both config and runtime are undefined', async () => {
+      const capturedMessages = { values: [] as Array<{ role: string; content: string }> };
+      const mockModel = createSystemMessageCapturingMockModel(capturedMessages);
+
+      const agent = new AISDKAgent({
+        model: mockModel,
+      });
+
+      const emittedEvents: AGUIEvent[] = [];
+      const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
+
+      const input = createTestInput();
+      const result = await agent.run(input, eventEmitter);
+
+      expect(result.success).toBe(true);
+      expect(capturedMessages.values.length).toBe(0);
+    });
+
+    test('supports function-based systemPrompt for dynamic resolution', async () => {
+      const capturedMessages = { values: [] as Array<{ role: string; content: string }> };
+      const mockModel = createSystemMessageCapturingMockModel(capturedMessages);
+
+      // Simulate a dynamic prompt that could be fetched from Langfuse or other sources
+      let dynamicPromptValue = 'Initial prompt';
+      const agent = new AISDKAgent({
+        model: mockModel,
+        systemPrompt: () => dynamicPromptValue,
+      });
+
+      const emittedEvents: AGUIEvent[] = [];
+      const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
+
+      // First run with initial prompt
+      const input1 = createTestInput();
+      await agent.run(input1, eventEmitter);
+
+      expect(capturedMessages.values.length).toBe(1);
+      expect(capturedMessages.values[0].content).toBe('Initial prompt');
+
+      // Update the dynamic prompt value (simulating Langfuse update)
+      dynamicPromptValue = 'Updated prompt from Langfuse';
+
+      // Second run should use the updated prompt without server restart
+      const input2 = createTestInput();
+      await agent.run(input2, eventEmitter);
+
+      expect(capturedMessages.values.length).toBe(1);
+      expect(capturedMessages.values[0].content).toBe('Updated prompt from Langfuse');
+    });
+
+    test('function-based systemPrompt returning empty string is skipped', async () => {
+      const capturedMessages = { values: [] as Array<{ role: string; content: string }> };
+      const mockModel = createSystemMessageCapturingMockModel(capturedMessages);
+
+      const agent = new AISDKAgent({
+        model: mockModel,
+        systemPrompt: () => '',
+      });
+
+      const emittedEvents: AGUIEvent[] = [];
+      const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
+
+      const input = createTestInput({
+        systemPrompt: 'Runtime prompt only',
+      });
+      const result = await agent.run(input, eventEmitter);
+
+      expect(result.success).toBe(true);
+      // Only runtime prompt should be present since function returned empty string
+      expect(capturedMessages.values.length).toBe(1);
+      expect(capturedMessages.values[0].content).toBe('Runtime prompt only');
+    });
+
+    test('supports async function-based systemPrompt', async () => {
+      const capturedMessages = { values: [] as Array<{ role: string; content: string }> };
+      const mockModel = createSystemMessageCapturingMockModel(capturedMessages);
+
+      // Simulate fetching from Langfuse or other async source
+      const agent = new AISDKAgent({
+        model: mockModel,
+        systemPrompt: async () => {
+          // Simulate async operation (e.g., Langfuse API call)
+          await new Promise((resolve) => setTimeout(resolve, 10));
+          return 'Async prompt from Langfuse';
+        },
+      });
+
+      const emittedEvents: AGUIEvent[] = [];
+      const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
+
+      const input = createTestInput();
+      const result = await agent.run(input, eventEmitter);
+
+      expect(result.success).toBe(true);
+      expect(capturedMessages.values.length).toBe(1);
+      expect(capturedMessages.values[0].content).toBe('Async prompt from Langfuse');
+    });
+
+    test('async systemPrompt is resolved fresh on each run', async () => {
+      const capturedMessages = { values: [] as Array<{ role: string; content: string }> };
+      const mockModel = createSystemMessageCapturingMockModel(capturedMessages);
+
+      // Simulate a prompt that changes over time (like Langfuse updates)
+      let promptVersion = 1;
+      const agent = new AISDKAgent({
+        model: mockModel,
+        systemPrompt: async () => {
+          await new Promise((resolve) => setTimeout(resolve, 5));
+          return `Prompt version ${promptVersion}`;
+        },
+      });
+
+      const emittedEvents: AGUIEvent[] = [];
+      const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
+
+      // First run
+      await agent.run(createTestInput(), eventEmitter);
+      expect(capturedMessages.values[0].content).toBe('Prompt version 1');
+
+      // Update the prompt (simulating Langfuse update)
+      promptVersion = 2;
+
+      // Second run should get the updated prompt
+      await agent.run(createTestInput(), eventEmitter);
+      expect(capturedMessages.values[0].content).toBe('Prompt version 2');
+    });
+
+    test('async systemPrompt returning empty string is skipped', async () => {
+      const capturedMessages = { values: [] as Array<{ role: string; content: string }> };
+      const mockModel = createSystemMessageCapturingMockModel(capturedMessages);
+
+      const agent = new AISDKAgent({
+        model: mockModel,
+        systemPrompt: async () => {
+          await new Promise((resolve) => setTimeout(resolve, 5));
+          return '';
+        },
+      });
+
+      const emittedEvents: AGUIEvent[] = [];
+      const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
+
+      const input = createTestInput({
+        systemPrompt: 'Runtime prompt only',
+      });
+      const result = await agent.run(input, eventEmitter);
+
+      expect(result.success).toBe(true);
+      expect(capturedMessages.values.length).toBe(1);
+      expect(capturedMessages.values[0].content).toBe('Runtime prompt only');
+    });
+  });
+
   describe('Tool filtering', () => {
     /**
      * Helper to create a mock MCP (remote) tool with the _remote property
