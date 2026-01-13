@@ -971,6 +971,128 @@ describe('AISDKAgent', () => {
     });
   });
 
+  describe('System prompt configuration', () => {
+    /**
+     * Helper to create a mock model that captures the system messages passed to it
+     */
+    function createSystemMessageCapturingMockModel(capturedMessages: { values: Array<{ role: string; content: string }> }) {
+      return new MockLanguageModelV3({
+        doStream: async ({ prompt }) => {
+          // Find all system messages in the prompt
+          const systemMessages = prompt.filter((msg: { role: string }) => msg.role === 'system');
+          capturedMessages.values = systemMessages.map((msg: { role: string; content: string }) => ({
+            role: msg.role,
+            content: msg.content,
+          }));
+
+          return {
+            stream: simulateReadableStream({
+              chunks: [
+                { type: 'text-start', id: 'text-1' },
+                { type: 'text-delta', id: 'text-1', delta: 'Done' },
+                { type: 'text-end', id: 'text-1' },
+                { type: 'finish', finishReason: 'stop', usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 } },
+              ],
+            }),
+            response: {
+              id: 'response-1',
+              timestamp: new Date(),
+              modelId: 'mock-model',
+              headers: {},
+              messages: [{ role: 'assistant', content: 'Done' }],
+            },
+          };
+        },
+      });
+    }
+
+    test('uses config systemPrompt when provided', async () => {
+      const capturedMessages = { values: [] as Array<{ role: string; content: string }> };
+      const mockModel = createSystemMessageCapturingMockModel(capturedMessages);
+
+      const agent = new AISDKAgent({
+        model: mockModel,
+        systemPrompt: 'You are a helpful assistant.',
+      });
+
+      const emittedEvents: AGUIEvent[] = [];
+      const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
+
+      const input = createTestInput();
+      const result = await agent.run(input, eventEmitter);
+
+      expect(result.success).toBe(true);
+      expect(capturedMessages.values.length).toBe(1);
+      expect(capturedMessages.values[0].content).toBe('You are a helpful assistant.');
+    });
+
+    test('sends config and runtime systemPrompts as separate messages', async () => {
+      const capturedMessages = { values: [] as Array<{ role: string; content: string }> };
+      const mockModel = createSystemMessageCapturingMockModel(capturedMessages);
+
+      const agent = new AISDKAgent({
+        model: mockModel,
+        systemPrompt: 'You are a helpful assistant.',
+      });
+
+      const emittedEvents: AGUIEvent[] = [];
+      const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
+
+      const input = createTestInput({
+        systemPrompt: 'Current state: {"todos": []}',
+      });
+      const result = await agent.run(input, eventEmitter);
+
+      expect(result.success).toBe(true);
+      // Config prompt and runtime prompt are sent as separate system messages
+      expect(capturedMessages.values.length).toBe(2);
+      expect(capturedMessages.values[0].role).toBe('system');
+      expect(capturedMessages.values[0].content).toBe('You are a helpful assistant.');
+      expect(capturedMessages.values[1].role).toBe('system');
+      expect(capturedMessages.values[1].content).toBe('Current state: {"todos": []}');
+    });
+
+    test('uses only runtime systemPrompt when config is not set', async () => {
+      const capturedMessages = { values: [] as Array<{ role: string; content: string }> };
+      const mockModel = createSystemMessageCapturingMockModel(capturedMessages);
+
+      const agent = new AISDKAgent({
+        model: mockModel,
+        // No systemPrompt in config
+      });
+
+      const emittedEvents: AGUIEvent[] = [];
+      const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
+
+      const input = createTestInput({
+        systemPrompt: 'Current state: {"todos": []}',
+      });
+      const result = await agent.run(input, eventEmitter);
+
+      expect(result.success).toBe(true);
+      expect(capturedMessages.values.length).toBe(1);
+      expect(capturedMessages.values[0].content).toBe('Current state: {"todos": []}');
+    });
+
+    test('no systemPrompt when both config and runtime are undefined', async () => {
+      const capturedMessages = { values: [] as Array<{ role: string; content: string }> };
+      const mockModel = createSystemMessageCapturingMockModel(capturedMessages);
+
+      const agent = new AISDKAgent({
+        model: mockModel,
+      });
+
+      const emittedEvents: AGUIEvent[] = [];
+      const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
+
+      const input = createTestInput();
+      const result = await agent.run(input, eventEmitter);
+
+      expect(result.success).toBe(true);
+      expect(capturedMessages.values.length).toBe(0);
+    });
+  });
+
   describe('Tool filtering', () => {
     /**
      * Helper to create a mock MCP (remote) tool with the _remote property
