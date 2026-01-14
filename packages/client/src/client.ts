@@ -134,6 +134,7 @@ export class UseAIClient {
       reconnection: true,
       reconnectionAttempts: this.maxReconnectAttempts,
       reconnectionDelay: this.reconnectDelay,
+      withCredentials: true,
     });
 
     this.socket.on('connect', () => {
