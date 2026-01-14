@@ -82,7 +82,6 @@ export function createServerConfig(
     port,
     agents: { [agentName]: agent },
     defaultAgent: agentName,
-    cors: { origin: '*' },
     ...additionalConfig,
   };
 }
@@ -148,8 +147,6 @@ export function createServerWithMockAgent(
     port,
     agents: { [agentName]: agent },
     defaultAgent: agentName,
-    // Enable CORS for test environment (Socket.IO default is disabled)
-    cors: { origin: '*', methods: ['GET', 'POST'] },
     ...additionalConfig,
   });
 }

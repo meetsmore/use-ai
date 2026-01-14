@@ -45,7 +45,6 @@ describe('Error Handling', () => {
       port: errorPort,
       agents: { test: errorAgent },
       defaultAgent: 'test',
-      cors: { origin: '*' },
     });
     cleanup.trackServer(errorServer);
 
@@ -74,7 +73,6 @@ describe('Error Handling', () => {
       port: apiErrorPort,
       agents: { test: apiErrorAgent },
       defaultAgent: 'test',
-      cors: { origin: '*' },
     });
     cleanup.trackServer(apiErrorServer);
 
@@ -138,7 +136,6 @@ describe('Error Handling', () => {
       port: abortPort,
       agents: { test: abortAgent },
       defaultAgent: 'test',
-      cors: { origin: '*' },
     });
     cleanup.trackServer(abortServer);
 

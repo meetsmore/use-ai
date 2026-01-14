@@ -33,7 +33,6 @@ describe('MCP Integration', () => {
       agents: { test: createTestAgent() },
       defaultAgent: 'test',
       mcpEndpoints: mcpConfig,
-      cors: { origin: '*' },
     });
 
     expect(mcpServer).toBeDefined();
@@ -91,7 +90,6 @@ describe('MCP Integration', () => {
           toolsCacheTtl: 60000,
         },
       ],
-      cors: { origin: '*' },
     });
 
     // Server cleanup happens in close()

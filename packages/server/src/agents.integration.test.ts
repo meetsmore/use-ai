@@ -40,7 +40,6 @@ describe('Agent System', () => {
       port: testPort,
       agents: { claude: claudeAgent, gpt: gptAgent },
       defaultAgent: 'claude',
-      cors: { origin: '*' },
     });
     cleanup.trackServer(server);
   });
@@ -106,7 +105,6 @@ describe('Agent System', () => {
       port: multiStepPort,
       agents: { test: multiStepAgent },
       defaultAgent: 'test',
-      cors: { origin: '*' },
     });
     cleanup.trackServer(multiStepServer);
 
@@ -208,7 +206,6 @@ describe('Agent System', () => {
       port: customPort,
       agents: { custom: customAgent },
       defaultAgent: 'custom',
-      cors: { origin: '*' },
     });
     cleanup.trackServer(customServer);
 
@@ -241,7 +238,6 @@ describe('Agent System', () => {
       port: statePort,
       agents: { test: stateAgent },
       defaultAgent: 'test',
-      cors: { origin: '*' },
     });
     cleanup.trackServer(stateServer);
 
@@ -278,7 +274,6 @@ describe('Agent System', () => {
       port: confirmPort,
       agents: { test: confirmAgent },
       defaultAgent: 'test',
-      cors: { origin: '*' },
     });
     cleanup.trackServer(confirmServer);
 

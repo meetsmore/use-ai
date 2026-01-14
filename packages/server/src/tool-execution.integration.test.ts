@@ -56,7 +56,6 @@ describe('Tool Execution Coordination', () => {
       port: toolPort,
       agents: { test: toolAgent },
       defaultAgent: 'test',
-      cors: { origin: '*' },
     });
     cleanup.trackServer(toolServer);
 
@@ -124,7 +123,6 @@ describe('Tool Execution Coordination', () => {
       port: coordPort,
       agents: { test: coordAgent },
       defaultAgent: 'test',
-      cors: { origin: '*' },
     });
     cleanup.trackServer(coordServer);
 
@@ -191,7 +189,6 @@ describe('Tool Execution Coordination', () => {
       port: waitPort,
       agents: { test: waitAgent },
       defaultAgent: 'test',
-      cors: { origin: '*' },
     });
     cleanup.trackServer(waitServer);
 
@@ -257,7 +254,6 @@ describe('Tool Execution Coordination', () => {
       port: multiPort,
       agents: { test: multiAgent },
       defaultAgent: 'test',
-      cors: { origin: '*' },
     });
     cleanup.trackServer(multiServer);
 
@@ -319,7 +315,6 @@ describe('Tool Execution Coordination', () => {
       port: convPort,
       agents: { test: convAgent },
       defaultAgent: 'test',
-      cors: { origin: '*' },
     });
     cleanup.trackServer(convServer);
 
