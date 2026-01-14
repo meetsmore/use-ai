@@ -34,6 +34,7 @@ describe('Connection Management', () => {
       port: testPort,
       agents: { test: agent },
       defaultAgent: 'test',
+      cors: { origin: '*' },
     });
     cleanup.trackServer(server);
 
@@ -49,6 +50,7 @@ describe('Connection Management', () => {
       port: testPort + 1,
       agents: { test: agent },
       defaultAgent: 'test',
+      cors: { origin: '*' },
     });
     cleanup.trackServer(server);
 
@@ -80,6 +82,7 @@ describe('Tool Use', () => {
       port: toolPort,
       agents: { test: toolAgent },
       defaultAgent: 'test',
+      cors: { origin: '*' },
     });
     cleanup.trackServer(toolServer);
 
@@ -143,6 +146,7 @@ describe('Tool Use', () => {
       port: tool2Port,
       agents: { test: tool2Agent },
       defaultAgent: 'test',
+      cors: { origin: '*' },
     });
     cleanup.trackServer(tool2Server);
 
@@ -201,6 +205,7 @@ describe('Tool Use', () => {
       port: seqPort,
       agents: { test: seqAgent },
       defaultAgent: 'test',
+      cors: { origin: '*' },
     });
     cleanup.trackServer(seqServer);
 
@@ -254,6 +259,7 @@ describe('Multiple Tool Use', () => {
       port: multiPort,
       agents: { test: multiAgent },
       defaultAgent: 'test',
+      cors: { origin: '*' },
     });
     cleanup.trackServer(multiServer);
 
@@ -333,6 +339,7 @@ describe('Error Handling', () => {
       port: errorPort,
       agents: { test: errorAgent },
       defaultAgent: 'test',
+      cors: { origin: '*' },
     });
     cleanup.trackServer(errorServer);
 
@@ -362,6 +369,7 @@ describe('State Management', () => {
       port: statePort,
       agents: { test: stateAgent },
       defaultAgent: 'test',
+      cors: { origin: '*' },
     });
     cleanup.trackServer(stateServer);
 
@@ -400,6 +408,7 @@ describe('Rate Limiting', () => {
       defaultAgent: 'test',
       rateLimitMaxRequests: 2,
       rateLimitWindowMs: 1000,
+      cors: { origin: '*' },
     });
     cleanup.trackServer(rateServer);
 
@@ -440,6 +449,7 @@ describe('Rate Limiting', () => {
       defaultAgent: 'test',
       rateLimitMaxRequests: 2,
       rateLimitWindowMs: 1000,
+      cors: { origin: '*' },
     });
     cleanup.trackServer(blockServer);
 
@@ -477,6 +487,7 @@ describe('Rate Limiting', () => {
       defaultAgent: 'test',
       rateLimitMaxRequests: 2,
       rateLimitWindowMs: 1000,
+      cors: { origin: '*' },
     });
     cleanup.trackServer(resetServer);
 
@@ -519,6 +530,7 @@ describe('Rate Limiting', () => {
       defaultAgent: 'test',
       rateLimitMaxRequests: 2,
       rateLimitWindowMs: 1000,
+      cors: { origin: '*' },
     });
     cleanup.trackServer(indepServer);
 

@@ -82,7 +82,7 @@ export class UseAIServer {
   private defaultAgentId: string; // ID of the default agent
   private agents: Record<string, Agent>; // Registry of all agents
   private clients: Map<string, ClientSession> = new Map();
-  private config: Required<Omit<UseAIServerConfig, 'defaultAgent' | 'agents' | 'plugins' | 'mcpEndpoints' | 'maxHttpBufferSize' | 'cors'>> & { maxHttpBufferSize: number; cors: CorsOptions };
+  private config: Required<Omit<UseAIServerConfig, 'defaultAgent' | 'agents' | 'plugins' | 'mcpEndpoints' | 'maxHttpBufferSize' | 'cors'>> & { maxHttpBufferSize: number; cors?: CorsOptions };
   private rateLimiter: RateLimiter;
   private cleanupInterval: NodeJS.Timeout;
   private clientIdCounter = 0;
@@ -102,7 +102,7 @@ export class UseAIServer {
       rateLimitMaxRequests: config.rateLimitMaxRequests ?? 0,
       rateLimitWindowMs: config.rateLimitWindowMs ?? 60000,
       maxHttpBufferSize: config.maxHttpBufferSize ?? 20 * 1024 * 1024, // 20MB default
-      cors: config.cors ?? { origin: '*', methods: ['GET', 'POST'] },
+      cors: config.cors,
     };
 
     // Set agents registry

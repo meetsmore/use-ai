@@ -63,7 +63,7 @@ export interface UseAIServerConfig<TAgents extends Record<string, import('./agen
    * CORS configuration for Socket.IO server.
    * Controls which origins can connect to the WebSocket server.
    *
-   * Default: { origin: '*', methods: ['GET', 'POST'] }
+   * Default: undefined
    *
    * For production with sticky sessions (cookie-based load balancing):
    * ```typescript

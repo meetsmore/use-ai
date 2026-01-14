@@ -19,6 +19,7 @@ describe('Configuration', () => {
       port: customPort,
       agents: { test: createTestAgent() },
       defaultAgent: 'test',
+      cors: { origin: '*' },
     });
     cleanup.trackServer(portServer);
 
@@ -40,6 +41,7 @@ describe('Configuration', () => {
         gemini: geminiAgent,
       },
       defaultAgent: 'claude',
+      cors: { origin: '*' },
     });
     cleanup.trackServer(multiAgentServer);
 
@@ -78,6 +80,7 @@ describe('Configuration', () => {
           namespace: 'mcp',
         },
       ],
+      cors: { origin: '*' },
     });
     cleanup.trackServer(mcpServer);
 

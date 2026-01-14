@@ -35,6 +35,7 @@ describe('Plugin Architecture', () => {
       agents: { test: createTestAgent() },
       defaultAgent: 'test',
       plugins: [plugin],
+      cors: { origin: '*' },
     });
     cleanup.trackServer(server);
 
@@ -63,6 +64,7 @@ describe('Plugin Architecture', () => {
       agents: { test: createTestAgent() },
       defaultAgent: 'test',
       plugins: [plugin],
+      cors: { origin: '*' },
     });
     cleanup.trackServer(pluginServer);
 
@@ -106,6 +108,7 @@ describe('Plugin Architecture', () => {
       agents: { test: createTestAgent() },
       defaultAgent: 'test',
       plugins: [plugin],
+      cors: { origin: '*' },
     });
     cleanup.trackServer(lifecycleServer);
 
@@ -143,6 +146,7 @@ describe('Plugin Architecture', () => {
       agents: { test: createTestAgent() },
       defaultAgent: 'test',
       plugins: [plugin],
+      cors: { origin: '*' },
     });
     cleanup.trackServer(sessionServer);
 
