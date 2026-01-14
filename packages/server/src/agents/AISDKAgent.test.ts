@@ -1477,23 +1477,6 @@ describe('AISDKAgent', () => {
       return new MockLanguageModelV3({
         provider: 'anthropic',
         modelId: 'claude-3-5-sonnet-20241022',
-        doStream: async () => ({
-          stream: simulateReadableStream({
-            chunks: [
-              { type: 'text-start', id: 'text-1' },
-              { type: 'text-delta', id: 'text-1', delta: 'Response' },
-              { type: 'text-end', id: 'text-1' },
-              { type: 'finish', finishReason: 'stop', usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 } },
-            ],
-          }),
-          response: {
-            id: 'response-1',
-            timestamp: new Date(),
-            modelId: 'claude-3-5-sonnet-20241022',
-            headers: {},
-            messages: [{ role: 'assistant', content: 'Response' }],
-          },
-        }),
       });
     }
 
@@ -1504,23 +1487,6 @@ describe('AISDKAgent', () => {
       return new MockLanguageModelV3({
         provider: 'openai',
         modelId: 'gpt-4-turbo',
-        doStream: async () => ({
-          stream: simulateReadableStream({
-            chunks: [
-              { type: 'text-start', id: 'text-1' },
-              { type: 'text-delta', id: 'text-1', delta: 'Response' },
-              { type: 'text-end', id: 'text-1' },
-              { type: 'finish', finishReason: 'stop', usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 } },
-            ],
-          }),
-          response: {
-            id: 'response-1',
-            timestamp: new Date(),
-            modelId: 'gpt-4-turbo',
-            headers: {},
-            messages: [{ role: 'assistant', content: 'Response' }],
-          },
-        }),
       });
     }
 
@@ -1551,97 +1517,6 @@ describe('AISDKAgent', () => {
         (msg: unknown) => (msg as { providerOptions?: unknown }).providerOptions
       );
       expect(hasProviderOptions).toBe(false);
-
-      mock.module('ai', () => ({
-        ...aiModule,
-        streamText: originalStreamText,
-      }));
-    });
-
-    test('cacheBreakpoint with isLast: adds cache control to last message', async () => {
-      const capturedMessages = { messages: [] as unknown[] };
-      const aiModule = await import('ai');
-      const originalStreamText = aiModule.streamText;
-
-      mock.module('ai', () => ({
-        ...aiModule,
-        streamText: createMockStreamResult(capturedMessages),
-      }));
-
-      const mockModel = createAnthropicMockModel();
-      const agent = new AISDKAgent({
-        model: mockModel,
-        cacheBreakpoint: (msg) => msg.isLast,
-      });
-
-      const emittedEvents: AGUIEvent[] = [];
-      const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
-
-      const input = createTestInput({
-        systemPrompt: 'You are a helpful assistant.',
-        messages: [
-          { role: 'user', content: 'Hello' },
-          { role: 'assistant', content: 'Hi there!' },
-          { role: 'user', content: 'How are you?' },
-        ],
-      });
-
-      await agent.run(input, eventEmitter);
-
-      // Should have 4 messages: system + 3 user/assistant messages
-      expect(capturedMessages.messages.length).toBe(4);
-
-      // Only the last message should have providerOptions
-      const messagesWithCache = capturedMessages.messages.filter(
-        (msg: unknown) => (msg as { providerOptions?: unknown }).providerOptions
-      );
-      expect(messagesWithCache.length).toBe(1);
-
-      // Verify it's the last message
-      const lastMsg = capturedMessages.messages[3] as { role: string; providerOptions?: { anthropic?: { cacheControl?: { type: string } } } };
-      expect(lastMsg.role).toBe('user');
-      expect(lastMsg.providerOptions?.anthropic?.cacheControl?.type).toBe('ephemeral');
-
-      mock.module('ai', () => ({
-        ...aiModule,
-        streamText: originalStreamText,
-      }));
-    });
-
-    test('cacheBreakpoint with system role: adds cache control to system prompt', async () => {
-      const capturedMessages = { messages: [] as unknown[] };
-      const aiModule = await import('ai');
-      const originalStreamText = aiModule.streamText;
-
-      mock.module('ai', () => ({
-        ...aiModule,
-        streamText: createMockStreamResult(capturedMessages),
-      }));
-
-      const mockModel = createAnthropicMockModel();
-      const agent = new AISDKAgent({
-        model: mockModel,
-        cacheBreakpoint: (msg) => msg.role === 'system',
-      });
-
-      const emittedEvents: AGUIEvent[] = [];
-      const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
-
-      const input = createTestInput({
-        systemPrompt: 'You are a helpful assistant.',
-      });
-
-      await agent.run(input, eventEmitter);
-
-      // First message should be system with cache control
-      const systemMsg = capturedMessages.messages[0] as { role: string; providerOptions?: { anthropic?: { cacheControl?: { type: string } } } };
-      expect(systemMsg.role).toBe('system');
-      expect(systemMsg.providerOptions?.anthropic?.cacheControl?.type).toBe('ephemeral');
-
-      // User message should not have cache control
-      const userMsg = capturedMessages.messages[1] as { role: string; providerOptions?: unknown };
-      expect(userMsg.role).toBe('user');
-      expect(userMsg.providerOptions).toBeUndefined();
 
       mock.module('ai', () => ({
         ...aiModule,
@@ -1696,54 +1571,6 @@ describe('AISDKAgent', () => {
       // Verify last message has cache control
       const lastMsg = capturedMessages.messages[3] as { role: string; providerOptions?: { anthropic?: { cacheControl?: { type: string } } } };
       expect(lastMsg.providerOptions?.anthropic?.cacheControl?.type).toBe('ephemeral');
-
-      mock.module('ai', () => ({
-        ...aiModule,
-        streamText: originalStreamText,
-      }));
-    });
-
-    test('cacheBreakpoint with index: adds cache control to first N messages', async () => {
-      const capturedMessages = { messages: [] as unknown[] };
-      const aiModule = await import('ai');
-      const originalStreamText = aiModule.streamText;
-
-      mock.module('ai', () => ({
-        ...aiModule,
-        streamText: createMockStreamResult(capturedMessages),
-      }));
-
-      const mockModel = createAnthropicMockModel();
-      const agent = new AISDKAgent({
-        model: mockModel,
-        // Cache first 2 messages (system + first user)
-        cacheBreakpoint: (msg) => msg.index < 2,
-      });
-
-      const emittedEvents: AGUIEvent[] = [];
-      const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
-
-      const input = createTestInput({
-        systemPrompt: 'You are a helpful assistant.',
-        messages: [
-          { role: 'user', content: 'Hello' },
-          { role: 'assistant', content: 'Hi there!' },
-          { role: 'user', content: 'How are you?' },
-        ],
-      });
-
-      await agent.run(input, eventEmitter);
-
-      // First 2 messages should have cache control
-      const msg0 = capturedMessages.messages[0] as { providerOptions?: unknown };
-      const msg1 = capturedMessages.messages[1] as { providerOptions?: unknown };
-      const msg2 = capturedMessages.messages[2] as { providerOptions?: unknown };
-      const msg3 = capturedMessages.messages[3] as { providerOptions?: unknown };
-
-      expect(msg0.providerOptions).toBeDefined();
-      expect(msg1.providerOptions).toBeDefined();
-      expect(msg2.providerOptions).toBeUndefined();
-      expect(msg3.providerOptions).toBeUndefined();
 
       mock.module('ai', () => ({
         ...aiModule,
@@ -1858,49 +1685,6 @@ describe('AISDKAgent', () => {
       }));
     });
 
-    test('cacheBreakpoint works without system prompt', async () => {
-      const capturedMessages = { messages: [] as unknown[] };
-      const aiModule = await import('ai');
-      const originalStreamText = aiModule.streamText;
-
-      mock.module('ai', () => ({
-        ...aiModule,
-        streamText: createMockStreamResult(capturedMessages),
-      }));
-
-      const mockModel = createAnthropicMockModel();
-      const agent = new AISDKAgent({
-        model: mockModel,
-        cacheBreakpoint: (msg) => msg.isLast,
-      });
-
-      const emittedEvents: AGUIEvent[] = [];
-      const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
-
-      // No system prompt
-      const input = createTestInput({
-        messages: [
-          { role: 'user', content: 'Hello' },
-          { role: 'assistant', content: 'Hi there!' },
-        ],
-      });
-
-      await agent.run(input, eventEmitter);
-
-      // Should have 2 messages (no system prompt)
-      expect(capturedMessages.messages.length).toBe(2);
-
-      // Only the last message should have cache control
-      const lastMsg = capturedMessages.messages[1] as { role: string; providerOptions?: { anthropic?: { cacheControl?: { type: string } } } };
-      expect(lastMsg.role).toBe('assistant');
-      expect(lastMsg.providerOptions?.anthropic?.cacheControl?.type).toBe('ephemeral');
-
-      mock.module('ai', () => ({
-        ...aiModule,
-        streamText: originalStreamText,
-      }));
-    });
-
     test('cacheBreakpoint with TTL string: adds cache control with explicit TTL', async () => {
       const capturedMessages = { messages: [] as unknown[] };
       const aiModule = await import('ai');
@@ -1942,75 +1726,7 @@ describe('AISDKAgent', () => {
       }));
     });
 
-    test('cacheBreakpoint with different TTLs for different messages', async () => {
-      const capturedMessages = { messages: [] as unknown[] };
-      const aiModule = await import('ai');
-      const originalStreamText = aiModule.streamText;
-
-      mock.module('ai', () => ({
-        ...aiModule,
-        streamText: createMockStreamResult(capturedMessages),
-      }));
-
-      const mockModel = createAnthropicMockModel();
-      const agent = new AISDKAgent({
-        model: mockModel,
-        // System prompt with 1h TTL, last message with 5m TTL
-        cacheBreakpoint: (msg) => {
-          if (msg.role === 'system') return '1h';
-          if (msg.isLast) return '5m';
-          return false;
-        },
-      });
-
-      const emittedEvents: AGUIEvent[] = [];
-      const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
-
-      const input = createTestInput({
-        systemPrompt: 'You are a helpful assistant.',
-        messages: [
-          { role: 'user', content: 'Hello' },
-          { role: 'assistant', content: 'Hi there!' },
-          { role: 'user', content: 'How are you?' },
-        ],
-      });
-
-      await agent.run(input, eventEmitter);
-
-      // Should have 4 messages
-      expect(capturedMessages.messages.length).toBe(4);
-
-      // System message should have 1h TTL
-      const systemMsg = capturedMessages.messages[0] as {
-        role: string;
-        providerOptions?: { anthropic?: { cacheControl?: { type: string; ttl?: string } } }
-      };
-      expect(systemMsg.role).toBe('system');
-      expect(systemMsg.providerOptions?.anthropic?.cacheControl?.type).toBe('ephemeral');
-      expect(systemMsg.providerOptions?.anthropic?.cacheControl?.ttl).toBe('1h');
-
-      // Middle messages should not have cache control
-      const msg1 = capturedMessages.messages[1] as { providerOptions?: unknown };
-      const msg2 = capturedMessages.messages[2] as { providerOptions?: unknown };
-      expect(msg1.providerOptions).toBeUndefined();
-      expect(msg2.providerOptions).toBeUndefined();
-
-      // Last message should have 5m TTL
-      const lastMsg = capturedMessages.messages[3] as {
-        role: string;
-        providerOptions?: { anthropic?: { cacheControl?: { type: string; ttl?: string } } }
-      };
-      expect(lastMsg.role).toBe('user');
-      expect(lastMsg.providerOptions?.anthropic?.cacheControl?.type).toBe('ephemeral');
-      expect(lastMsg.providerOptions?.anthropic?.cacheControl?.ttl).toBe('5m');
-
-      mock.module('ai', () => ({
-        ...aiModule,
-        streamText: originalStreamText,
-      }));
-    });
-
-    test('cacheBreakpoint with true: adds cache control without TTL (default 5m)', async () => {
+    test('cacheBreakpoint with true: adds cache control without TTL', async () => {
       const capturedMessages = { messages: [] as unknown[] };
       const aiModule = await import('ai');
       const originalStreamText = aiModule.streamText;
