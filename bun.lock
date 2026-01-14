@@ -65,7 +65,7 @@
     },
     "packages/client": {
       "name": "@meetsmore-oss/use-ai-client",
-      "version": "1.2.0",
+      "version": "1.2.3",
       "dependencies": {
         "@meetsmore-oss/use-ai-core": "workspace:*",
         "react-markdown": "^8.0.0",
@@ -92,7 +92,7 @@
     },
     "packages/core": {
       "name": "@meetsmore-oss/use-ai-core",
-      "version": "1.2.0",
+      "version": "1.2.3",
       "dependencies": {
         "@ag-ui/core": "^0.0.41",
       },
@@ -103,9 +103,9 @@
     },
     "packages/plugin-mastra": {
       "name": "@meetsmore-oss/use-ai-plugin-mastra",
-      "version": "1.2.0",
+      "version": "1.2.3",
       "dependencies": {
-        "@meetsmore-oss/use-ai-core": "1.2.0",
+        "@meetsmore-oss/use-ai-core": "1.2.3",
         "ai": "6.0.0-beta.116",
         "uuid": "^11.0.3",
         "zod": "^4.1.8",
@@ -113,39 +113,39 @@
       "devDependencies": {
         "@ai-sdk/anthropic": "^2.0.53",
         "@mastra/core": "^1.0.0-beta",
-        "@meetsmore-oss/use-ai-server": "1.2.0",
+        "@meetsmore-oss/use-ai-server": "1.2.3",
         "@types/uuid": "^10.0.0",
         "typescript": "^5.9.3",
       },
       "peerDependencies": {
         "@mastra/core": ">=1.0.0-beta",
-        "@meetsmore-oss/use-ai-server": "1.2.0",
+        "@meetsmore-oss/use-ai-server": "1.2.3",
       },
     },
     "packages/plugin-workflows": {
       "name": "@meetsmore-oss/use-ai-plugin-workflows",
-      "version": "1.2.0",
+      "version": "1.2.3",
       "dependencies": {
-        "@meetsmore-oss/use-ai-core": "1.2.0",
+        "@meetsmore-oss/use-ai-core": "1.2.3",
         "ai": "6.0.0-beta.116",
         "uuid": "^11.0.3",
       },
       "devDependencies": {
-        "@meetsmore-oss/use-ai-server": "1.2.0",
+        "@meetsmore-oss/use-ai-server": "1.2.3",
         "@types/uuid": "^10.0.0",
         "typescript": "^5.9.3",
       },
       "peerDependencies": {
-        "@meetsmore-oss/use-ai-server": "1.2.0",
+        "@meetsmore-oss/use-ai-server": "1.2.3",
       },
     },
     "packages/server": {
       "name": "@meetsmore-oss/use-ai-server",
-      "version": "1.2.0",
+      "version": "1.2.3",
       "dependencies": {
         "@ai-sdk/anthropic": "3.0.0-beta.59",
         "@ai-sdk/openai": "3.0.0-beta.66",
-        "@meetsmore-oss/use-ai-core": "1.2.0",
+        "@meetsmore-oss/use-ai-core": "1.2.3",
         "ai": "6.0.0-beta.116",
         "picomatch": "^4.0.3",
         "socket.io": "^4.8.1",
