@@ -1,6 +1,6 @@
 {
   "name": "@meetsmore-oss/use-ai-plugin-mastra",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "license": "BUSL-1.1",
   "files": [
     "dist"
@@ -32,7 +32,7 @@
     "test:e2e": "bun test $(find src -name '*.integration.test.ts' -type f)"
   },
   "dependencies": {
-    "@meetsmore-oss/use-ai-core": "1.2.2",
+    "@meetsmore-oss/use-ai-core": "1.2.3",
     "ai": "6.0.0-beta.116",
     "uuid": "^11.0.3",
     "zod": "^4.1.8"
@@ -40,12 +40,12 @@
   "devDependencies": {
     "@ai-sdk/anthropic": "^2.0.53",
     "@mastra/core": "^1.0.0-beta",
-    "@meetsmore-oss/use-ai-server": "1.2.2",
+    "@meetsmore-oss/use-ai-server": "1.2.3",
     "@types/uuid": "^10.0.0",
     "typescript": "^5.9.3"
   },
   "peerDependencies": {
-    "@meetsmore-oss/use-ai-server": "1.2.2",
+    "@meetsmore-oss/use-ai-server": "1.2.3",
     "@mastra/core": ">=1.0.0-beta"
   },
   "peerDependenciesMeta": {
