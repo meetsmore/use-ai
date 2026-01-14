@@ -2,7 +2,7 @@ import React, { createContext, useContext } from 'react';
 import { UseAIChatPanel } from './UseAIChatPanel';
 import { UseAIFloatingChatWrapper, CloseButton } from './UseAIFloatingChatWrapper';
 import type { Message } from './UseAIChatPanel';
-import type { AgentInfo } from '../types';
+import type { AgentInfo, Citation } from '../types';
 import type { FileUploadConfig, FileAttachment } from '../fileUpload/types';
 import type { SavedCommand } from '../commands/types';
 import type { Chat } from '../providers/chatRepository/types';
@@ -22,6 +22,8 @@ export interface ChatUIContextValue {
   messages: Message[];
   /** Currently streaming text from assistant (real-time updates) */
   streamingText: string;
+  /** Citations for the currently streaming message (before it's finalized) */
+  streamingCitations: Citation[];
   /** Aggregated suggestions from all useAI hooks */
   suggestions: string[];
   /** File upload configuration */
@@ -136,6 +138,7 @@ export function UseAIChat({ floating = false }: UseAIChatProps) {
     loading: ctx.loading,
     connected: ctx.connected,
     streamingText: ctx.streamingText,
+    streamingCitations: ctx.streamingCitations,
     currentChatId: ctx.history.currentId,
     onNewChat: ctx.history.create,
     onLoadChat: ctx.history.load,

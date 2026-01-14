@@ -1,5 +1,5 @@
 import { io, Socket } from 'socket.io-client';
-import { EventType } from '@meetsmore-oss/use-ai-core';
+import { EventType, CITATION_EVENT_NAME } from '@meetsmore-oss/use-ai-core';
 import type {
   ToolDefinition,
   Message,
@@ -15,6 +15,9 @@ import type {
   McpHeadersMap,
   AgentInfo,
   MultimodalContent,
+  Citation,
+  CitationEvent,
+  CustomEvent,
 } from './types';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -107,7 +110,7 @@ export class UseAIClient {
   private _currentMessageContent: string = '';
 
   // Assistant message assembly (for tracking full conversation history)
-  private _currentAssistantMessage: { id: string; role: 'assistant'; content: string } | null = null;
+  private _currentAssistantMessage: { id: string; role: 'assistant'; content: string; citations?: Citation[] } | null = null;
   private _currentAssistantToolCalls: Array<{ id: string; type: 'function'; function: { name: string; arguments: string } }> = [];
 
   // Tool call assembly
@@ -115,6 +118,9 @@ export class UseAIClient {
     name: string;
     args: string;
   }> = new Map();
+
+  // Citations for the currently streaming message
+  private _currentStreamingCitations: Citation[] = [];
 
   /**
    * Creates a new UseAI client instance.
@@ -198,6 +204,7 @@ export class UseAIClient {
         content: '',
       };
       this._currentAssistantToolCalls = [];
+      this._currentStreamingCitations = [];
     }
 
     // Handle text message streaming
@@ -245,11 +252,21 @@ export class UseAIClient {
       }
     }
 
+    // Handle citation events
+    else if (event.type === EventType.CUSTOM) {
+      const customEvent = event as CustomEvent;
+      if (customEvent.name === CITATION_EVENT_NAME) {
+        const citationEvent = customEvent.value as CitationEvent;
+        // Store citations for the current streaming message
+        this._currentStreamingCitations = citationEvent.citations;
+      }
+    }
+
     // Handle run completion - finalize assistant message
     else if (event.type === EventType.RUN_FINISHED) {
       // Add completed assistant message to conversation history
       if (this._currentAssistantMessage) {
-        const assistantMessage: AssistantMessageWithTools = {
+        const assistantMessage: AssistantMessageWithTools & { citations?: Citation[] } = {
           id: this._currentAssistantMessage.id!,
           role: 'assistant',
           content: this._currentAssistantMessage.content || '',
@@ -260,9 +277,16 @@ export class UseAIClient {
           assistantMessage.toolCalls = this._currentAssistantToolCalls;
         }
 
+        // Add citations if any
+        if (this._currentStreamingCitations.length > 0) {
+          assistantMessage.citations = this._currentStreamingCitations;
+        }
+
         this._messages.push(assistantMessage);
 
-        // Reset for next message
+        // Reset message state for next message
+        // Note: Don't clear _currentStreamingCitations here - they're needed by event handlers
+        // and will be cleared at the start of the next run (RUN_STARTED)
         this._currentAssistantMessage = null;
         this._currentAssistantToolCalls = [];
       }
@@ -514,6 +538,14 @@ export class UseAIClient {
   }
 
   /**
+   * Gets citations for the currently streaming message.
+   * Use this while a response is being streamed to show citations in real-time.
+   */
+  get currentStreamingCitations(): Citation[] {
+    return this._currentStreamingCitations;
+  }
+
+  /**
    * Gets the list of available agents from the server.
    */
   get availableAgents(): AgentInfo[] {
@@ -607,6 +639,7 @@ export class UseAIClient {
       this.currentToolCalls.clear();
       this._currentAssistantMessage = null;
       this._currentAssistantToolCalls = [];
+      this._currentStreamingCitations = [];
     }
     this._threadId = threadId;
   }
@@ -630,6 +663,7 @@ export class UseAIClient {
     this.currentToolCalls.clear();
     this._currentAssistantMessage = null;
     this._currentAssistantToolCalls = [];
+    this._currentStreamingCitations = [];
   }
 
   send(message: UseAIClientMessage) {

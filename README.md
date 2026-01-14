@@ -37,6 +37,7 @@ A React client/framework for easily enabling AI to control your users frontend.
     - [Suggestions](#suggestions)
     - [`confirmationRequired`](#confirmationrequired)
     - [Chat History](#chat-history)
+    - [Citations](#citations)
     - [Error Code Mapping](#error-code-mapping)
     - [Using the AI directly (without chat UI)](#using-the-ai-directly-without-chat-ui)
     - [Custom UI](#custom-ui)
@@ -511,6 +512,26 @@ root.render(
   </UseAIProvider>
 );
 ```
+
+### Citations
+
+AI responses can include Wikipedia-style inline citations that link to source URLs. When the AI uses web search or other grounded tools, citations appear as clickable chiclet buttons in the response text.
+
+**How it works:**
+
+1. The AI places `[^n]` markers in its response text where citations apply
+2. Citation metadata (URL, title) is sent via AG-UI `CUSTOM` events
+3. The chat UI transforms `[^n]` markers into clickable chiclet buttons
+4. Clicking a citation opens the source URL in a new tab
+
+**Example AI response:**
+```
+According to recent studies[^1], the global temperature has risen by 1.1°C[^2].
+```
+
+Citations are automatically supported when using:
+- **AI SDK models** with web search or grounding enabled (via `source` chunks)
+- **MastraWorkflowAgent** workflows that emit citation chunks via `writer.custom()`
 
 ### Error Code Mapping
 

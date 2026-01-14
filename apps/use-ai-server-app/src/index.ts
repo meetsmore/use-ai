@@ -28,8 +28,30 @@ function createAgents(): { agents: Record<string, Agent>; defaultAgent: string }
   if (anthropicApiKey) {
     const model = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-20250514';
     const anthropic = createAnthropic({ apiKey: anthropicApiKey });
-    agents.claude = new AISDKAgent({ model: anthropic(model), name: 'Claude' });
-    enabledAgents.push(`claude (${model})`);
+
+    // Check for web search enablement (costs $10/1000 searches)
+    const webSearchEnabled = process.env.ANTHROPIC_WEB_SEARCH === 'true';
+    const webSearchMaxUses = Number(process.env.ANTHROPIC_WEB_SEARCH_MAX_USES) || 5;
+
+    let providerTools: Record<string, unknown> | undefined;
+    if (webSearchEnabled) {
+      providerTools = {
+        web_search: anthropic.tools.webSearch_20250305({
+          maxUses: webSearchMaxUses,
+        }),
+      };
+      // Citation instructions are auto-added by AISDKAgent when citations: true (default)
+    }
+
+    agents.claude = new AISDKAgent({
+      model: anthropic(model),
+      name: 'Claude',
+      providerTools,
+      // citations: true is the default, which adds CITATION_SYSTEM_INSTRUCTION
+    });
+
+    const features = webSearchEnabled ? `, web_search (max ${webSearchMaxUses})` : '';
+    enabledAgents.push(`claude (${model}${features})`);
   }
 
   // Check for OpenAI API key
@@ -37,8 +59,29 @@ function createAgents(): { agents: Record<string, Agent>; defaultAgent: string }
   if (openaiApiKey) {
     const model = process.env.OPENAI_MODEL || 'gpt-4-turbo';
     const openai = createOpenAI({ apiKey: openaiApiKey });
-    agents.gpt = new AISDKAgent({ model: openai(model), name: 'ChatGPT' });
-    enabledAgents.push(`gpt (${model})`);
+
+    // Check for web search enablement
+    const webSearchEnabled = process.env.OPENAI_WEB_SEARCH === 'true';
+
+    let providerTools: Record<string, unknown> | undefined;
+    if (webSearchEnabled) {
+      providerTools = {
+        web_search: openai.tools.webSearch({
+          searchContextSize: 'medium',
+        }),
+      };
+      // Citation instructions are auto-added by AISDKAgent when citations: true (default)
+    }
+
+    agents.gpt = new AISDKAgent({
+      model: openai(model),
+      name: 'ChatGPT',
+      providerTools,
+      // citations: true is the default, which adds CITATION_SYSTEM_INSTRUCTION
+    });
+
+    const features = webSearchEnabled ? ', web_search' : '';
+    enabledAgents.push(`gpt (${model}${features})`);
   }
 
   // Require at least one agent

@@ -1,11 +1,11 @@
-import { streamText, jsonSchema, LanguageModel, stepCountIs, type ModelMessage, type SystemModelMessage } from 'ai';
+import { streamText, generateText, jsonSchema, LanguageModel, stepCountIs, type ModelMessage, type SystemModelMessage } from 'ai';
 import type { JSONSchema7 } from 'json-schema';
 import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
 import type { Agent, AgentInput, EventEmitter, AgentResult, ClientSession } from './types';
-import type { ToolDefinition } from '../types';
+import type { ToolDefinition, Citation, CitationEvent, CustomEvent } from '../types';
 import type { RemoteToolDefinition } from '../mcp';
-import { EventType, ErrorCode } from '../types';
+import { EventType, ErrorCode, CITATION_EVENT_NAME, CITATION_SYSTEM_INSTRUCTION } from '../types';
 import { createClientToolExecutor } from '../utils/toolConverter';
 import type {
   TextMessageStartEvent,
@@ -151,6 +151,58 @@ export interface AISDKAgentConfig {
    * ```
    */
   toolFilter?: (tool: ToolDefinition) => boolean;
+
+  /**
+   * Optional provider-defined tools (e.g., Anthropic web search, OpenAI file search).
+   * These are passed directly to the AI SDK and merged with client/MCP tools.
+   *
+   * @example
+   * ```typescript
+   * import { createAnthropic } from '@ai-sdk/anthropic';
+   *
+   * const anthropic = createAnthropic();
+   * const webSearch = anthropic.tools.webSearch_20250305({ maxUses: 5 });
+   *
+   * new AISDKAgent({
+   *   model: anthropic('claude-sonnet-4-20250514'),
+   *   providerTools: { web_search: webSearch },
+   * });
+   * ```
+   */
+  providerTools?: Record<string, unknown>;
+
+  /**
+   * Optional suffix to append to the system prompt.
+   * Useful for adding instructions when specific provider tools are enabled.
+   *
+   * @example
+   * ```typescript
+   * new AISDKAgent({
+   *   model: anthropic('claude-sonnet-4-20250514'),
+   *   providerTools: { web_search: webSearch },
+   *   systemPromptSuffix: 'Always search the web before answering questions about current events.',
+   * });
+   * ```
+   */
+  systemPromptSuffix?: string;
+
+  /**
+   * Enable citation support for web search and RAG sources.
+   * When enabled, the system prompt automatically includes instructions
+   * for the AI to use citation markers that render as clickable chiclets.
+   *
+   * @default true
+   *
+   * @example
+   * ```typescript
+   * // Disable citations (e.g., for simple chat without web search)
+   * new AISDKAgent({
+   *   model: anthropic('claude-sonnet-4-20250514'),
+   *   citations: false,
+   * });
+   * ```
+   */
+  citations?: boolean;
 }
 
 /**
@@ -204,6 +256,9 @@ export class AISDKAgent implements Agent {
   private langfuse: LangfuseConfig;
   private toolFilter?: (tool: ToolDefinition) => boolean;
   private systemPrompt?: string | (() => string | Promise<string>);
+  private providerTools?: Record<string, unknown>;
+  private systemPromptSuffix?: string;
+  private citations: boolean;
 
   constructor(config: AISDKAgentConfig) {
     this.model = config.model;
@@ -211,6 +266,9 @@ export class AISDKAgent implements Agent {
     this.annotation = config.annotation;
     this.toolFilter = config.toolFilter;
     this.systemPrompt = config.systemPrompt;
+    this.providerTools = config.providerTools;
+    this.systemPromptSuffix = config.systemPromptSuffix;
+    this.citations = config.citations ?? true; // Enabled by default
     // Initialize Langfuse observability (automatically reads env vars)
     this.langfuse = initializeLangfuse();
   }
@@ -266,6 +324,16 @@ export class AISDKAgent implements Agent {
       timestamp: Date.now(),
     });
 
+    // Track streaming state (outside try block for error recovery)
+    let messageId: string | null = null;
+    let hasEmittedTextStart = false;
+    let finalText = '';
+    let hasAnyContent = false;
+
+    // Track citations from sources (outside try block for error recovery)
+    const collectedCitations: Citation[] = [];
+    let citationNumber = 0;
+
     try {
       logger.info('Sending to AI SDK model (streaming)', {
         clientId: session.clientId,
@@ -298,14 +366,169 @@ export class AISDKAgent implements Agent {
         systemMessages: systemMessages?.map(m => m.content.substring(0, 80) + (m.content.length > 80 ? '...' : '')),
       });
 
+      // Convert and merge tools (client tools + provider tools like web search)
+      const clientTools = tools.length > 0
+        ? this.sanitizeToolsForAPI(this.filterTools(tools), session)
+        : {};
+      const allTools = this.providerTools
+        ? { ...clientTools, ...this.providerTools }
+        : clientTools;
+
+      // Check if provider tools are present (like web search)
+      // Provider tools cause streaming parsing issues, so use non-streaming mode
+      const hasProviderTools = this.providerTools && Object.keys(this.providerTools).length > 0;
+
+      // Debug: log tool types
+      if (Object.keys(allTools).length > 0) {
+        logger.debug('Tool types being passed to AI SDK', {
+          toolNames: Object.keys(allTools),
+          hasProviderTools,
+          toolTypes: Object.entries(allTools).map(([name, tool]) => ({
+            name,
+            type: (tool as { type?: string }).type,
+            hasInputSchema: !!(tool as { inputSchema?: unknown }).inputSchema,
+            hasExecute: !!(tool as { execute?: unknown }).execute,
+          })),
+        });
+      }
+
+      // Use non-streaming mode when provider tools are present to avoid streaming parsing bugs
+      if (hasProviderTools) {
+        logger.info('Using non-streaming mode due to provider tools', {
+          clientId: session.clientId,
+          providerToolNames: Object.keys(this.providerTools || {}),
+        });
+
+        const result = await generateText({
+          model: this.model,
+          messages: messagesWithSystem,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          tools: Object.keys(allTools).length > 0 ? (allTools as any) : undefined,
+          maxOutputTokens: 4096,
+          abortSignal: session.abortController?.signal,
+          experimental_telemetry: this.langfuse?.enabled
+            ? {
+                isEnabled: true,
+                metadata: {
+                  sessionId: session.clientId,
+                  threadId: session.threadId,
+                  runId,
+                  ipAddress: session.ipAddress,
+                  toolCount: tools.length,
+                },
+              }
+            : undefined,
+        });
+
+        // Process sources for citations
+        if (result.sources && Array.isArray(result.sources)) {
+          for (const source of result.sources) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const src = source as any;
+            if (src.url) {
+              citationNumber++;
+              const citation: Citation = {
+                id: src.id || uuidv4(),
+                number: citationNumber,
+                type: 'url',
+                url: src.url,
+                title: src.title,
+                metadata: src.providerMetadata,
+              };
+              collectedCitations.push(citation);
+
+              logger.debug('Citation collected (non-streaming)', {
+                number: citationNumber,
+                url: src.url,
+                title: src.title,
+              });
+            }
+          }
+        }
+
+        // Emit text message events
+        finalText = result.text || '';
+        if (finalText) {
+          hasAnyContent = true;
+          messageId = uuidv4();
+
+          // Emit citation event if we have citations
+          if (collectedCitations.length > 0) {
+            events.emit<CustomEvent>({
+              type: EventType.CUSTOM,
+              name: CITATION_EVENT_NAME,
+              value: {
+                messageId,
+                citations: [...collectedCitations],
+              } satisfies CitationEvent,
+              timestamp: Date.now(),
+            });
+          }
+
+          // Emit text message events
+          events.emit<TextMessageStartEvent>({
+            type: EventType.TEXT_MESSAGE_START,
+            messageId,
+            role: 'assistant',
+            timestamp: Date.now(),
+          });
+
+          events.emit<TextMessageContentEvent>({
+            type: EventType.TEXT_MESSAGE_CONTENT,
+            messageId,
+            delta: finalText,
+            timestamp: Date.now(),
+          });
+
+          events.emit<TextMessageEndEvent>({
+            type: EventType.TEXT_MESSAGE_END,
+            messageId,
+            timestamp: Date.now(),
+          });
+        }
+
+        // Check for empty response
+        if (!hasAnyContent) {
+          events.emit<RunErrorEvent>({
+            type: EventType.RUN_ERROR,
+            message: 'AI returned an empty response. This may be due to an ambiguous request. Please try being more specific.',
+            timestamp: Date.now(),
+          });
+          return {
+            success: false,
+            error: 'Empty response from AI',
+            conversationHistory: messages,
+          };
+        }
+
+        // Update conversation history
+        const sanitizedMessages = this.sanitizeMessages(result.response.messages);
+        session.conversationHistory.push(...sanitizedMessages);
+
+        // Log final response
+        logger.aiResponse([finalText]);
+
+        // Emit RUN_FINISHED
+        events.emit<RunFinishedEvent>({
+          type: EventType.RUN_FINISHED,
+          threadId: session.threadId,
+          runId,
+          result: finalText,
+          timestamp: Date.now(),
+        });
+
+        return {
+          success: true,
+          conversationHistory: session.conversationHistory,
+        };
+      }
+
+      // Streaming mode for regular tools (no provider tools)
       const stream = streamText({
         model: this.model,
         messages: messagesWithSystem,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        tools:
-          tools.length > 0
-            ? (this.sanitizeToolsForAPI(this.filterTools(tools), session) as any)
-            : undefined,
+        tools: Object.keys(allTools).length > 0 ? (allTools as any) : undefined,
         stopWhen: stepCountIs(10), // Allow AI SDK to handle multi-step tool execution automatically
         maxOutputTokens: 4096,
         abortSignal: session.abortController?.signal,
@@ -326,12 +549,8 @@ export class AISDKAgent implements Agent {
         },
       });
 
-      // Track streaming state
-      let messageId: string | null = null;
-      let hasEmittedTextStart = false;
-      let finalText = '';
+      // Track streaming state (continued)
       let currentStepNumber = 0;
-      let hasAnyContent = false;
 
       // Track active tool calls for streaming args
       const activeToolCalls = new Map<string, { name: string; args: string }>();
@@ -353,7 +572,10 @@ export class AISDKAgent implements Agent {
             hasAnyContent = true;
             // Start text message on first text chunk
             if (!hasEmittedTextStart) {
-              messageId = uuidv4();
+              // Reuse messageId from citations if already set, otherwise generate new
+              if (!messageId) {
+                messageId = uuidv4();
+              }
               events.emit<TextMessageStartEvent>({
                 type: EventType.TEXT_MESSAGE_START,
                 messageId,
@@ -460,9 +682,58 @@ export class AISDKAgent implements Agent {
             throw chunk.error;
           }
 
+          case 'source': {
+            // Handle RAG/web search source citations
+            // AI SDK source chunks contain: id, sourceType, url?, title?, providerMetadata?
+            const sourceChunk = chunk as {
+              type: 'source';
+              id: string;
+              sourceType: string;
+              url?: string;
+              title?: string;
+              providerMetadata?: Record<string, unknown>;
+            };
+
+            // Only create citations for sources with URLs
+            if (sourceChunk.url) {
+              citationNumber++;
+              const citation: Citation = {
+                id: sourceChunk.id,
+                number: citationNumber,
+                type: 'url',
+                url: sourceChunk.url,
+                title: sourceChunk.title,
+                metadata: sourceChunk.providerMetadata,
+              };
+              collectedCitations.push(citation);
+
+              // Emit citation event via CustomEvent
+              const citationMessageId: string = messageId ?? uuidv4();
+              if (!messageId) {
+                messageId = citationMessageId;
+              }
+
+              events.emit<CustomEvent>({
+                type: EventType.CUSTOM,
+                name: CITATION_EVENT_NAME,
+                value: {
+                  messageId: citationMessageId,
+                  citations: [...collectedCitations],
+                } satisfies CitationEvent,
+                timestamp: Date.now(),
+              });
+
+              logger.debug('Citation collected', {
+                number: citationNumber,
+                url: sourceChunk.url,
+                title: sourceChunk.title,
+              });
+            }
+            break;
+          }
+
           // Ignored chunk types:
           // 'start', 'finish' - internal stream lifecycle
-          // 'source' - RAG sources (future)
           // 'file' - generated files (future)
           // 'text-start', 'text-end' - we handle text-delta instead
           // 'reasoning-start', 'reasoning-end' - we handle reasoning-delta
@@ -561,14 +832,23 @@ export class AISDKAgent implements Agent {
         conversationHistory: session.conversationHistory,
       };
     } catch (error) {
+      // Log full error details for debugging
+      const errorDetails = error instanceof Error
+        ? error.message
+        : typeof error === 'object' && error !== null
+          ? JSON.stringify(error, null, 2)
+          : String(error);
+
+      // Log the error
       logger.error('Error calling AI SDK model', {
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: errorDetails,
+        errorType: error?.constructor?.name || typeof error,
         clientId: session.clientId,
       });
 
       // Detect error type and send error code for client-side message handling
       let errorCode = ErrorCode.UNKNOWN_ERROR;
-      let errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = error instanceof Error ? error.message : errorDetails;
 
       const isAPIError = (err: unknown): err is APIError => {
         return typeof err === 'object' && err !== null;
@@ -629,10 +909,11 @@ export class AISDKAgent implements Agent {
   /**
    * Builds an array of system messages from config and runtime prompts.
    * Each prompt becomes a separate SystemModelMessage, preserving their distinct purposes.
+   * Also appends systemPromptSuffix and citation instructions as needed.
    *
    * @param configPrompt - Resolved system prompt from agent config (already resolved via resolveSystemPrompt)
    * @param runtimePrompt - System prompt from AgentInput (generated by server based on state)
-   * @returns Array of SystemModelMessage objects, or undefined if both are empty
+   * @returns Array of SystemModelMessage objects, or undefined if all are empty
    */
   private buildSystemMessages(configPrompt?: string, runtimePrompt?: string): SystemModelMessage[] | undefined {
     const messages: SystemModelMessage[] = [];
@@ -645,6 +926,18 @@ export class AISDKAgent implements Agent {
     // Runtime prompt (from server.buildSystemPrompt) is added as separate message
     if (runtimePrompt) {
       messages.push({ role: 'system', content: runtimePrompt });
+    }
+
+    // Add suffix and citation instructions as a combined message
+    const additionalParts: string[] = [];
+    if (this.systemPromptSuffix) {
+      additionalParts.push(this.systemPromptSuffix);
+    }
+    if (this.citations) {
+      additionalParts.push(CITATION_SYSTEM_INSTRUCTION);
+    }
+    if (additionalParts.length > 0) {
+      messages.push({ role: 'system', content: additionalParts.join('\n\n') });
     }
 
     return messages.length > 0 ? messages : undefined;

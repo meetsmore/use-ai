@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
-import type { UseAIConfig, AGUIEvent, ToolCallEndEvent, RunErrorEvent, AgentInfo, TextMessageContentEvent } from '../types';
+import type { UseAIConfig, AGUIEvent, ToolCallEndEvent, RunErrorEvent, AgentInfo, TextMessageContentEvent, Citation } from '../types';
 import { EventType, ErrorCode } from '../types';
 import { UseAIFloatingButton } from '../components/UseAIFloatingButton';
 import { UseAIChatPanel, type Message } from '../components/UseAIChatPanel';
@@ -377,6 +377,7 @@ export function UseAIProvider({
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [streamingText, setStreamingText] = useState('');
+  const [streamingCitations, setStreamingCitations] = useState<Citation[]>([]);
   // Track which chat the current streaming text belongs to
   const streamingChatIdRef = useRef<string | null>(null);
 
@@ -539,12 +540,17 @@ export function UseAIProvider({
         // Update streaming text in real-time for UI display
         const contentEvent = event as TextMessageContentEvent;
         setStreamingText(prev => prev + contentEvent.delta);
+        // Update streaming citations from client (they arrive throughout streaming)
+        setStreamingCitations(client.currentStreamingCitations);
       } else if (event.type === EventType.TEXT_MESSAGE_END) {
         const content = client.currentMessageContent;
         if (content) {
           console.log('[Provider] Received text message:', content.substring(0, 100));
-          saveAIResponse(content); // Fire-and-forget is intentional here
+          // Get final citations before clearing
+          const finalCitations = client.currentStreamingCitations;
+          saveAIResponse(content, undefined, finalCitations.length > 0 ? finalCitations : undefined); // Fire-and-forget is intentional here
           setStreamingText(''); // Clear streaming text now that message is complete
+          setStreamingCitations([]); // Clear streaming citations
           streamingChatIdRef.current = null; // Clear streaming chat association
           setLoading(false);
         }
@@ -559,8 +565,24 @@ export function UseAIProvider({
         // Display error message in chat UI with error styling
         saveAIResponse(userMessage, 'error'); // Fire-and-forget is intentional here
         setStreamingText(''); // Clear any partial streaming text
+        setStreamingCitations([]); // Clear any partial citations
         streamingChatIdRef.current = null; // Clear streaming chat association
 
+        setLoading(false);
+      } else if (event.type === EventType.RUN_FINISHED) {
+        // Fallback: ensure loading is set to false when run completes
+        // This handles edge cases where TEXT_MESSAGE_END might not be received
+        // (e.g., web search streaming errors that recover with partial content)
+        setStreamingText(currentStreamingText => {
+          // If there's pending streaming text that wasn't saved, save it now
+          if (currentStreamingText) {
+            const finalCitations = client.currentStreamingCitations;
+            saveAIResponse(currentStreamingText, undefined, finalCitations.length > 0 ? finalCitations : undefined);
+            setStreamingCitations([]);
+            streamingChatIdRef.current = null;
+          }
+          return ''; // Clear streaming text
+        });
         setLoading(false);
       }
     });
@@ -612,8 +634,9 @@ export function UseAIProvider({
   const handleSendMessage = useCallback(async (message: string, attachments?: FileAttachment[]) => {
     if (!clientRef.current) return;
 
-    // Clear any previous streaming text when starting a new message
+    // Clear any previous streaming text and citations when starting a new message
     setStreamingText('');
+    setStreamingCitations([]);
 
     // Activate pending chat if exists (user is sending first message to it)
     const activatedChatId = activatePendingChat();
@@ -721,9 +744,10 @@ export function UseAIProvider({
     },
   };
 
-  // Only show streaming text if it belongs to the currently displayed chat
+  // Only show streaming text/citations if they belong to the currently displayed chat
   // This prevents streaming from a previous chat appearing when switching chats
   const effectiveStreamingText = streamingChatIdRef.current === displayedChatId ? streamingText : '';
+  const effectiveStreamingCitations = streamingChatIdRef.current === displayedChatId ? streamingCitations : [];
 
   // Chat UI context value - used by UseAIChat component
   const chatUIContextValue: ChatUIContextValue = {
@@ -732,6 +756,7 @@ export function UseAIProvider({
     sendMessage: handleSendMessage,
     messages,
     streamingText: effectiveStreamingText,
+    streamingCitations: effectiveStreamingCitations,
     suggestions: aggregatedSuggestions,
     fileUploadConfig,
     history: {
@@ -772,6 +797,7 @@ export function UseAIProvider({
     loading,
     connected,
     streamingText: effectiveStreamingText,
+    streamingCitations: effectiveStreamingCitations,
     currentChatId: displayedChatId,
     onNewChat: createNewChat,
     onLoadChat: loadChat,

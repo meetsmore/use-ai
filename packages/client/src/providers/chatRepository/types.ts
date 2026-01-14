@@ -1,4 +1,5 @@
 import type { PersistedFileMetadata } from '../../fileUpload/types';
+import type { Citation } from '../../types';
 
 /**
  * Display mode for chat messages.
@@ -46,6 +47,8 @@ export interface PersistedMessage {
   content: PersistedMessageContent;
   createdAt: Date;
   displayMode?: MessageDisplayMode;
+  /** Citations for this message (AI SDK source chunks, RAG, etc.) */
+  citations?: Citation[];
 }
 
 /**

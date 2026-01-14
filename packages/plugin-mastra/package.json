@@ -33,12 +33,12 @@
   },
   "dependencies": {
     "@meetsmore-oss/use-ai-core": "1.2.0",
-    "ai": "6.0.0-beta.116",
+    "ai": "6.0.33",
     "uuid": "^11.0.3",
     "zod": "^4.1.8"
   },
   "devDependencies": {
-    "@ai-sdk/anthropic": "^2.0.53",
+    "@ai-sdk/anthropic": "3.0.9",
     "@mastra/core": "^1.0.0-beta",
     "@meetsmore-oss/use-ai-server": "1.2.0",
     "@types/uuid": "^10.0.0",

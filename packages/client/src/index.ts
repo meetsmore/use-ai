@@ -26,10 +26,18 @@ export { UseAIFloatingChatWrapper, CloseButton } from './components/UseAIFloatin
 export { UseAIFloatingButton } from './components/UseAIFloatingButton';
 export { UseAIChat } from './components/UseAIChat';
 export type { UseAIChatProps } from './components/UseAIChat';
+export { MarkdownContent } from './components/MarkdownContent';
 
 export type { UseAIOptions, UseAIResult } from './useAI';
 export type { UseAIWorkflowResult, TriggerWorkflowOptions, WorkflowProgress } from './useAIWorkflow';
-export type { UseAIConfig, ToolDefinition, AgentInfo } from './types';
+export type { UseAIConfig, ToolDefinition, AgentInfo, Citation, CitationEvent } from './types';
+export {
+  CITATION_EVENT_NAME,
+  CITATION_PATTERN,
+  CITATION_SYSTEM_INSTRUCTION,
+  createCitationMarker,
+  transformLegacyCitations,
+} from './types';
 export type {
   UseAIContextValue,
   ChatContextValue,

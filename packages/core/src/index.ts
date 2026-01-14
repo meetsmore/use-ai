@@ -49,6 +49,21 @@ export type {
   FileContent,
   MultimodalContent,
   UserMessageContent,
+  // Citation types
+  Citation,
+  CitationEvent,
 } from './types';
 
-export { EventType, ErrorCode } from './types';
+export {
+  EventType,
+  ErrorCode,
+  CITATION_EVENT_NAME,
+  CITATION_MARKER_START,
+  CITATION_MARKER_END,
+  CITATION_MARKER_SEP,
+  CITATION_PATTERN,
+  LEGACY_CITATION_PATTERN,
+  CITATION_SYSTEM_INSTRUCTION,
+  createCitationMarker,
+  transformLegacyCitations,
+} from './types';

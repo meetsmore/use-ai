@@ -53,7 +53,8 @@ function createToolCallStreamChunks(
  */
 export function createTestAgent(name: string = 'test-agent'): AISDKAgent {
   const mockModel = new MockLanguageModelV3({
-    doStream: async () => ({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    doStream: (async () => ({
       stream: simulateReadableStream({
         chunks: createTextStreamChunks('Default response'),
       }),
@@ -64,7 +65,7 @@ export function createTestAgent(name: string = 'test-agent'): AISDKAgent {
         headers: {},
         messages: [{ role: 'assistant', content: 'Default response' }],
       },
-    }),
+    })) as any,
   });
   return new AISDKAgent({ model: mockModel });
 }
@@ -218,7 +219,8 @@ export function createToolCallMockModel(
 ): MockLanguageModelV3 {
   const inputStr = JSON.stringify(toolInput);
   return new MockLanguageModelV3({
-    doStream: async () => ({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    doStream: (async () => ({
       stream: simulateReadableStream({
         chunks: createToolCallStreamChunks(toolCallId, toolName, inputStr),
       }),
@@ -236,7 +238,7 @@ export function createToolCallMockModel(
           },
         ],
       },
-    }),
+    })) as any,
   });
 }
 
@@ -342,7 +344,8 @@ export function createSystemPromptValidatorMockModel(
   validator: (messages: unknown[]) => void
 ): MockLanguageModelV3 {
   return new MockLanguageModelV3({
-    doStream: async (params?: unknown) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    doStream: (async (params?: unknown) => {
       const messages = (params as { prompt?: unknown[] })?.prompt || [];
       validator(messages);
 
@@ -358,7 +361,7 @@ export function createSystemPromptValidatorMockModel(
           messages: [{ role: 'assistant', content: 'OK' }],
         },
       };
-    },
+    }) as any,
   });
 }
 
@@ -369,7 +372,8 @@ export function createToolValidatorMockModel(
   validator: (tools: unknown) => void
 ): MockLanguageModelV3 {
   return new MockLanguageModelV3({
-    doStream: async (params?: unknown) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    doStream: (async (params?: unknown) => {
       const tools = (params as { tools?: unknown })?.tools || {};
       validator(tools);
 
@@ -385,7 +389,7 @@ export function createToolValidatorMockModel(
           messages: [{ role: 'assistant', content: 'OK' }],
         },
       };
-    },
+    }) as any,
   });
 }
 

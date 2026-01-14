@@ -255,6 +255,146 @@ describe('LocalStorageChatRepository', () => {
     });
   });
 
+  describe('citation persistence', () => {
+    it('should save and load messages with citations', async () => {
+      const chatId = await repository.createChat();
+      const chat = await repository.loadChat(chatId);
+
+      chat!.messages.push({
+        id: 'msg1',
+        role: 'assistant',
+        content: 'According to research [1], this is true.',
+        createdAt: new Date(),
+        citations: [
+          {
+            id: 'cite-1',
+            number: 1,
+            type: 'url',
+            url: 'https://example.com/research',
+            title: 'Research Paper',
+          },
+        ],
+      });
+
+      await repository.saveChat(chat!);
+
+      const loadedChat = await repository.loadChat(chatId);
+      expect(loadedChat!.messages).toHaveLength(1);
+      expect(loadedChat!.messages[0].citations).toHaveLength(1);
+      expect(loadedChat!.messages[0].citations![0].number).toBe(1);
+      expect(loadedChat!.messages[0].citations![0].url).toBe('https://example.com/research');
+      expect(loadedChat!.messages[0].citations![0].title).toBe('Research Paper');
+    });
+
+    it('should handle messages with multiple citations', async () => {
+      const chatId = await repository.createChat();
+      const chat = await repository.loadChat(chatId);
+
+      chat!.messages.push({
+        id: 'msg1',
+        role: 'assistant',
+        content: 'See [1] and [2] for details.',
+        createdAt: new Date(),
+        citations: [
+          {
+            id: 'cite-1',
+            number: 1,
+            type: 'url',
+            url: 'https://example.com/source1',
+            title: 'Source One',
+          },
+          {
+            id: 'cite-2',
+            number: 2,
+            type: 'url',
+            url: 'https://example.com/source2',
+            title: 'Source Two',
+          },
+        ],
+      });
+
+      await repository.saveChat(chat!);
+
+      const loadedChat = await repository.loadChat(chatId);
+      expect(loadedChat!.messages[0].citations).toHaveLength(2);
+      expect(loadedChat!.messages[0].citations![0].number).toBe(1);
+      expect(loadedChat!.messages[0].citations![1].number).toBe(2);
+    });
+
+    it('should handle messages without citations (undefined)', async () => {
+      const chatId = await repository.createChat();
+      const chat = await repository.loadChat(chatId);
+
+      chat!.messages.push({
+        id: 'msg1',
+        role: 'user',
+        content: 'Hello',
+        createdAt: new Date(),
+        // No citations field
+      });
+
+      await repository.saveChat(chat!);
+
+      const loadedChat = await repository.loadChat(chatId);
+      expect(loadedChat!.messages[0].citations).toBeUndefined();
+    });
+
+    it('should handle messages with empty citations array', async () => {
+      const chatId = await repository.createChat();
+      const chat = await repository.loadChat(chatId);
+
+      chat!.messages.push({
+        id: 'msg1',
+        role: 'assistant',
+        content: 'No citations here.',
+        createdAt: new Date(),
+        citations: [],
+      });
+
+      await repository.saveChat(chat!);
+
+      const loadedChat = await repository.loadChat(chatId);
+      expect(loadedChat!.messages[0].citations).toEqual([]);
+    });
+
+    it('should preserve all citation properties', async () => {
+      const chatId = await repository.createChat();
+      const chat = await repository.loadChat(chatId);
+
+      chat!.messages.push({
+        id: 'msg1',
+        role: 'assistant',
+        content: 'Full citation test [1]',
+        createdAt: new Date(),
+        citations: [
+          {
+            id: 'cite-full',
+            number: 1,
+            type: 'url',
+            url: 'https://example.com/full',
+            title: 'Full Citation',
+            snippet: 'This is a snippet from the source',
+            toolName: 'web_search',
+            metadata: { provider: 'test', confidence: 0.95 },
+          },
+        ],
+      });
+
+      await repository.saveChat(chat!);
+
+      const loadedChat = await repository.loadChat(chatId);
+      const citation = loadedChat!.messages[0].citations![0];
+      expect(citation.id).toBe('cite-full');
+      expect(citation.number).toBe(1);
+      expect(citation.type).toBe('url');
+      expect(citation.url).toBe('https://example.com/full');
+      expect(citation.title).toBe('Full Citation');
+      expect(citation.snippet).toBe('This is a snippet from the source');
+      expect(citation.toolName).toBe('web_search');
+      expect(citation.metadata).toEqual({ provider: 'test', confidence: 0.95 });
+    });
+  });
+
   describe('maxChats limit', () => {
     it('should enforce max chats limit when creating new chat', async () => {
       const smallRepository = new LocalStorageChatRepository(storage, 3);

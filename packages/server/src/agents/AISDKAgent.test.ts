@@ -15,13 +15,23 @@ import {
 } from '../utils/toolFilters';
 
 /**
+ * Helper to create mock usage object that works with AI SDK 6.x
+ * The usage format changed between beta and stable releases.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function createMockUsage(inputTokens: number, outputTokens: number, totalTokens: number): any {
+  return { inputTokens, outputTokens, totalTokens };
+}
+
+/**
  * Helper to create a streaming mock model that emits text
  * Note: Model-level chunks use 'delta' for text-delta, not 'text'
  * The streamText function transforms these to 'text' in the public API
  */
 function createStreamingTextMockModel(text: string) {
   return new MockLanguageModelV3({
-    doStream: async () => ({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    doStream: (async () => ({
       stream: simulateReadableStream({
         chunks: [
           { type: 'text-start', id: 'text-1' },
@@ -30,7 +40,7 @@ function createStreamingTextMockModel(text: string) {
           {
             type: 'finish',
             finishReason: 'stop' as const,
-            usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
+            usage: createMockUsage(10, 5, 15),
           },
         ],
       }),
@@ -43,7 +53,7 @@ function createStreamingTextMockModel(text: string) {
           { role: 'assistant', content: text },
         ],
       },
-    }),
+    })) as any,
   });
 }
 
@@ -53,7 +63,8 @@ function createStreamingTextMockModel(text: string) {
  */
 function createMultiDeltaStreamingMockModel(deltas: string[]) {
   return new MockLanguageModelV3({
-    doStream: async () => ({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    doStream: (async () => ({
       stream: simulateReadableStream({
         chunks: [
           { type: 'text-start', id: 'text-1' },
@@ -62,7 +73,7 @@ function createMultiDeltaStreamingMockModel(deltas: string[]) {
           {
             type: 'finish',
             finishReason: 'stop' as const,
-            usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
+            usage: createMockUsage(10, 5, 15),
           },
         ],
       }),
@@ -75,7 +86,7 @@ function createMultiDeltaStreamingMockModel(deltas: string[]) {
           { role: 'assistant', content: deltas.join('') },
         ],
       },
-    }),
+    })) as any,
   });
 }
 
@@ -235,7 +246,8 @@ describe('AISDKAgent', () => {
   test('run emits TOOL_CALL events when AI uses tools', async () => {
     const toolCallId = 'tool-call-123';
     const mockModel = new MockLanguageModelV3({
-      doStream: async ({ tools }) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      doStream: (async ({ tools }: { tools?: Record<string, unknown> }) => {
         // Check if tools are provided and create tool call stream
         const hasTools = tools && Object.keys(tools).length > 0;
 
@@ -250,8 +262,8 @@ describe('AISDKAgent', () => {
                 { type: 'tool-call', toolCallId, toolName: 'test_tool', input: '{"value":"test"}' },
                 {
                   type: 'finish',
-                  finishReason: 'tool-calls',
-                  usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
+                  finishReason: 'tool-calls' as const,
+                  usage: createMockUsage(10, 5, 15),
                 },
               ],
             }),
@@ -286,8 +298,8 @@ describe('AISDKAgent', () => {
               { type: 'text-end', id: 'text-1' },
               {
                 type: 'finish',
-                finishReason: 'stop',
-                usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
+                finishReason: 'stop' as const,
+                usage: createMockUsage(10, 5, 15),
               },
             ],
           }),
@@ -299,7 +311,7 @@ describe('AISDKAgent', () => {
             messages: [{ role: 'assistant', content: 'Done' }],
           },
         };
-      },
+      }) as any,
     });
 
     const agent = new AISDKAgent({ model: mockModel });
@@ -378,7 +390,8 @@ describe('AISDKAgent', () => {
     const toolCallId = 'tool-call-empty-args';
     let callCount = 0;
     const mockModel = new MockLanguageModelV3({
-      doStream: async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      doStream: (async () => {
         callCount++;
 
         // First call: return tool call without streaming args
@@ -394,8 +407,8 @@ describe('AISDKAgent', () => {
                 { type: 'tool-call', toolCallId, toolName: 'logout_tool', input: '{}' },
                 {
                   type: 'finish',
-                  finishReason: 'tool-calls',
-                  usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
+                  finishReason: 'tool-calls' as const,
+                  usage: createMockUsage(10, 5, 15),
                 },
               ],
             }),
@@ -430,8 +443,8 @@ describe('AISDKAgent', () => {
               { type: 'text-end', id: 'text-1' },
               {
                 type: 'finish',
-                finishReason: 'stop',
-                usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
+                finishReason: 'stop' as const,
+                usage: createMockUsage(10, 5, 15),
               },
             ],
           }),
@@ -443,7 +456,7 @@ describe('AISDKAgent', () => {
             messages: [{ role: 'assistant', content: 'Logged out successfully' }],
           },
         };
-      },
+      }) as any,
     });
 
     const agent = new AISDKAgent({ model: mockModel });
@@ -565,7 +578,7 @@ describe('AISDKAgent', () => {
               yield { type: 'text-end', id: 'text-1' };
               yield {
                 type: 'finish',
-                finishReason: 'stop',
+                finishReason: 'stop' as const,
                 usage: { inputTokens: 100, outputTokens: 50, totalTokens: 150 },
               };
             })(),
@@ -669,7 +682,7 @@ describe('AISDKAgent', () => {
               yield { type: 'text-end', id: 'text-1' };
               yield {
                 type: 'finish',
-                finishReason: 'stop',
+                finishReason: 'stop' as const,
                 usage: { inputTokens: 100, outputTokens: 50, totalTokens: 150 },
               };
             })(),
@@ -773,7 +786,7 @@ describe('AISDKAgent', () => {
               yield { type: 'text-end', id: 'text-1' };
               yield {
                 type: 'finish',
-                finishReason: 'stop',
+                finishReason: 'stop' as const,
                 usage: { inputTokens: 100, outputTokens: 50, totalTokens: 150 },
               };
             })(),
@@ -848,7 +861,8 @@ describe('AISDKAgent', () => {
       // Note: Model-level chunks don't have 'start-step'/'finish-step' - those are emitted by streamText
       // We need to use the model-level chunk format with 'stream-start'
       const mockModel = new MockLanguageModelV3({
-        doStream: async () => ({
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        doStream: (async () => ({
           stream: simulateReadableStream({
             chunks: [
               { type: 'stream-start', warnings: [] },
@@ -857,8 +871,8 @@ describe('AISDKAgent', () => {
               { type: 'text-end', id: 'text-1' },
               {
                 type: 'finish',
-                finishReason: 'stop',
-                usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
+                finishReason: 'stop' as const,
+                usage: createMockUsage(10, 5, 15),
               },
             ],
           }),
@@ -869,7 +883,7 @@ describe('AISDKAgent', () => {
             headers: {},
             messages: [{ role: 'assistant', content: 'Hello' }],
           },
-        }),
+        })) as any,
       });
 
       const agent = new AISDKAgent({ model: mockModel });
@@ -894,7 +908,8 @@ describe('AISDKAgent', () => {
 
     test('handles error chunk in stream', async () => {
       const mockModel = new MockLanguageModelV3({
-        doStream: async () => ({
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        doStream: (async () => ({
           stream: simulateReadableStream({
             chunks: [
               { type: 'stream-start', warnings: [] },
@@ -909,7 +924,7 @@ describe('AISDKAgent', () => {
             headers: {},
             messages: [],
           },
-        }),
+        })) as any,
       });
 
       const agent = new AISDKAgent({ model: mockModel });
@@ -931,13 +946,14 @@ describe('AISDKAgent', () => {
 
     test('handles empty response (no text, no tool calls)', async () => {
       const mockModel = new MockLanguageModelV3({
-        doStream: async () => ({
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        doStream: (async () => ({
           stream: simulateReadableStream({
             chunks: [
               { type: 'stream-start', warnings: [] },
               {
                 type: 'finish',
-                finishReason: 'stop',
+                finishReason: 'stop' as const,
                 usage: { inputTokens: 10, outputTokens: 0, totalTokens: 10 },
               },
             ],
@@ -949,7 +965,7 @@ describe('AISDKAgent', () => {
             headers: {},
             messages: [],
           },
-        }),
+        })) as any,
       });
 
       const agent = new AISDKAgent({ model: mockModel });
@@ -977,7 +993,8 @@ describe('AISDKAgent', () => {
      */
     function createSystemMessageCapturingMockModel(capturedMessages: { values: Array<{ role: string; content: string }> }) {
       return new MockLanguageModelV3({
-        doStream: async ({ prompt }) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        doStream: (async ({ prompt }: { prompt: Array<{ role: string; content: unknown }> }) => {
           // Find all system messages in the prompt
           // System messages have content as string, so we can safely cast
           const systemMessages = prompt.filter((msg) => msg.role === 'system') as Array<{ role: string; content: string }>;
@@ -992,7 +1009,7 @@ describe('AISDKAgent', () => {
                 { type: 'text-start', id: 'text-1' },
                 { type: 'text-delta', id: 'text-1', delta: 'Done' },
                 { type: 'text-end', id: 'text-1' },
-                { type: 'finish', finishReason: 'stop', usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 } },
+                { type: 'finish', finishReason: 'stop' as const, usage: createMockUsage(10, 5, 15) },
               ],
             }),
             response: {
@@ -1003,7 +1020,7 @@ describe('AISDKAgent', () => {
               messages: [{ role: 'assistant', content: 'Done' }],
             },
           };
-        },
+        }) as any,
       });
     }
 
@@ -1014,6 +1031,7 @@ describe('AISDKAgent', () => {
       const agent = new AISDKAgent({
         model: mockModel,
         systemPrompt: 'You are a helpful assistant.',
+        citations: false,
       });
 
       const emittedEvents: AGUIEvent[] = [];
@@ -1034,6 +1052,7 @@ describe('AISDKAgent', () => {
       const agent = new AISDKAgent({
         model: mockModel,
         systemPrompt: 'You are a helpful assistant.',
+        citations: false,
       });
 
       const emittedEvents: AGUIEvent[] = [];
@@ -1060,6 +1079,7 @@ describe('AISDKAgent', () => {
       const agent = new AISDKAgent({
         model: mockModel,
         // No systemPrompt in config
+        citations: false,
       });
 
       const emittedEvents: AGUIEvent[] = [];
@@ -1081,6 +1101,7 @@ describe('AISDKAgent', () => {
 
       const agent = new AISDKAgent({
         model: mockModel,
+        citations: false,
       });
 
       const emittedEvents: AGUIEvent[] = [];
@@ -1102,6 +1123,7 @@ describe('AISDKAgent', () => {
       const agent = new AISDKAgent({
         model: mockModel,
         systemPrompt: () => dynamicPromptValue,
+        citations: false,
       });
 
       const emittedEvents: AGUIEvent[] = [];
@@ -1132,6 +1154,7 @@ describe('AISDKAgent', () => {
       const agent = new AISDKAgent({
         model: mockModel,
         systemPrompt: () => '',
+        citations: false,
       });
 
       const emittedEvents: AGUIEvent[] = [];
@@ -1160,6 +1183,7 @@ describe('AISDKAgent', () => {
           await new Promise((resolve) => setTimeout(resolve, 10));
           return 'Async prompt from Langfuse';
         },
+        citations: false,
       });
 
       const emittedEvents: AGUIEvent[] = [];
@@ -1185,6 +1209,7 @@ describe('AISDKAgent', () => {
           await new Promise((resolve) => setTimeout(resolve, 5));
           return `Prompt version ${promptVersion}`;
         },
+        citations: false,
       });
 
       const emittedEvents: AGUIEvent[] = [];
@@ -1212,6 +1237,7 @@ describe('AISDKAgent', () => {
           await new Promise((resolve) => setTimeout(resolve, 5));
           return '';
         },
+        citations: false,
       });
 
       const emittedEvents: AGUIEvent[] = [];
@@ -1262,7 +1288,8 @@ describe('AISDKAgent', () => {
      */
     function createToolCapturingMockModel(capturedTools: { names: string[] }) {
       return new MockLanguageModelV3({
-        doStream: async ({ tools }) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        doStream: (async ({ tools }: { tools?: Record<string, { name?: string }> }) => {
           // Capture tool names - tools is an object with tool definitions
           // The keys may be numeric indices, so we need to extract names from values
           if (tools) {
@@ -1275,7 +1302,7 @@ describe('AISDKAgent', () => {
                 { type: 'text-start', id: 'text-1' },
                 { type: 'text-delta', id: 'text-1', delta: 'Done' },
                 { type: 'text-end', id: 'text-1' },
-                { type: 'finish', finishReason: 'stop', usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 } },
+                { type: 'finish', finishReason: 'stop' as const, usage: createMockUsage(10, 5, 15) },
               ],
             }),
             response: {
@@ -1286,7 +1313,7 @@ describe('AISDKAgent', () => {
               messages: [{ role: 'assistant', content: 'Done' }],
             },
           };
-        },
+        }) as any,
       });
     }
 

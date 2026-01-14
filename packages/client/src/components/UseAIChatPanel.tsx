@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import type { Chat, PersistedMessageContent, PersistedContentPart } from '../providers/chatRepository/types';
-import type { AgentInfo } from '../types';
+import type { AgentInfo, Citation } from '../types';
 import type { FileAttachment, FileUploadConfig } from '../fileUpload/types';
 import { MarkdownContent } from './MarkdownContent';
 import { FileChip, FilePlaceholder } from './FileChip';
@@ -34,6 +34,8 @@ interface Message {
   timestamp: Date;
   /** Display mode for styling the message bubble */
   displayMode?: MessageDisplayMode;
+  /** Citations for this message (AI SDK source chunks, RAG, etc.) */
+  citations?: Citation[];
 }
 
 /**
@@ -66,6 +68,8 @@ export interface UseAIChatPanelProps {
   connected: boolean;
   /** Currently streaming text from assistant (real-time updates) */
   streamingText?: string;
+  /** Citations for the currently streaming message (before it's finalized) */
+  streamingCitations?: Citation[];
   currentChatId?: string | null;
   onNewChat?: () => Promise<string | void>;
   onLoadChat?: (chatId: string) => Promise<void>;
@@ -95,6 +99,7 @@ export function UseAIChatPanel({
   loading,
   connected,
   streamingText = '',
+  streamingCitations = [],
   currentChatId,
   onNewChat,
   onLoadChat,
@@ -798,7 +803,7 @@ export function UseAIChatPanel({
                 </div>
               )}
               {message.role === 'assistant' ? (
-                <MarkdownContent content={getTextContent(message.content)} />
+                <MarkdownContent content={getTextContent(message.content)} citations={message.citations} />
               ) : (
                 getTextContent(message.content)
               )}
@@ -845,7 +850,7 @@ export function UseAIChatPanel({
               }}
             >
               {streamingText ? (
-                <MarkdownContent content={streamingText} />
+                <MarkdownContent content={streamingText} citations={streamingCitations} />
               ) : (
                 <>
                   <span style={{ opacity: 0.6 }}>{strings.input.thinking}</span>

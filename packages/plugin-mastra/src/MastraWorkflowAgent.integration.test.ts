@@ -122,7 +122,8 @@ describe('MastraWorkflowAgent', () => {
       const testAgent = new Agent({
         id: 'calculator-agent',
         name: 'calculatorAgent',
-        model: anthropic('claude-haiku-4-5'),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        model: anthropic('claude-haiku-4-5') as any,
         instructions: 'You are a helpful assistant. Use the calculator tool for math.',
         tools: { calculator: calculatorTool },
       });
@@ -250,7 +251,8 @@ describe('MastraWorkflowAgent', () => {
       const testAgent = new Agent({
         id: 'calculator-agent',
         name: 'calculatorAgent',
-        model: anthropic('claude-haiku-4-5'),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        model: anthropic('claude-haiku-4-5') as any,
         instructions: 'You are a helpful assistant. Use the calculator tool for math.',
         tools: {},
       });
@@ -412,7 +414,8 @@ describe('MastraWorkflowAgent', () => {
       const simpleAgent = new Agent({
         id: 'simple-agent',
         name: 'simpleAgent',
-        model: anthropic('claude-haiku-4-5'),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        model: anthropic('claude-haiku-4-5') as any,
         instructions: 'You are a helpful assistant. Keep responses very brief.',
         tools: {},
       });
@@ -491,7 +494,8 @@ describe('MastraWorkflowAgent', () => {
       const testAgent = new Agent({
         id: 'time-agent',
         name: 'timeAgent',
-        model: anthropic('claude-haiku-4-5'),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        model: anthropic('claude-haiku-4-5') as any,
         instructions: 'You MUST use the getCurrentTime tool to get the time. Always call the tool first.',
         tools: { getCurrentTime: getCurrentTimeTool },
       });
@@ -637,7 +641,8 @@ describe('MastraWorkflowAgent', () => {
       const testAgent = new Agent({
         id: 'weather-agent',
         name: 'weatherAgent',
-        model: anthropic('claude-haiku-4-5'),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        model: anthropic('claude-haiku-4-5') as any,
         instructions: 'You are a weather assistant. Use the get_weather tool.',
         tools: {},
       });

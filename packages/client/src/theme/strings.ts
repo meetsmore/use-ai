@@ -99,6 +99,8 @@ export const defaultStrings = {
     API_OVERLOADED: 'The AI service is currently experiencing high demand. Please try again in a moment.',
     /** Error when rate limited */
     RATE_LIMITED: 'Too many requests. Please wait a moment before trying again.',
+    /** Error with web search streaming (known AI SDK issue) */
+    WEB_SEARCH_STREAMING_ERROR: 'Web search encountered a temporary issue. Please try your question again.',
     /** Error for unknown/unexpected errors */
     UNKNOWN_ERROR: 'An unexpected error occurred. Please try again.',
   },

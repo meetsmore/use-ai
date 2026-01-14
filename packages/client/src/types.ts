@@ -55,6 +55,20 @@ export type {
   FileContent,
   MultimodalContent,
   UserMessageContent,
+  // Citation types
+  Citation,
+  CitationEvent,
 } from '@meetsmore-oss/use-ai-core';
 
-export { EventType, ErrorCode } from '@meetsmore-oss/use-ai-core';
+export {
+  EventType,
+  ErrorCode,
+  CITATION_EVENT_NAME,
+  CITATION_MARKER_START,
+  CITATION_MARKER_END,
+  CITATION_MARKER_SEP,
+  CITATION_PATTERN,
+  CITATION_SYSTEM_INSTRUCTION,
+  createCitationMarker,
+  transformLegacyCitations,
+} from '@meetsmore-oss/use-ai-core';

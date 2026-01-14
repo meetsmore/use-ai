@@ -99,4 +99,13 @@ export type {
   RunWorkflowMessage,
 } from '@meetsmore-oss/use-ai-core';
 
-export { EventType, ErrorCode } from '@meetsmore-oss/use-ai-core';
+export {
+  EventType,
+  ErrorCode,
+  // Citation types and constants
+  CITATION_EVENT_NAME,
+  CITATION_SYSTEM_INSTRUCTION,
+} from '@meetsmore-oss/use-ai-core';
+
+// Re-export citation types
+export type { Citation, CitationEvent } from '@meetsmore-oss/use-ai-core';

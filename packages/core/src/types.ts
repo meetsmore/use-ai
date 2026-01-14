@@ -43,6 +43,8 @@ export enum ErrorCode {
   API_OVERLOADED = 'API_OVERLOADED',
   /** Error when rate limit is exceeded (HTTP 429) */
   RATE_LIMITED = 'RATE_LIMITED',
+  /** Known issue with Anthropic web search streaming. See: https://github.com/vercel/ai/issues/7649 */
+  WEB_SEARCH_STREAMING_ERROR = 'WEB_SEARCH_STREAMING_ERROR',
   /** Generic error for unknown or unexpected errors */
   UNKNOWN_ERROR = 'UNKNOWN_ERROR',
 }
@@ -360,3 +362,17 @@ export type MultimodalContent = TextContent | ImageContent | FileContent;
  * When multimodal, the array can contain text, images, and files.
  */
 export type UserMessageContent = string | MultimodalContent[];
+
+// Re-export all citation types from dedicated module
+export {
+  CITATION_EVENT_NAME,
+  CITATION_MARKER_START,
+  CITATION_MARKER_END,
+  CITATION_MARKER_SEP,
+  LEGACY_CITATION_PATTERN,
+  CITATION_PATTERN,
+  createCitationMarker,
+  transformLegacyCitations,
+  CITATION_SYSTEM_INSTRUCTION,
+} from './citations';
+export type { Citation, CitationEvent } from './citations';

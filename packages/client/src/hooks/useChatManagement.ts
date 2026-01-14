@@ -2,7 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import type { ChatRepository, Chat, PersistedMessageContent } from '../providers/chatRepository/types';
 import type { Message } from '../components/UseAIChatPanel';
 import type { UseAIClient } from '../client';
-import type { Message as AGUIMessage } from '../types';
+import type { Message as AGUIMessage, Citation } from '../types';
 
 // Constants
 const CHAT_TITLE_MAX_LENGTH = 50;
@@ -39,6 +39,7 @@ function transformMessagesToUI(
     content: PersistedMessageContent;
     createdAt: Date;
     displayMode?: 'default' | 'error';
+    citations?: Citation[];
   }>
 ): Message[] {
   return storageMessages.map((msg) => ({
@@ -47,6 +48,7 @@ function transformMessagesToUI(
     content: msg.content,
     timestamp: msg.createdAt,
     displayMode: msg.displayMode,
+    citations: msg.citations,
   }));
 }
 
@@ -95,7 +97,7 @@ export interface UseChatManagementReturn {
   /** Saves a user message to storage and reloads messages */
   saveUserMessage: (chatId: string, content: PersistedMessageContent) => Promise<boolean>;
   /** Saves an AI response to storage and optionally reloads messages */
-  saveAIResponse: (content: string, displayMode?: 'default' | 'error') => Promise<void>;
+  saveAIResponse: (content: string, displayMode?: 'default' | 'error', citations?: Citation[]) => Promise<void>;
   /** Reloads messages from storage for the given chat ID */
   reloadMessages: (chatId: string) => Promise<void>;
   /** Snapshot refs for use in event handlers */
@@ -367,7 +369,8 @@ export function useChatManagement({
    */
   const saveAIResponse = useCallback(async (
     content: string,
-    displayMode?: 'default' | 'error'
+    displayMode?: 'default' | 'error',
+    citations?: Citation[]
   ): Promise<void> => {
     const currentChatIdValue = currentChatIdSnapshot.current;
     const pendingChatIdValue = pendingChatIdSnapshot.current;
@@ -387,13 +390,27 @@ export function useChatManagement({
       }
 
       const { generateMessageId } = await import('../providers/chatRepository/types');
-      chat.messages.push({
+      const message: {
+        id: string;
+        role: 'assistant';
+        content: string;
+        createdAt: Date;
+        displayMode?: 'default' | 'error';
+        citations?: Citation[];
+      } = {
         id: generateMessageId(),
         role: 'assistant',
         content,
         createdAt: new Date(),
         displayMode,
-      });
+      };
+
+      // Add citations if provided
+      if (citations && citations.length > 0) {
+        message.citations = citations;
+      }
+
+      chat.messages.push(message);
 
       // Auto-generate title from first user message if not set
       if (!chat.title) {
