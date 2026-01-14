@@ -1,3 +1,7 @@
+// Import and re-export CorsOptions from cors package (used by Socket.IO internally)
+import type { CorsOptions } from 'cors';
+export type { CorsOptions };
+
 /**
  * Configuration for an MCP (Model Context Protocol) endpoint.
  * MCP endpoints provide tools that can be discovered and executed server-side.
@@ -55,6 +59,25 @@ export interface UseAIServerConfig<TAgents extends Record<string, import('./agen
    * Default: 20MB (20 * 1024 * 1024)
    */
   maxHttpBufferSize?: number;
+  /**
+   * CORS configuration for Socket.IO server.
+   * Controls which origins can connect to the WebSocket server.
+   *
+   * Default: { origin: '*', methods: ['GET', 'POST'] }
+   *
+   * For production with sticky sessions (cookie-based load balancing):
+   * ```typescript
+   * cors: {
+   *   origin: 'https://your-frontend.com',
+   *   methods: ['GET', 'POST'],
+   *   credentials: true,
+   * }
+   * ```
+   *
+   * @see https://socket.io/docs/v4/handling-cors/
+   * @see https://socket.io/docs/v4/using-multiple-nodes/
+   */
+  cors?: CorsOptions;
 }
 
 // Re-export all types from @meetsmore-oss/use-ai-core

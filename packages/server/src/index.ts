@@ -1,5 +1,5 @@
 export { UseAIServer } from './server';
-export type { UseAIServerConfig, McpEndpointConfig, ToolDefinition } from './types';
+export type { UseAIServerConfig, McpEndpointConfig, ToolDefinition, CorsOptions } from './types';
 export type { ClientSession } from './server';
 
 // Export agents for advanced usage
