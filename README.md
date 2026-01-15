@@ -105,6 +105,7 @@ docker run -d \
   --name use-ai-server \
   -p 8081:8081 \
   -e ANTHROPIC_API_KEY=your-api-key \
+  -e CORS_ORIGIN='*' \
   ghcr.io/meetsmore/use-ai-server:latest
 ```
 
@@ -132,6 +133,9 @@ services:
       # - LOG_FORMAT=json
       # - RATE_LIMIT_MAX_REQUESTS=0
       # - RATE_LIMIT_WINDOW_MS=60000
+
+      # CORS: Set to '*' for local dev, or your frontend URL for production
+      - CORS_ORIGIN=*
 
       # Optional: Langfuse observability
       # - LANGFUSE_PUBLIC_KEY=pk-lf-xxx
@@ -196,7 +200,7 @@ export default function App() {
 Run the server (see [Installation > Server](#server) for more options):
 
 ```bash
-docker run -d -p 8081:8081 -e ANTHROPIC_API_KEY='your-api-key' ghcr.io/meetsmore/use-ai-server:latest
+docker run -d -p 8081:8081 -e ANTHROPIC_API_KEY='your-api-key' -e CORS_ORIGIN='*' ghcr.io/meetsmore/use-ai-server:latest
 ```
 
 Start your frontend:
