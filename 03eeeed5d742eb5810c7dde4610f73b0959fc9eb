@@ -1,0 +1,40 @@
+apps/use-ai-server-app/src/index.ts
+  fac02d3ca1b2ba53 17-18,182-188
+README.md
+  fac02d3ca1b2ba53 108,137-139,203
+.env.example
+  fac02d3ca1b2ba53 17
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.31",
+  "base_commit_sha": "03eeeed5d742eb5810c7dde4610f73b0959fc9eb",
+  "prompts": {
+    "e778261d92cfbd09": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "32c7a1f7-ea16-4bbf-b8e6-fa0ab57f06bb",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 22,
+      "total_deletions": 22,
+      "accepted_lines": 13,
+      "overriden_lines": 0
+    },
+    "fac02d3ca1b2ba53": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bc2210b1-8e5f-40fe-9ee6-1e4006354a1f",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 25,
+      "total_deletions": 11,
+      "accepted_lines": 15,
+      "overriden_lines": 0
+    }
+  }
+}
