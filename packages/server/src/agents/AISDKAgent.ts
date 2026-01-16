@@ -24,46 +24,12 @@ import type {
 } from '../types';
 import { logger } from '../logger';
 import { initializeLangfuse, type LangfuseConfig } from '../instrumentation';
+import { applyCacheBreakpoints, type CacheBreakpointFn } from './anthropicCache';
 
 /**
  * Generic tool arguments type - tools receive key-value pairs
  */
 type ToolArguments = Record<string, unknown>;
-
-/**
- * ModelMessage extended with positional context for cache breakpoint decisions.
- * Used by the cacheBreakpoint config to determine which messages should have
- * Anthropic's cache_control breakpoints applied.
- *
- * System prompt is included as role: 'system' at index 0 when present.
- */
-export type MessageWithCacheContext = ModelMessage & {
-  /** Position in the messages array (0-indexed, system prompt is 0 if present) */
-  index: number;
-  /** Total number of messages including system prompt */
-  totalCount: number;
-  /** True if this is the first message */
-  isFirst: boolean;
-  /** True if this is the last message */
-  isLast: boolean;
-};
-
-/**
- * Cache TTL options for Anthropic prompt caching.
- * - '5m': 5-minute cache (default, refreshed on each use at no cost)
- * - '1h': 1-hour cache (additional cost, useful for infrequent access patterns)
- *
- * @see https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching#1-hour-cache-duration
- */
-export type CacheTtl = '5m' | '1h';
-
-/**
- * Return type for cacheBreakpoint function.
- * - `false` / `null` / `undefined`: No cache breakpoint
- * - `true`: Cache breakpoint with default TTL (5m)
- * - `'5m'` / `'1h'`: Cache breakpoint with specified TTL
- */
-export type CacheBreakpointResult = boolean | CacheTtl | null | undefined;
 
 /**
  * Generic tool result type - tools can return any value
@@ -233,7 +199,7 @@ export interface AISDKAgentConfig {
    * }
    * ```
    */
-  cacheBreakpoint?: (message: MessageWithCacheContext) => CacheBreakpointResult;
+  cacheBreakpoint?: CacheBreakpointFn;
 }
 
 /**
@@ -287,7 +253,7 @@ export class AISDKAgent implements Agent {
   private langfuse: LangfuseConfig;
   private toolFilter?: (tool: ToolDefinition) => boolean;
   private systemPrompt?: string | (() => string | Promise<string>);
-  private cacheBreakpoint?: (message: MessageWithCacheContext) => CacheBreakpointResult;
+  private cacheBreakpoint?: CacheBreakpointFn;
 
   constructor(config: AISDKAgentConfig) {
     this.model = config.model;
@@ -384,7 +350,11 @@ export class AISDKAgent implements Agent {
       });
 
       // Apply cache breakpoints for Anthropic prompt caching
-      const messagesWithCache = this.applyCacheBreakpoints(messagesWithSystem);
+      const messagesWithCache = applyCacheBreakpoints(
+        messagesWithSystem,
+        this.cacheBreakpoint,
+        this.model
+      );
 
       const stream = streamText({
         model: this.model,
@@ -770,92 +740,6 @@ export class AISDKAgent implements Agent {
     }
 
     return filteredTools;
-  }
-
-  /**
-   * Checks if the configured model is an Anthropic model (Claude).
-   */
-  private isAnthropicModel(): boolean {
-    const model = this.model;
-    // String format: "anthropic/claude-3-5-sonnet-20241022"
-    if (typeof model === 'string') {
-      return model.startsWith('anthropic/');
-    }
-    // Object format: { provider: 'anthropic' | 'anthropic.messages' | ... }
-    const provider = (model as { provider?: string }).provider;
-    return provider?.startsWith('anthropic') ?? false;
-  }
-
-  /**
-   * Applies cache breakpoints to messages for Anthropic prompt caching.
-   * Only applies when:
-   * 1. cacheBreakpoint config is provided
-   * 2. Model is an Anthropic model
-   *
-   * Adds providerOptions.anthropic.cacheControl to messages where
-   * the cacheBreakpoint function returns true.
-   *
-   * @param messages - The messages array (system prompt should be prepended as role: 'system')
-   * @returns Messages with cache control providerOptions added where applicable
-   */
-  private applyCacheBreakpoints(messages: ModelMessage[]): ModelMessage[] {
-    // Skip if no cacheBreakpoint configured or not Anthropic model
-    if (!this.cacheBreakpoint || !this.isAnthropicModel()) {
-      return messages;
-    }
-
-    const totalCount = messages.length;
-    let cacheBreakpointCount = 0;
-
-    const result = messages.map((message, index) => {
-      const context: MessageWithCacheContext = {
-        ...message,
-        index,
-        totalCount,
-        isFirst: index === 0,
-        isLast: index === totalCount - 1,
-      };
-
-      const breakpointResult = this.cacheBreakpoint!(context);
-
-      // Check if we should add a cache breakpoint
-      // truthy values: true, '5m', '1h'
-      // falsy values: false, null, undefined
-      if (breakpointResult) {
-        cacheBreakpointCount++;
-
-        // Build cache control object
-        // If result is a TTL string ('5m' or '1h'), include it
-        // If result is `true`, use default (no TTL field = 5m default)
-        const cacheControl: { type: 'ephemeral'; ttl?: CacheTtl } =
-          typeof breakpointResult === 'string'
-            ? { type: 'ephemeral', ttl: breakpointResult }
-            : { type: 'ephemeral' };
-
-        // Add cache control to the message
-        return {
-          ...message,
-          providerOptions: {
-            ...(message as { providerOptions?: Record<string, unknown> }).providerOptions,
-            anthropic: {
-              cacheControl,
-            },
-          },
-        };
-      }
-
-      return message;
-    });
-
-    if (cacheBreakpointCount > 0) {
-      logger.debug('Applied cache breakpoints', {
-        agentName: this.name,
-        totalMessages: totalCount,
-        cacheBreakpointCount,
-      });
-    }
-
-    return result;
   }
 
   /**
