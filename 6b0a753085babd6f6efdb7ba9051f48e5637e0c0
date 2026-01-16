@@ -1,0 +1,27 @@
+packages/server/src/agents/index.ts
+  77662abc34c2b353 7-10,13-15
+packages/server/src/agents/AISDKAgent.ts
+  77662abc34c2b353 27,202,256,354-356
+packages/server/src/agents/anthropicCache.ts
+  77662abc34c2b353 1-6,8-35,37-141
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.34",
+  "base_commit_sha": "6b0a753085babd6f6efdb7ba9051f48e5637e0c0",
+  "prompts": {
+    "77662abc34c2b353": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8bac0019-00c3-4861-a19f-effda2d37479",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Masuda Hiroto <masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 171,
+      "total_deletions": 138,
+      "accepted_lines": 152,
+      "overriden_lines": 2
+    }
+  }
+}
