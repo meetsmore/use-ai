@@ -158,18 +158,18 @@ export function UseAIChatPanel({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  const maxTextareaHeight = 160;
+
   // Auto-resize textarea based on content
   useEffect(() => {
     const textarea = textareaRef.current;
     if (!textarea) return;
 
     // Reset to single row to measure actual content height
-    textarea.style.height = '0px';
+    textarea.style.height = 'auto';
 
     // Calculate new height based on scrollHeight (clamped to max)
-    const maxHeight = 160;
-    const newHeight = Math.min(textarea.scrollHeight, maxHeight);
-
+    const newHeight = Math.min(textarea.scrollHeight, maxTextareaHeight);
     textarea.style.height = `${newHeight}px`;
   }, [input]);
 
@@ -962,11 +962,10 @@ export function UseAIChatPanel({
               fontSize: '14px',
               lineHeight: '1.4',
               resize: 'none',
-              maxHeight: '160px',
+              maxHeight: `${maxTextareaHeight}px`,
               fontFamily: 'inherit',
               outline: 'none',
               background: 'transparent',
-              overflow: 'hidden',
               overflowY: 'auto',
               boxSizing: 'border-box',
             }}
