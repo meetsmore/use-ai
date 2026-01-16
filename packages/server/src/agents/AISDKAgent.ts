@@ -24,6 +24,7 @@ import type {
 } from '../types';
 import { logger } from '../logger';
 import { initializeLangfuse, type LangfuseConfig } from '../instrumentation';
+import { applyCacheBreakpoints, type CacheBreakpointFn } from './anthropicCache';
 
 /**
  * Generic tool arguments type - tools receive key-value pairs
@@ -151,6 +152,54 @@ export interface AISDKAgentConfig {
    * ```
    */
   toolFilter?: (tool: ToolDefinition) => boolean;
+
+  /**
+   * Anthropic-specific: Configure cache breakpoints for prompt caching.
+   * Only applies when using Anthropic models (Claude).
+   *
+   * Prompt caching reduces costs and latency by caching message prefixes.
+   * Cache breakpoints mark where the cacheable prefix ends.
+   *
+   * The function receives each message with positional context and returns
+   * true to add a cache breakpoint after that message.
+   *
+   * System prompt is included as role: 'system' at index 0 when present.
+   *
+   * @see https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching
+   *
+   * @example
+   * ```typescript
+   * // Cache system prompt + last message (most common pattern)
+   * {
+   *   cacheBreakpoint: (msg) => msg.role === 'system' || msg.isLast
+   * }
+   *
+   * // Cache only the last message
+   * {
+   *   cacheBreakpoint: (msg) => msg.isLast
+   * }
+   *
+   * // Cache system prompt only
+   * {
+   *   cacheBreakpoint: (msg) => msg.role === 'system'
+   * }
+   *
+   * // Cache first 3 messages + last
+   * {
+   *   cacheBreakpoint: (msg) => msg.index < 3 || msg.isLast
+   * }
+   *
+   * // System prompt with 1h TTL, last message with 5m TTL
+   * {
+   *   cacheBreakpoint: (msg) => {
+   *     if (msg.role === 'system') return '1h';
+   *     if (msg.isLast) return '5m';
+   *     return false;
+   *   }
+   * }
+   * ```
+   */
+  cacheBreakpoint?: CacheBreakpointFn;
 }
 
 /**
@@ -204,6 +253,7 @@ export class AISDKAgent implements Agent {
   private langfuse: LangfuseConfig;
   private toolFilter?: (tool: ToolDefinition) => boolean;
   private systemPrompt?: string | (() => string | Promise<string>);
+  private cacheBreakpoint?: CacheBreakpointFn;
 
   constructor(config: AISDKAgentConfig) {
     this.model = config.model;
@@ -211,6 +261,7 @@ export class AISDKAgent implements Agent {
     this.annotation = config.annotation;
     this.toolFilter = config.toolFilter;
     this.systemPrompt = config.systemPrompt;
+    this.cacheBreakpoint = config.cacheBreakpoint;
     // Initialize Langfuse observability (automatically reads env vars)
     this.langfuse = initializeLangfuse();
   }
@@ -298,9 +349,17 @@ export class AISDKAgent implements Agent {
         systemMessages: systemMessages?.map(m => m.content.substring(0, 80) + (m.content.length > 80 ? '...' : '')),
       });
 
+      // Apply cache breakpoints for Anthropic prompt caching
+      const messagesWithCache = applyCacheBreakpoints(
+        messagesWithSystem,
+        this.cacheBreakpoint,
+        this.model
+      );
+
       const stream = streamText({
         model: this.model,
-        messages: messagesWithSystem,
+        messages: messagesWithCache,
+        // Note: system prompt is included in messages array to support cache breakpoints
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         tools:
           tools.length > 0
