@@ -1,0 +1,70 @@
+docs/plans/agent-plugins.md
+  9cae658e7603b554 10,24-26,29,31,34,36,39-41,43,45-47,49,51,58,60-69,76,82,156-157,159,165-166,168,174-176,180,182-183,188-189,208-209,218,224-225,231,237-238,244,248,255,262-263,269,275-276,330,335-336,359-360,378-379,402,404,602,698,701,704-717,721,724,727,730,733,771-772,776-781,783,786,788,790,794,796,798,800,802
+packages/server/src/agents/AISDKAgent.ts
+  25e3b5c2fc630869 328,331,340-341,345-347,356,364-365,579,604,613
+  ef306ff7a719c51e 27-28,156-173,227,237-251,305-316,327,329-330,332-336,603,605-612,614,616-617,625
+packages/server/src/index.ts
+  ef306ff7a719c51e 9-20,24
+packages/server/src/agents/plugins/__tests__/runner.test.ts
+  ef306ff7a719c51e 1-49,51-130,132-137,139-142,144-148,153-201,203-211,213-577
+  25e3b5c2fc630869 50,131,138,143,149-152,202,212
+README.md
+  25e3b5c2fc630869 55,851-933
+packages/server/src/logger.ts
+  ef306ff7a719c51e 9
+packages/server/src/agents/plugins/index.ts
+  ef306ff7a719c51e 1-40
+packages/server/src/agents/plugins/types.ts
+  ef306ff7a719c51e 2-35,38-198
+  25e3b5c2fc630869 1,36-37
+packages/server/src/agents/plugins/runner.ts
+  ef306ff7a719c51e 1-159
+packages/server/src/agents/index.ts
+  ef306ff7a719c51e 8-18
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.34",
+  "base_commit_sha": "c6832485eea7eed8300947c0dadf4364df3097ae",
+  "prompts": {
+    "25e3b5c2fc630869": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "61c1e7f9-1d58-4ca0-8972-f8cff77c631d",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 120,
+      "total_deletions": 123,
+      "accepted_lines": 110,
+      "overriden_lines": 0
+    },
+    "9cae658e7603b554": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6618facf-f726-4d90-a59d-037f683f4291",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 144,
+      "total_deletions": 139,
+      "accepted_lines": 108,
+      "overriden_lines": 0
+    },
+    "ef306ff7a719c51e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f14fe7b1-972a-465e-b2ab-15ff319ced3f",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 1204,
+      "total_deletions": 51,
+      "accepted_lines": 1056,
+      "overriden_lines": 0
+    }
+  }
+}
