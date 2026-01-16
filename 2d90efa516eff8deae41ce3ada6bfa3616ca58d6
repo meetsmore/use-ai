@@ -1,0 +1,75 @@
+packages/client/src/components/UseAIChatPanel.tsx
+  942e5ff18cd08a7c 124,161-175,924,927-930,947-975,980-981,984-992,994-995,1001-1002,1006-1009,1014,1016-1026,1031,1033,1037,1039-1046,1048,1050-1052
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.34",
+  "base_commit_sha": "2d90efa516eff8deae41ce3ada6bfa3616ca58d6",
+  "prompts": {
+    "29ae583e8f548490": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ed01bc54-c7f2-4990-b208-1d044c751b85",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Masuda Hiroto <masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 188,
+      "total_deletions": 35,
+      "accepted_lines": 159,
+      "overriden_lines": 0
+    },
+    "5049eab6cb8070a4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bc4653bb-af91-4d03-b545-4a8c7e58c498",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Masuda Hiroto <masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 6,
+      "total_deletions": 2,
+      "accepted_lines": 6,
+      "overriden_lines": 0
+    },
+    "942e5ff18cd08a7c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "52a9436c-3586-4cd1-a719-10199715cd6d",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Masuda Hiroto <masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 144,
+      "total_deletions": 114,
+      "accepted_lines": 96,
+      "overriden_lines": 0
+    },
+    "d5129a31fcff53a6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "817973c4-3e6a-47a1-9714-8ebde75b3433",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Masuda Hiroto <masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 93,
+      "total_deletions": 63,
+      "accepted_lines": 21,
+      "overriden_lines": 4
+    },
+    "ea4b30cb5c202363": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "53bb7933-fa9f-4143-8531-9a009ee70cec",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Masuda Hiroto <masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 9,
+      "total_deletions": 41,
+      "accepted_lines": 4,
+      "overriden_lines": 2
+    }
+  }
+}
