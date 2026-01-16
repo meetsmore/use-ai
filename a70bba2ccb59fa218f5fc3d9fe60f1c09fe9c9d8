@@ -1,0 +1,23 @@
+CONTRIBUTING.md
+  5a080a417f83ed08 56
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.34",
+  "base_commit_sha": "a70bba2ccb59fa218f5fc3d9fe60f1c09fe9c9d8",
+  "prompts": {
+    "5a080a417f83ed08": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5c6d12b1-a6bf-4264-ae5f-dac5353abeaf",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 29,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  }
+}
