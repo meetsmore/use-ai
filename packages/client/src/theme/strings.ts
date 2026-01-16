@@ -43,8 +43,6 @@ export const defaultStrings = {
     placeholder: 'Type a message...',
     /** Input placeholder when connecting */
     connectingPlaceholder: 'Connecting...',
-    /** Send button text */
-    send: 'Send',
     /** Loading indicator text */
     thinking: 'Thinking',
   },
