@@ -14,6 +14,8 @@ const logFormat = process.env.LOG_FORMAT || 'pretty';
 const maxHttpBufferSize = process.env.MAX_HTTP_BUFFER_SIZE
   ? Number(process.env.MAX_HTTP_BUFFER_SIZE)
   : undefined;
+// CORS origin for Socket.IO (e.g., '*' for local dev, 'https://example.com' for production)
+const corsOrigin = process.env.CORS_ORIGIN;
 
 /**
  * Create agents based on available API keys.
@@ -177,6 +179,13 @@ logger.info('Starting UseAI server', { logFormat });
       plugins: plugins.length > 0 ? plugins : undefined,
       mcpEndpoints: mcpEndpoints.length > 0 ? mcpEndpoints : undefined,
       maxHttpBufferSize,
+      cors: corsOrigin
+        ? {
+            origin: corsOrigin === '*' ? true : corsOrigin,
+            methods: ['GET', 'POST'],
+            credentials: true,
+          }
+        : undefined,
     });
 
     // Initialize MCP endpoints
