@@ -6,11 +6,22 @@ export type { ClientSession } from './server';
 export type { Agent, AgentInput, EventEmitter, AgentResult } from './agents';
 export { AISDKAgent, type AISDKAgentConfig } from './agents';
 
-// Export plugin types for creating custom plugins
+// Export agent plugin types for creating custom agent plugins
+export type {
+  AgentPlugin,
+  AgentPluginContext,
+  AgentRunInput,
+  AgentRunResult,
+  ToolCallInfo,
+  ToolResultInfo,
+} from './agents';
+export { AgentPluginRunner } from './agents';
+
+// Export server plugin types for creating custom server plugins
 export type { UseAIServerPlugin, MessageHandler } from './plugins';
 
 // Export logger for plugins
-export { logger } from './logger';
+export { logger, Logger } from './logger';
 
 // Export utilities for plugins and custom agents
 export {

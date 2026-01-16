@@ -6,7 +6,7 @@ interface LogData {
   [key: string]: unknown;
 }
 
-class Logger {
+export class Logger {
   private format: 'json' | 'pretty';
   private silent: boolean;
 
