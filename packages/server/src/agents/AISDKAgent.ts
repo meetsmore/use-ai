@@ -24,6 +24,8 @@ import type {
 } from '../types';
 import { logger } from '../logger';
 import { initializeLangfuse, type LangfuseConfig } from '../instrumentation';
+import type { AgentPlugin, AgentPluginContext } from './plugins';
+import { AgentPluginRunner } from './plugins';
 
 /**
  * Generic tool arguments type - tools receive key-value pairs
@@ -151,6 +153,24 @@ export interface AISDKAgentConfig {
    * ```
    */
   toolFilter?: (tool: ToolDefinition) => boolean;
+
+  /**
+   * Optional plugins to extend agent functionality.
+   * Plugins are executed in array order and can modify inputs,
+   * transform responses, intercept tool calls, and handle errors.
+   *
+   * @example
+   * ```typescript
+   * {
+   *   plugins: [
+   *     loggingPlugin,    // Runs first
+   *     citationPlugin,   // Runs second
+   *     metricsPlugin,    // Runs last
+   *   ]
+   * }
+   * ```
+   */
+  plugins?: AgentPlugin[];
 }
 
 /**
@@ -204,6 +224,7 @@ export class AISDKAgent implements Agent {
   private langfuse: LangfuseConfig;
   private toolFilter?: (tool: ToolDefinition) => boolean;
   private systemPrompt?: string | (() => string | Promise<string>);
+  private pluginRunner: AgentPluginRunner;
 
   constructor(config: AISDKAgentConfig) {
     this.model = config.model;
@@ -213,6 +234,21 @@ export class AISDKAgent implements Agent {
     this.systemPrompt = config.systemPrompt;
     // Initialize Langfuse observability (automatically reads env vars)
     this.langfuse = initializeLangfuse();
+    // Initialize plugin runner with provided plugins
+    this.pluginRunner = new AgentPluginRunner(config.plugins ?? []);
+    // Initialize plugins with provider info
+    this.pluginRunner.initialize({ provider: this.getProviderName() });
+  }
+
+  /**
+   * Get the provider name from the model.
+   * Used for plugin initialization and provider-specific behavior.
+   */
+  private getProviderName(): string {
+    // AI SDK models have a provider property
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const modelAny = this.model as any;
+    return modelAny.provider || modelAny.providerId || 'unknown';
   }
 
   getName(): string {
@@ -266,6 +302,18 @@ export class AISDKAgent implements Agent {
       timestamp: Date.now(),
     });
 
+    // Create plugin context for this run
+    const pluginContext: AgentPluginContext = {
+      runId,
+      clientId: session.clientId,
+      threadId: session.threadId,
+      provider: this.getProviderName(),
+      events,
+      state: new Map(),
+      logger,
+      session,
+    };
+
     try {
       logger.info('Sending to AI SDK model (streaming)', {
         clientId: session.clientId,
@@ -276,17 +324,27 @@ export class AISDKAgent implements Agent {
       // Sanitize messages before sending to ensure no provider-specific fields leak through (e.g. for Anthropic: 'tool_use_id')
       const sanitizedInputMessages = this.sanitizeMessages(messages);
 
+      // Run onUserMessage plugin hook
+      const inputAfterPlugins = await this.pluginRunner.onUserMessage(
+        {
+          messages: sanitizedInputMessages,
+          systemMessages,
+          tools,
+        },
+        pluginContext
+      );
+
       // Prepend system messages to the messages array
       // This allows multiple system messages to be sent as separate messages
       const messagesWithSystem: ModelMessage[] = [
-        ...(systemMessages || []),
-        ...sanitizedInputMessages,
+        ...(inputAfterPlugins.systemMessages || []),
+        ...inputAfterPlugins.messages,
       ];
 
       logger.apiRequest({
-        tools: tools.map((t) => t.name),
-        messageCount: messages.length,
-        messages: messages.map((msg: ModelMessage) => ({
+        tools: inputAfterPlugins.tools.map((t) => t.name),
+        messageCount: inputAfterPlugins.messages.length,
+        messages: inputAfterPlugins.messages.map((msg: ModelMessage) => ({
           role: msg.role,
           preview:
             typeof msg.content === 'string'
@@ -295,7 +353,7 @@ export class AISDKAgent implements Agent {
               ? `${msg.content.length} content blocks`
               : 'complex content',
         })),
-        systemMessages: systemMessages?.map(m => m.content.substring(0, 80) + (m.content.length > 80 ? '...' : '')),
+        systemMessages: inputAfterPlugins.systemMessages?.map(m => m.content.substring(0, 80) + (m.content.length > 80 ? '...' : '')),
       });
 
       const stream = streamText({
@@ -303,8 +361,8 @@ export class AISDKAgent implements Agent {
         messages: messagesWithSystem,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         tools:
-          tools.length > 0
-            ? (this.sanitizeToolsForAPI(this.filterTools(tools), session) as any)
+          inputAfterPlugins.tools.length > 0
+            ? (this.sanitizeToolsForAPI(this.filterTools(inputAfterPlugins.tools), session) as any)
             : undefined,
         stopWhen: stepCountIs(10), // Allow AI SDK to handle multi-step tool execution automatically
         maxOutputTokens: 4096,
@@ -518,7 +576,7 @@ export class AISDKAgent implements Agent {
       // Determine which messages are new by checking if result.response.messages includes
       // the input messages or only the new messages generated by the AI
       const firstResponseMsg = responseMessages[0];
-      const lastInputMsg = sanitizedInputMessages[sanitizedInputMessages.length - 1];
+      const lastInputMsg = inputAfterPlugins.messages[inputAfterPlugins.messages.length - 1];
 
       let includesInputMessages = false;
       if (firstResponseMsg && lastInputMsg) {
@@ -542,9 +600,21 @@ export class AISDKAgent implements Agent {
       const sanitizedMessages = this.sanitizeMessages(newMessages);
       session.conversationHistory.push(...sanitizedMessages);
 
+      // Run onAgentResponse plugin hook
+      const outputAfterPlugins = await this.pluginRunner.onAgentResponse(
+        {
+          text: finalText,
+          response: { messages: responseMessages },
+        },
+        pluginContext
+      );
+
+      // Use processed text from plugins
+      const resultText = outputAfterPlugins.text;
+
       // Log final response
-      if (finalText) {
-        logger.aiResponse([finalText]);
+      if (resultText) {
+        logger.aiResponse([resultText]);
       }
 
       // Emit RUN_FINISHED
@@ -552,7 +622,7 @@ export class AISDKAgent implements Agent {
         type: EventType.RUN_FINISHED,
         threadId: session.threadId,
         runId,
-        result: finalText,
+        result: resultText,
         timestamp: Date.now(),
       });
 

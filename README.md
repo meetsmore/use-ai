@@ -52,6 +52,7 @@ A React client/framework for easily enabling AI to control your users frontend.
     - [External MCPs](#external-mcps)
     - [Rate Limiting](#rate-limiting)
     - [Langfuse](#langfuse)
+    - [Agent Plugins](#agent-plugins)
   - [Plugins](#plugins)
     - [`@meetsmore-oss/use-ai-plugin-workflows`](#meetsmore-use-ai-plugin-workflows)
     - [`@meetsmore-oss/use-ai-plugin-mastra`](#meetsmore-use-ai-plugin-mastra)
@@ -845,6 +846,89 @@ The `use-ai` `AISDKAgent` supports this out of the box, just set these environme
 ```bash
 LANGFUSE_PUBLIC_KEY='your-langfuse-public-key'
 LANGFUSE_SECRET_KEY='your-langfuse-secret-key'
+```
+
+### Agent Plugins
+
+Agent plugins allow you to extend `AISDKAgent` behavior by hooking into the agent lifecycle. Use them to modify inputs, transform responses, intercept tool calls, or add observability.
+
+```typescript
+import { AISDKAgent, type AgentPlugin } from '@meetsmore-oss/use-ai-server';
+import { anthropic } from '@ai-sdk/anthropic';
+
+// Define a plugin
+const loggingPlugin: AgentPlugin = {
+  id: 'logging',
+
+  onUserMessage(input, context) {
+    context.logger.info('User message received', {
+      messageCount: input.messages.length,
+      toolCount: input.tools.length,
+    });
+    return input;
+  },
+
+  onAgentResponse(result, context) {
+    context.logger.info('Agent response', {
+      textLength: result.text.length,
+    });
+    return result;
+  },
+};
+
+// Use the plugin
+const agent = new AISDKAgent({
+  model: anthropic('claude-sonnet-4-20250514'),
+  plugins: [loggingPlugin],
+});
+```
+
+**Available Hooks:**
+
+| Hook                | When Called                        | Can Modify                    |
+|---------------------|------------------------------------|-------------------------------|
+| `initialize`        | Once when agent is created         | -                             |
+| `onUserMessage`     | Before sending to AI               | messages, systemMessages, tools |
+| `onAgentResponse`   | After AI completes (incl. tools)   | text, response data           |
+| `onTextChunk`       | For each streaming chunk           | chunk text                    |
+| `onBeforeToolCall`  | Before tool execution              | tool call args, or skip (null)|
+| `onAfterToolCall`   | After tool execution               | tool result                   |
+| `destroy`           | When agent is destroyed            | -                             |
+
+**Plugin Execution Order:**
+
+Plugins execute in array order. Each hook passes its output to the next plugin:
+
+```typescript
+new AISDKAgent({
+  model: anthropic('claude-sonnet-4-20250514'),
+  plugins: [
+    rateLimitPlugin,   // Runs first
+    loggingPlugin,     // Runs second
+    metricsPlugin,     // Runs last
+  ],
+});
+```
+
+**Shared State:**
+
+Plugins can share data within a single run via `context.state`:
+
+```typescript
+const timingPlugin: AgentPlugin = {
+  id: 'timing',
+
+  onUserMessage(input, context) {
+    context.state.set('startTime', Date.now());
+    return input;
+  },
+
+  onAgentResponse(result, context) {
+    const duration = Date.now() - (context.state.get('startTime') as number);
+    context.logger.info(`Request took ${duration}ms`);
+    return result;
+  },
+};
 ```
 
 ### Bundled Client Library (optional)
