@@ -121,6 +121,7 @@ export function UseAIChatPanel({
   const [chatHistory, setChatHistory] = useState<Array<Omit<Chat, 'messages'>>>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [displayedSuggestions, setDisplayedSuggestions] = useState<string[]>([]);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Message hover state for save button
   const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
@@ -156,6 +157,21 @@ export function UseAIChatPanel({
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  const maxTextareaHeight = 160;
+
+  // Auto-resize textarea based on content
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    // Reset to single row to measure actual content height
+    textarea.style.height = 'auto';
+
+    // Calculate new height based on scrollHeight (clamped to max)
+    const newHeight = Math.min(textarea.scrollHeight, maxTextareaHeight);
+    textarea.style.height = `${newHeight}px`;
+  }, [input]);
 
   // Randomly select up to 4 suggestions when messages become empty
   useEffect(() => {
@@ -905,10 +921,13 @@ export function UseAIChatPanel({
           </div>
         )}
 
+        {/* Input container - single border around everything */}
         <div
           style={{
-            display: 'flex',
-            gap: '8px',
+            border: `1px solid ${theme.borderColor}`,
+            borderRadius: '12px',
+            background: theme.backgroundColor,
+            overflow: 'hidden',
             position: 'relative',
           }}
         >
@@ -925,104 +944,113 @@ export function UseAIChatPanel({
             accept={acceptedTypes?.join(',')}
           />
 
-          {/* Input container with textarea and file button */}
+          {/* Textarea area */}
+          <textarea
+            ref={textareaRef}
+            data-testid="chat-input"
+            className="chat-input"
+            value={input}
+            onChange={handleInputChange}
+            onKeyDown={handleKeyDown}
+            placeholder={connected ? strings.input.placeholder : strings.input.connectingPlaceholder}
+            disabled={!connected || loading}
+            rows={1}
+            style={{
+              width: '100%',
+              padding: '10px 14px 6px',
+              border: 'none',
+              fontSize: '14px',
+              lineHeight: '1.4',
+              resize: 'none',
+              maxHeight: `${maxTextareaHeight}px`,
+              fontFamily: 'inherit',
+              outline: 'none',
+              background: 'transparent',
+              overflowY: 'auto',
+              boxSizing: 'border-box',
+            }}
+          />
+
+          {/* Bottom toolbar - fixed */}
           <div
             style={{
-              flex: 1,
               display: 'flex',
               alignItems: 'center',
-              border: `1px solid ${theme.borderColor}`,
-              borderRadius: '8px',
-              background: theme.backgroundColor,
-              overflow: 'hidden',
+              justifyContent: 'space-between',
+              padding: '4px 8px',
             }}
           >
-            <textarea
-              data-testid="chat-input"
-              className="chat-input"
-              value={input}
-              onChange={handleInputChange}
-              onKeyDown={handleKeyDown}
-              placeholder={connected ? strings.input.placeholder : strings.input.connectingPlaceholder}
-              disabled={!connected || loading}
+            {/* Left side - file picker */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {fileUploadEnabled && (
+                <button
+                  data-testid="file-picker-button"
+                  onClick={openFilePicker}
+                  disabled={!connected || loading}
+                  style={{
+                    padding: '4px',
+                    background: 'transparent',
+                    border: `1px solid ${theme.borderColor}`,
+                    borderRadius: '50%',
+                    cursor: connected && !loading ? 'pointer' : 'not-allowed',
+                    color: theme.secondaryTextColor,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '28px',
+                    height: '28px',
+                    transition: 'all 0.15s',
+                    opacity: connected && !loading ? 1 : 0.5,
+                  }}
+                  onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
+                    if (connected && !loading) {
+                      e.currentTarget.style.color = theme.primaryColor;
+                      e.currentTarget.style.borderColor = theme.primaryColor;
+                    }
+                  }}
+                  onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
+                    e.currentTarget.style.color = theme.secondaryTextColor;
+                    e.currentTarget.style.borderColor = theme.borderColor;
+                  }}
+                  title={strings.fileUpload.attachFiles}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="12" y1="5" x2="12" y2="19" />
+                    <line x1="5" y1="12" x2="19" y2="12" />
+                  </svg>
+                </button>
+              )}
+            </div>
+
+            {/* Right side - send button */}
+            <button
+              data-testid="chat-send-button"
+              className="chat-send-button"
+              onClick={handleSend}
+              disabled={!connected || loading || (!input.trim() && attachments.length === 0)}
               style={{
-                flex: 1,
-                padding: '10px 12px',
+                padding: '6px',
+                background: connected && !loading && (input.trim() || attachments.length > 0)
+                  ? theme.primaryGradient
+                  : theme.buttonDisabledBackground,
+                color: connected && !loading && (input.trim() || attachments.length > 0) ? 'white' : theme.secondaryTextColor,
                 border: 'none',
-                fontSize: '14px',
-                resize: 'none',
-                minHeight: '44px',
-                maxHeight: '120px',
-                fontFamily: 'inherit',
-                outline: 'none',
-                background: 'transparent',
+                borderRadius: '50%',
+                cursor: connected && !loading && (input.trim() || attachments.length > 0) ? 'pointer' : 'not-allowed',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '32px',
+                height: '32px',
+                transition: 'all 0.2s',
               }}
-              rows={1}
-            />
-
-            {/* File picker button inside input */}
-            {fileUploadEnabled && (
-              <button
-                data-testid="file-picker-button"
-                onClick={openFilePicker}
-                disabled={!connected || loading}
-                style={{
-                  padding: '6px',
-                  marginRight: '6px',
-                  background: 'transparent',
-                  border: 'none',
-                  borderRadius: '6px',
-                  cursor: connected && !loading ? 'pointer' : 'not-allowed',
-                  color: theme.secondaryTextColor,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  transition: 'all 0.15s',
-                  opacity: connected && !loading ? 1 : 0.5,
-                }}
-                onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
-                  if (connected && !loading) {
-                    e.currentTarget.style.color = theme.primaryColor;
-                    e.currentTarget.style.background = theme.activeBackground;
-                  }
-                }}
-                onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
-                  e.currentTarget.style.color = theme.secondaryTextColor;
-                  e.currentTarget.style.background = 'transparent';
-                }}
-                title={strings.fileUpload.attachFiles}
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="10" />
-                  <line x1="12" y1="8" x2="12" y2="16" />
-                  <line x1="8" y1="12" x2="16" y2="12" />
-                </svg>
-              </button>
-            )}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="12" y1="19" x2="12" y2="5" />
+                <polyline points="5 12 12 5 19 12" />
+              </svg>
+            </button>
           </div>
-
-          <button
-            data-testid="chat-send-button"
-            className="chat-send-button"
-            onClick={handleSend}
-            disabled={!connected || loading || (!input.trim() && attachments.length === 0)}
-            style={{
-              padding: '10px 16px',
-              background: connected && !loading && (input.trim() || attachments.length > 0)
-                ? theme.primaryGradient
-                : theme.buttonDisabledBackground,
-              color: connected && !loading && (input.trim() || attachments.length > 0) ? 'white' : theme.secondaryTextColor,
-              border: 'none',
-              borderRadius: '8px',
-              cursor: connected && !loading && (input.trim() || attachments.length > 0) ? 'pointer' : 'not-allowed',
-              fontSize: '14px',
-              fontWeight: '600',
-              minWidth: '60px',
-              transition: 'all 0.2s',
-            }}
-          >
-            {strings.input.send}
-          </button>
         </div>
       </div>
 
