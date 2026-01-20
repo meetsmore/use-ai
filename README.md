@@ -11,8 +11,6 @@
 
 A React client/framework for easily enabling AI to control your users frontend.
 
-<img width="1137" height="817" alt="image" src="https://github.com/user-attachments/assets/e8dd5176-cca0-4104-9342-a6dea914f0f8" />
-
 ### [Demo video](https://github.com/user-attachments/assets/a0dd44e7-a64a-4106-afe2-49e5c8a1cbb4)
 
 ## Table of Contents
@@ -59,6 +57,8 @@ A React client/framework for easily enabling AI to control your users frontend.
     - [`@meetsmore-oss/use-ai-plugin-mastra`](#meetsmore-use-ai-plugin-mastra)
 
 ## Overview
+
+<img width="1137" height="817" alt="image" src="https://github.com/user-attachments/assets/e8dd5176-cca0-4104-9342-a6dea914f0f8" />
 
 **TodoList.tsx**
 ```typescript
