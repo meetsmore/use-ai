@@ -1,13 +1,13 @@
 # @use-ai
 
-<img width="420" height="420" alt="image" src="https://github.com/user-attachments/assets/87aea2e3-9680-4164-a92b-e2554d8e2e3b" />
-
 [![CI](https://github.com/meetsmore/use-ai/actions/workflows/ci.yml/badge.svg)](https://github.com/meetsmore/use-ai/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/@meetsmore-oss/use-ai-client)](https://www.npmjs.com/package/@meetsmore-oss/use-ai-client)
 [![npm](https://img.shields.io/npm/v/@meetsmore-oss/use-ai-server)](https://www.npmjs.com/package/@meetsmore-oss/use-ai-server)
 [![Docker](https://img.shields.io/badge/Docker-ghcr.io%2Fmeetsmore%2Fuse--ai--server-blue?logo=docker)](https://github.com/meetsmore/use-ai/pkgs/container/use-ai-server)
 [![License: BUSL-1.1](https://img.shields.io/badge/License-BUSL--1.1-blue.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+
+<img width="420" height="420" alt="image" src="https://github.com/user-attachments/assets/87aea2e3-9680-4164-a92b-e2554d8e2e3b" />
 
 A React client/framework for easily enabling AI to control your users frontend.
 
