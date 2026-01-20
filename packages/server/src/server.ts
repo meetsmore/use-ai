@@ -472,6 +472,15 @@ export class UseAIServer {
               data: block.url as string,
               mediaType: (block.mimeType as string) || 'application/octet-stream',
             });
+          } else if (block.type === 'transformed_file' && 'text' in block) {
+            // Transformed file from client-side FileTransformer - convert to text
+            const originalFile = (block as { originalFile?: { name?: string; mimeType?: string } }).originalFile;
+            const fileName = originalFile?.name || 'file';
+            const mimeType = originalFile?.mimeType || 'application/octet-stream';
+            parts.push({
+              type: 'text',
+              text: `[Content of file "${fileName}" (${mimeType})]:\n\n${block.text as string}`,
+            });
           }
         }
 

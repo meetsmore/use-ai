@@ -840,10 +840,29 @@ export class AISDKAgent implements Agent {
     mediaType: z.string(),
   }).strip();
 
+  /**
+   * Schema for transformed file content.
+   * Transforms the input to a text content part with file context.
+   * This allows file transformers on the client to send pre-processed file content.
+   */
+  private static readonly transformedFileContentSchema = z.object({
+    type: z.literal('transformed_file'),
+    text: z.string(),
+    originalFile: z.object({
+      name: z.string(),
+      mimeType: z.string(),
+      size: z.number(),
+    }),
+  }).transform((val) => ({
+    type: 'text' as const,
+    text: `[Content of file "${val.originalFile.name}" (${val.originalFile.mimeType})]:\n\n${val.text}`,
+  }));
+
   private static readonly contentPartSchema = z.union([
     AISDKAgent.textContentSchema,
     AISDKAgent.imageContentSchema,
     AISDKAgent.fileContentSchema,
+    AISDKAgent.transformedFileContentSchema,
     AISDKAgent.toolCallContentSchema,
     AISDKAgent.toolResultContentSchema,
   ]);

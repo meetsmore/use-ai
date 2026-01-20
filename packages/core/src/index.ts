@@ -47,6 +47,7 @@ export type {
   TextContent,
   ImageContent,
   FileContent,
+  TransformedFileContent,
   MultimodalContent,
   UserMessageContent,
 } from './types';

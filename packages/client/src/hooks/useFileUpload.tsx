@@ -1,6 +1,7 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
-import type { FileAttachment, FileUploadConfig } from '../fileUpload/types';
+import type { FileAttachment, FileUploadConfig, FileProcessingState } from '../fileUpload/types';
 import { DEFAULT_MAX_FILE_SIZE } from '../fileUpload/types';
+import { findTransformer } from '../fileUpload/mimeTypeMatcher';
 import { v4 as uuidv4 } from 'uuid';
 import { useTheme, useStrings } from '../theme';
 
@@ -76,6 +77,8 @@ export interface UseFileUploadReturn {
   maxFileSize: number;
   /** Accepted MIME types */
   acceptedTypes?: string[];
+  /** Processing state for each file (by attachment ID) */
+  processingState: Map<string, FileProcessingState>;
   /** Ref to attach to hidden file input */
   fileInputRef: React.MutableRefObject<HTMLInputElement | null>;
   /** Validates and adds files to attachments */
@@ -143,6 +146,7 @@ export function useFileUpload({
   const [attachments, setAttachments] = useState<FileAttachment[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [fileError, setFileError] = useState<string | null>(null);
+  const [processingState, setProcessingState] = useState<Map<string, FileProcessingState>>(new Map());
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   // Counter to track nested drag enter/leave events (prevents flickering)
   const dragCounterRef = useRef(0);
@@ -150,6 +154,7 @@ export function useFileUpload({
   const enabled = config !== undefined;
   const maxFileSize = config?.maxFileSize ?? DEFAULT_MAX_FILE_SIZE;
   const acceptedTypes = config?.acceptedTypes;
+  const transformers = config?.transformers;
 
   // Clear file error after 3 seconds
   useEffect(() => {
@@ -163,10 +168,45 @@ export function useFileUpload({
   useEffect(() => {
     setAttachments([]);
     setFileError(null);
+    setProcessingState(new Map());
   }, [resetDependency]);
 
   /**
+   * Runs a transformer for a file attachment.
+   * Updates processing state and attachment with transformed content.
+   */
+  const runTransformer = useCallback(async (
+    attachmentId: string,
+    file: File,
+    transformer: { transform: (file: File, onProgress?: (progress: number) => void) => Promise<string> }
+  ) => {
+    // Set initial processing state
+    setProcessingState(prev => new Map(prev).set(attachmentId, { status: 'processing' }));
+
+    try {
+      const transformedContent = await transformer.transform(file, (progress) => {
+        setProcessingState(prev => new Map(prev).set(attachmentId, {
+          status: 'processing',
+          progress,
+        }));
+      });
+
+      // Update attachment with transformed content
+      setAttachments(prev => prev.map(a =>
+        a.id === attachmentId ? { ...a, transformedContent } : a
+      ));
+
+      // Mark as done
+      setProcessingState(prev => new Map(prev).set(attachmentId, { status: 'done' }));
+    } catch (error) {
+      console.error(`[useFileUpload] Transformation failed for ${file.name}:`, error);
+      setProcessingState(prev => new Map(prev).set(attachmentId, { status: 'error' }));
+    }
+  }, []);
+
+  /**
    * Validates and adds files to attachments.
+   * If a transformer matches the file type, transformation starts immediately.
    */
   const handleFiles = useCallback(async (files: FileList | File[]) => {
     const fileArray = Array.from(files);
@@ -191,23 +231,36 @@ export function useFileUpload({
       // Generate preview for images
       const preview = await generateImagePreview(file);
 
+      // Create attachment
+      const attachmentId = uuidv4();
+      const attachment: FileAttachment = {
+        id: attachmentId,
+        file,
+        preview,
+      };
+
       // Add to attachments
-      setAttachments(prev => [
-        ...prev,
-        {
-          id: uuidv4(),
-          file,
-          preview,
-        },
-      ]);
+      setAttachments(prev => [...prev, attachment]);
+
+      // Check for transformer and start transformation immediately
+      const transformer = findTransformer(file.type, transformers);
+      if (transformer) {
+        // Run transformer in background (don't await - let it update state as it progresses)
+        runTransformer(attachmentId, file, transformer);
+      }
     }
-  }, [maxFileSize, acceptedTypes, strings]);
+  }, [maxFileSize, acceptedTypes, strings, transformers, runTransformer]);
 
   /**
    * Removes a file attachment by ID.
    */
   const removeAttachment = useCallback((id: string) => {
     setAttachments(prev => prev.filter(a => a.id !== id));
+    setProcessingState(prev => {
+      const next = new Map(prev);
+      next.delete(id);
+      return next;
+    });
   }, []);
 
   /**
@@ -215,6 +268,7 @@ export function useFileUpload({
    */
   const clearAttachments = useCallback(() => {
     setAttachments([]);
+    setProcessingState(new Map());
   }, []);
 
   /**
@@ -333,6 +387,7 @@ export function useFileUpload({
     enabled,
     maxFileSize,
     acceptedTypes,
+    processingState,
     fileInputRef,
     handleFiles,
     removeAttachment,

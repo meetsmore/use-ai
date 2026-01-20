@@ -62,12 +62,19 @@ export type {
 export { EmbedFileUploadBackend } from './fileUpload/EmbedFileUploadBackend';
 export { DEFAULT_MAX_FILE_SIZE } from './fileUpload/types';
 export { useFileUpload } from './hooks/useFileUpload';
+export { matchesMimeType, findTransformer } from './fileUpload/mimeTypeMatcher';
+export { processAttachments, clearTransformationCache } from './fileUpload/processAttachments';
 export type {
   FileUploadBackend,
   FileUploadConfig,
   FileAttachment,
   PersistedFileMetadata,
+  FileTransformer,
+  FileTransformerMap,
+  FileProcessingStatus,
+  FileProcessingState,
 } from './fileUpload/types';
+export type { ProcessAttachmentsConfig } from './fileUpload/processAttachments';
 export type {
   UseFileUploadOptions,
   UseFileUploadReturn,
