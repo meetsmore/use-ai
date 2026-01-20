@@ -1,6 +1,6 @@
 # @use-ai
 
-<img width="420" height="420" alt="image" src="https://github.com/user-attachments/assets/7764b54c-b129-4bd3-8e51-ac759a9982db" />
+<img width="420" height="420" alt="image" src="https://github.com/user-attachments/assets/87aea2e3-9680-4164-a92b-e2554d8e2e3b" />
 
 [![CI](https://github.com/meetsmore/use-ai/actions/workflows/ci.yml/badge.svg)](https://github.com/meetsmore/use-ai/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/@meetsmore-oss/use-ai-client)](https://www.npmjs.com/package/@meetsmore-oss/use-ai-client)
