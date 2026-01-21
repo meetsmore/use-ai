@@ -37,6 +37,7 @@ A React client/framework for easily enabling AI to control your users frontend.
     - [Suggestions](#suggestions)
     - [`confirmationRequired`](#confirmationrequired)
     - [Chat History](#chat-history)
+    - [Programmatic Chat Control](#programmatic-chat-control)
     - [Error Code Mapping](#error-code-mapping)
     - [Using the AI directly (without chat UI)](#using-the-ai-directly-without-chat-ui)
     - [Custom UI](#custom-ui)
@@ -516,6 +517,51 @@ root.render(
     <App />
   </UseAIProvider>
 );
+```
+
+### Programmatic Chat Control
+
+You can send messages to the chat programmatically from your application code using `chat.sendMessage()` from `useAIContext()`. This is useful for triggering AI conversations from button clicks, form submissions, or other user interactions.
+
+```tsx
+import { useAIContext } from '@meetsmore-oss/use-ai-client';
+
+function MyComponent() {
+  const { chat } = useAIContext();
+
+  const handleClick = async () => {
+    // Send a simple message (opens chat panel automatically)
+    await chat.sendMessage('Hello, AI!');
+  };
+
+  return <button onClick={handleClick}>Ask AI</button>;
+}
+```
+
+**Examples:**
+
+```tsx
+// Start a fresh conversation
+await chat.sendMessage('Let\'s start over', { newChat: true });
+
+// Send with file attachments
+const file = document.querySelector('input[type="file"]').files[0];
+await chat.sendMessage('Please analyze this file', { attachments: [file] });
+
+// Send without opening the chat panel (background operation)
+await chat.sendMessage('Process this in the background', { openChat: false });
+```
+
+**Queueing:** If you call `sendMessage` while the AI is still responding, messages are automatically queued and processed one at a time.
+
+**Error Handling:** The function throws an error if not connected to the server. Wrap calls in try/catch for proper error handling:
+
+```tsx
+try {
+  await chat.sendMessage('Hello!');
+} catch (error) {
+  console.error('Failed to send message:', error);
+}
 ```
 
 ### Error Code Mapping
