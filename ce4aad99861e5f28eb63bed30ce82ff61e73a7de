@@ -1,0 +1,40 @@
+packages/client/src/fileUpload/processAttachments.test.ts
+  83d001bac3beac38 71-113
+packages/client/src/fileUpload/processAttachments.ts
+  83d001bac3beac38 92-107
+packages/client/src/providers/useAIProvider.tsx
+  83d001bac3beac38 13,649-653,658
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.34",
+  "base_commit_sha": "ce4aad99861e5f28eb63bed30ce82ff61e73a7de",
+  "prompts": {
+    "83d001bac3beac38": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "64e3199b-82ff-4adf-850f-e2a4ccaedcce",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 68,
+      "total_deletions": 35,
+      "accepted_lines": 67,
+      "overriden_lines": 0
+    },
+    "f5c649f5434b4571": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0e81313e-4593-436c-bc57-1ac4ae561957",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 57,
+      "total_deletions": 1,
+      "accepted_lines": 56,
+      "overriden_lines": 0
+    }
+  }
+}
