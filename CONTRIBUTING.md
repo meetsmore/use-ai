@@ -53,8 +53,7 @@ Thank you for your interest in contributing to use-ai! This document provides gu
 │   ├── core/                    # Shared types (AG-UI protocol)
 │   ├── server/                  # Socket.IO server
 │   ├── plugin-workflows/        # Workflow execution plugin
-│   ├── plugin-workflows-client/ # Client hooks for workflows
-│   └── plugin-mastra/           # Mastra integration plugin
+│   └── plugin-workflows-client/ # Client hooks for workflows
 ```
 
 ## Development Workflow
