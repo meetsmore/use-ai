@@ -10,6 +10,7 @@ import { convertToolsToDefinitions, executeDefinedTool, type ToolsDefinition } f
 import type { ChatRepository, Chat, PersistedMessageContent, PersistedContentPart } from './chatRepository/types';
 import { LocalStorageChatRepository } from './chatRepository/LocalStorageChatRepository';
 import type { FileAttachment, FileUploadConfig } from '../fileUpload/types';
+import { processAttachments } from '../fileUpload/processAttachments';
 import { EmbedFileUploadBackend } from '../fileUpload/EmbedFileUploadBackend';
 import type { MultimodalContent } from '@meetsmore-oss/use-ai-core';
 import type { CommandRepository, SavedCommand } from '../commands/types';
@@ -644,44 +645,17 @@ export function UseAIProvider({
       }
       persistedContent = persistedParts;
 
-      // Build multimodal content using pre-transformed content from attachments
-      // (transformation happens when files are added, not at send time)
+      // Build multimodal content from attachments
+      const fileContent = await processAttachments(attachments, {
+        backend: fileUploadConfig?.backend,
+        transformers: fileUploadConfig?.transformers,
+      });
+
       multimodalContent = [];
       if (message.trim()) {
         multimodalContent.push({ type: 'text', text: message });
       }
-
-      // Get the backend for files that weren't transformed
-      const backend = fileUploadConfig?.backend ?? new EmbedFileUploadBackend();
-
-      for (const attachment of attachments) {
-        if (attachment.transformedContent !== undefined) {
-          // Use pre-transformed content
-          multimodalContent.push({
-            type: 'transformed_file',
-            text: attachment.transformedContent,
-            originalFile: {
-              name: attachment.file.name,
-              mimeType: attachment.file.type,
-              size: attachment.file.size,
-            },
-          });
-        } else {
-          // No transformer - encode as URL
-          try {
-            const url = await backend.prepareForSend(attachment.file);
-            multimodalContent.push({
-              type: 'file',
-              mimeType: attachment.file.type,
-              name: attachment.file.name,
-              url,
-            });
-          } catch (error) {
-            console.error('[Provider] Failed to encode file:', error);
-            // TODO: Show error to user - for now just log and skip this file
-          }
-        }
-      }
+      multimodalContent.push(...fileContent);
     }
 
     // Save user message to storage

@@ -68,6 +68,49 @@ describe('processAttachments', () => {
     });
   });
 
+  describe('with pre-transformed content', () => {
+    it('uses pre-transformed content when available', async () => {
+      const attachment: FileAttachment = {
+        id: '1',
+        file: createMockFile('doc.pdf', 'application/pdf'),
+        transformedContent: 'Pre-transformed PDF content',
+      };
+
+      const result = await processAttachments([attachment], { backend: mockBackend });
+
+      expect(result).toHaveLength(1);
+      expect(result[0].type).toBe('transformed_file');
+      const transformed = result[0] as { type: 'transformed_file'; text: string; originalFile: { name: string } };
+      expect(transformed.text).toBe('Pre-transformed PDF content');
+      expect(transformed.originalFile.name).toBe('doc.pdf');
+    });
+
+    it('skips transformer lookup when pre-transformed content exists', async () => {
+      let transformerCalled = false;
+      const transformer: FileTransformer = {
+        transform: async () => {
+          transformerCalled = true;
+          return 'From transformer';
+        },
+      };
+
+      const attachment: FileAttachment = {
+        id: '1',
+        file: createMockFile('doc.pdf', 'application/pdf'),
+        transformedContent: 'Pre-transformed content',
+      };
+
+      const result = await processAttachments([attachment], {
+        backend: mockBackend,
+        transformers: { 'application/pdf': transformer },
+      });
+
+      expect(transformerCalled).toBe(false);
+      expect(result[0].type).toBe('transformed_file');
+      expect((result[0] as { text: string }).text).toBe('Pre-transformed content');
+    });
+  });
+
   describe('with transformers', () => {
     it('transforms files with matching transformer', async () => {
       const transformer: FileTransformer = {

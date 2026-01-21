@@ -89,6 +89,22 @@ export async function processAttachments(
     onFileProgress?.(attachment.id, { status: 'processing' });
 
     try {
+      // Check for pre-transformed content first (transformation at attach time)
+      if (attachment.transformedContent !== undefined) {
+        contentParts.push({
+          type: 'transformed_file',
+          text: attachment.transformedContent,
+          originalFile: {
+            name: attachment.file.name,
+            mimeType: attachment.file.type,
+            size: attachment.file.size,
+          },
+        });
+        onFileProgress?.(attachment.id, { status: 'done' });
+        continue;
+      }
+
+      // Look for a transformer to apply at send time
       const transformer = findTransformer(attachment.file.type, transformers);
 
       if (transformer) {
