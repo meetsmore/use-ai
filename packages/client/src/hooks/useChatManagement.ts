@@ -3,6 +3,19 @@ import type { ChatRepository, Chat, PersistedMessageContent } from '../providers
 import type { Message } from '../components/UseAIChatPanel';
 import type { UseAIClient } from '../client';
 import type { Message as AGUIMessage } from '../types';
+import type { FileAttachment } from '../fileUpload/types';
+
+/**
+ * Options for programmatically sending a message via sendMessage().
+ */
+export interface SendMessageOptions {
+  /** Start a new chat before sending. Default: false (continue existing chat) */
+  newChat?: boolean;
+  /** File attachments to include with the message */
+  attachments?: File[];
+  /** Open the chat panel after sending. Default: true */
+  openChat?: boolean;
+}
 
 // Constants
 const CHAT_TITLE_MAX_LENGTH = 50;
@@ -69,6 +82,14 @@ export interface UseChatManagementOptions {
   repository: ChatRepository;
   /** Reference to the UseAIClient (can be null during initialization) */
   clientRef: React.MutableRefObject<UseAIClient | null>;
+  /** Callback to send a message (from UseAIProvider) */
+  onSendMessage?: (message: string, attachments?: FileAttachment[]) => Promise<void>;
+  /** Callback to open/close the chat panel */
+  setOpen?: (open: boolean) => void;
+  /** Whether the client is connected */
+  connected?: boolean;
+  /** Whether the AI is currently loading/processing a response */
+  loading?: boolean;
 }
 
 export interface UseChatManagementReturn {
@@ -98,6 +119,11 @@ export interface UseChatManagementReturn {
   saveAIResponse: (content: string, displayMode?: 'default' | 'error') => Promise<void>;
   /** Reloads messages from storage for the given chat ID */
   reloadMessages: (chatId: string) => Promise<void>;
+  /**
+   * Programmatically send a message to the chat.
+   * Throws on failure (e.g., not connected, no onSendMessage callback).
+   */
+  sendMessage: (message: string, options?: SendMessageOptions) => Promise<void>;
   /** Snapshot refs for use in event handlers */
   currentChatIdSnapshot: React.MutableRefObject<string | null>;
   pendingChatIdSnapshot: React.MutableRefObject<string | null>;
@@ -136,6 +162,10 @@ export interface UseChatManagementReturn {
 export function useChatManagement({
   repository,
   clientRef,
+  onSendMessage,
+  setOpen,
+  connected,
+  loading,
 }: UseChatManagementOptions): UseChatManagementReturn {
   /**
    * Current active chat where AI responses are saved.
@@ -462,6 +492,101 @@ export function useChatManagement({
   // The displayed chat ID is the pending chat (if any) or the current active chat
   const displayedChatId = pendingChatId || currentChatId;
 
+  // Message queue for programmatic sending
+  const pendingMessagesRef = useRef<Array<{ message: string; options?: SendMessageOptions }>>([]);
+  const isProcessingQueueRef = useRef(false);
+
+  // Keep loading state in a ref for the queue processor
+  const loadingRef = useRef(loading);
+  useEffect(() => {
+    loadingRef.current = loading;
+  }, [loading]);
+
+  /**
+   * Processes queued messages one at a time.
+   */
+  const processMessageQueue = useCallback(async () => {
+    if (isProcessingQueueRef.current || pendingMessagesRef.current.length === 0 || !onSendMessage) {
+      return;
+    }
+
+    isProcessingQueueRef.current = true;
+
+    while (pendingMessagesRef.current.length > 0) {
+      const { message, options } = pendingMessagesRef.current.shift()!;
+      const { newChat = false, attachments = [], openChat = true } = options ?? {};
+
+      // Optionally create new chat
+      if (newChat) {
+        await createNewChat();
+      }
+
+      // Convert File[] to FileAttachment[]
+      const fileAttachments: FileAttachment[] = await Promise.all(
+        attachments.map(async (file) => {
+          let preview: string | undefined;
+          if (file.type.startsWith('image/')) {
+            preview = await new Promise<string | undefined>((resolve) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : undefined);
+              reader.onerror = () => resolve(undefined);
+              reader.readAsDataURL(file);
+            });
+          }
+          return {
+            id: crypto.randomUUID(),
+            file,
+            preview,
+          };
+        })
+      );
+
+      // Send the message
+      await onSendMessage(message, fileAttachments.length > 0 ? fileAttachments : undefined);
+
+      // Open chat panel if requested
+      if (openChat && setOpen) {
+        setOpen(true);
+      }
+
+      // Wait for loading to complete before processing next message
+      await new Promise<void>((resolve) => {
+        const checkLoading = () => {
+          setTimeout(() => {
+            if (!loadingRef.current) {
+              resolve();
+            } else {
+              checkLoading();
+            }
+          }, 100);
+        };
+        checkLoading();
+      });
+    }
+
+    isProcessingQueueRef.current = false;
+  }, [onSendMessage, createNewChat, setOpen]);
+
+  /**
+   * Programmatically sends a message to the chat.
+   * Messages are queued and processed one at a time.
+   */
+  const sendMessage = useCallback(async (message: string, options?: SendMessageOptions): Promise<void> => {
+    if (!onSendMessage) {
+      throw new Error('sendMessage is not available (onSendMessage callback not provided)');
+    }
+
+    if (!connected) {
+      throw new Error('Not connected to UseAI server');
+    }
+
+    // Queue the message
+    pendingMessagesRef.current.push({ message, options });
+
+    // Start processing if not already
+    await processMessageQueue();
+  }, [onSendMessage, connected, processMessageQueue]);
+
   return {
     currentChatId,
     pendingChatId,
@@ -476,6 +601,7 @@ export function useChatManagement({
     saveUserMessage,
     saveAIResponse,
     reloadMessages,
+    sendMessage,
     currentChatIdSnapshot,
     pendingChatIdSnapshot,
   };

@@ -13,7 +13,7 @@ import type { FileAttachment, FileUploadConfig } from '../fileUpload/types';
 import { EmbedFileUploadBackend } from '../fileUpload/EmbedFileUploadBackend';
 import type { MultimodalContent } from '@meetsmore-oss/use-ai-core';
 import type { CommandRepository, SavedCommand } from '../commands/types';
-import { useChatManagement } from '../hooks/useChatManagement';
+import { useChatManagement, type SendMessageOptions } from '../hooks/useChatManagement';
 import { useAgentSelection } from '../hooks/useAgentSelection';
 import { useCommandManagement } from '../hooks/useCommandManagement';
 import { useToolRegistry } from '../hooks/useToolRegistry';
@@ -37,6 +37,11 @@ export interface ChatContextValue {
   list: () => Promise<Array<Omit<Chat, 'messages'>>>;
   /** Clears the current chat messages */
   clear: () => Promise<void>;
+  /**
+   * Programmatically send a message to the chat.
+   * Throws on failure (e.g., not connected).
+   */
+  sendMessage: (message: string, options?: SendMessageOptions) => Promise<void>;
 }
 
 /**
@@ -151,6 +156,7 @@ const noOpContextValue: UseAIContextValue = {
     delete: async () => {},
     list: async () => [],
     clear: async () => {},
+    sendMessage: async () => {},
   },
   agents: {
     available: [],
@@ -385,6 +391,9 @@ export function UseAIProvider({
     chatRepository || new LocalStorageChatRepository()
   );
 
+  // Ref for handleSendMessage to break circular dependency with useChatManagement
+  const handleSendMessageRef = useRef<((message: string, attachments?: FileAttachment[]) => Promise<void>) | null>(null);
+
   // Initialize tool registry hook
   const {
     registerTools,
@@ -410,10 +419,21 @@ export function UseAIProvider({
     connected,
   });
 
+  // Stable callback that uses the ref (for useChatManagement)
+  const stableSendMessage = useCallback(async (message: string, attachments?: FileAttachment[]) => {
+    if (handleSendMessageRef.current) {
+      await handleSendMessageRef.current(message, attachments);
+    }
+  }, []);
+
   // Initialize chat management hook
   const chatManagement = useChatManagement({
     repository: repositoryRef.current,
     clientRef,
+    onSendMessage: stableSendMessage,
+    setOpen: setIsChatOpen,
+    connected,
+    loading,
   });
 
   const {
@@ -429,6 +449,7 @@ export function UseAIProvider({
     activatePendingChat,
     saveUserMessage,
     saveAIResponse,
+    sendMessage,
   } = chatManagement;
 
   // Initialize agent selection hook
@@ -685,6 +706,9 @@ export function UseAIProvider({
     await clientRef.current.sendPrompt(message, multimodalContent);
   }, [activatePendingChat, currentChatId, saveUserMessage, fileUploadConfig]);
 
+  // Update the ref so useChatManagement's sendMessage can use it
+  handleSendMessageRef.current = handleSendMessage;
+
   const value: UseAIContextValue = {
     serverUrl,
     connected,
@@ -705,6 +729,7 @@ export function UseAIProvider({
       delete: deleteChat,
       list: listChats,
       clear: clearCurrentChat,
+      sendMessage,
     },
     agents: {
       available: availableAgents,
