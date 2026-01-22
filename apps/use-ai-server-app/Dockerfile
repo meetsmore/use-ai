@@ -16,7 +16,6 @@ COPY packages/core/package.json ./packages/core/
 COPY packages/client/package.json ./packages/client/
 COPY packages/server/package.json ./packages/server/
 COPY packages/plugin-workflows/package.json ./packages/plugin-workflows/
-COPY packages/plugin-mastra/package.json ./packages/plugin-mastra/
 COPY apps/use-ai-server-app/package.json ./apps/use-ai-server-app/
 COPY apps/example/package.json ./apps/example/
 COPY apps/example-nest-mcp-server/package.json ./apps/example-nest-mcp-server/

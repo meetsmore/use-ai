@@ -7,9 +7,9 @@
 [![License: BUSL-1.1](https://img.shields.io/badge/License-BUSL--1.1-blue.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 
-A React client/framework for easily enabling AI to control your users frontend.
+<img width="420" height="420" alt="image" src="https://github.com/user-attachments/assets/87aea2e3-9680-4164-a92b-e2554d8e2e3b" />
 
-<img width="1137" height="817" alt="image" src="https://github.com/user-attachments/assets/e8dd5176-cca0-4104-9342-a6dea914f0f8" />
+A React client/framework for easily enabling AI to control your users frontend.
 
 ### [Demo video](https://github.com/user-attachments/assets/a0dd44e7-a64a-4106-afe2-49e5c8a1cbb4)
 
@@ -54,9 +54,10 @@ A React client/framework for easily enabling AI to control your users frontend.
     - [Langfuse](#langfuse)
   - [Plugins](#plugins)
     - [`@meetsmore-oss/use-ai-plugin-workflows`](#meetsmore-use-ai-plugin-workflows)
-    - [`@meetsmore-oss/use-ai-plugin-mastra`](#meetsmore-use-ai-plugin-mastra)
 
 ## Overview
+
+<img width="1137" height="817" alt="image" src="https://github.com/user-attachments/assets/e8dd5176-cca0-4104-9342-a6dea914f0f8" />
 
 **TodoList.tsx**
 ```typescript
@@ -271,7 +272,6 @@ Because the tools are all clientside, we don't need to worry about auth for the 
 ├── packages
 │   ├── client                   # frontend React library
 │   ├── core                     # shared types
-│   ├── plugin-mastra            # Mastra workflow agent plugin
 │   ├── plugin-workflows         # headless workflow execution plugin
 │   ├── plugin-workflows-client  # client hooks for workflows
 │   └── server                   # backend server library
@@ -717,9 +717,6 @@ ANTHROPIC_API_KEY=sk-ant-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 # DEBUG=1                                             # Enable debug logging
 # MAX_HTTP_BUFFER_SIZE=10485760                       # Max payload size in bytes
 
-# Mastra Workflow Agent (optional)
-# MASTRA_URL=http://localhost:4111
-
 # Rate Limiting (optional)
 # RATE_LIMIT_MAX_REQUESTS=0
 # RATE_LIMIT_WINDOW_MS=60000
@@ -985,24 +982,3 @@ Because it's awkward to get API keys for workflows from Dify, you can use a mapp
 ```tsx
   const { trigger, status, text, error, connected } = useAIWorkflow('dify', 'greeting-workflow');
 ```
-
-### `@meetsmore-oss/use-ai-plugin-mastra`
-
-`@meetsmore-oss/use-ai-plugin-mastra` provides a `MastraWorkflowAgent` that runs Mastra workflows as conversational agents.
-
-```typescript
-import { MastraWorkflowAgent } from '@meetsmore-oss/use-ai-plugin-mastra';
-
-const server = new UseAIServer({
-  agents: {
-    'mastra-agent': new MastraWorkflowAgent({
-      workflowId: 'my-workflow',
-      agentName: 'My Mastra Agent',
-      annotation: 'Powered by Mastra',
-    })
-  },
-  defaultAgent: 'mastra-agent',
-});
-```
-
-Set `MASTRA_URL` environment variable to configure the Mastra server endpoint.
