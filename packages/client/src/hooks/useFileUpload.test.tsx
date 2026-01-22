@@ -3,15 +3,18 @@ import { useFileUpload } from './useFileUpload';
 import { clearTransformationCache } from '../fileUpload/processAttachments';
 import type { FileTransformer } from '../fileUpload/types';
 
+// Mock getCurrentChat for all tests
+const mockGetCurrentChat = async () => null;
+
 describe('useFileUpload', () => {
   describe('when disabled', () => {
     it('returns enabled: false when config is undefined', () => {
-      const { result } = renderHook(() => useFileUpload({}));
+      const { result } = renderHook(() => useFileUpload({ getCurrentChat: mockGetCurrentChat }));
       expect(result.current.enabled).toBe(false);
     });
 
     it('ignores drag events when disabled', () => {
-      const { result } = renderHook(() => useFileUpload({}));
+      const { result } = renderHook(() => useFileUpload({ getCurrentChat: mockGetCurrentChat }));
 
       const mockEvent = {
         preventDefault: jest.fn(),
@@ -34,28 +37,28 @@ describe('useFileUpload', () => {
     };
 
     it('returns enabled: true when config is provided', () => {
-      const { result } = renderHook(() => useFileUpload({ config }));
+      const { result } = renderHook(() => useFileUpload({ getCurrentChat: mockGetCurrentChat, config }));
       expect(result.current.enabled).toBe(true);
     });
 
     it('returns correct maxFileSize and acceptedTypes', () => {
-      const { result } = renderHook(() => useFileUpload({ config }));
+      const { result } = renderHook(() => useFileUpload({ getCurrentChat: mockGetCurrentChat, config }));
       expect(result.current.maxFileSize).toBe(10 * 1024 * 1024);
       expect(result.current.acceptedTypes).toEqual(['image/*', 'application/pdf']);
     });
 
     it('starts with empty attachments', () => {
-      const { result } = renderHook(() => useFileUpload({ config }));
+      const { result } = renderHook(() => useFileUpload({ getCurrentChat: mockGetCurrentChat, config }));
       expect(result.current.attachments).toEqual([]);
     });
 
     it('starts with no file error', () => {
-      const { result } = renderHook(() => useFileUpload({ config }));
+      const { result } = renderHook(() => useFileUpload({ getCurrentChat: mockGetCurrentChat, config }));
       expect(result.current.fileError).toBeNull();
     });
 
     it('sets isDragging on dragenter', () => {
-      const { result } = renderHook(() => useFileUpload({ config }));
+      const { result } = renderHook(() => useFileUpload({ getCurrentChat: mockGetCurrentChat, config }));
 
       const mockEvent = {
         preventDefault: jest.fn(),
@@ -70,7 +73,7 @@ describe('useFileUpload', () => {
     });
 
     it('clears isDragging on dragleave when counter reaches zero', () => {
-      const { result } = renderHook(() => useFileUpload({ config }));
+      const { result } = renderHook(() => useFileUpload({ getCurrentChat: mockGetCurrentChat, config }));
 
       const mockEvent = {
         preventDefault: jest.fn(),
@@ -91,7 +94,7 @@ describe('useFileUpload', () => {
     });
 
     it('handles nested drag events without flickering', () => {
-      const { result } = renderHook(() => useFileUpload({ config }));
+      const { result } = renderHook(() => useFileUpload({ getCurrentChat: mockGetCurrentChat, config }));
 
       const mockEvent = {
         preventDefault: jest.fn(),
@@ -124,7 +127,7 @@ describe('useFileUpload', () => {
     });
 
     it('does not set isDragging when disabled prop is true', () => {
-      const { result } = renderHook(() => useFileUpload({ config, disabled: true }));
+      const { result } = renderHook(() => useFileUpload({ getCurrentChat: mockGetCurrentChat, config, disabled: true }));
 
       const mockEvent = {
         preventDefault: jest.fn(),
@@ -139,7 +142,7 @@ describe('useFileUpload', () => {
     });
 
     it('adds valid files to attachments', async () => {
-      const { result } = renderHook(() => useFileUpload({ config }));
+      const { result } = renderHook(() => useFileUpload({ getCurrentChat: mockGetCurrentChat, config }));
 
       // Use PDF to avoid FileReader (not available in test env)
       const mockFile = new File(['test'], 'test.pdf', { type: 'application/pdf' });
@@ -154,7 +157,7 @@ describe('useFileUpload', () => {
 
     it('rejects files that exceed maxFileSize', async () => {
       const smallConfig = { ...config, maxFileSize: 10 };
-      const { result } = renderHook(() => useFileUpload({ config: smallConfig }));
+      const { result } = renderHook(() => useFileUpload({ getCurrentChat: mockGetCurrentChat, config: smallConfig }));
 
       const mockFile = new File(['test content that is too large'], 'test.png', { type: 'image/png' });
 
@@ -167,7 +170,7 @@ describe('useFileUpload', () => {
     });
 
     it('rejects files with unaccepted types', async () => {
-      const { result } = renderHook(() => useFileUpload({ config }));
+      const { result } = renderHook(() => useFileUpload({ getCurrentChat: mockGetCurrentChat, config }));
 
       const mockFile = new File(['test'], 'test.txt', { type: 'text/plain' });
 
@@ -180,7 +183,7 @@ describe('useFileUpload', () => {
     });
 
     it('removes attachment by id', async () => {
-      const { result } = renderHook(() => useFileUpload({ config }));
+      const { result } = renderHook(() => useFileUpload({ getCurrentChat: mockGetCurrentChat, config }));
 
       // Use PDF to avoid FileReader (not available in test env)
       const mockFile = new File(['test'], 'test.pdf', { type: 'application/pdf' });
@@ -199,7 +202,7 @@ describe('useFileUpload', () => {
     });
 
     it('clears all attachments', async () => {
-      const { result } = renderHook(() => useFileUpload({ config }));
+      const { result } = renderHook(() => useFileUpload({ getCurrentChat: mockGetCurrentChat, config }));
 
       // Use PDF to avoid FileReader (not available in test env)
       const mockFile1 = new File(['test1'], 'test1.pdf', { type: 'application/pdf' });
@@ -220,7 +223,7 @@ describe('useFileUpload', () => {
 
     it('clears attachments when resetDependency changes', async () => {
       const { result, rerender } = renderHook(
-        ({ dep }) => useFileUpload({ config, resetDependency: dep }),
+        ({ dep }) => useFileUpload({ getCurrentChat: mockGetCurrentChat, config, resetDependency: dep }),
         { initialProps: { dep: 'chat-1' } }
       );
 
@@ -255,7 +258,7 @@ describe('useFileUpload', () => {
         transformers: { 'application/pdf': mockTransformer },
       };
 
-      const { result } = renderHook(() => useFileUpload({ config: configWithTransformer }));
+      const { result } = renderHook(() => useFileUpload({ getCurrentChat: mockGetCurrentChat, config: configWithTransformer }));
 
       // Create a file with fixed lastModified to ensure cache key consistency
       const mockFile = new File(['test content'], 'test.pdf', {

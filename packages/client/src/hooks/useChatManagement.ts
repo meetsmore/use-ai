@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import type { ChatRepository, Chat, PersistedMessageContent } from '../providers/chatRepository/types';
+import type { ChatRepository, Chat, ChatMetadata, CreateChatOptions, PersistedMessageContent } from '../providers/chatRepository/types';
 import type { Message } from '../components/UseAIChatPanel';
 import type { UseAIClient } from '../client';
 import type { Message as AGUIMessage } from '../types';
@@ -15,10 +15,20 @@ export interface SendMessageOptions {
   attachments?: File[];
   /** Open the chat panel after sending. Default: true */
   openChat?: boolean;
+  /** Metadata to set on the new chat (only used when newChat: true) */
+  metadata?: ChatMetadata;
 }
 
 // Constants
 const CHAT_TITLE_MAX_LENGTH = 50;
+
+/**
+ * Deep equality comparison using JSON serialization.
+ * Works for JSON-serializable values (primitives, arrays, plain objects).
+ */
+function deepEquals(a: unknown, b: unknown): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
 
 /**
  * Generates a chat title from a message, truncating if necessary.
@@ -102,7 +112,7 @@ export interface UseChatManagementReturn {
   /** The displayed chat ID (pending or current) */
   displayedChatId: string | null;
   /** Creates a new chat and switches to it */
-  createNewChat: () => Promise<string>;
+  createNewChat: (options?: CreateChatOptions) => Promise<string>;
   /** Loads an existing chat by ID */
   loadChat: (chatId: string) => Promise<void>;
   /** Deletes a chat by ID */
@@ -124,6 +134,10 @@ export interface UseChatManagementReturn {
    * Throws on failure (e.g., not connected, no onSendMessage callback).
    */
   sendMessage: (message: string, options?: SendMessageOptions) => Promise<void>;
+  /** Get the current chat object. Metadata is frozen to prevent accidental mutation. */
+  getCurrentChat: () => Promise<Chat | null>;
+  /** Update metadata for the current chat */
+  updateMetadata: (metadata: ChatMetadata, overwrite?: boolean) => Promise<void>;
   /** Snapshot refs for use in event handlers */
   currentChatIdSnapshot: React.MutableRefObject<string | null>;
   pendingChatIdSnapshot: React.MutableRefObject<string | null>;
@@ -231,23 +245,23 @@ export function useChatManagement({
   /**
    * Creates a new chat.
    */
-  const createNewChat = useCallback(async (): Promise<string> => {
+  const createNewChat = useCallback(async (options?: CreateChatOptions): Promise<string> => {
     console.log('[ChatManagement] createNewChat called - currentChatId:', currentChatId, 'pendingChatId:', pendingChatId, 'messages.length:', messages.length);
 
-    // If we already have a pending blank chat, don't create another one
+    // Check if we can reuse the last created blank chat with matching options
     if (pendingChatId && messages.length === 0) {
-      console.log('[ChatManagement] Pending chat is already blank, not creating new chat');
-      return pendingChatId;
-    }
-
-    // If current chat is already blank (and no pending chat), don't create a new one
-    if (currentChatId && !pendingChatId && messages.length === 0) {
-      console.log('[ChatManagement] Current chat is already blank, not creating new chat');
-      return currentChatId;
+      const existingChat = await repository.loadChat(pendingChatId);
+      const optionsMatch = existingChat
+        && existingChat.title === options?.title
+        && deepEquals(existingChat.metadata, options?.metadata);
+      if (optionsMatch) {
+        console.log('[ChatManagement] Last created chat has matching options, reusing:', pendingChatId);
+        return pendingChatId;
+      }
     }
 
     console.log('[ChatManagement] Creating new chat...');
-    const chatId = await repository.createChat();
+    const chatId = await repository.createChat(options);
 
     // Set as pending - don't switch currentChatId until user sends a message
     setPendingChatId(chatId);
@@ -327,6 +341,31 @@ export function useChatManagement({
       }
     }
   }, [currentChatId, repository]);
+
+  /**
+   * Gets the current chat object (including metadata).
+   * Metadata is frozen to prevent accidental mutation.
+   */
+  const getCurrentChat = useCallback(async (): Promise<Chat | null> => {
+    const chatId = pendingChatId || currentChatId;
+    if (!chatId) return null;
+    const chat = await repository.loadChat(chatId);
+    if (chat?.metadata) {
+      chat.metadata = Object.freeze({ ...chat.metadata });
+    }
+    return chat;
+  }, [pendingChatId, currentChatId, repository]);
+
+  /**
+   * Updates metadata for the current chat.
+   */
+  const updateMetadata = useCallback(async (metadata: ChatMetadata, overwrite = false): Promise<void> => {
+    const chatId = pendingChatId || currentChatId;
+    if (!chatId) {
+      throw new Error('No active chat');
+    }
+    await repository.updateMetadata(chatId, metadata, overwrite);
+  }, [pendingChatId, currentChatId, repository]);
 
   /**
    * Activates the pending chat (called when user sends first message).
@@ -514,11 +553,11 @@ export function useChatManagement({
 
     while (pendingMessagesRef.current.length > 0) {
       const { message, options } = pendingMessagesRef.current.shift()!;
-      const { newChat = false, attachments = [], openChat = true } = options ?? {};
+      const { newChat = false, attachments = [], openChat = true, metadata } = options ?? {};
 
-      // Optionally create new chat
+      // Optionally create new chat with metadata
       if (newChat) {
-        await createNewChat();
+        await createNewChat({ metadata });
       }
 
       // Convert File[] to FileAttachment[]
@@ -602,6 +641,8 @@ export function useChatManagement({
     saveAIResponse,
     reloadMessages,
     sendMessage,
+    getCurrentChat,
+    updateMetadata,
     currentChatIdSnapshot,
     pendingChatIdSnapshot,
   };
