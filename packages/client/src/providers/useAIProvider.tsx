@@ -313,6 +313,30 @@ export interface UseAIProviderProps extends UseAIConfig {
    * ```
    */
   visibleAgentIds?: AgentInfo['id'][];
+  /**
+   * Callback when the chat open state should change.
+   * Called by programmatic actions like `sendMessage({ openChat: true })`.
+   * Useful when `renderChat=false` and you control the chat panel's visibility externally.
+   *
+   * @example
+   * ```tsx
+   * const [sidebarOpen, setSidebarOpen] = useState(false);
+   *
+   * <UseAIProvider
+   *   serverUrl="ws://localhost:8081"
+   *   renderChat={false}
+   *   onOpenChange={(isOpen) => {
+   *     // Sync with external sidebar state
+   *     setSidebarOpen(isOpen);
+   *   }}
+   * >
+   *   <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)}>
+   *     <UseAIChat />
+   *   </Sidebar>
+   * </UseAIProvider>
+   * ```
+   */
+  onOpenChange?: (isOpen: boolean) => void;
 }
 
 /**
@@ -369,6 +393,7 @@ export function UseAIProvider({
   theme: customTheme,
   strings: customStrings,
   visibleAgentIds,
+  onOpenChange,
 }: UseAIProviderProps) {
   // Compute effective file upload config: use default if undefined, disable if false
   const fileUploadConfig = fileUploadConfigProp === false
@@ -382,6 +407,12 @@ export function UseAIProvider({
   const [connected, setConnected] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  // Wrapper for setIsChatOpen that also calls onOpenChange callback
+  const handleSetChatOpen = useCallback((open: boolean) => {
+    setIsChatOpen(open);
+    onOpenChange?.(open);
+  }, [onOpenChange]);
   const [streamingText, setStreamingText] = useState('');
   // Track which chat the current streaming text belongs to
   const streamingChatIdRef = useRef<string | null>(null);
@@ -431,7 +462,7 @@ export function UseAIProvider({
     repository: repositoryRef.current,
     clientRef,
     onSendMessage: stableSendMessage,
-    setOpen: setIsChatOpen,
+    setOpen: handleSetChatOpen,
     connected,
     loading,
   });
@@ -780,7 +811,7 @@ export function UseAIProvider({
     },
     ui: {
       isOpen: isChatOpen,
-      setOpen: setIsChatOpen,
+      setOpen: handleSetChatOpen,
     },
   };
 
@@ -819,10 +850,10 @@ export function UseAIProvider({
     if (isUIDisabled) return null;
 
     return (
-      <UseAIFloatingChatWrapper isOpen={isChatOpen} onClose={() => setIsChatOpen(false)}>
+      <UseAIFloatingChatWrapper isOpen={isChatOpen} onClose={() => handleSetChatOpen(false)}>
         <UseAIChatPanel
           {...chatPanelProps}
-          closeButton={<CloseButton onClick={() => setIsChatOpen(false)} />}
+          closeButton={<CloseButton onClick={() => handleSetChatOpen(false)} />}
         />
       </UseAIFloatingChatWrapper>
     );
@@ -835,7 +866,7 @@ export function UseAIProvider({
     return (
       <CustomChat
         isOpen={isChatOpen}
-        onClose={() => setIsChatOpen(false)}
+        onClose={() => handleSetChatOpen(false)}
         onSendMessage={handleSendMessage}
         messages={messages}
         loading={loading}
@@ -857,7 +888,7 @@ export function UseAIProvider({
       <>
         {ButtonComponent && (
           <ButtonComponent
-            onClick={() => setIsChatOpen(true)}
+            onClick={() => handleSetChatOpen(true)}
             connected={connected}
           />
         )}

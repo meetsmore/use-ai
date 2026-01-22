@@ -264,4 +264,32 @@ test.describe('Programmatic Chat', () => {
       }).toPass({ timeout: 30000, intervals: [1000] });
     });
   });
+
+  test.describe('Opening Custom Chat UIs', () => {
+    test('sendMessage with openChat=true should trigger onOpenChange and open sidebar', async ({ page }) => {
+    const sidebar = page.getByTestId('collapsible-sidebar');
+    const sendButton = page.getByTestId('send-and-open-button');
+
+    // Sidebar should be closed initially
+    await expect(sidebar).toHaveCSS('width', '0px');
+
+    // Click "Send Message & Open Sidebar" button
+    await expect(sendButton).toBeEnabled();
+    await sendButton.click();
+
+    // Wait for sidebar to open via onOpenChange callback
+    await page.waitForTimeout(400);
+
+    // Sidebar should now be open (onOpenChange was called with true)
+    await expect(sidebar).toHaveCSS('width', '380px');
+
+    // Chat input should be visible inside the sidebar
+    await expect(page.getByTestId('chat-input')).toBeVisible({ timeout: 5000 });
+
+    // User message should appear in chat
+    const userMessage = page.getByTestId('chat-message-user');
+    await expect(userMessage).toBeVisible({ timeout: 5000 });
+    await expect(userMessage).toContainText('Hello! I just clicked a button to send this message.');
+  });
+  })
 });
