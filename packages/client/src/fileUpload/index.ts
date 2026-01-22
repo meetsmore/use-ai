@@ -14,4 +14,4 @@ export { EmbedFileUploadBackend } from './EmbedFileUploadBackend';
 
 export { matchesMimeType, findTransformer } from './mimeTypeMatcher';
 
-export { processAttachments, clearTransformationCache, type ProcessAttachmentsConfig } from './processAttachments';
+export { processAttachments, clearTransformationCache, getTransformedContent, type ProcessAttachmentsConfig } from './processAttachments';

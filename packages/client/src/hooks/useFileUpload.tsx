@@ -1,7 +1,8 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
-import type { FileAttachment, FileUploadConfig, FileProcessingState } from '../fileUpload/types';
+import type { FileAttachment, FileUploadConfig, FileProcessingState, FileTransformer } from '../fileUpload/types';
 import { DEFAULT_MAX_FILE_SIZE } from '../fileUpload/types';
 import { findTransformer } from '../fileUpload/mimeTypeMatcher';
+import { getTransformedContent } from '../fileUpload/processAttachments';
 import { v4 as uuidv4 } from 'uuid';
 import { useTheme, useStrings } from '../theme';
 
@@ -174,17 +175,18 @@ export function useFileUpload({
   /**
    * Runs a transformer for a file attachment.
    * Updates processing state and attachment with transformed content.
+   * Uses centralized cache to avoid re-transforming the same file.
    */
   const runTransformer = useCallback(async (
     attachmentId: string,
     file: File,
-    transformer: { transform: (file: File, onProgress?: (progress: number) => void) => Promise<string> }
+    transformer: FileTransformer
   ) => {
     // Set initial processing state
     setProcessingState(prev => new Map(prev).set(attachmentId, { status: 'processing' }));
 
     try {
-      const transformedContent = await transformer.transform(file, (progress) => {
+      const transformedContent = await getTransformedContent(file, transformer, (progress) => {
         setProcessingState(prev => new Map(prev).set(attachmentId, {
           status: 'processing',
           progress,

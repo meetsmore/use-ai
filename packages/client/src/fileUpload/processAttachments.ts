@@ -42,7 +42,7 @@ function getFileCacheKey(file: File): string {
  * @returns The transformed text content
  * @throws If transformation fails
  */
-async function getTransformedContent(
+export async function getTransformedContent(
   file: File,
   transformer: FileTransformer,
   onProgress?: (progress: number) => void
