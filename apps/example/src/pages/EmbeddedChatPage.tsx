@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { UseAIProvider, UseAIChat } from '@meetsmore-oss/use-ai-client';
+import { UseAIProvider, UseAIChat, useAIContext } from '@meetsmore-oss/use-ai-client';
 
-type LayoutType = 'sidebar' | 'split' | 'compact';
+type LayoutType = 'sidebar' | 'collapsible' | 'split' | 'compact';
 
 function DemoContent({ title }: { title: string }) {
   return (
@@ -44,6 +44,139 @@ function SidebarLayout() {
   );
 }
 
+/**
+ * Collapsible sidebar content that uses programmatic chat control.
+ * This demonstrates the onOpenChange callback integration.
+ */
+function CollapsibleSidebarContent({ isOpen, setIsOpen }: { isOpen: boolean; setIsOpen: (open: boolean) => void }) {
+  const { chat, connected } = useAIContext();
+  const [isSending, setIsSending] = useState(false);
+
+  const handleSendAndOpen = async () => {
+    if (!connected || isSending) return;
+    setIsSending(true);
+    try {
+      // This will trigger onOpenChange(true) which opens the sidebar
+      await chat.sendMessage('Hello! I just clicked a button to send this message.', { openChat: true });
+    } catch (error) {
+      console.error('Failed to send message:', error);
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  return (
+    <div style={styles.layoutContainer}>
+      <div style={styles.sidebarLayout}>
+        {/* Main content area */}
+        <div style={styles.mainContent}>
+          <DemoContent title="Collapsible Sidebar Demo" />
+
+          <div style={styles.collapsibleDemo}>
+            <h4 style={styles.collapsibleDemoTitle}>Programmatic Chat Control</h4>
+            <p style={styles.collapsibleDemoText}>
+              This demo shows how <code style={styles.code}>onOpenChange</code> works with externally managed sidebars.
+              The sidebar state is managed in React, and <code style={styles.code}>sendMessage()</code> with{' '}
+              <code style={styles.code}>openChat: true</code> triggers the <code style={styles.code}>onOpenChange</code> callback.
+            </p>
+
+            <div style={styles.statusBadge} data-testid="connection-status">
+              Status: {connected ? (
+                <span style={styles.connected} data-testid="status-connected">Connected</span>
+              ) : (
+                <span style={styles.disconnected} data-testid="status-disconnected">Disconnected</span>
+              )}
+            </div>
+
+            <div style={styles.buttonGroup}>
+              <button
+                style={styles.toggleButton}
+                onClick={() => setIsOpen(!isOpen)}
+                data-testid="toggle-sidebar-button"
+              >
+                {isOpen ? 'Close Sidebar' : 'Open Sidebar'}
+              </button>
+              <button
+                style={{
+                  ...styles.toggleButton,
+                  ...styles.sendButton,
+                }}
+                onClick={handleSendAndOpen}
+                disabled={!connected || isSending}
+                data-testid="send-and-open-button"
+              >
+                {isSending ? 'Sending...' : 'Send Message & Open Sidebar'}
+              </button>
+            </div>
+
+            <div style={styles.codeExample}>
+              <h5 style={styles.codeExampleTitle}>Code Example</h5>
+              <pre style={styles.codeBlock}>
+{`const [sidebarOpen, setSidebarOpen] = useState(false);
+
+<UseAIProvider
+  serverUrl="ws://localhost:8081"
+  renderChat={false}
+  onOpenChange={(isOpen) => {
+    // Called when sendMessage({ openChat: true }) is used
+    setSidebarOpen(isOpen);
+  }}
+>
+  <Sidebar isOpen={sidebarOpen}>
+    <UseAIChat />
+  </Sidebar>
+</UseAIProvider>`}
+              </pre>
+            </div>
+          </div>
+
+          <div style={styles.contentCards}>
+            {[1, 2, 3].map((i) => (
+              <div key={i} style={styles.card}>
+                <h4 style={styles.cardTitle}>Card {i}</h4>
+                <p style={styles.cardText}>Sample card content goes here.</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Collapsible chat sidebar */}
+        <div
+          style={{
+            ...styles.chatSidebar,
+            ...styles.collapsibleChatSidebar,
+            width: isOpen ? '380px' : '0px',
+            borderLeft: isOpen ? '1px solid #e5e7eb' : 'none',
+          }}
+          data-testid="collapsible-sidebar"
+        >
+          {isOpen && <UseAIChat />}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Wrapper component that provides the UseAIProvider with onOpenChange.
+ */
+function CollapsibleSidebarLayout() {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <UseAIProvider
+      serverUrl="ws://localhost:8081"
+      renderChat={false}
+      onOpenChange={(open) => {
+        console.log('[CollapsibleSidebar] onOpenChange called:', open);
+        setIsOpen(open);
+      }}
+    >
+      <CollapsibleSidebarContent isOpen={isOpen} setIsOpen={setIsOpen} />
+    </UseAIProvider>
+  );
+}
+
 function SplitLayout() {
   return (
     <div style={styles.layoutContainer}>
@@ -81,13 +214,47 @@ function CompactLayout() {
 }
 
 export default function EmbeddedChatPage() {
-  const [layout, setLayout] = useState<LayoutType>('sidebar');
+  const [layout, setLayout] = useState<LayoutType>('collapsible');
 
   const layouts: { type: LayoutType; label: string; description: string }[] = [
+    { type: 'collapsible', label: 'Collapsible', description: 'Collapsible sidebar with onOpenChange demo' },
     { type: 'sidebar', label: 'Sidebar', description: 'Chat in a right sidebar (380px width)' },
     { type: 'split', label: 'Split View', description: '50/50 split between content and chat' },
     { type: 'compact', label: 'Compact', description: 'Chat in a bottom panel (400px height)' },
   ];
+
+  // Collapsible layout has its own UseAIProvider with onOpenChange
+  if (layout === 'collapsible') {
+    return (
+      <div style={styles.page}>
+        {/* Layout selector */}
+        <div style={styles.selector}>
+          <h2 style={styles.pageTitle}>Embedded Chat Demo</h2>
+          <p style={styles.pageDescription}>
+            Using <code style={styles.code}>&lt;UseAIChat&gt;</code> component with{' '}
+            <code style={styles.code}>renderChat=&#123;false&#125;</code> to place chat anywhere.
+          </p>
+          <div style={styles.layoutButtons}>
+            {layouts.map(({ type, label, description }) => (
+              <button
+                key={type}
+                onClick={() => setLayout(type)}
+                style={{
+                  ...styles.layoutButton,
+                  ...(layout === type ? styles.layoutButtonActive : {}),
+                }}
+                title={description}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <CollapsibleSidebarLayout />
+      </div>
+    );
+  }
 
   return (
     <UseAIProvider
@@ -199,6 +366,10 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
   },
+  collapsibleChatSidebar: {
+    transition: 'width 0.3s ease-in-out',
+    overflow: 'hidden',
+  },
 
   // Split layout
   splitLayout: {
@@ -282,6 +453,83 @@ const styles: Record<string, React.CSSProperties> = {
   cardText: {
     fontSize: '13px',
     color: '#6b7280',
+    margin: 0,
+  },
+
+  // Collapsible demo
+  collapsibleDemo: {
+    background: '#f9fafb',
+    borderRadius: '8px',
+    padding: '20px',
+    marginBottom: '24px',
+    border: '1px solid #e5e7eb',
+  },
+  collapsibleDemoTitle: {
+    fontSize: '16px',
+    fontWeight: '600',
+    color: '#1f2937',
+    margin: '0 0 8px',
+  },
+  collapsibleDemoText: {
+    fontSize: '14px',
+    color: '#6b7280',
+    margin: '0 0 16px',
+    lineHeight: '1.6',
+  },
+  statusBadge: {
+    marginBottom: '16px',
+    fontSize: '14px',
+  },
+  connected: {
+    color: '#22c55e',
+    fontWeight: 'bold',
+  },
+  disconnected: {
+    color: '#ef4444',
+    fontWeight: 'bold',
+  },
+  buttonGroup: {
+    display: 'flex',
+    gap: '12px',
+    marginBottom: '20px',
+  },
+  toggleButton: {
+    padding: '10px 20px',
+    background: 'white',
+    border: '1px solid #e5e7eb',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '500',
+    color: '#374151',
+    transition: 'all 0.2s',
+  },
+  sendButton: {
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    borderColor: 'transparent',
+    color: 'white',
+  },
+  codeExample: {
+    background: 'white',
+    borderRadius: '8px',
+    padding: '16px',
+    border: '1px solid #e5e7eb',
+  },
+  codeExampleTitle: {
+    fontSize: '14px',
+    fontWeight: '600',
+    color: '#1f2937',
+    margin: '0 0 12px',
+  },
+  codeBlock: {
+    background: '#1e1e1e',
+    color: '#d4d4d4',
+    padding: '16px',
+    borderRadius: '8px',
+    overflow: 'auto',
+    fontSize: '12px',
+    lineHeight: '1.5',
+    fontFamily: 'monospace',
     margin: 0,
   },
 };

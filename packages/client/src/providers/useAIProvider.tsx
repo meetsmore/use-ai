@@ -14,7 +14,7 @@ import { processAttachments } from '../fileUpload/processAttachments';
 import { EmbedFileUploadBackend } from '../fileUpload/EmbedFileUploadBackend';
 import type { MultimodalContent } from '@meetsmore-oss/use-ai-core';
 import type { CommandRepository, SavedCommand } from '../commands/types';
-import { useChatManagement } from '../hooks/useChatManagement';
+import { useChatManagement, type SendMessageOptions } from '../hooks/useChatManagement';
 import { useAgentSelection } from '../hooks/useAgentSelection';
 import { useCommandManagement } from '../hooks/useCommandManagement';
 import { useToolRegistry } from '../hooks/useToolRegistry';
@@ -38,6 +38,11 @@ export interface ChatContextValue {
   list: () => Promise<Array<Omit<Chat, 'messages'>>>;
   /** Clears the current chat messages */
   clear: () => Promise<void>;
+  /**
+   * Programmatically send a message to the chat.
+   * Throws on failure (e.g., not connected).
+   */
+  sendMessage: (message: string, options?: SendMessageOptions) => Promise<void>;
 }
 
 /**
@@ -152,6 +157,7 @@ const noOpContextValue: UseAIContextValue = {
     delete: async () => {},
     list: async () => [],
     clear: async () => {},
+    sendMessage: async () => {},
   },
   agents: {
     available: [],
@@ -308,6 +314,30 @@ export interface UseAIProviderProps extends UseAIConfig {
    * ```
    */
   visibleAgentIds?: AgentInfo['id'][];
+  /**
+   * Callback when the chat open state should change.
+   * Called by programmatic actions like `sendMessage({ openChat: true })`.
+   * Useful when `renderChat=false` and you control the chat panel's visibility externally.
+   *
+   * @example
+   * ```tsx
+   * const [sidebarOpen, setSidebarOpen] = useState(false);
+   *
+   * <UseAIProvider
+   *   serverUrl="ws://localhost:8081"
+   *   renderChat={false}
+   *   onOpenChange={(isOpen) => {
+   *     // Sync with external sidebar state
+   *     setSidebarOpen(isOpen);
+   *   }}
+   * >
+   *   <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)}>
+   *     <UseAIChat />
+   *   </Sidebar>
+   * </UseAIProvider>
+   * ```
+   */
+  onOpenChange?: (isOpen: boolean) => void;
 }
 
 /**
@@ -364,6 +394,7 @@ export function UseAIProvider({
   theme: customTheme,
   strings: customStrings,
   visibleAgentIds,
+  onOpenChange,
 }: UseAIProviderProps) {
   // Compute effective file upload config: use default if undefined, disable if false
   const fileUploadConfig = fileUploadConfigProp === false
@@ -377,6 +408,12 @@ export function UseAIProvider({
   const [connected, setConnected] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  // Wrapper for setIsChatOpen that also calls onOpenChange callback
+  const handleSetChatOpen = useCallback((open: boolean) => {
+    setIsChatOpen(open);
+    onOpenChange?.(open);
+  }, [onOpenChange]);
   const [streamingText, setStreamingText] = useState('');
   // Track which chat the current streaming text belongs to
   const streamingChatIdRef = useRef<string | null>(null);
@@ -385,6 +422,9 @@ export function UseAIProvider({
   const repositoryRef = useRef<ChatRepository>(
     chatRepository || new LocalStorageChatRepository()
   );
+
+  // Ref for handleSendMessage to break circular dependency with useChatManagement
+  const handleSendMessageRef = useRef<((message: string, attachments?: FileAttachment[]) => Promise<void>) | null>(null);
 
   // Initialize tool registry hook
   const {
@@ -411,10 +451,21 @@ export function UseAIProvider({
     connected,
   });
 
+  // Stable callback that uses the ref (for useChatManagement)
+  const stableSendMessage = useCallback(async (message: string, attachments?: FileAttachment[]) => {
+    if (handleSendMessageRef.current) {
+      await handleSendMessageRef.current(message, attachments);
+    }
+  }, []);
+
   // Initialize chat management hook
   const chatManagement = useChatManagement({
     repository: repositoryRef.current,
     clientRef,
+    onSendMessage: stableSendMessage,
+    setOpen: handleSetChatOpen,
+    connected,
+    loading,
   });
 
   const {
@@ -430,6 +481,7 @@ export function UseAIProvider({
     activatePendingChat,
     saveUserMessage,
     saveAIResponse,
+    sendMessage,
   } = chatManagement;
 
   // Initialize agent selection hook
@@ -668,6 +720,9 @@ export function UseAIProvider({
     await clientRef.current.sendPrompt(message, multimodalContent);
   }, [activatePendingChat, currentChatId, saveUserMessage, fileUploadConfig]);
 
+  // Update the ref so useChatManagement's sendMessage can use it
+  handleSendMessageRef.current = handleSendMessage;
+
   const value: UseAIContextValue = {
     serverUrl,
     connected,
@@ -688,6 +743,7 @@ export function UseAIProvider({
       delete: deleteChat,
       list: listChats,
       clear: clearCurrentChat,
+      sendMessage,
     },
     agents: {
       available: availableAgents,
@@ -738,7 +794,7 @@ export function UseAIProvider({
     },
     ui: {
       isOpen: isChatOpen,
-      setOpen: setIsChatOpen,
+      setOpen: handleSetChatOpen,
     },
   };
 
@@ -777,10 +833,10 @@ export function UseAIProvider({
     if (isUIDisabled) return null;
 
     return (
-      <UseAIFloatingChatWrapper isOpen={isChatOpen} onClose={() => setIsChatOpen(false)}>
+      <UseAIFloatingChatWrapper isOpen={isChatOpen} onClose={() => handleSetChatOpen(false)}>
         <UseAIChatPanel
           {...chatPanelProps}
-          closeButton={<CloseButton onClick={() => setIsChatOpen(false)} />}
+          closeButton={<CloseButton onClick={() => handleSetChatOpen(false)} />}
         />
       </UseAIFloatingChatWrapper>
     );
@@ -793,7 +849,7 @@ export function UseAIProvider({
     return (
       <CustomChat
         isOpen={isChatOpen}
-        onClose={() => setIsChatOpen(false)}
+        onClose={() => handleSetChatOpen(false)}
         onSendMessage={handleSendMessage}
         messages={messages}
         loading={loading}
@@ -815,7 +871,7 @@ export function UseAIProvider({
       <>
         {ButtonComponent && (
           <ButtonComponent
-            onClick={() => setIsChatOpen(true)}
+            onClick={() => handleSetChatOpen(true)}
             connected={connected}
           />
         )}
