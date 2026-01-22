@@ -28,6 +28,11 @@ export interface FileAttachment {
   file: File;
   /** Data URL for image thumbnails (generated on attach for preview) */
   preview?: string;
+  /**
+   * Transformed content (if a transformer matched this file's MIME type).
+   * Populated asynchronously after attachment - check processingState for status.
+   */
+  transformedContent?: string;
 }
 
 /**
@@ -52,6 +57,51 @@ export interface FileUploadBackend {
 }
 
 /**
+ * A transformer that converts files into string representations for the AI.
+ */
+export interface FileTransformer {
+  /**
+   * Transform the file into a string representation for the AI.
+   *
+   * @param file - The file to transform
+   * @param onProgress - Optional callback for reporting progress (0-100).
+   *                     If called, UI shows progress bar; otherwise shows spinner.
+   * @returns A string representation the AI will receive
+   * @throws If transformation fails
+   */
+  transform(file: File, onProgress?: (progress: number) => void): Promise<string>;
+}
+
+/**
+ * Map of MIME type patterns to transformers.
+ *
+ * Keys are MIME type patterns:
+ * - Exact match: 'application/pdf'
+ * - Partial wildcard: 'image/*'
+ * - Global wildcard: '*' or '*\/*'
+ *
+ * When multiple patterns match, the most specific one wins:
+ * 1. Exact match (e.g., 'application/pdf')
+ * 2. Partial wildcard (e.g., 'image/*')
+ * 3. Global wildcard ('*' or '*\/*')
+ */
+export type FileTransformerMap = Record<string, FileTransformer>;
+
+/**
+ * Status of file processing during send.
+ */
+export type FileProcessingStatus = 'idle' | 'processing' | 'done' | 'error';
+
+/**
+ * Processing state for a file attachment.
+ */
+export interface FileProcessingState {
+  status: FileProcessingStatus;
+  /** Progress 0-100, or undefined for indeterminate (spinner) */
+  progress?: number;
+}
+
+/**
  * Configuration for file uploads in UseAIProvider.
  */
 export interface FileUploadConfig {
@@ -71,4 +121,10 @@ export interface FileUploadConfig {
    * If undefined, all types are accepted.
    */
   acceptedTypes?: string[];
+  /**
+   * Map of MIME type patterns to transformers.
+   * Files matching a transformer pattern will be converted to text
+   * before being sent to the AI.
+   */
+  transformers?: FileTransformerMap;
 }

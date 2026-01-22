@@ -328,11 +328,18 @@ export class UseAIClient {
           return { type: 'text', text: part.text };
         } else if (part.type === 'image') {
           return { type: 'image', url: part.url };
-        } else {
+        } else if (part.type === 'file') {
           return {
             type: 'file',
             url: part.url,
             mimeType: part.mimeType,
+          };
+        } else {
+          // transformed_file - pass through as-is, server will convert to text
+          return {
+            type: 'transformed_file',
+            text: part.text,
+            originalFile: part.originalFile,
           };
         }
       });

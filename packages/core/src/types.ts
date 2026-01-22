@@ -350,10 +350,34 @@ export interface FileContent {
 }
 
 /**
+ * Transformed file content part for multimodal messages.
+ * Created when a file is processed by a FileTransformer on the client.
+ * The AI receives the transformed text, not the original file data.
+ *
+ * Note: This is internal to use-ai. The server converts this to plain text
+ * before passing to the AI SDK, preserving AG-UI protocol compatibility.
+ */
+export interface TransformedFileContent {
+  type: 'transformed_file';
+  /** The transformed text representation of the file */
+  text: string;
+  /** Metadata about the original file (for display and context) */
+  originalFile: {
+    name: string;
+    mimeType: string;
+    size: number;
+  };
+}
+
+/**
  * Content part for multimodal messages.
  * A message can contain multiple content parts of different types.
  */
-export type MultimodalContent = TextContent | ImageContent | FileContent;
+export type MultimodalContent =
+  | TextContent
+  | ImageContent
+  | FileContent
+  | TransformedFileContent;
 
 /**
  * User message content - can be a simple string or multimodal content array.

@@ -4,7 +4,7 @@ export type { ClientSession } from './server';
 
 // Export agents for advanced usage
 export type { Agent, AgentInput, EventEmitter, AgentResult } from './agents';
-export { AISDKAgent, type AISDKAgentConfig, type MessageWithCacheContext, type CacheTtl, type CacheBreakpointResult } from './agents';
+export { AISDKAgent, type AISDKAgentConfig, type MessageWithCacheContext, type CacheTtl, type CacheBreakpointResult, type CacheBreakpointFn } from './agents';
 
 // Export plugin types for creating custom plugins
 export type { UseAIServerPlugin, MessageHandler } from './plugins';

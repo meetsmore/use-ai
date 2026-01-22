@@ -1,6 +1,8 @@
 import React from 'react';
-import type { FileAttachment } from '../fileUpload/types';
+import type { FileAttachment, FileProcessingState } from '../fileUpload/types';
 import { useTheme } from '../theme';
+import { Spinner } from './Spinner';
+import { ProgressBar } from './ProgressBar';
 
 /**
  * Props for the FileChip component.
@@ -12,6 +14,8 @@ export interface FileChipProps {
   onRemove: () => void;
   /** Whether the chip is disabled (e.g., during sending) */
   disabled?: boolean;
+  /** Processing state for this file (for transformation progress) */
+  processingState?: FileProcessingState;
 }
 
 /**
@@ -47,11 +51,15 @@ function truncateFilename(name: string, maxLength: number = 20): string {
  * - Displays file icon for non-image files
  * - Shows truncated filename and file size
  * - Has a remove button (×)
+ * - Shows processing overlay with spinner or progress bar
  */
-export function FileChip({ attachment, onRemove, disabled }: FileChipProps) {
+export function FileChip({ attachment, onRemove, disabled, processingState }: FileChipProps) {
   const theme = useTheme();
   const { file, preview } = attachment;
   const isImage = file.type.startsWith('image/');
+  const isProcessing = processingState?.status === 'processing';
+  const hasError = processingState?.status === 'error';
+  const progress = processingState?.progress;
 
   return (
     <div
@@ -66,6 +74,8 @@ export function FileChip({ attachment, onRemove, disabled }: FileChipProps) {
         fontSize: '13px',
         color: theme.textColor,
         maxWidth: '200px',
+        position: 'relative',
+        opacity: isProcessing ? 0.7 : 1,
       }}
     >
       {/* Preview or icon */}
@@ -119,21 +129,21 @@ export function FileChip({ attachment, onRemove, disabled }: FileChipProps) {
       <button
         data-testid="file-chip-remove"
         onClick={onRemove}
-        disabled={disabled}
+        disabled={disabled || isProcessing}
         style={{
           background: 'transparent',
           border: 'none',
           padding: '2px 4px',
-          cursor: disabled ? 'not-allowed' : 'pointer',
+          cursor: disabled || isProcessing ? 'not-allowed' : 'pointer',
           color: theme.placeholderTextColor,
           fontSize: '16px',
           lineHeight: 1,
           borderRadius: '4px',
           transition: 'all 0.15s',
-          opacity: disabled ? 0.5 : 1,
+          opacity: disabled || isProcessing ? 0.5 : 1,
         }}
         onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
-          if (!disabled) {
+          if (!disabled && !isProcessing) {
             e.currentTarget.style.background = theme.borderColor;
             e.currentTarget.style.color = theme.textColor;
           }
@@ -145,6 +155,52 @@ export function FileChip({ attachment, onRemove, disabled }: FileChipProps) {
       >
         ×
       </button>
+
+      {/* Processing overlay */}
+      {isProcessing && (
+        <div
+          data-testid="file-chip-processing"
+          style={{
+            position: 'absolute',
+            inset: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(255, 255, 255, 0.7)',
+            borderRadius: 'inherit',
+          }}
+        >
+          {progress !== undefined ? (
+            <ProgressBar progress={progress} size={16} color={theme.secondaryTextColor} />
+          ) : (
+            <Spinner size={16} color={theme.secondaryTextColor} />
+          )}
+        </div>
+      )}
+
+      {/* Error indicator */}
+      {hasError && (
+        <div
+          data-testid="file-chip-error"
+          style={{
+            position: 'absolute',
+            bottom: '-2px',
+            right: '-2px',
+            width: '12px',
+            height: '12px',
+            borderRadius: '50%',
+            background: '#ef4444',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '8px',
+            color: 'white',
+            fontWeight: 'bold',
+          }}
+        >
+          !
+        </div>
+      )}
     </div>
   );
 }

@@ -10,6 +10,7 @@ import { convertToolsToDefinitions, executeDefinedTool, type ToolsDefinition } f
 import type { ChatRepository, Chat, PersistedMessageContent, PersistedContentPart } from './chatRepository/types';
 import { LocalStorageChatRepository } from './chatRepository/LocalStorageChatRepository';
 import type { FileAttachment, FileUploadConfig } from '../fileUpload/types';
+import { processAttachments } from '../fileUpload/processAttachments';
 import { EmbedFileUploadBackend } from '../fileUpload/EmbedFileUploadBackend';
 import type { MultimodalContent } from '@meetsmore-oss/use-ai-core';
 import type { CommandRepository, SavedCommand } from '../commands/types';
@@ -679,9 +680,6 @@ export function UseAIProvider({
     let multimodalContent: MultimodalContent[] | undefined;
 
     if (attachments && attachments.length > 0) {
-      // Use the configured backend or default to EmbedFileUploadBackend
-      const backend = fileUploadConfig?.backend ?? new EmbedFileUploadBackend();
-
       // Build persisted content (metadata only) for storage
       const persistedParts: PersistedContentPart[] = [];
       if (message.trim()) {
@@ -699,32 +697,17 @@ export function UseAIProvider({
       }
       persistedContent = persistedParts;
 
-      // Build multimodal content (with URLs) for sending to AI
-      const contentParts: MultimodalContent[] = [];
+      // Build multimodal content from attachments
+      const fileContent = await processAttachments(attachments, {
+        backend: fileUploadConfig?.backend,
+        transformers: fileUploadConfig?.transformers,
+      });
+
+      multimodalContent = [];
       if (message.trim()) {
-        contentParts.push({ type: 'text', text: message });
+        multimodalContent.push({ type: 'text', text: message });
       }
-
-      // Convert files to URLs
-      for (const attachment of attachments) {
-        try {
-          const url = await backend.prepareForSend(attachment.file);
-          if (attachment.file.type.startsWith('image/')) {
-            contentParts.push({ type: 'image', url });
-          } else {
-            contentParts.push({
-              type: 'file',
-              url,
-              mimeType: attachment.file.type,
-              name: attachment.file.name,
-            });
-          }
-        } catch (error) {
-          console.error('[Provider] Failed to prepare file for send:', error);
-        }
-      }
-
-      multimodalContent = contentParts;
+      multimodalContent.push(...fileContent);
     }
 
     // Save user message to storage

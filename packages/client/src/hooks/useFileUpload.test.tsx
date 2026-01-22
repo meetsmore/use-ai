@@ -1,5 +1,7 @@
 import { renderHook, act } from '@testing-library/react';
 import { useFileUpload } from './useFileUpload';
+import { clearTransformationCache } from '../fileUpload/processAttachments';
+import type { FileTransformer } from '../fileUpload/types';
 
 describe('useFileUpload', () => {
   describe('when disabled', () => {
@@ -235,6 +237,56 @@ describe('useFileUpload', () => {
       rerender({ dep: 'chat-2' });
 
       expect(result.current.attachments).toHaveLength(0);
+    });
+
+    it('uses cache when the same file is added multiple times', async () => {
+      clearTransformationCache();
+
+      let transformCallCount = 0;
+      const mockTransformer: FileTransformer = {
+        transform: async (file) => {
+          transformCallCount++;
+          return `Transformed: ${file.name}`;
+        },
+      };
+
+      const configWithTransformer = {
+        ...config,
+        transformers: { 'application/pdf': mockTransformer },
+      };
+
+      const { result } = renderHook(() => useFileUpload({ config: configWithTransformer }));
+
+      // Create a file with fixed lastModified to ensure cache key consistency
+      const mockFile = new File(['test content'], 'test.pdf', {
+        type: 'application/pdf',
+        lastModified: 1000000,
+      });
+
+      // First: add the file via the hook
+      await act(async () => {
+        await result.current.handleFiles([mockFile]);
+      });
+
+      // Wait for transformation to complete
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      });
+
+      expect(transformCallCount).toBe(1);
+      expect(result.current.attachments).toHaveLength(1);
+
+      // Second: add the same file again - should use cache
+      await act(async () => {
+        await result.current.handleFiles([mockFile]);
+      });
+
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      });
+
+      expect(result.current.attachments).toHaveLength(2);
+      expect(transformCallCount).toBe(1); // Still 1, not 2 - cache was used
     });
   });
 });
