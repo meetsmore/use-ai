@@ -126,12 +126,13 @@ export function UseAIChatPanel({
   // Message hover state for save button
   const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
 
-  // File upload hook
+  // File upload hook - includes processing state for transformation progress
   const {
     attachments,
     fileError,
     enabled: fileUploadEnabled,
     acceptedTypes,
+    processingState: fileProcessingState,
     fileInputRef,
     removeAttachment,
     clearAttachments,
@@ -916,6 +917,7 @@ export function UseAIChatPanel({
                 attachment={attachment}
                 onRemove={() => removeAttachment(attachment.id)}
                 disabled={loading}
+                processingState={fileProcessingState.get(attachment.id)}
               />
             ))}
           </div>
@@ -939,6 +941,7 @@ export function UseAIChatPanel({
             ref={fileInputRef}
             type="file"
             multiple
+            data-testid="file-input"
             style={{ display: 'none' }}
             onChange={handleFileInputChange}
             accept={acceptedTypes?.join(',')}

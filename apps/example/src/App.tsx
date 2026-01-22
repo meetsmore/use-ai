@@ -8,6 +8,7 @@ import InvisibleTestPage from './pages/InvisibleTestPage';
 import WorkflowDemoPage from './pages/WorkflowDemoPage';
 import RemoteMcpToolsPage from './pages/RemoteMcpToolsPage';
 import EmbeddedChatPage from './pages/EmbeddedChatPage';
+import FileTransformersPage from './pages/FileTransformersPage';
 
 function Navigation() {
   const { navigate, currentRoute } = useRouter();
@@ -21,6 +22,7 @@ function Navigation() {
     { path: '/workflow-demo', label: 'Workflow Demo' },
     { path: '/remote-mcp-tools', label: 'Remote MCP Tools' },
     { path: '/embedded-chat', label: 'Embedded Chat' },
+    { path: '/file-transformers', label: 'File Transformers' },
   ];
 
   return (
@@ -73,6 +75,9 @@ function AppContent() {
       </Route>
       <Route path="/embedded-chat">
         <EmbeddedChatPage />
+      </Route>
+      <Route path="/file-transformers">
+        <FileTransformersPage />
       </Route>
     </>
   );
