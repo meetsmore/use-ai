@@ -1,0 +1,66 @@
+packages/client/src/providers/useAIProvider.tsx
+  631490222e119f8c 10,32,46-53,169-170,495-496,714,734,760-761,797
+apps/example/src/pages/ProgrammaticChatPage.tsx
+  631490222e119f8c 2,10,84-94,146-151,161-166
+packages/client/src/providers/chatRepository/LocalStorageChatRepository.test.ts
+  631490222e119f8c 258-369
+packages/client/src/fileUpload/processAttachments.test.ts
+  631490222e119f8c 29-31,41,50,66,82,94,107,121,126,140,148,162,168,181,186,197,202,212,221,226-276,285,301,310,330,339
+packages/client/src/components/UseAIChatPanel.tsx
+  631490222e119f8c 75,105,147
+packages/client/src/index.ts
+  631490222e119f8c 53,75
+packages/client/src/components/UseAIChat.tsx
+  631490222e119f8c 41-42,146
+packages/client/src/fileUpload/types.ts
+  631490222e119f8c 1-2,62-68,77,85
+packages/client/src/hooks/useChatManagement.ts
+  631490222e119f8c 26-32,251,253-260
+packages/client/src/hooks/useFileUpload.tsx
+  631490222e119f8c 2-3,61-62,146,193-197,215
+packages/client/src/hooks/useFileUpload.test.tsx
+  631490222e119f8c 6-8,12,17,40,45,51,56,61,76,97,130,145,160,173,186,205,226,261
+packages/client/src/fileUpload/processAttachments.ts
+  631490222e119f8c 7,10,18-19,45,53,63,89,92-95,123
+packages/client/src/providers/chatRepository/types.ts
+  631490222e119f8c 4-8,66-67,75-76,133-142
+docs/plans/chat-metadata.md
+  d5827168c435cf4e 108,110-111,114,140,145,163-164,166,179-185,190,213-220,222,392-404,410,415-417,447,454-455,457,464-622,630,632-634,636-638,640,643-647
+apps/example/src/App.tsx
+  631490222e119f8c 83
+packages/client/src/providers/chatRepository/LocalStorageChatRepository.ts
+  631490222e119f8c 3,59,169-178
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.37",
+  "base_commit_sha": "5440857ab66118891f8b0e11129f6c44b2d081fd",
+  "prompts": {
+    "631490222e119f8c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cb1b8600-3f5b-44a0-a5cd-c1bc7b01880c",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 450,
+      "total_deletions": 152,
+      "accepted_lines": 351,
+      "overriden_lines": 1
+    },
+    "d5827168c435cf4e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "78681dca-b3ba-42b3-9c12-f27f793ceb6a",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 227,
+      "total_deletions": 38,
+      "accepted_lines": 222,
+      "overriden_lines": 0
+    }
+  }
+}
