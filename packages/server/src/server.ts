@@ -217,11 +217,16 @@ export class UseAIServer {
     const getCorsHeaders = (
       req: Request,
       isPreflight: boolean
-    ): { headers: Record<string, string>; optionsSuccessStatus: number } => {
+    ): { headers: Record<string, string>; optionsSuccessStatus: number } | null => {
+      // If no CORS config is provided, don't add any CORS headers
+      if (!this.config.cors) {
+        return null;
+      }
+
       const headers: Record<string, string> = {};
       const varyHeaders: string[] = [];
 
-      // Merge user config with defaults, ensuring all CorsOptions properties are available
+      // Merge user config with defaults
       const corsConfig: Required<Pick<CorsOptions, 'origin' | 'methods' | 'preflightContinue' | 'optionsSuccessStatus'>> &
         Pick<CorsOptions, 'credentials' | 'allowedHeaders' | 'exposedHeaders' | 'maxAge'> = {
         ...corsDefaults,
@@ -234,6 +239,10 @@ export class UseAIServer {
       if (!corsConfig.origin || corsConfig.origin === '*') {
         // Allow any origin
         headers['Access-Control-Allow-Origin'] = '*';
+      } else if (corsConfig.origin === true) {
+        // Reflect the request origin
+        headers['Access-Control-Allow-Origin'] = requestOrigin || '*';
+        varyHeaders.push('Origin');
       } else if (isString(corsConfig.origin)) {
         // Fixed origin
         headers['Access-Control-Allow-Origin'] = corsConfig.origin;
@@ -315,15 +324,16 @@ export class UseAIServer {
       fetch: async (req: Request, server: Parameters<typeof this.engine.handleRequest>[1]) => {
         const url = new URL(req.url);
         const isPreflight = req.method === 'OPTIONS';
-        const { headers: corsHeaders, optionsSuccessStatus } = getCorsHeaders(req, isPreflight);
+        const corsResult = getCorsHeaders(req, isPreflight);
+        const corsHeaders = corsResult?.headers ?? {};
 
-        // Handle CORS preflight
-        if (isPreflight) {
-          const corsConfig = this.config.cors ?? corsDefaults;
+        // Handle CORS preflight (only if CORS is configured)
+        if (isPreflight && corsResult) {
+          const corsConfig = this.config.cors!; // Safe: corsResult is non-null only if cors is configured
           if (!corsConfig.preflightContinue) {
             // Safari (and potentially other browsers) need content-length 0 for 204
             return new Response(null, {
-              status: optionsSuccessStatus,
+              status: corsResult.optionsSuccessStatus,
               headers: {
                 ...corsHeaders,
                 'Content-Length': '0',
@@ -344,8 +354,8 @@ export class UseAIServer {
         if (url.pathname.startsWith('/socket.io/')) {
           const response = await this.engine.handleRequest(req, server);
 
-          // Add CORS headers to Socket.IO responses
-          if (response) {
+          // Add CORS headers to Socket.IO responses (only if CORS is configured)
+          if (response && corsResult) {
             const newHeaders = new Headers(response.headers);
             for (const [key, value] of Object.entries(corsHeaders)) {
               newHeaders.set(key, value);
