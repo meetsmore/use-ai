@@ -180,40 +180,133 @@ export class UseAIServer {
   private getBunConfig() {
     const handler = this.engine.handler();
 
-    // Build CORS headers based on config
-    const getCorsHeaders = (origin: string | null): Record<string, string> => {
+    // CORS defaults (matching cors package behavior)
+    const corsDefaults = {
+      origin: '*' as const,
+      methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+      preflightContinue: false,
+      optionsSuccessStatus: 204,
+    };
+
+    // Check if a string value
+    const isString = (s: unknown): s is string => typeof s === 'string' || s instanceof String;
+
+    // Check if origin is allowed (supports boolean, string, RegExp, and arrays)
+    // Ported from cors package: https://github.com/expressjs/cors
+    const isOriginAllowed = (
+      origin: string | undefined,
+      allowedOrigin: boolean | string | RegExp | (boolean | string | RegExp)[]
+    ): boolean => {
+      if (Array.isArray(allowedOrigin)) {
+        for (const allowed of allowedOrigin) {
+          if (isOriginAllowed(origin, allowed)) {
+            return true;
+          }
+        }
+        return false;
+      } else if (isString(allowedOrigin)) {
+        return origin === allowedOrigin;
+      } else if (allowedOrigin instanceof RegExp) {
+        return origin ? allowedOrigin.test(origin) : false;
+      } else {
+        return !!allowedOrigin;
+      }
+    };
+
+    // Build CORS headers based on config (ported from cors package)
+    const getCorsHeaders = (
+      req: Request,
+      isPreflight: boolean
+    ): { headers: Record<string, string>; optionsSuccessStatus: number } => {
       const headers: Record<string, string> = {};
+      const varyHeaders: string[] = [];
 
-      if (this.config.cors) {
-        const corsOrigin = this.config.cors.origin;
-        if (corsOrigin === true || corsOrigin === '*') {
-          headers['Access-Control-Allow-Origin'] = origin || '*';
-        } else if (typeof corsOrigin === 'string') {
-          headers['Access-Control-Allow-Origin'] = corsOrigin;
-        } else if (Array.isArray(corsOrigin) && origin && corsOrigin.includes(origin)) {
-          headers['Access-Control-Allow-Origin'] = origin;
+      // Merge user config with defaults, ensuring all CorsOptions properties are available
+      const corsConfig: Required<Pick<CorsOptions, 'origin' | 'methods' | 'preflightContinue' | 'optionsSuccessStatus'>> &
+        Pick<CorsOptions, 'credentials' | 'allowedHeaders' | 'exposedHeaders' | 'maxAge'> = {
+        ...corsDefaults,
+        ...this.config.cors,
+      };
+
+      const requestOrigin = req.headers.get('Origin') || undefined;
+
+      // Configure origin
+      if (!corsConfig.origin || corsConfig.origin === '*') {
+        // Allow any origin
+        headers['Access-Control-Allow-Origin'] = '*';
+      } else if (isString(corsConfig.origin)) {
+        // Fixed origin
+        headers['Access-Control-Allow-Origin'] = corsConfig.origin;
+        varyHeaders.push('Origin');
+      } else {
+        // boolean, RegExp, or array - check if origin is allowed
+        const isAllowed = isOriginAllowed(requestOrigin, corsConfig.origin);
+        if (isAllowed && requestOrigin) {
+          headers['Access-Control-Allow-Origin'] = requestOrigin;
         }
+        // Note: If not allowed, we don't set the header (browser will block)
+        varyHeaders.push('Origin');
+      }
 
-        if (this.config.cors.credentials) {
-          headers['Access-Control-Allow-Credentials'] = 'true';
+      // Configure credentials
+      if (corsConfig.credentials === true) {
+        headers['Access-Control-Allow-Credentials'] = 'true';
+      }
+
+      // Configure exposed headers (for actual responses)
+      if (corsConfig.exposedHeaders) {
+        const exposedHeaders = Array.isArray(corsConfig.exposedHeaders)
+          ? corsConfig.exposedHeaders.join(',')
+          : corsConfig.exposedHeaders;
+        if (exposedHeaders) {
+          headers['Access-Control-Expose-Headers'] = exposedHeaders;
         }
+      }
 
-        if (this.config.cors.methods) {
-          const methods = Array.isArray(this.config.cors.methods)
-            ? this.config.cors.methods.join(', ')
-            : this.config.cors.methods;
+      // Preflight-only headers
+      if (isPreflight) {
+        // Configure methods
+        if (corsConfig.methods) {
+          const methods = Array.isArray(corsConfig.methods)
+            ? corsConfig.methods.join(',')
+            : corsConfig.methods;
           headers['Access-Control-Allow-Methods'] = methods;
         }
 
-        headers['Access-Control-Allow-Headers'] = 'Content-Type';
-      } else {
-        // No CORS config provided - minimal defaults (apps should configure CORS explicitly)
-        headers['Access-Control-Allow-Origin'] = origin || '*';
-        headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS';
-        headers['Access-Control-Allow-Headers'] = 'Content-Type';
+        // Configure allowed headers
+        const allowedHeaders = corsConfig.allowedHeaders;
+        if (allowedHeaders) {
+          const headersValue = Array.isArray(allowedHeaders)
+            ? allowedHeaders.join(',')
+            : allowedHeaders;
+          headers['Access-Control-Allow-Headers'] = headersValue;
+        } else {
+          // Reflect request headers if not specified
+          const requestedHeaders = req.headers.get('Access-Control-Request-Headers');
+          if (requestedHeaders) {
+            headers['Access-Control-Allow-Headers'] = requestedHeaders;
+            varyHeaders.push('Access-Control-Request-Headers');
+          }
+        }
+
+        // Configure max age
+        if (corsConfig.maxAge !== undefined) {
+          const maxAge = String(corsConfig.maxAge);
+          if (maxAge) {
+            headers['Access-Control-Max-Age'] = maxAge;
+          }
+        }
       }
 
-      return headers;
+      // Set Vary header if needed
+      if (varyHeaders.length > 0) {
+        headers['Vary'] = varyHeaders.join(', ');
+      }
+
+      return {
+        headers,
+        optionsSuccessStatus: corsConfig.optionsSuccessStatus ?? 204,
+      };
     };
 
     return {
@@ -221,15 +314,23 @@ export class UseAIServer {
       idleTimeout: this.config.idleTimeout,
       fetch: async (req: Request, server: Parameters<typeof this.engine.handleRequest>[1]) => {
         const url = new URL(req.url);
-        const origin = req.headers.get('Origin');
-        const corsHeaders = getCorsHeaders(origin);
+        const isPreflight = req.method === 'OPTIONS';
+        const { headers: corsHeaders, optionsSuccessStatus } = getCorsHeaders(req, isPreflight);
 
         // Handle CORS preflight
-        if (req.method === 'OPTIONS') {
-          return new Response(null, {
-            status: 204,
-            headers: corsHeaders,
-          });
+        if (isPreflight) {
+          const corsConfig = this.config.cors ?? corsDefaults;
+          if (!corsConfig.preflightContinue) {
+            // Safari (and potentially other browsers) need content-length 0 for 204
+            return new Response(null, {
+              status: optionsSuccessStatus,
+              headers: {
+                ...corsHeaders,
+                'Content-Length': '0',
+              },
+            });
+          }
+          // If preflightContinue is true, fall through to handle the request
         }
 
         // Health check endpoint

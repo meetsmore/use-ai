@@ -1,6 +1,86 @@
-// Import and re-export CorsOptions from cors package (used by Socket.IO internally)
-import type { CorsOptions } from 'cors';
-export type { CorsOptions };
+/**
+ * Allowed origin types for CORS configuration.
+ * Supports boolean, string, RegExp, or an array of these types.
+ *
+ * Note: Function-based origins (CustomOrigin from cors package) are not supported
+ * because Bun's fetch handler is synchronous and cannot handle callback-based APIs.
+ *
+ * @example
+ * ```typescript
+ * // Allow all origins
+ * origin: true
+ *
+ * // Allow specific origin
+ * origin: 'https://example.com'
+ *
+ * // Allow origins matching a pattern
+ * origin: /\.example\.com$/
+ *
+ * // Allow multiple origins
+ * origin: ['https://app.example.com', 'https://admin.example.com']
+ *
+ * // Allow origins matching multiple patterns
+ * origin: [/\.example\.com$/, 'https://trusted-site.com']
+ * ```
+ */
+export type CorsOrigin = boolean | string | RegExp | (boolean | string | RegExp)[];
+
+/**
+ * CORS configuration options.
+ * Based on the cors package but excludes function-based origins which are not supported
+ * in Bun's synchronous fetch handler.
+ *
+ * @see https://github.com/expressjs/cors#configuration-options
+ */
+export interface CorsOptions {
+  /**
+   * Configures the Access-Control-Allow-Origin header.
+   * - `true`: Reflects the request origin (allows all origins)
+   * - `false`: Disables CORS
+   * - `string`: Sets a specific origin (e.g., 'https://example.com')
+   * - `RegExp`: Allows origins matching the pattern
+   * - `Array`: Allows origins matching any of the values/patterns
+   *
+   * @default '*'
+   */
+  origin?: CorsOrigin;
+  /**
+   * Configures the Access-Control-Allow-Methods header.
+   * @default 'GET,HEAD,PUT,PATCH,POST,DELETE'
+   */
+  methods?: string | string[];
+  /**
+   * Configures the Access-Control-Allow-Headers header.
+   * If not specified, reflects the headers specified in the request's
+   * Access-Control-Request-Headers header.
+   */
+  allowedHeaders?: string | string[];
+  /**
+   * Configures the Access-Control-Expose-Headers header.
+   * No custom headers are exposed by default.
+   */
+  exposedHeaders?: string | string[];
+  /**
+   * Configures the Access-Control-Allow-Credentials header.
+   * Set to true to pass the header, otherwise it is omitted.
+   */
+  credentials?: boolean;
+  /**
+   * Configures the Access-Control-Max-Age header.
+   * Set to an integer to pass the header, otherwise it is omitted.
+   */
+  maxAge?: number;
+  /**
+   * Pass the CORS preflight response to the next handler.
+   * @default false
+   */
+  preflightContinue?: boolean;
+  /**
+   * Provides a status code to use for successful OPTIONS requests.
+   * @default 204
+   */
+  optionsSuccessStatus?: number;
+}
 
 /**
  * Configuration for an MCP (Model Context Protocol) endpoint.
