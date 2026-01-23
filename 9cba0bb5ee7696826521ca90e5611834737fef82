@@ -1,0 +1,62 @@
+packages/server/src/server.ts
+  09679ea7099eb838 61-63,78-83,89,94,97,116,249,252,260,272-275,286-292,310,328,339,363,368,380,387,406,410,432,444-445,455-456,459,465,471,484,491,497,510,514,521,528,533,541,544,551,562,570,577,590,592,611,618-621,623,626-627,630-631,633-634,638,641,648,663,671,717,730-741,749,760,771,775,789-796,802,807,817,837-842,848,863-869,884,888-889,891
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.37",
+  "base_commit_sha": "9cba0bb5ee7696826521ca90e5611834737fef82",
+  "prompts": {
+    "09679ea7099eb838": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "21a5472c-ceb1-4a8a-907f-dcb0ef86a42a",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 135,
+      "total_deletions": 6,
+      "accepted_lines": 123,
+      "overriden_lines": 0
+    },
+    "f5c649f5434b4571": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0e81313e-4593-436c-bc57-1ac4ae561957",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 57,
+      "total_deletions": 1,
+      "accepted_lines": 8,
+      "overriden_lines": 0
+    },
+    "f7331b6d42f10c97": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5fb20dff-cc64-48bc-a938-f2a4c3e4896e",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 272,
+      "total_deletions": 325,
+      "accepted_lines": 120,
+      "overriden_lines": 0
+    },
+    "fac02d3ca1b2ba53": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bc2210b1-8e5f-40fe-9ee6-1e4006354a1f",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 25,
+      "total_deletions": 11,
+      "accepted_lines": 0,
+      "overriden_lines": 0
+    }
+  }
+}
