@@ -1,10 +1,4 @@
 #!/usr/bin/env bun
-/**
- * Bun-native UseAI server entry point.
- * Uses @socket.io/bun-engine for optimal WebSocket performance.
- *
- * Usage: bun src/index.ts
- */
 import { UseAIServer, AISDKAgent, logger } from '@meetsmore-oss/use-ai-server';
 import type { Agent, McpEndpointConfig } from '@meetsmore-oss/use-ai-server';
 import { createAnthropic } from '@ai-sdk/anthropic';
@@ -161,12 +155,14 @@ function createMcpEndpoints(): McpEndpointConfig[] {
   return endpoints;
 }
 
-logger.info('Starting UseAI server (Bun-native)', { logFormat });
+logger.info('Starting UseAI server', { logFormat });
 
+// Create agents and workflow runners
 const { agents, defaultAgent } = createAgents();
 const workflowRunners = createWorkflowRunners();
 const mcpEndpoints = createMcpEndpoints();
 
+// Build plugins array
 const plugins = [];
 if (workflowRunners.size > 0) {
   plugins.push(new WorkflowsPlugin({ runners: workflowRunners }));
@@ -200,9 +196,11 @@ if (mcpEndpoints.length > 0) {
   await server.initialize();
 }
 
+// Server will log when it's actually listening via the callback in the constructor
 if (logFormat === 'pretty') {
-  console.log(`✓ UseAI server (Bun-native) is running on port ${port}`);
+  console.log(`✓ UseAI server is running on port ${port}`);
   console.log(`  WebSocket URL: ws://localhost:${port}`);
   console.log(`  Log format: ${logFormat} (set LOG_FORMAT=json for structured logs)`);
   console.log('  Press Ctrl+C to stop');
 }
+

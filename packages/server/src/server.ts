@@ -29,30 +29,50 @@ import { findMatch } from './utils/patternMatcher';
 export type { ClientSession } from './agents/types';
 
 /**
- * Bun-native WebSocket server that coordinates between client applications and AI agents.
- * Uses @socket.io/bun-engine for optimal performance with Bun's native HTTP server.
+ * WebSocket server that coordinates between client applications and AI agents.
+ * Supports pluggable agents (AISDKAgent, etc.) via AG-UI protocol.
  *
- * This server is specifically designed for Bun runtime and uses Bun's native
- * WebSocket implementation. The server automatically starts listening when instantiated.
+ * Responsibilities:
+ * - Manages WebSocket connections from clients
+ * - Accepts RunAgentInput messages
+ * - Delegates to pluggable agents (AISDKAgent, etc.)
+ * - Emits AG-UI events (TEXT_MESSAGE_*, TOOL_CALL_*, etc.)
+ * - Routes tool execution requests back to clients
+ * - Maintains conversation history and state per session
+ * - Handles rate limiting
+ * - Supports plugins for extending functionality
  *
  * @example
  * ```typescript
  * import { UseAIServer, AISDKAgent } from '@meetsmore-oss/use-ai-server';
  * import { createAnthropic } from '@ai-sdk/anthropic';
+ * import { openai } from '@ai-sdk/openai';
  *
- * const anthropic = createAnthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+ * // Single agent (Claude)
+ * const anthropic = createAnthropic({
+ *   apiKey: process.env.ANTHROPIC_API_KEY,
+ * });
  * const claudeAgent = new AISDKAgent({
  *   model: anthropic('claude-sonnet-4-20250514'),
  * });
- *
  * const server = new UseAIServer({
  *   port: 8081,
  *   agents: { claude: claudeAgent },
- *   defaultAgent: 'claude',
+ *   defaultAgent: 'claude', // Default agent name
  * });
  *
- * // Server is now running on port 8081
- * // Call server.close() to stop
+ * // Multiple agents (Claude + OpenAI)
+ * const gptAgent = new AISDKAgent({
+ *   model: openai('gpt-4-turbo'),
+ * });
+ * const multiServer = new UseAIServer({
+ *   port: 8081,
+ *   agents: {
+ *     claude: claudeAgent,
+ *     'gpt-4': gptAgent,
+ *   },
+ *   runner: 'claude', // Default for chat
+ * });
  * ```
  */
 export class UseAIServer {
