@@ -1,5 +1,4 @@
 export { UseAIServer } from './server';
-export { BunUseAIServer, type BunUseAIServerConfig } from './bunServer';
 export type { UseAIServerConfig, McpEndpointConfig, ToolDefinition, CorsOptions } from './types';
 export type { ClientSession } from './server';
 

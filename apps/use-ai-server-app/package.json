@@ -14,11 +14,9 @@
   "type": "module",
   "scripts": {
     "clean": "rm -rf dist *.tsbuildinfo",
-    "build": "bun build src/index.ts --outdir dist --target node --format esm",
+    "build": "bun build src/index.ts --outdir dist --target bun --format esm",
     "start": "bun src/index.ts",
-    "start:bun": "bun src/bunIndex.ts",
-    "dev": "bun --watch src/bunIndex.ts",
-    "dev:node": "bun --watch src/index.ts"
+    "dev": "bun --watch src/index.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "3.0.0-beta.59",

@@ -78,6 +78,12 @@ export interface UseAIServerConfig<TAgents extends Record<string, import('./agen
    * @see https://socket.io/docs/v4/using-multiple-nodes/
    */
   cors?: CorsOptions;
+  /**
+   * Idle timeout in seconds for the Bun server.
+   * Must be greater than the pingInterval option (25 seconds by default).
+   * Default: 30
+   */
+  idleTimeout?: number;
 }
 
 // Re-export all types from @meetsmore-oss/use-ai-core
