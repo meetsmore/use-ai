@@ -30,7 +30,9 @@
     "test:e2e:debug": "cd apps/example && bun run test:e2e:debug",
     "test:e2e:react-16": "cd apps/example && bun run test:e2e:react-16",
     "clean": "turbo run clean && rm -rf .cache/turbo",
-    "kill": "(lsof -ti:3000 2>/dev/null | xargs -r kill; lsof -ti:3002 2>/dev/null | xargs -r kill; lsof -ti:8081 2>/dev/null | xargs -r kill) && echo 'Killed processes on ports 3000, 3002, 8081' || echo 'No processes to kill'"
+    "kill": "(lsof -ti:3000 2>/dev/null | xargs -r kill; lsof -ti:3002 2>/dev/null | xargs -r kill; lsof -ti:8081 2>/dev/null | xargs -r kill) && echo 'Killed processes on ports 3000, 3002, 8081' || echo 'No processes to kill'",
+    "start:server": "cd apps/use-ai-server-app && bun src/bunIndex.ts",
+    "start:server:node": "cd apps/use-ai-server-app && bun src/index.ts"
   },
   "devDependencies": {
     "@types/bun": "latest",
