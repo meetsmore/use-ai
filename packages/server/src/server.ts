@@ -94,6 +94,9 @@ export class UseAIServer {
   private messageHandlers: Map<string, MessageHandler> = new Map();
   private mcpEndpoints: RemoteMcpToolsProvider[] = [];
   private bunServer: ReturnType<typeof Bun.serve> | null = null;
+  // Store client IP addresses for polling transport (keyed by session ID)
+  // WebSocket transport can use BunWebSocket.remoteAddress directly
+  private pollingClientIps: Map<string, string> = new Map();
 
   /**
    * Creates a new UseAI server instance.
@@ -150,6 +153,19 @@ export class UseAIServer {
     // Note: bun-engine has its own CORS handling separate from socket.io
     this.engine = new BunEngine({
       path: '/socket.io/',
+    });
+
+    // Capture client IP for polling transport at engine connection time
+    // For WebSocket, BunWebSocket.remoteAddress is available directly (no need to store here)
+    // For polling, server.requestIP() works because there's no WebSocket upgrade
+    this.engine.on('connection', (engineSocket, _req, bunServer) => {
+      // Only store for polling - WebSocket uses BunWebSocket.remoteAddress
+      if (engineSocket.transport?.name === 'polling') {
+        const clientIp = bunServer.requestIP(_req);
+        if (clientIp) {
+          this.pollingClientIps.set(engineSocket.id, clientIp.address);
+        }
+      }
     });
 
     // Create Socket.IO server and bind to Bun engine
@@ -434,8 +450,17 @@ export class UseAIServer {
     this.io.on('connection', (socket: Socket) => {
       const clientId = `client-${++this.clientIdCounter}`;
       const threadId = uuidv4();
-      const ipAddress = socket.handshake.address || socket.id;
-      const transport = socket.conn.transport.name;
+      // Note: Type assertions needed because socket.io uses engine.io types,
+      // but we use bun-engine which has different type definitions
+      const conn = socket.conn as unknown as { id: string; transport: { name: string; socket?: { remoteAddress?: string } } };
+      // Get IP address for rate limiting (Bun-native implementation):
+      // - WebSocket: BunWebSocket.remoteAddress
+      // - Polling: pollingClientIps map (captured in engine connection event)
+      const ipAddress =
+        conn.transport.socket?.remoteAddress ||
+        this.pollingClientIps.get(conn.id) ||
+        socket.id; // fallback to socket.id if IP cannot be determined
+      const transport = conn.transport.name;
       logger.info('Client connected', { clientId, threadId, ipAddress, transport });
 
       // Log transport upgrades
@@ -490,6 +515,9 @@ export class UseAIServer {
 
       socket.on('disconnect', () => {
         logger.info('Client disconnected', { clientId, ipAddress });
+
+        // Clean up polling IP entry
+        this.pollingClientIps.delete(conn.id);
 
         // Call plugin lifecycle hooks
         for (const plugin of this.plugins) {

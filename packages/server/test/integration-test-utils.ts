@@ -9,7 +9,7 @@ import { MockLanguageModelV3, simulateReadableStream } from 'ai/test';
 import { AISDKAgent } from '../src/agents/AISDKAgent';
 import type { UseAIServerConfig } from '../src/types';
 import { UseAIServer } from '../src/server';
-import { createTestClient as createTestClientBase } from './test-utils';
+import { createTestClient as createTestClientBase, createPollingTestClient as createPollingTestClientBase } from './test-utils';
 
 /**
  * Helper to create streaming chunks for a text response
@@ -199,10 +199,19 @@ export class TestCleanupManager {
   }
 
   /**
-   * Create a test client and track it for cleanup
+   * Create a test client (WebSocket) and track it for cleanup
    */
   async createTestClient(port: number): Promise<Socket> {
     const socket = await createTestClientBase(port);
+    this.trackSocket(socket);
+    return socket;
+  }
+
+  /**
+   * Create a polling test client and track it for cleanup
+   */
+  async createPollingTestClient(port: number): Promise<Socket> {
+    const socket = await createPollingTestClientBase(port);
     this.trackSocket(socket);
     return socket;
   }

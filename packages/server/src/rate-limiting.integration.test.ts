@@ -183,4 +183,73 @@ describe('Rate Limiting', () => {
     socket.disconnect();
     errorServer.close();
   });
+
+  test('Rate limiting works correctly with HTTP long-polling transport', async () => {
+    // Create a separate server for this test
+    const pollingPort = 9304;
+    const pollingServer = new UseAIServer(createServerConfig(pollingPort, 'test-agent', {
+      rateLimitMaxRequests: 2,
+      rateLimitWindowMs: 1000,
+    }));
+    cleanup.trackServer(pollingServer);
+
+    // Create a client that uses polling transport only (no WebSocket upgrade)
+    const socket = await cleanup.createPollingTestClient(pollingPort);
+
+    // Verify we're using polling transport
+    expect(socket.io.engine.transport.name).toBe('polling');
+
+    // First request
+    sendRunAgent(socket, { prompt: 'Polling Request 1', tools: [] });
+    await waitForEventType(socket, EventType.TEXT_MESSAGE_END);
+
+    // Second request
+    sendRunAgent(socket, { prompt: 'Polling Request 2', tools: [] });
+    await waitForEventType(socket, EventType.TEXT_MESSAGE_END);
+
+    // Third request should be rate limited
+    sendRunAgent(socket, { prompt: 'Polling Request 3', tools: [] });
+    const errorEvent = await waitForEventType(socket, EventType.RUN_ERROR);
+
+    expect((errorEvent as any).message).toContain('Rate limit exceeded');
+
+    socket.disconnect();
+    pollingServer.close();
+  });
+
+  test('Polling and WebSocket clients from same IP share rate limit', async () => {
+    // Create a separate server for this test
+    const mixedPort = 9305;
+    const mixedServer = new UseAIServer(createServerConfig(mixedPort, 'test-agent', {
+      rateLimitMaxRequests: 2,
+      rateLimitWindowMs: 1000,
+    }));
+    cleanup.trackServer(mixedServer);
+
+    // Create one WebSocket client and one polling client
+    const wsSocket = await cleanup.createTestClient(mixedPort);
+    const pollingSocket = await cleanup.createPollingTestClient(mixedPort);
+
+    // Verify transports
+    expect(wsSocket.io.engine.transport.name).toBe('websocket');
+    expect(pollingSocket.io.engine.transport.name).toBe('polling');
+
+    // WebSocket client makes first request
+    sendRunAgent(wsSocket, { prompt: 'WS Request 1', tools: [] });
+    await waitForEventType(wsSocket, EventType.TEXT_MESSAGE_END);
+
+    // Polling client makes second request (shares IP with WebSocket client)
+    sendRunAgent(pollingSocket, { prompt: 'Polling Request 1', tools: [] });
+    await waitForEventType(pollingSocket, EventType.TEXT_MESSAGE_END);
+
+    // Third request from polling client should be rate limited (shared IP pool exhausted)
+    sendRunAgent(pollingSocket, { prompt: 'Polling Request 2', tools: [] });
+    const errorEvent = await waitForEventType(pollingSocket, EventType.RUN_ERROR);
+
+    expect((errorEvent as any).message).toContain('Rate limit exceeded');
+
+    wsSocket.disconnect();
+    pollingSocket.disconnect();
+    mixedServer.close();
+  });
 });
