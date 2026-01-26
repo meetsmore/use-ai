@@ -1,0 +1,29 @@
+packages/server/src/server.ts
+  644024b20e7e0d7a 97-99,158-170,453-462,519-521
+packages/server/test/test-utils.ts
+  644024b20e7e0d7a 171,181-187
+packages/server/src/rate-limiting.integration.test.ts
+  644024b20e7e0d7a 186-254
+packages/server/test/integration-test-utils.ts
+  644024b20e7e0d7a 12,202,209-214
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.37",
+  "base_commit_sha": "abe9812fe24cd4cb19042a4960c22bca07eb558f",
+  "prompts": {
+    "644024b20e7e0d7a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b7b5f274-fc20-4941-b7eb-b526141d8496",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 279,
+      "total_deletions": 156,
+      "accepted_lines": 125,
+      "overriden_lines": 0
+    }
+  }
+}
