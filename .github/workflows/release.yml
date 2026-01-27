@@ -40,7 +40,7 @@ jobs:
       - name: Setup Node.js (for npm OIDC publishing)
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
@@ -58,9 +58,6 @@ jobs:
 
       - name: Configure npm for OIDC provenance publishing
         run: npm config set provenance true
-
-      - name: Upgrade npm for OIDC support
-        run: npm install -g npm@11.8.0
 
       - name: Publish packages
         run: bunx pubz --ci --version ${{ inputs.version }} --registry https://registry.npmjs.org
