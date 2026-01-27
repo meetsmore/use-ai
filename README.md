@@ -54,6 +54,7 @@ A React client/framework for easily enabling AI to control your users frontend.
     - [External MCPs](#external-mcps)
     - [Rate Limiting](#rate-limiting)
     - [Langfuse](#langfuse)
+    - [Feedback](#feedback)
   - [Plugins](#plugins)
     - [`@meetsmore-oss/use-ai-plugin-workflows`](#meetsmore-use-ai-plugin-workflows)
 
@@ -923,6 +924,20 @@ The `use-ai` `AISDKAgent` supports this out of the box, just set these environme
 LANGFUSE_PUBLIC_KEY='your-langfuse-public-key'
 LANGFUSE_SECRET_KEY='your-langfuse-secret-key'
 ```
+
+### Feedback
+
+Enable thumbs up/down feedback buttons on AI messages to collect user ratings. Feedback is submitted to Langfuse as scores linked to the corresponding trace.
+
+**Server setup:**
+
+The plugin reads Langfuse credentials from `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY` environment variables by default.
+
+If these are set, the `FeedbackPlugin` will be enabled automatically.
+
+**Client setup:**
+
+The built-in chat UI includes feedback buttons automatically when the server has `FeedbackPlugin` enabled.
 
 ### Bundled Client Library (optional)
 

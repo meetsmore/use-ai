@@ -1,4 +1,5 @@
 import type { PersistedFileMetadata } from '../../fileUpload/types';
+import type { FeedbackValue } from '@meetsmore-oss/use-ai-core';
 
 /**
  * Arbitrary metadata attached to a chat.
@@ -52,6 +53,10 @@ export interface PersistedMessage {
   content: PersistedMessageContent;
   createdAt: Date;
   displayMode?: MessageDisplayMode;
+  /** Langfuse trace ID for feedback tracking (only for assistant messages) */
+  traceId?: string;
+  /** User feedback on this message (only for assistant messages) */
+  feedback?: FeedbackValue;
 }
 
 /**

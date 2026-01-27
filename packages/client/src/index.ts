@@ -135,6 +135,13 @@ export type {
   UsePromptStateReturn,
 } from './hooks/usePromptState';
 
+// Feedback
+export { useFeedback } from './hooks/useFeedback';
+export type {
+  UseFeedbackOptions,
+  UseFeedbackReturn,
+} from './hooks/useFeedback';
+
 // Tool stabilization
 export { useStableTools } from './hooks/useStableTools';
 

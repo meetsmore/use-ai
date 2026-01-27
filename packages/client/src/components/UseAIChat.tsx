@@ -2,7 +2,7 @@ import React, { createContext, useContext } from 'react';
 import { UseAIChatPanel } from './UseAIChatPanel';
 import { UseAIFloatingChatWrapper, CloseButton } from './UseAIFloatingChatWrapper';
 import type { Message } from './UseAIChatPanel';
-import type { AgentInfo } from '../types';
+import type { AgentInfo, FeedbackValue } from '../types';
 import type { FileUploadConfig, FileAttachment } from '../fileUpload/types';
 import type { SavedCommand } from '../commands/types';
 import type { Chat } from '../providers/chatRepository/types';
@@ -69,6 +69,13 @@ export interface ChatUIContextValue {
     isOpen: boolean;
     /** Set the chat open state */
     setOpen: (open: boolean) => void;
+  };
+  /** Feedback functionality */
+  feedback?: {
+    /** Whether feedback is enabled (requires Langfuse on server) */
+    enabled: boolean;
+    /** Submit feedback for a message */
+    submit: (messageId: string, traceId: string, feedback: FeedbackValue) => void;
   };
 }
 
@@ -154,6 +161,8 @@ export function UseAIChat({ floating = false }: UseAIChatProps) {
     onSaveCommand: ctx.commands.save,
     onRenameCommand: ctx.commands.rename,
     onDeleteCommand: ctx.commands.delete,
+    feedbackEnabled: ctx.feedback?.enabled,
+    onFeedback: ctx.feedback?.submit,
   };
 
   if (floating) {

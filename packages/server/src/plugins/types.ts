@@ -70,4 +70,12 @@ export interface UseAIServerPlugin {
    * @param session - The disconnecting client session
    */
   onClientDisconnect?(session: ClientSession): void;
+
+  /**
+   * Optional cleanup hook called when the server is shutting down.
+   * Use this to flush pending data, close connections, etc.
+   *
+   * @returns Promise that resolves when cleanup is complete
+   */
+  close?(): Promise<void>;
 }

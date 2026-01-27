@@ -22,6 +22,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type { Agent, EventEmitter } from './agents/types';
 import type { ClientSession } from './agents/types';
 import type { UseAIServerPlugin, MessageHandler } from './plugins/types';
+import { FeedbackPlugin } from './plugins/FeedbackPlugin';
 import { RemoteMcpToolsProvider, type RemoteToolDefinition } from './mcp';
 import { findMatch } from './utils/patternMatcher';
 
@@ -199,6 +200,13 @@ export class UseAIServer {
    * This allows plugins to register custom message handlers.
    */
   private initializePlugins() {
+
+    // Auto-enable FeedbackPlugin if Langfuse env vars are set and not already configured
+    const hasFeedbackPlugin = this.plugins.some(p => p.getName() === 'feedback');
+    if (!hasFeedbackPlugin && process.env.LANGFUSE_PUBLIC_KEY && process.env.LANGFUSE_SECRET_KEY) {
+      this.plugins.push(new FeedbackPlugin());
+    }
+
     for (const plugin of this.plugins) {
       logger.info('Initializing plugin', { pluginName: plugin.getName() });
 
@@ -808,11 +816,16 @@ export class UseAIServer {
    * Closes the server and cleans up resources.
    * Stops accepting new connections and terminates all existing connections.
    */
-  public close() {
+  public async close() {
     clearInterval(this.cleanupInterval);
 
     // Clean up all MCP endpoints
     this.mcpEndpoints.forEach(endpoint => endpoint.destroy());
+
+    // Close all plugins
+    await Promise.all(
+      this.plugins.map(plugin => plugin.close?.())
+    );
 
     this.io.close();
     this.httpServer.close();

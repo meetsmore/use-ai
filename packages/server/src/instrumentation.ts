@@ -1,20 +1,40 @@
+import { Langfuse } from 'langfuse';
 import { logger } from './logger.js';
 
-export interface LangfuseConfig {
+// Store trace IDs by runId for feedback linking
+const traceIdByRunId = new Map<string, string>();
+
+export interface LangfuseApi {
   enabled: boolean;
-  spanProcessor?: {
-    forceFlush(): Promise<void>;
-  };
+  /** Langfuse SDK client for score operations */
+  client?: Langfuse;
   flush?: () => Promise<void>;
+}
+
+/**
+ * Store a trace ID for a given runId (called by span processor).
+ */
+export function pushTraceIdForRun(runId: string, traceId: string): void {
+  traceIdByRunId.set(runId, traceId);
+}
+
+/**
+ * Get and remove the trace ID for a given runId.
+ * Removes from state since it should only be needed once (client stores it with the message).
+ */
+export function popTraceIdForRun(runId: string): string | undefined {
+  const traceId = traceIdByRunId.get(runId);
+  if (traceId) {
+    traceIdByRunId.delete(runId);
+  }
+  return traceId;
 }
 
 /**
  * Initializes Langfuse observability using OpenTelemetry.
  * Only activates if LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY are set.
- *
- * @returns Configuration object indicating if Langfuse is enabled
  */
-export function initializeLangfuse(): LangfuseConfig {
+export function initializeLangfuse(): LangfuseApi {
   const enabled = Boolean(
     process.env.LANGFUSE_PUBLIC_KEY &&
     process.env.LANGFUSE_SECRET_KEY
@@ -24,39 +44,68 @@ export function initializeLangfuse(): LangfuseConfig {
     return { enabled: false };
   }
 
+  const baseUrl = process.env.LANGFUSE_BASE_URL || 'https://cloud.langfuse.com';
+  const release = process.env.LANGFUSE_RELEASE || 'use-ai-test';
+
+  // Create Langfuse SDK client for score operations
+  const langfuseClient = new Langfuse({
+    publicKey: process.env.LANGFUSE_PUBLIC_KEY!,
+    secretKey: process.env.LANGFUSE_SECRET_KEY!,
+    baseUrl,
+    release,
+  });
+
   try {
-    // Dynamically import Langfuse dependencies
-    // This prevents errors if packages aren't installed
+    const { NodeSDK } = require('@opentelemetry/sdk-node');
     const { LangfuseSpanProcessor } = require('@langfuse/otel');
-    const { NodeTracerProvider } = require('@opentelemetry/sdk-trace-node');
 
     const langfuseSpanProcessor = new LangfuseSpanProcessor({
       publicKey: process.env.LANGFUSE_PUBLIC_KEY!,
       secretKey: process.env.LANGFUSE_SECRET_KEY!,
-      baseUrl: process.env.LANGFUSE_BASE_URL || 'https://cloud.langfuse.com',
+      baseUrl,
+      release,
     });
 
-    const tracerProvider = new NodeTracerProvider({
-      spanProcessors: [langfuseSpanProcessor],
+    // Capture trace IDs from AI SDK spans for feedback linking
+    const traceIdCaptureProcessor = {
+      onStart(span: { spanContext(): { traceId: string }; attributes?: Record<string, unknown> }) {
+        const runId = span.attributes?.['ai.telemetry.metadata.runId'] as string | undefined;
+        if (runId) {
+          pushTraceIdForRun(runId, span.spanContext().traceId);
+        }
+      },
+      onEnd() { /** `popTraceIdForRun` is called in AISDKAgent when RUN_FINISHED is called. */ },
+      shutdown() { return Promise.resolve(); },
+      forceFlush() { return Promise.resolve(); },
+    };
+
+    const sdk = new NodeSDK({
+      spanProcessors: [traceIdCaptureProcessor as unknown as typeof langfuseSpanProcessor, langfuseSpanProcessor],
     });
 
-    tracerProvider.register();
+    sdk.start();
 
-    logger.info('Langfuse observability initialized', {
-      baseUrl: process.env.LANGFUSE_BASE_URL || 'https://cloud.langfuse.com',
+    logger.info('Langfuse observability initialized', { baseUrl, release });
+
+    return {
+      enabled: true,
+      client: langfuseClient,
+      flush: async () => {
+        await langfuseSpanProcessor.forceFlush();
+        await langfuseClient.flushAsync();
+      },
+    };
+  } catch (error) {
+    logger.warn('Failed to initialize Langfuse OTEL. Install @langfuse/otel and @opentelemetry/sdk-node for tracing.', {
+      error: error instanceof Error ? error.message : 'Unknown error',
     });
 
     return {
       enabled: true,
-      spanProcessor: langfuseSpanProcessor,
+      client: langfuseClient,
       flush: async () => {
-        await langfuseSpanProcessor.forceFlush();
+        await langfuseClient.flushAsync();
       },
     };
-  } catch (error) {
-    logger.warn('Failed to initialize Langfuse. Install @langfuse/otel and @opentelemetry/sdk-trace-node to enable observability.', {
-      error: error instanceof Error ? error.message : 'Unknown error',
-    });
-    return { enabled: false };
   }
 }
