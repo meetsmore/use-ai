@@ -158,10 +158,10 @@ export class UseAIServer {
     // Capture client IP for polling transport at engine connection time
     // For WebSocket, BunWebSocket.remoteAddress is available directly (no need to store here)
     // For polling, server.requestIP() works because there's no WebSocket upgrade
-    this.engine.on('connection', (engineSocket, _req, bunServer) => {
+    this.engine.on('connection', (engineSocket, req, bunServer) => {
       // Only store for polling - WebSocket uses BunWebSocket.remoteAddress
       if (engineSocket.transport?.name === 'polling') {
-        const clientIp = bunServer.requestIP(_req);
+        const clientIp = bunServer.requestIP(req);
         if (clientIp) {
           this.pollingClientIps.set(engineSocket.id, clientIp.address);
         }
