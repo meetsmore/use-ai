@@ -80,6 +80,7 @@ function AppContent() {
       </Route>
       <Route path="/programmatic-chat">
         <ProgrammaticChatPage />
+      </Route>
       <Route path="/file-transformers">
         <FileTransformersPage />
       </Route>
