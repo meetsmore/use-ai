@@ -15,6 +15,7 @@ import type {
   McpHeadersMap,
   AgentInfo,
   MultimodalContent,
+  FeedbackValue,
 } from './types';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -116,6 +117,10 @@ export class UseAIClient {
     args: string;
   }> = new Map();
 
+  // Feedback tracking
+  private _langfuseEnabled = false;
+  private langfuseConfigHandlers: Set<(enabled: boolean) => void> = new Set();
+
   /**
    * Creates a new UseAI client instance.
    *
@@ -174,6 +179,14 @@ export class UseAIClient {
       this._defaultAgent = data.defaultAgent;
       // Notify listeners
       this.agentsChangeHandlers.forEach(handler => handler(data.agents, data.defaultAgent));
+    });
+
+    // Listen for server config (including Langfuse enabled status)
+    this.socket.on('config', (data: { langfuseEnabled?: boolean }) => {
+      console.log('[Client] Received server config:', data);
+      this._langfuseEnabled = data.langfuseEnabled ?? false;
+      // Notify listeners
+      this.langfuseConfigHandlers.forEach(handler => handler(this._langfuseEnabled));
     });
 
     this.socket.on('connect_error', (error) => {
@@ -665,5 +678,45 @@ export class UseAIClient {
    */
   isConnected(): boolean {
     return this.socket !== null && this.socket.connected;
+  }
+
+  /**
+   * Subscribes to Langfuse config changes.
+   *
+   * @param handler - Callback function receiving langfuse enabled status
+   * @returns Cleanup function to unsubscribe
+   */
+  onLangfuseConfigChange(handler: (enabled: boolean) => void): () => void {
+    this.langfuseConfigHandlers.add(handler);
+    // Immediately call with current value
+    handler(this._langfuseEnabled);
+    return () => {
+      this.langfuseConfigHandlers.delete(handler);
+    };
+  }
+
+  /**
+   * Submits feedback for an assistant message.
+   * Sends feedback to the server, which forwards it to Langfuse.
+   *
+   * @param messageId - The client-side message ID
+   * @param traceId - The Langfuse trace ID (runId from RUN_FINISHED)
+   * @param feedback - 'upvote' for positive, 'downvote' for negative, null to remove
+   */
+  submitFeedback(messageId: string, traceId: string, feedback: FeedbackValue): void {
+    if (!this.socket?.connected) {
+      console.warn('[UseAI] Cannot submit feedback: not connected');
+      return;
+    }
+
+    if (!this._langfuseEnabled) {
+      console.warn('[UseAI] Cannot submit feedback: Langfuse not enabled on server');
+      return;
+    }
+
+    this.send({
+      type: 'message_feedback',
+      data: { messageId, traceId, feedback },
+    });
   }
 }

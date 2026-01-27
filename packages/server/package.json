@@ -34,6 +34,7 @@
     "@ai-sdk/openai": "3.0.0-beta.66",
     "@meetsmore-oss/use-ai-core": "1.2.4",
     "ai": "6.0.0-beta.116",
+    "langfuse": "^3.38.6",
     "picomatch": "^4.0.3",
     "socket.io": "^4.8.1",
     "uuid": "^11.1.0",
@@ -41,6 +42,9 @@
   },
   "optionalDependencies": {
     "@langfuse/otel": "^4.0.0",
+    "@langfuse/tracing": "^4.0.0",
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/sdk-node": "^0.200.0",
     "@opentelemetry/sdk-trace-node": "^2.2.0"
   },
   "devDependencies": {
@@ -49,7 +53,6 @@
     "@types/json-schema": "^7.0.15",
     "@types/picomatch": "^4.0.2",
     "@types/uuid": "^10.0.0",
-    "langfuse": "^3.38.6",
     "socket.io-client": "^4.8.1",
     "testcontainers": "^11.8.1",
     "typescript": "^5.9.3"

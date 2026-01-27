@@ -52,6 +52,8 @@ function transformMessagesToUI(
     content: PersistedMessageContent;
     createdAt: Date;
     displayMode?: 'default' | 'error';
+    traceId?: string;
+    feedback?: 'upvote' | 'downvote' | null;
   }>
 ): Message[] {
   return storageMessages.map((msg) => ({
@@ -60,6 +62,8 @@ function transformMessagesToUI(
     content: msg.content,
     timestamp: msg.createdAt,
     displayMode: msg.displayMode,
+    traceId: msg.traceId,
+    feedback: msg.feedback,
   }));
 }
 
@@ -82,6 +86,10 @@ export interface UseChatManagementOptions {
   repository: ChatRepository;
   /** Reference to the UseAIClient (can be null during initialization) */
   clientRef: React.MutableRefObject<UseAIClient | null>;
+  /** Current messages state (owned by provider) */
+  messages: Message[];
+  /** Setter for messages state (owned by provider) */
+  setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
   /** Callback to send a message (from UseAIProvider) */
   onSendMessage?: (message: string, attachments?: FileAttachment[]) => Promise<void>;
   /** Callback to open/close the chat panel */
@@ -97,8 +105,6 @@ export interface UseChatManagementReturn {
   currentChatId: string | null;
   /** Chat loaded for viewing but not yet active for AI responses */
   pendingChatId: string | null;
-  /** Current messages in the chat */
-  messages: Message[];
   /** The displayed chat ID (pending or current) */
   displayedChatId: string | null;
   /** Creates a new chat and switches to it */
@@ -116,7 +122,7 @@ export interface UseChatManagementReturn {
   /** Saves a user message to storage and reloads messages */
   saveUserMessage: (chatId: string, content: PersistedMessageContent) => Promise<boolean>;
   /** Saves an AI response to storage and optionally reloads messages */
-  saveAIResponse: (content: string, displayMode?: 'default' | 'error') => Promise<void>;
+  saveAIResponse: (content: string, displayMode?: 'default' | 'error', traceId?: string) => Promise<void>;
   /** Reloads messages from storage for the given chat ID */
   reloadMessages: (chatId: string) => Promise<void>;
   /**
@@ -124,9 +130,6 @@ export interface UseChatManagementReturn {
    * Throws on failure (e.g., not connected, no onSendMessage callback).
    */
   sendMessage: (message: string, options?: SendMessageOptions) => Promise<void>;
-  /** Snapshot refs for use in event handlers */
-  currentChatIdSnapshot: React.MutableRefObject<string | null>;
-  pendingChatIdSnapshot: React.MutableRefObject<string | null>;
 }
 
 /**
@@ -144,7 +147,6 @@ export interface UseChatManagementReturn {
  * const {
  *   currentChatId,
  *   pendingChatId,
- *   messages,
  *   createNewChat,
  *   loadChat,
  *   deleteChat,
@@ -156,12 +158,16 @@ export interface UseChatManagementReturn {
  * } = useChatManagement({
  *   repository: chatRepository,
  *   clientRef,
+ *   messages,
+ *   setMessages,
  * });
  * ```
  */
 export function useChatManagement({
   repository,
   clientRef,
+  messages,
+  setMessages,
   onSendMessage,
   setOpen,
   connected,
@@ -179,8 +185,6 @@ export function useChatManagement({
    * This prevents race conditions when AI is still responding to the previous chat.
    */
   const [pendingChatId, setPendingChatId] = useState<string | null>(null);
-
-  const [messages, setMessages] = useState<Message[]>([]);
 
   /**
    * Snapshot refs to capture latest chat IDs in event handler closures.
@@ -397,7 +401,8 @@ export function useChatManagement({
    */
   const saveAIResponse = useCallback(async (
     content: string,
-    displayMode?: 'default' | 'error'
+    displayMode?: 'default' | 'error',
+    traceId?: string
   ): Promise<void> => {
     const currentChatIdValue = currentChatIdSnapshot.current;
     const pendingChatIdValue = pendingChatIdSnapshot.current;
@@ -423,6 +428,7 @@ export function useChatManagement({
         content,
         createdAt: new Date(),
         displayMode,
+        traceId,
       });
 
       // Auto-generate title from first user message if not set
@@ -590,7 +596,6 @@ export function useChatManagement({
   return {
     currentChatId,
     pendingChatId,
-    messages,
     displayedChatId,
     createNewChat,
     loadChat,
@@ -602,7 +607,5 @@ export function useChatManagement({
     saveAIResponse,
     reloadMessages,
     sendMessage,
-    currentChatIdSnapshot,
-    pendingChatIdSnapshot,
   };
 }

@@ -48,7 +48,7 @@ describe('Langfuse Integration', () => {
     const config = initializeLangfuse();
 
     expect(config.enabled).toBe(false);
-    expect(config.spanProcessor).toBeUndefined();
+    expect(config.client).toBeUndefined();
     expect(config.flush).toBeUndefined();
   });
 
@@ -68,15 +68,14 @@ describe('Langfuse Integration', () => {
     expect(config.enabled).toBe(false);
   });
 
-  test('should enable Langfuse and register tracer with span processor when both keys are set', () => {
+  test('should enable Langfuse when both keys are set', () => {
     process.env.LANGFUSE_PUBLIC_KEY = 'pk-lf-test';
     process.env.LANGFUSE_SECRET_KEY = 'sk-lf-test';
 
     const config = initializeLangfuse();
 
     expect(config.enabled).toBe(true);
-    expect(config.spanProcessor).toBeDefined();
-    expect(config.spanProcessor?.forceFlush).toBeInstanceOf(Function);
+    expect(config.client).toBeDefined();
     expect(config.flush).toBeInstanceOf(Function);
   });
 
@@ -87,8 +86,7 @@ describe('Langfuse Integration', () => {
 
     const config = initializeLangfuse();
 
-    // Langfuse is enabled with custom URL
     expect(config.enabled).toBe(true);
-    expect(config.spanProcessor).toBeDefined();
+    expect(config.client).toBeDefined();
   });
 });
