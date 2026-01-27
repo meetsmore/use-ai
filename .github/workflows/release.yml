@@ -59,6 +59,9 @@ jobs:
       - name: Configure npm for OIDC provenance publishing
         run: npm config set provenance true
 
+      - name: Upgrade npm for OIDC support
+        run: npm install -g npm@11.8.0
+
       - name: Publish packages
         run: bunx pubz --ci --version ${{ inputs.version }} --registry https://registry.npmjs.org
 
