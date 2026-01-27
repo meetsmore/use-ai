@@ -26,6 +26,9 @@ function createAttachment(id: string, name: string, type: string): FileAttachmen
 
 const mockBackend = new MockFileUploadBackend();
 
+// Default getCurrentChat for tests (no chat needed for unit tests)
+const testGetCurrentChat = async () => null;
+
 describe('processAttachments', () => {
   beforeEach(() => {
     // Clear transformation cache before each test
@@ -35,7 +38,7 @@ describe('processAttachments', () => {
   describe('without transformers', () => {
     it('processes images as image content', async () => {
       const attachment = createAttachment('1', 'photo.png', 'image/png');
-      const result = await processAttachments([attachment], { backend: mockBackend });
+      const result = await processAttachments([attachment], { getCurrentChat: testGetCurrentChat, backend: mockBackend });
 
       expect(result).toHaveLength(1);
       expect(result[0].type).toBe('image');
@@ -44,7 +47,7 @@ describe('processAttachments', () => {
 
     it('processes non-images as file content', async () => {
       const attachment = createAttachment('1', 'document.pdf', 'application/pdf');
-      const result = await processAttachments([attachment], { backend: mockBackend });
+      const result = await processAttachments([attachment], { getCurrentChat: testGetCurrentChat, backend: mockBackend });
 
       expect(result).toHaveLength(1);
       expect(result[0].type).toBe('file');
@@ -60,7 +63,7 @@ describe('processAttachments', () => {
         createAttachment('2', 'doc.pdf', 'application/pdf'),
       ];
 
-      const result = await processAttachments(attachments, { backend: mockBackend });
+      const result = await processAttachments(attachments, { getCurrentChat: testGetCurrentChat, backend: mockBackend });
 
       expect(result).toHaveLength(2);
       expect(result[0].type).toBe('image');
@@ -76,7 +79,7 @@ describe('processAttachments', () => {
         transformedContent: 'Pre-transformed PDF content',
       };
 
-      const result = await processAttachments([attachment], { backend: mockBackend });
+      const result = await processAttachments([attachment], { getCurrentChat: testGetCurrentChat, backend: mockBackend });
 
       expect(result).toHaveLength(1);
       expect(result[0].type).toBe('transformed_file');
@@ -88,7 +91,7 @@ describe('processAttachments', () => {
     it('skips transformer lookup when pre-transformed content exists', async () => {
       let transformerCalled = false;
       const transformer: FileTransformer = {
-        transform: async () => {
+        transform: async (_file, _context) => {
           transformerCalled = true;
           return 'From transformer';
         },
@@ -101,6 +104,7 @@ describe('processAttachments', () => {
       };
 
       const result = await processAttachments([attachment], {
+        getCurrentChat: testGetCurrentChat,
         backend: mockBackend,
         transformers: { 'application/pdf': transformer },
       });
@@ -114,11 +118,12 @@ describe('processAttachments', () => {
   describe('with transformers', () => {
     it('transforms files with matching transformer', async () => {
       const transformer: FileTransformer = {
-        transform: async (file) => `Transformed: ${file.name}`,
+        transform: async (file, _context) => `Transformed: ${file.name}`,
       };
 
       const attachment = createAttachment('1', 'test.pdf', 'application/pdf');
       const result = await processAttachments([attachment], {
+        getCurrentChat: testGetCurrentChat,
         transformers: { 'application/pdf': transformer },
       });
 
@@ -132,7 +137,7 @@ describe('processAttachments', () => {
     it('caches transformation results', async () => {
       let callCount = 0;
       const transformer: FileTransformer = {
-        transform: async (file) => {
+        transform: async (file, _context) => {
           callCount++;
           return `Transformed: ${file.name}`;
         },
@@ -140,7 +145,7 @@ describe('processAttachments', () => {
 
       const file = createMockFile('test.pdf', 'application/pdf');
       const attachment: FileAttachment = { id: '1', file };
-      const config = { transformers: { 'application/pdf': transformer } };
+      const config = { getCurrentChat: testGetCurrentChat, transformers: { 'application/pdf': transformer } };
 
       // First call
       await processAttachments([attachment], config);
@@ -154,13 +159,13 @@ describe('processAttachments', () => {
     it('does not cache different files', async () => {
       let callCount = 0;
       const transformer: FileTransformer = {
-        transform: async (file) => {
+        transform: async (file, _context) => {
           callCount++;
           return `Transformed: ${file.name}`;
         },
       };
 
-      const config = { transformers: { 'application/pdf': transformer } };
+      const config = { getCurrentChat: testGetCurrentChat, transformers: { 'application/pdf': transformer } };
 
       // First file
       await processAttachments([createAttachment('1', 'doc1.pdf', 'application/pdf')], config);
@@ -173,11 +178,12 @@ describe('processAttachments', () => {
 
     it('uses default handling for non-matching files', async () => {
       const transformer: FileTransformer = {
-        transform: async () => 'transformed',
+        transform: async (_file, _context) => 'transformed',
       };
 
       const attachment = createAttachment('1', 'photo.png', 'image/png');
       const result = await processAttachments([attachment], {
+        getCurrentChat: testGetCurrentChat,
         backend: mockBackend,
         transformers: { 'application/pdf': transformer },
       });
@@ -188,11 +194,12 @@ describe('processAttachments', () => {
 
     it('matches wildcard patterns', async () => {
       const transformer: FileTransformer = {
-        transform: async (file) => `Transformed: ${file.name}`,
+        transform: async (file, _context) => `Transformed: ${file.name}`,
       };
 
       const attachment = createAttachment('1', 'photo.png', 'image/png');
       const result = await processAttachments([attachment], {
+        getCurrentChat: testGetCurrentChat,
         transformers: { 'image/*': transformer },
       });
 
@@ -202,7 +209,7 @@ describe('processAttachments', () => {
 
     it('throws on transformer error', async () => {
       const transformer: FileTransformer = {
-        transform: async () => {
+        transform: async (_file, _context) => {
           throw new Error('Transform failed');
         },
       };
@@ -211,9 +218,61 @@ describe('processAttachments', () => {
 
       await expect(
         processAttachments([attachment], {
+          getCurrentChat: testGetCurrentChat,
           transformers: { 'application/pdf': transformer },
         })
       ).rejects.toThrow('Transform failed');
+    });
+
+    it('passes chat context to transformer', async () => {
+      const mockChat = {
+        id: 'test-chat-id',
+        title: 'Test Chat',
+        messages: [],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        metadata: { customField: 'customValue', documentType: 'invoice' },
+      };
+
+      let receivedContext: unknown = null;
+      const transformer: FileTransformer = {
+        transform: async (_file, context) => {
+          receivedContext = context;
+          return 'Transformed with context';
+        },
+      };
+
+      const attachment = createAttachment('1', 'test.pdf', 'application/pdf');
+      await processAttachments([attachment], {
+        getCurrentChat: async () => mockChat,
+        transformers: { 'application/pdf': transformer },
+      });
+
+      expect(receivedContext).not.toBeNull();
+      expect((receivedContext as { chat: typeof mockChat }).chat).toBe(mockChat);
+      expect((receivedContext as { chat: typeof mockChat }).chat.metadata).toEqual({
+        customField: 'customValue',
+        documentType: 'invoice',
+      });
+    });
+
+    it('passes null chat context when no chat exists', async () => {
+      let receivedContext: unknown = null;
+      const transformer: FileTransformer = {
+        transform: async (_file, context) => {
+          receivedContext = context;
+          return 'Transformed';
+        },
+      };
+
+      const attachment = createAttachment('1', 'test.pdf', 'application/pdf');
+      await processAttachments([attachment], {
+        getCurrentChat: async () => null,
+        transformers: { 'application/pdf': transformer },
+      });
+
+      expect(receivedContext).not.toBeNull();
+      expect((receivedContext as { chat: null }).chat).toBeNull();
     });
   });
 
@@ -223,6 +282,7 @@ describe('processAttachments', () => {
 
       const attachment = createAttachment('1', 'photo.png', 'image/png');
       await processAttachments([attachment], {
+        getCurrentChat: testGetCurrentChat,
         backend: mockBackend,
         onFileProgress: (fileId, state) => {
           progressUpdates.push({ fileId, state });
@@ -238,7 +298,7 @@ describe('processAttachments', () => {
       const progressUpdates: Array<{ fileId: string; state: FileProcessingState }> = [];
 
       const transformer: FileTransformer = {
-        transform: async (file, onProgress) => {
+        transform: async (_file, _context, onProgress) => {
           onProgress?.(50);
           onProgress?.(100);
           return 'done';
@@ -247,6 +307,7 @@ describe('processAttachments', () => {
 
       const attachment = createAttachment('1', 'test.pdf', 'application/pdf');
       await processAttachments([attachment], {
+        getCurrentChat: testGetCurrentChat,
         transformers: { 'application/pdf': transformer },
         onFileProgress: (fileId, state) => {
           progressUpdates.push({ fileId, state });
@@ -266,7 +327,7 @@ describe('processAttachments', () => {
       const progressUpdates: Array<{ fileId: string; state: FileProcessingState }> = [];
 
       const transformer: FileTransformer = {
-        transform: async () => {
+        transform: async (_file, _context) => {
           throw new Error('Failed');
         },
       };
@@ -275,6 +336,7 @@ describe('processAttachments', () => {
 
       try {
         await processAttachments([attachment], {
+          getCurrentChat: testGetCurrentChat,
           transformers: { 'application/pdf': transformer },
           onFileProgress: (fileId, state) => {
             progressUpdates.push({ fileId, state });

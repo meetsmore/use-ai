@@ -4,8 +4,10 @@ import type {
   FileUploadBackend,
   FileTransformerMap,
   FileTransformer,
+  FileTransformerContext,
   FileProcessingState,
 } from './types';
+import type { Chat } from '../providers/chatRepository/types';
 import { findTransformer } from './mimeTypeMatcher';
 import { EmbedFileUploadBackend } from './EmbedFileUploadBackend';
 
@@ -13,6 +15,8 @@ import { EmbedFileUploadBackend } from './EmbedFileUploadBackend';
  * Configuration for processing file attachments.
  */
 export interface ProcessAttachmentsConfig {
+  /** Function to get the current chat (for transformer context) */
+  getCurrentChat: () => Promise<Chat | null>;
   /** Backend for converting files to URLs (default: EmbedFileUploadBackend) */
   backend?: FileUploadBackend;
   /** Map of MIME type patterns to transformers */
@@ -38,6 +42,7 @@ function getFileCacheKey(file: File): string {
  * Get transformed content for a file, using cache if available.
  * @param file - The file to transform
  * @param transformer - The transformer to use
+ * @param context - Context for the transformer (including current chat)
  * @param onProgress - Optional progress callback
  * @returns The transformed text content
  * @throws If transformation fails
@@ -45,6 +50,7 @@ function getFileCacheKey(file: File): string {
 export async function getTransformedContent(
   file: File,
   transformer: FileTransformer,
+  context: FileTransformerContext,
   onProgress?: (progress: number) => void
 ): Promise<string> {
   const cacheKey = getFileCacheKey(file);
@@ -54,7 +60,7 @@ export async function getTransformedContent(
     return cached;
   }
 
-  const result = await transformer.transform(file, onProgress);
+  const result = await transformer.transform(file, context, onProgress);
   transformationCache.set(cacheKey, result);
   return result;
 }
@@ -80,10 +86,12 @@ export async function processAttachments(
   attachments: FileAttachment[],
   config: ProcessAttachmentsConfig
 ): Promise<MultimodalContent[]> {
-  const backend = config.backend ?? new EmbedFileUploadBackend();
-  const transformers = config.transformers ?? {};
-  const { onFileProgress } = config;
+  const { getCurrentChat, backend = new EmbedFileUploadBackend(), transformers = {}, onFileProgress } = config;
   const contentParts: MultimodalContent[] = [];
+
+  // Get current chat once for all transformers
+  const chat = await getCurrentChat();
+  const context: FileTransformerContext = { chat };
 
   for (const attachment of attachments) {
     onFileProgress?.(attachment.id, { status: 'processing' });
@@ -112,6 +120,7 @@ export async function processAttachments(
         const transformedText = await getTransformedContent(
           attachment.file,
           transformer,
+          context,
           (progress) => {
             onFileProgress?.(attachment.id, { status: 'processing', progress });
           }

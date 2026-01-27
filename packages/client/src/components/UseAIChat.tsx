@@ -38,6 +38,8 @@ export interface ChatUIContextValue {
     delete: (chatId: string) => Promise<void>;
     /** Lists all available chats */
     list: () => Promise<Array<Omit<Chat, 'messages'>>>;
+    /** Gets the current chat (with frozen metadata) */
+    get: () => Promise<Chat | null>;
   };
   /** Agent selection */
   agents: {
@@ -148,6 +150,7 @@ export function UseAIChat({ floating = false }: UseAIChatProps) {
     onLoadChat: ctx.history.load,
     onDeleteChat: ctx.history.delete,
     onListChats: ctx.history.list,
+    onGetChat: ctx.history.get,
     suggestions: ctx.suggestions,
     availableAgents: ctx.agents.available,
     defaultAgent: ctx.agents.default,

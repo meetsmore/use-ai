@@ -7,7 +7,7 @@ import { UseAIFloatingChatWrapper, CloseButton } from '../components/UseAIFloati
 import { __UseAIChatContext, type ChatUIContextValue } from '../components/UseAIChat';
 import { UseAIClient } from '../client';
 import { convertToolsToDefinitions, executeDefinedTool, type ToolsDefinition } from '../defineTool';
-import type { ChatRepository, Chat, PersistedMessageContent, PersistedContentPart } from './chatRepository/types';
+import type { ChatRepository, Chat, ChatMetadata, CreateChatOptions, PersistedMessageContent, PersistedContentPart } from './chatRepository/types';
 import { LocalStorageChatRepository } from './chatRepository/LocalStorageChatRepository';
 import type { FileAttachment, FileUploadConfig } from '../fileUpload/types';
 import { processAttachments } from '../fileUpload/processAttachments';
@@ -30,7 +30,7 @@ export interface ChatContextValue {
   /** The current chat ID */
   currentId: string | null;
   /** Creates a new chat and switches to it */
-  create: () => Promise<string>;
+  create: (options?: CreateChatOptions) => Promise<string>;
   /** Loads an existing chat by ID */
   load: (chatId: string) => Promise<void>;
   /** Deletes a chat by ID */
@@ -44,6 +44,14 @@ export interface ChatContextValue {
    * Throws on failure (e.g., not connected).
    */
   sendMessage: (message: string, options?: SendMessageOptions) => Promise<void>;
+  /** Get the current chat object. Metadata is frozen to prevent accidental mutation. */
+  get: () => Promise<Chat | null>;
+  /**
+   * Update metadata for the current chat.
+   * @param metadata Metadata to set/merge
+   * @param overwrite If true, replaces all metadata instead of merging (default: false)
+   */
+  updateMetadata: (metadata: ChatMetadata, overwrite?: boolean) => Promise<void>;
 }
 
 /**
@@ -159,6 +167,8 @@ const noOpContextValue: UseAIContextValue = {
     list: async () => [],
     clear: async () => {},
     sendMessage: async () => {},
+    get: async () => null,
+    updateMetadata: async () => {},
   },
   agents: {
     available: [],
@@ -485,6 +495,8 @@ export function UseAIProvider({
     saveUserMessage,
     saveAIResponse,
     sendMessage,
+    getCurrentChat,
+    updateMetadata,
   } = chatManagement;
 
   // Initialize feedback hook
@@ -715,6 +727,7 @@ export function UseAIProvider({
 
       // Build multimodal content from attachments
       const fileContent = await processAttachments(attachments, {
+        getCurrentChat,
         backend: fileUploadConfig?.backend,
         transformers: fileUploadConfig?.transformers,
       });
@@ -734,7 +747,7 @@ export function UseAIProvider({
     // State is already up-to-date via updatePrompt calls from useAI hooks
     setLoading(true);
     await clientRef.current.sendPrompt(message, multimodalContent);
-  }, [activatePendingChat, currentChatId, saveUserMessage, fileUploadConfig]);
+  }, [activatePendingChat, currentChatId, saveUserMessage, fileUploadConfig, getCurrentChat]);
 
   // Update the ref so useChatManagement's sendMessage can use it
   handleSendMessageRef.current = handleSendMessage;
@@ -760,6 +773,8 @@ export function UseAIProvider({
       list: listChats,
       clear: clearCurrentChat,
       sendMessage,
+      get: getCurrentChat,
+      updateMetadata,
     },
     agents: {
       available: availableAgents,
@@ -795,6 +810,7 @@ export function UseAIProvider({
       load: loadChat,
       delete: deleteChat,
       list: listChats,
+      get: getCurrentChat,
     },
     agents: {
       available: availableAgents,

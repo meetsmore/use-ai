@@ -1,5 +1,6 @@
 import type {
   Chat,
+  ChatMetadata,
   ChatRepository,
   CreateChatOptions,
   ListChatsOptions,
@@ -55,6 +56,7 @@ export class LocalStorageChatRepository implements ChatRepository {
       messages: [],
       createdAt: now,
       updatedAt: now,
+      metadata: options?.metadata,
     };
 
     // Enforce max chats limit by deleting oldest chat if needed
@@ -162,6 +164,16 @@ export class LocalStorageChatRepository implements ChatRepository {
       console.error('Failed to clear all chats:', error);
       throw new Error(`Failed to clear all chats: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
+  }
+
+  async updateMetadata(id: string, metadata: ChatMetadata, overwrite = false): Promise<void> {
+    const chat = await this.loadChat(id);
+    if (!chat) {
+      throw new Error(`Chat not found: ${id}`);
+    }
+
+    chat.metadata = overwrite ? metadata : { ...chat.metadata, ...metadata };
+    await this.saveChat(chat);
   }
 
   private getChatKey(id: string): string {
