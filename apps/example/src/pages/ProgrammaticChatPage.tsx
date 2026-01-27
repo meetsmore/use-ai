@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { useAIContext } from '@meetsmore-oss/use-ai-client';
+import { useAIContext, type SendMessageOptions } from '@meetsmore-oss/use-ai-client';
 
 export default function ProgrammaticChatPage() {
   const { chat, connected } = useAIContext();
@@ -7,7 +7,7 @@ export default function ProgrammaticChatPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isSending, setIsSending] = useState(false);
 
-  const handleSendPreset = async (message: string, options?: { newChat?: boolean }) => {
+  const handleSendPreset = async (message: string, options?: SendMessageOptions) => {
     if (!connected || isSending) return;
     setIsSending(true);
     try {
@@ -81,6 +81,17 @@ export default function ProgrammaticChatPage() {
           >
             New chat + greeting
           </button>
+          <button
+            style={styles.button}
+            onClick={() => handleSendPreset('Process this document as an invoice.', {
+              newChat: true,
+              metadata: { documentType: 'invoice', priority: 'high' }
+            })}
+            disabled={!connected || isSending}
+            data-testid="btn-new-chat-with-metadata"
+          >
+            New chat with metadata
+          </button>
         </div>
       </section>
 
@@ -132,6 +143,12 @@ function MyComponent() {
   // Start a new chat
   await chat.sendMessage('Fresh start', { newChat: true });
 
+  // New chat with metadata (useful for file transformers)
+  await chat.sendMessage('Process this document', {
+    newChat: true,
+    metadata: { documentType: 'invoice', customerId: '12345' }
+  });
+
   // With file attachment
   await chat.sendMessage('Analyze this', {
     attachments: [file]
@@ -141,6 +158,12 @@ function MyComponent() {
   await chat.sendMessage('Background task', {
     openChat: false
   });
+
+  // Access/update metadata on current chat
+  const currentChat = await chat.get();
+  console.log(currentChat?.metadata);
+
+  await chat.updateMetadata({ processed: true });
 }`}
         </pre>
       </section>

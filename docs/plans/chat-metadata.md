@@ -99,21 +99,19 @@ Location: `packages/client/src/providers/chatRepository/types.ts`
 
 Add a dedicated method for updating metadata:
 
-> TODO: Add a flag for overwrite which replaces whole metadata object.
-> TODO: We also need a way to get the metadata (access readonly object or getMetadata function)
-
 ```typescript
 interface ChatRepository {
   // ... existing methods
 
   /**
    * Updates metadata for a chat.
-   * Merges with existing metadata (does not replace).
+   * By default, merges with existing metadata. Set `overwrite: true` to replace entirely.
    * @param id Chat ID
-   * @param metadata Metadata to merge
+   * @param metadata Metadata to set/merge
+   * @param overwrite If true, replaces all metadata instead of merging
    * @returns Promise resolving when update is complete
    */
-  updateMetadata(id: string, metadata: ChatMetadata): Promise<void>;
+  updateMetadata(id: string, metadata: ChatMetadata, overwrite?: boolean): Promise<void>;
 }
 ```
 
@@ -139,12 +137,12 @@ async createChat(options?: CreateChatOptions): Promise<string> {
   return id;
 }
 
-async updateMetadata(id: string, metadata: ChatMetadata): Promise<void> {
+async updateMetadata(id: string, metadata: ChatMetadata, overwrite = false): Promise<void> {
   const chat = await this.loadChat(id);
   if (!chat) {
     throw new Error(`Chat not found: ${id}`);
   }
-  chat.metadata = { ...chat.metadata, ...metadata };
+  chat.metadata = overwrite ? metadata : { ...chat.metadata, ...metadata };
   chat.updatedAt = new Date();
   await this.saveChat(chat);
 }
@@ -162,8 +160,10 @@ interface UseChatManagementReturn {
 
   /** Get the current chat object (including metadata) */
   getCurrentChat: () => Promise<Chat | null>;
+  /** Get a read-only copy of metadata for the current chat */
+  getMetadata: () => Promise<Readonly<ChatMetadata> | null>;
   /** Update metadata for the current chat */
-  updateMetadata: (metadata: ChatMetadata) => Promise<void>;
+  updateMetadata: (metadata: ChatMetadata, overwrite?: boolean) => Promise<void>;
 }
 ```
 
@@ -176,12 +176,18 @@ const getCurrentChat = useCallback(async (): Promise<Chat | null> => {
   return repository.loadChat(chatId);
 }, [displayedChatId, repository]);
 
-const updateMetadata = useCallback(async (metadata: ChatMetadata): Promise<void> => {
+const getMetadata = useCallback(async (): Promise<Readonly<ChatMetadata> | null> => {
+  const chat = await getCurrentChat();
+  if (!chat?.metadata) return null;
+  return Object.freeze({ ...chat.metadata });
+}, [getCurrentChat]);
+
+const updateMetadata = useCallback(async (metadata: ChatMetadata, overwrite = false): Promise<void> => {
   const chatId = displayedChatId;
   if (!chatId) {
     throw new Error('No active chat');
   }
-  await repository.updateMetadata(chatId, metadata);
+  await repository.updateMetadata(chatId, metadata, overwrite);
 }, [displayedChatId, repository]);
 ```
 
@@ -190,8 +196,6 @@ const updateMetadata = useCallback(async (metadata: ChatMetadata): Promise<void>
 Location: `packages/client/src/providers/useAIProvider.tsx`
 
 Update the context value to expose metadata operations:
-
-> TODO: So people dont mutate the metadata object and expect it to be updated, add a `getMetadata` method for the chat.
 
 ```typescript
 interface UseAIContextValue {
@@ -205,8 +209,17 @@ interface UseAIContextValue {
     clear: () => Promise<void>;
     /** Get the current chat object (including metadata) */
     get: () => Promise<Chat | null>;
-    /** Update metadata for the current chat */
-    updateMetadata: (metadata: ChatMetadata) => Promise<void>;
+    /**
+     * Get a read-only copy of metadata for the current chat.
+     * Returns a frozen object to prevent accidental mutation.
+     */
+    getMetadata: () => Promise<Readonly<ChatMetadata> | null>;
+    /**
+     * Update metadata for the current chat.
+     * @param metadata Metadata to set/merge
+     * @param overwrite If true, replaces all metadata instead of merging (default: false)
+     */
+    updateMetadata: (metadata: ChatMetadata, overwrite?: boolean) => Promise<void>;
   };
 }
 ```
@@ -376,16 +389,32 @@ await chat.sendMessage('Analyze this invoice', {
 });
 ```
 
+### Reading Metadata
+
+```typescript
+const { chat } = useAIContext();
+
+// Get a read-only copy of metadata
+const metadata = await chat.getMetadata();
+console.log(metadata?.documentType);  // 'invoice'
+
+// Attempting to mutate will fail (object is frozen)
+// metadata.documentType = 'receipt';  // TypeError: Cannot assign to read only property
+```
+
 ### Updating Metadata After Creation
 
 ```typescript
 const { chat } = useAIContext();
 
-// Update metadata on current chat
+// Merge with existing metadata (default behavior)
 await chat.updateMetadata({
   processingStage: 'extraction-complete',
   extractedFields: ['vendor', 'amount', 'date'],
 });
+
+// Replace all metadata entirely
+await chat.updateMetadata({ newKey: 'newValue' }, true);
 ```
 
 ### Reading Metadata in File Transformer
@@ -415,23 +444,182 @@ Location: `packages/client/src/providers/chatRepository/localStorage.test.ts`
 
 - `createChat` stores metadata correctly
 - `updateMetadata` merges with existing metadata
+- `updateMetadata` with `overwrite: true` replaces all metadata
 - `updateMetadata` throws for non-existent chat
 - Metadata persists through save/load cycle
 
 Location: `packages/client/src/hooks/useChatManagement.test.ts`
 
 - `getCurrentChat` returns chat with metadata
+- `getMetadata` returns frozen copy of metadata
+- `getMetadata` returns null when no metadata exists
 - `updateMetadata` updates current chat
+- `updateMetadata` with `overwrite: true` replaces metadata
 - `sendMessage` with `newChat: true` and `metadata` creates chat with metadata
 
 ### E2E Tests
 
 Location: `apps/example/test/chat-metadata.e2e.test.ts`
 
-- Create chat with metadata → metadata persists
-- Update metadata → changes are reflected
-- File transformer receives chat metadata
-- Programmatic chat invocation with metadata works end-to-end
+#### Test 1: Metadata can be set and retrieved
+
+```typescript
+test('metadata can be set and retrieved', async ({ page }) => {
+  // Create a chat with initial metadata
+  const chatId = await page.evaluate(async () => {
+    const { chat } = window.__useAIContext__;
+    return await chat.create({
+      title: 'Test Chat',
+      metadata: { source: 'test', priority: 'high' },
+    });
+  });
+
+  // Retrieve and verify metadata
+  const metadata = await page.evaluate(async () => {
+    const { chat } = window.__useAIContext__;
+    return await chat.getMetadata();
+  });
+
+  expect(metadata).toEqual({ source: 'test', priority: 'high' });
+
+  // Update metadata (merge)
+  await page.evaluate(async () => {
+    const { chat } = window.__useAIContext__;
+    await chat.updateMetadata({ status: 'active' });
+  });
+
+  const updatedMetadata = await page.evaluate(async () => {
+    const { chat } = window.__useAIContext__;
+    return await chat.getMetadata();
+  });
+
+  expect(updatedMetadata).toEqual({ source: 'test', priority: 'high', status: 'active' });
+
+  // Update metadata (overwrite)
+  await page.evaluate(async () => {
+    const { chat } = window.__useAIContext__;
+    await chat.updateMetadata({ newKey: 'only' }, true);
+  });
+
+  const overwrittenMetadata = await page.evaluate(async () => {
+    const { chat } = window.__useAIContext__;
+    return await chat.getMetadata();
+  });
+
+  expect(overwrittenMetadata).toEqual({ newKey: 'only' });
+});
+```
+
+#### Test 2: sendMessage can pass metadata
+
+```typescript
+test('sendMessage creates chat with metadata', async ({ page }) => {
+  // Send message with newChat and metadata
+  await page.evaluate(async () => {
+    const { chat } = window.__useAIContext__;
+    await chat.sendMessage('Hello AI', {
+      newChat: true,
+      metadata: {
+        documentType: 'invoice',
+        ocrMode: 'high-accuracy',
+      },
+    });
+  });
+
+  // Verify metadata was set on the new chat
+  const metadata = await page.evaluate(async () => {
+    const { chat } = window.__useAIContext__;
+    return await chat.getMetadata();
+  });
+
+  expect(metadata).toEqual({
+    documentType: 'invoice',
+    ocrMode: 'high-accuracy',
+  });
+
+  // Verify chat was created and is active
+  const currentId = await page.evaluate(() => {
+    const { chat } = window.__useAIContext__;
+    return chat.currentId;
+  });
+
+  expect(currentId).toBeTruthy();
+});
+```
+
+#### Test 3: Transformers can access metadata
+
+```typescript
+test('file transformer receives chat metadata', async ({ page }) => {
+  // Track what context the transformer receives
+  let receivedContext: FileTransformerContext | null = null;
+
+  // Register a test transformer that captures context
+  await page.evaluate(() => {
+    window.__testTransformerContext__ = null;
+
+    window.__testTransformer__ = {
+      async transform(file, context, onProgress) {
+        window.__testTransformerContext__ = context;
+        return `Transformed: ${file.name}`;
+      },
+    };
+  });
+
+  // Create chat with metadata
+  await page.evaluate(async () => {
+    const { chat } = window.__useAIContext__;
+    await chat.create({
+      metadata: { documentType: 'invoice', extractFields: ['vendor', 'amount'] },
+    });
+  });
+
+  // Upload a file (triggers transformer)
+  const fileInput = page.locator('input[type="file"]');
+  await fileInput.setInputFiles({
+    name: 'test.pdf',
+    mimeType: 'application/pdf',
+    buffer: Buffer.from('fake pdf content'),
+  });
+
+  // Wait for transformer to be called
+  await page.waitForFunction(() => window.__testTransformerContext__ !== null);
+
+  // Verify transformer received the chat with metadata
+  const context = await page.evaluate(() => window.__testTransformerContext__);
+
+  expect(context.chat).toBeTruthy();
+  expect(context.chat.metadata).toEqual({
+    documentType: 'invoice',
+    extractFields: ['vendor', 'amount'],
+  });
+});
+
+test('transformer receives null chat when no chat is active', async ({ page }) => {
+  // Ensure no chat is active
+  await page.evaluate(async () => {
+    const { chat } = window.__useAIContext__;
+    await chat.clear();
+    window.__testTransformerContext__ = null;
+  });
+
+  // Upload a file
+  const fileInput = page.locator('input[type="file"]');
+  await fileInput.setInputFiles({
+    name: 'test.pdf',
+    mimeType: 'application/pdf',
+    buffer: Buffer.from('fake pdf content'),
+  });
+
+  // Wait for transformer to be called
+  await page.waitForFunction(() => window.__testTransformerContext__ !== null);
+
+  // Verify transformer received null chat
+  const context = await page.evaluate(() => window.__testTransformerContext__);
+
+  expect(context.chat).toBeNull();
+});
+```
 
 ## Migration Notes
 
@@ -439,18 +627,21 @@ Location: `apps/example/test/chat-metadata.e2e.test.ts`
 - The `metadata` field is optional, so no migration script is needed
 - listChats should include metadata in the returned chat summaries (update `Omit<Chat, 'messages'>` pattern if needed)
 
-## Open Questions
+## Design Decisions
 
-1. **Should `listChats` include metadata?**
-   - Current signature returns `Omit<Chat, 'messages'>`
-   - This would naturally include metadata, which seems correct
-   - Recommendation: Yes, include metadata in list results
+1. **`listChats` includes metadata**
+   - Current signature returns `Omit<Chat, 'messages'>`, which naturally includes metadata
+   - This allows consumers to filter/search chats by metadata without loading full messages
 
-2. **Should metadata updates trigger re-renders?**
-   - Recommendation: No, metadata is primarily for programmatic access
-   - If UI needs to react to metadata changes, consumer can poll or use their own state
+2. **Metadata updates do not trigger re-renders**
+   - Metadata is primarily for programmatic access, not UI state
+   - If UI needs to react to metadata changes, consumer can poll or manage their own state
 
-3. **Size limits on metadata?**
+3. **No hard size limits on metadata (v1)**
    - localStorage has ~5MB limit total
-   - Recommendation: Document that metadata should be kept small (< 10KB per chat)
-   - No hard enforcement in v1
+   - Document that metadata should be kept small (< 10KB per chat)
+   - No enforcement in v1; can add validation later if needed
+
+4. **`getMetadata` returns a frozen copy**
+   - Prevents accidental mutation of the returned object
+   - Users must call `updateMetadata` to make changes

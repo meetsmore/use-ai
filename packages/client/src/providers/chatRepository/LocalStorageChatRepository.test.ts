@@ -255,6 +255,118 @@ describe('LocalStorageChatRepository', () => {
     });
   });
 
+  describe('metadata', () => {
+    it('should create chat with initial metadata', async () => {
+      const chatId = await repository.createChat({
+        title: 'Test Chat',
+        metadata: { source: 'test', priority: 'high' },
+      });
+      const chat = await repository.loadChat(chatId);
+
+      expect(chat).not.toBeNull();
+      expect(chat!.metadata).toEqual({ source: 'test', priority: 'high' });
+    });
+
+    it('should create chat without metadata when not provided', async () => {
+      const chatId = await repository.createChat({ title: 'Test Chat' });
+      const chat = await repository.loadChat(chatId);
+
+      expect(chat).not.toBeNull();
+      expect(chat!.metadata).toBeUndefined();
+    });
+
+    it('should update metadata (merge by default)', async () => {
+      const chatId = await repository.createChat({
+        metadata: { existing: 'value', toOverwrite: 'old' },
+      });
+
+      await repository.updateMetadata(chatId, { new: 'value', toOverwrite: 'new' });
+
+      const chat = await repository.loadChat(chatId);
+      expect(chat!.metadata).toEqual({
+        existing: 'value',
+        new: 'value',
+        toOverwrite: 'new',
+      });
+    });
+
+    it('should update metadata (overwrite mode)', async () => {
+      const chatId = await repository.createChat({
+        metadata: { existing: 'value', toRemove: 'old' },
+      });
+
+      await repository.updateMetadata(chatId, { replacement: 'only' }, true);
+
+      const chat = await repository.loadChat(chatId);
+      expect(chat!.metadata).toEqual({ replacement: 'only' });
+    });
+
+    it('should throw when updating metadata for non-existent chat', async () => {
+      await expect(
+        repository.updateMetadata('non-existent-id', { key: 'value' })
+      ).rejects.toThrow('Chat not found: non-existent-id');
+    });
+
+    it('should persist metadata through save/load cycle', async () => {
+      const chatId = await repository.createChat({
+        metadata: { documentType: 'invoice', extractFields: ['vendor', 'amount'] },
+      });
+
+      // Modify the chat and save
+      const chat = await repository.loadChat(chatId);
+      chat!.messages.push({
+        id: 'msg1',
+        role: 'user',
+        content: 'Test message',
+        createdAt: new Date(),
+      });
+      await repository.saveChat(chat!);
+
+      // Reload and verify metadata is preserved
+      const loadedChat = await repository.loadChat(chatId);
+      expect(loadedChat!.metadata).toEqual({
+        documentType: 'invoice',
+        extractFields: ['vendor', 'amount'],
+      });
+    });
+
+    it('should include metadata in listChats results', async () => {
+      await repository.createChat({
+        title: 'Chat 1',
+        metadata: { source: 'programmatic' },
+      });
+      await repository.createChat({
+        title: 'Chat 2',
+        metadata: { source: 'manual' },
+      });
+
+      const chats = await repository.listChats();
+      expect(chats).toHaveLength(2);
+      expect(chats.find(c => c.title === 'Chat 1')?.metadata).toEqual({ source: 'programmatic' });
+      expect(chats.find(c => c.title === 'Chat 2')?.metadata).toEqual({ source: 'manual' });
+    });
+
+    it('should handle complex metadata values', async () => {
+      const complexMetadata = {
+        stringValue: 'test',
+        numberValue: 42,
+        booleanValue: true,
+        arrayValue: ['a', 'b', 'c'],
+        nestedObject: {
+          deep: {
+            value: 'nested',
+          },
+        },
+        nullValue: null,
+      };
+
+      const chatId = await repository.createChat({ metadata: complexMetadata });
+      const chat = await repository.loadChat(chatId);
+
+      expect(chat!.metadata).toEqual(complexMetadata);
+    });
+  });
+
   describe('maxChats limit', () => {
     it('should enforce max chats limit when creating new chat', async () => {
       const smallRepository = new LocalStorageChatRepository(storage, 3);

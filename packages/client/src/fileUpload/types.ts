@@ -1,3 +1,5 @@
+import type { Chat } from '../providers/chatRepository/types';
+
 /**
  * Default maximum file size (10MB)
  */
@@ -57,6 +59,14 @@ export interface FileUploadBackend {
 }
 
 /**
+ * Context provided to file transformers.
+ */
+export interface FileTransformerContext {
+  /** The current chat (includes metadata) */
+  chat: Chat | null;
+}
+
+/**
  * A transformer that converts files into string representations for the AI.
  */
 export interface FileTransformer {
@@ -64,12 +74,17 @@ export interface FileTransformer {
    * Transform the file into a string representation for the AI.
    *
    * @param file - The file to transform
+   * @param context - Context including the current chat and its metadata
    * @param onProgress - Optional callback for reporting progress (0-100).
    *                     If called, UI shows progress bar; otherwise shows spinner.
    * @returns A string representation the AI will receive
    * @throws If transformation fails
    */
-  transform(file: File, onProgress?: (progress: number) => void): Promise<string>;
+  transform(
+    file: File,
+    context: FileTransformerContext,
+    onProgress?: (progress: number) => void
+  ): Promise<string>;
 }
 
 /**

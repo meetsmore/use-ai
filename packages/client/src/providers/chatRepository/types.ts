@@ -2,6 +2,12 @@ import type { PersistedFileMetadata } from '../../fileUpload/types';
 import type { FeedbackValue } from '@meetsmore-oss/use-ai-core';
 
 /**
+ * Arbitrary metadata attached to a chat.
+ * Use this to store context about the chat (e.g., how it was invoked, document type being processed).
+ */
+export type ChatMetadata = Record<string, unknown>;
+
+/**
  * Display mode for chat messages.
  * Determines the visual styling of the message bubble.
  */
@@ -62,6 +68,8 @@ export interface Chat {
   messages: PersistedMessage[];
   createdAt: Date;
   updatedAt: Date;
+  /** Arbitrary metadata attached to the chat */
+  metadata?: ChatMetadata;
 }
 
 /**
@@ -69,6 +77,8 @@ export interface Chat {
  */
 export interface CreateChatOptions {
   title?: string;
+  /** Initial metadata for the chat */
+  metadata?: ChatMetadata;
 }
 
 /**
@@ -125,6 +135,16 @@ export interface ChatRepository {
    * @returns Promise resolving when all chats are deleted
    */
   deleteAll(): Promise<void>;
+
+  /**
+   * Updates metadata for a chat.
+   * By default, merges with existing metadata. Set `overwrite: true` to replace entirely.
+   * @param id Chat ID
+   * @param metadata Metadata to set/merge
+   * @param overwrite If true, replaces all metadata instead of merging
+   * @returns Promise resolving when update is complete
+   */
+  updateMetadata(id: string, metadata: ChatMetadata, overwrite?: boolean): Promise<void>;
 }
 
 /**

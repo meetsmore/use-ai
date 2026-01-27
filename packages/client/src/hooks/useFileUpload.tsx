@@ -1,5 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
-import type { FileAttachment, FileUploadConfig, FileProcessingState, FileTransformer } from '../fileUpload/types';
+import type { FileAttachment, FileUploadConfig, FileProcessingState, FileTransformer, FileTransformerContext } from '../fileUpload/types';
+import type { Chat } from '../providers/chatRepository/types';
 import { DEFAULT_MAX_FILE_SIZE } from '../fileUpload/types';
 import { findTransformer } from '../fileUpload/mimeTypeMatcher';
 import { getTransformedContent } from '../fileUpload/processAttachments';
@@ -57,6 +58,8 @@ function isTypeAccepted(mimeType: string, acceptedTypes?: string[]): boolean {
 }
 
 export interface UseFileUploadOptions {
+  /** Function to get the current chat (for transformer context) */
+  getCurrentChat: () => Promise<Chat | null>;
   /** Configuration for file uploads. If undefined, file upload is disabled. */
   config?: FileUploadConfig;
   /** Whether file operations should be disabled (e.g., during loading) */
@@ -140,6 +143,7 @@ export function useFileUpload({
   config,
   disabled = false,
   resetDependency,
+  getCurrentChat,
 }: UseFileUploadOptions): UseFileUploadReturn {
   const strings = useStrings();
   const theme = useTheme();
@@ -186,7 +190,11 @@ export function useFileUpload({
     setProcessingState(prev => new Map(prev).set(attachmentId, { status: 'processing' }));
 
     try {
-      const transformedContent = await getTransformedContent(file, transformer, (progress) => {
+      // Get current chat for context
+      const chat = await getCurrentChat();
+      const context: FileTransformerContext = { chat };
+
+      const transformedContent = await getTransformedContent(file, transformer, context, (progress) => {
         setProcessingState(prev => new Map(prev).set(attachmentId, {
           status: 'processing',
           progress,
@@ -204,7 +212,7 @@ export function useFileUpload({
       console.error(`[useFileUpload] Transformation failed for ${file.name}:`, error);
       setProcessingState(prev => new Map(prev).set(attachmentId, { status: 'error' }));
     }
-  }, []);
+  }, [getCurrentChat]);
 
   /**
    * Validates and adds files to attachments.

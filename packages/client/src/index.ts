@@ -50,6 +50,7 @@ export { generateChatId, generateMessageId } from './providers/chatRepository/ty
 export type {
   ChatRepository,
   Chat,
+  ChatMetadata,
   PersistedMessage,
   PersistedMessageContent,
   PersistedContentPart,
@@ -71,6 +72,7 @@ export type {
   FileAttachment,
   PersistedFileMetadata,
   FileTransformer,
+  FileTransformerContext,
   FileTransformerMap,
   FileProcessingStatus,
   FileProcessingState,
