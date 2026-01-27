@@ -1,0 +1,78 @@
+packages/core/src/types.ts
+  95f722c23c7021e5 250,256,260-261,264-265,267-278,280-281
+packages/server/src/plugins/index.ts
+  95f722c23c7021e5 2
+packages/server/src/plugins/types.ts
+  95f722c23c7021e5 73-80
+packages/core/src/index.ts
+  95f722c23c7021e5 42-43
+apps/example/src/App.tsx
+  95f722c23c7021e5 83
+packages/server/src/instrumentation.ts
+  95f722c23c7021e5 1,4-6,9-10,14-16,18-22,24,26-32,47-57,59,66,69-76,78-83,86,88,92,95,99,102,104-109
+packages/client/src/client.ts
+  95f722c23c7021e5 18,120-123,184-191,682-703,705-721
+packages/client/src/types.ts
+  95f722c23c7021e5 48-49
+packages/client/src/components/UseAIChat.tsx
+  95f722c23c7021e5 5,71-77,161-162
+packages/server/src/index.ts
+  95f722c23c7021e5 9,11
+packages/server/src/agents/AISDKAgent.ts
+  95f722c23c7021e5 610,612-613,617
+packages/client/src/components/UseAIChatPanel.tsx
+  95f722c23c7021e5 3,37-40,44-47,49-85,87-123,125-127,177-180,209-210,926-937,940,942-947,950,952-958
+packages/client/src/providers/chatRepository/types.ts
+  95f722c23c7021e5 2,50-53
+packages/server/src/server.ts
+  95f722c23c7021e5 25,204-208,819,825-828
+packages/client/src/hooks/useChatManagement.ts
+  95f722c23c7021e5 55,65-66,89-92,125,161-162,169-170,404-405,431
+packages/server/src/plugins/FeedbackPlugin.ts
+  95f722c23c7021e5 1-135,137-143,145-165
+packages/server/package.json
+  95f722c23c7021e5 37,45-47
+packages/client/src/hooks/useFeedback.ts
+  95f722c23c7021e5 1-162
+packages/server/src/langfuse.integration.test.ts
+  95f722c23c7021e5 51,71,78,90
+docs/plans/feedback.md
+  185f0088f791cbce 1-15,18-52,55-337
+packages/client/src/providers/useAIProvider.tsx
+  95f722c23c7021e5 2,22,412,467-468,490-497,607-611,614-617,619,815-818,849-850
+packages/client/src/index.ts
+  95f722c23c7021e5 136-142
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.37",
+  "base_commit_sha": "d955bf6490f759fdc496328eab94b1092b62bc60",
+  "prompts": {
+    "185f0088f791cbce": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "48148e72-6514-4078-8f47-ac89486d92c0",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 333,
+      "total_deletions": 0,
+      "accepted_lines": 333,
+      "overriden_lines": 0
+    },
+    "95f722c23c7021e5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "99b4e0ff-fd61-4e6a-a331-ec323bbe2d81",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 1931,
+      "total_deletions": 1021,
+      "accepted_lines": 933,
+      "overriden_lines": 24
+    }
+  }
+}
