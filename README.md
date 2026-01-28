@@ -37,6 +37,7 @@ A React client/framework for easily enabling AI to control your users frontend.
     - [Suggestions](#suggestions)
     - [`confirmationRequired`](#confirmationrequired)
     - [Chat History](#chat-history)
+    - [Chat Metadata](#chat-metadata)
     - [Programmatic Chat Control](#programmatic-chat-control)
     - [Error Code Mapping](#error-code-mapping)
     - [Using the AI directly (without chat UI)](#using-the-ai-directly-without-chat-ui)
@@ -515,6 +516,39 @@ root.render(
     <App />
   </UseAIProvider>
 );
+```
+
+### Chat Metadata
+
+Chats can have arbitrary metadata attached to them. This is useful for storing custom data like document types, customer IDs, or any other context that file transformers or your application logic might need.
+
+**Setting metadata when creating a chat:**
+
+```tsx
+const { chat } = useAIContext();
+
+// Create a new chat with metadata
+await chat.sendMessage('Process this invoice', {
+  newChat: true,
+  metadata: { documentType: 'invoice', customerId: '12345' }
+});
+```
+
+**Accessing and updating metadata:**
+
+```tsx
+const { chat } = useAIContext();
+
+// Get the current chat (metadata is frozen to prevent accidental mutation)
+const currentChat = await chat.get();
+console.log(currentChat?.metadata); // { documentType: 'invoice', customerId: '12345' }
+
+// Update metadata (merges with existing by default)
+await chat.updateMetadata({ processed: true });
+
+// Or replace all metadata
+await chat.updateMetadata({ newField: 'value' }, true); // overwrite = true
+```
 ```
 
 ### Programmatic Chat Control

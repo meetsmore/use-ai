@@ -71,6 +71,8 @@ export interface UseAIChatPanelProps {
   onLoadChat?: (chatId: string) => Promise<void>;
   onDeleteChat?: (chatId: string) => Promise<void>;
   onListChats?: () => Promise<Array<Omit<Chat, 'messages'>>>;
+  /** Gets the current chat */
+  onGetChat?: () => Promise<Chat | null>;
   suggestions?: string[];
   availableAgents?: AgentInfo[];
   defaultAgent?: string | null;
@@ -100,6 +102,7 @@ export function UseAIChatPanel({
   onLoadChat,
   onDeleteChat,
   onListChats,
+  onGetChat,
   suggestions,
   availableAgents,
   defaultAgent,
@@ -141,6 +144,7 @@ export function UseAIChatPanel({
     getDropZoneProps,
     DropZoneOverlay,
   } = useFileUpload({
+    getCurrentChat: onGetChat ?? (async () => null),
     config: fileUploadConfig,
     disabled: loading,
     resetDependency: currentChatId,
