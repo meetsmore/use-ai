@@ -1,0 +1,23 @@
+packages/server/package.json
+  dc677193525319da 38
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.37",
+  "base_commit_sha": "47c1709e0d6138c8ccbafbbf8ce657c5a73cb803",
+  "prompts": {
+    "dc677193525319da": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e68cf192-fc8e-4620-874e-0cd0c9aaf779",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 2,
+      "total_deletions": 1,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  }
+}
