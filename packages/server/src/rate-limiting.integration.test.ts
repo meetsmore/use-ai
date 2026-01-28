@@ -184,6 +184,39 @@ describe('Rate Limiting', () => {
     errorServer.close();
   });
 
+  test('Rate limiting works correctly with WebSocket transport', async () => {
+    // Create a separate server for this test
+    const wsPort = 9306;
+    const wsServer = new UseAIServer(createServerConfig(wsPort, 'test-agent', {
+      rateLimitMaxRequests: 2,
+      rateLimitWindowMs: 1000,
+    }));
+    cleanup.trackServer(wsServer);
+
+    // Create a client that uses WebSocket transport
+    const socket = await cleanup.createTestClient(wsPort);
+
+    // Verify we're using WebSocket transport
+    expect(socket.io.engine.transport.name).toBe('websocket');
+
+    // First request
+    sendRunAgent(socket, { prompt: 'WebSocket Request 1', tools: [] });
+    await waitForEventType(socket, EventType.TEXT_MESSAGE_END);
+
+    // Second request
+    sendRunAgent(socket, { prompt: 'WebSocket Request 2', tools: [] });
+    await waitForEventType(socket, EventType.TEXT_MESSAGE_END);
+
+    // Third request should be rate limited
+    sendRunAgent(socket, { prompt: 'WebSocket Request 3', tools: [] });
+    const errorEvent = await waitForEventType(socket, EventType.RUN_ERROR);
+
+    expect((errorEvent as any).message).toContain('Rate limit exceeded');
+
+    socket.disconnect();
+    wsServer.close();
+  });
+
   test('Rate limiting works correctly with HTTP long-polling transport', async () => {
     // Create a separate server for this test
     const pollingPort = 9304;
