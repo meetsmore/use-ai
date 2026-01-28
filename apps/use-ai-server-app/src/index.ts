@@ -157,50 +157,59 @@ function createMcpEndpoints(): McpEndpointConfig[] {
 
 logger.info('Starting UseAI server', { logFormat });
 
-// Create agents and workflow runners
-const { agents, defaultAgent } = createAgents();
-const workflowRunners = createWorkflowRunners();
-const mcpEndpoints = createMcpEndpoints();
+(async () => {
+  try {
+    // Create agents and workflow runners
+    const { agents, defaultAgent } = createAgents();
+    const workflowRunners = createWorkflowRunners();
+    const mcpEndpoints = createMcpEndpoints();
 
-// Build plugins array
-const plugins = [];
-if (workflowRunners.size > 0) {
-  plugins.push(new WorkflowsPlugin({ runners: workflowRunners }));
-}
+    // Build plugins array
+    const plugins = [];
+    if (workflowRunners.size > 0) {
+      plugins.push(new WorkflowsPlugin({ runners: workflowRunners }));
+    }
 
-const server = new UseAIServer({
-  port,
-  agents,
-  defaultAgent,
-  rateLimitMaxRequests,
-  rateLimitWindowMs,
-  plugins: plugins.length > 0 ? plugins : undefined,
-  mcpEndpoints: mcpEndpoints.length > 0 ? mcpEndpoints : undefined,
-  maxHttpBufferSize,
-  cors: corsOrigin
-    ? {
-        origin: corsOrigin === '*' ? true : corsOrigin,
-        methods: ['GET', 'POST'],
-        credentials: true,
-      }
-    : {
-        origin: true, // Allow all origins by default for local development
-        methods: ['GET', 'POST'],
-        credentials: true,
-      },
-  idleTimeout: 30, // Must be greater than pingInterval (25s)
-});
+    const server = new UseAIServer({
+      port,
+      agents,
+      defaultAgent,
+      rateLimitMaxRequests,
+      rateLimitWindowMs,
+      plugins: plugins.length > 0 ? plugins : undefined,
+      mcpEndpoints: mcpEndpoints.length > 0 ? mcpEndpoints : undefined,
+      maxHttpBufferSize,
+      cors: corsOrigin
+        ? {
+            origin: corsOrigin === '*' ? true : corsOrigin,
+            methods: ['GET', 'POST'],
+            credentials: true,
+          }
+        : {
+            origin: true, // Allow all origins by default for local development
+            methods: ['GET', 'POST'],
+            credentials: true,
+          },
+      idleTimeout: 30, // Must be greater than pingInterval (25s)
+    });
 
-// Initialize MCP endpoints
-if (mcpEndpoints.length > 0) {
-  await server.initialize();
-}
+    // Initialize MCP endpoints
+    if (mcpEndpoints.length > 0) {
+      await server.initialize();
+    }
 
-// Server will log when it's actually listening via the callback in the constructor
-if (logFormat === 'pretty') {
-  console.log(`✓ UseAI server is running on port ${port}`);
-  console.log(`  WebSocket URL: ws://localhost:${port}`);
-  console.log(`  Log format: ${logFormat} (set LOG_FORMAT=json for structured logs)`);
-  console.log('  Press Ctrl+C to stop');
-}
+    // Server will log when it's actually listening via the callback in the constructor
+    if (logFormat === 'pretty') {
+      console.log(`✓ UseAI server is running on port ${port}`);
+      console.log(`  WebSocket URL: ws://localhost:${port}`);
+      console.log(`  Log format: ${logFormat} (set LOG_FORMAT=json for structured logs)`);
+      console.log('  Press Ctrl+C to stop');
+    }
+  } catch (error) {
+    logger.error('Failed to start server', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+    process.exit(1);
+  }
+})();
 
