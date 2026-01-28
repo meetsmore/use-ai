@@ -1,6 +1,6 @@
 import { Server as SocketIOServer, Socket } from 'socket.io';
+import { Server as BunEngine } from '@socket.io/bun-engine';
 import { ModelMessage, ToolModelMessage } from 'ai';
-import { createServer } from 'http';
 import { createHash } from 'crypto';
 import { EventType, type McpHeadersMap } from '@meetsmore-oss/use-ai-core';
 import type {
@@ -24,6 +24,7 @@ import type { ClientSession } from './agents/types';
 import type { UseAIServerPlugin, MessageHandler } from './plugins/types';
 import { RemoteMcpToolsProvider, type RemoteToolDefinition } from './mcp';
 import { findMatch } from './utils/patternMatcher';
+import { createBunConfig } from './bun-config';
 
 // Re-export ClientSession type for external use
 export type { ClientSession } from './agents/types';
@@ -77,18 +78,26 @@ export type { ClientSession } from './agents/types';
  */
 export class UseAIServer {
   private io: SocketIOServer;
-  private httpServer: ReturnType<typeof createServer>;
+  private engine: BunEngine;
   private agent: Agent; // Default agent for chat (run_agent)
   private defaultAgentId: string; // ID of the default agent
   private agents: Record<string, Agent>; // Registry of all agents
   private clients: Map<string, ClientSession> = new Map();
-  private config: Required<Omit<UseAIServerConfig, 'defaultAgent' | 'agents' | 'plugins' | 'mcpEndpoints' | 'maxHttpBufferSize' | 'cors'>> & { maxHttpBufferSize: number; cors?: CorsOptions };
+  private config: Required<Omit<UseAIServerConfig, 'defaultAgent' | 'agents' | 'plugins' | 'mcpEndpoints' | 'maxHttpBufferSize' | 'cors' | 'idleTimeout'>> & {
+    maxHttpBufferSize: number;
+    cors?: CorsOptions;
+    idleTimeout: number;
+  };
   private rateLimiter: RateLimiter;
   private cleanupInterval: NodeJS.Timeout;
   private clientIdCounter = 0;
   private plugins: UseAIServerPlugin[] = [];
   private messageHandlers: Map<string, MessageHandler> = new Map();
   private mcpEndpoints: RemoteMcpToolsProvider[] = [];
+  private bunServer: ReturnType<typeof Bun.serve> | null = null;
+  // Store client IP addresses for polling transport (keyed by session ID)
+  // WebSocket transport can use BunWebSocket.remoteAddress directly
+  private pollingClientIps: Map<string, string> = new Map();
 
   /**
    * Creates a new UseAI server instance.
@@ -103,6 +112,7 @@ export class UseAIServer {
       rateLimitWindowMs: config.rateLimitWindowMs ?? 60000,
       maxHttpBufferSize: config.maxHttpBufferSize ?? 20 * 1024 * 1024, // 20MB default
       cors: config.cors,
+      idleTimeout: config.idleTimeout ?? 30,
     };
 
     // Set agents registry
@@ -140,25 +150,32 @@ export class UseAIServer {
     this.plugins = config.plugins ?? [];
     this.initializePlugins();
 
-    // Create HTTP server for health checks
-    this.httpServer = createServer((req, res) => {
-      if (req.url === '/health') {
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ status: 'ok' }));
-      } else {
-        res.writeHead(404);
-        res.end();
+    // Create Bun-native engine
+    // Note: bun-engine has its own CORS handling separate from socket.io
+    this.engine = new BunEngine({
+      path: '/socket.io/',
+    });
+
+    // Capture client IP for polling transport at engine connection time
+    // For WebSocket, BunWebSocket.remoteAddress is available directly (no need to store here)
+    // For polling, server.requestIP() works because there's no WebSocket upgrade
+    this.engine.on('connection', (engineSocket, req, bunServer) => {
+      // Only store for polling - WebSocket uses BunWebSocket.remoteAddress
+      if (engineSocket.transport?.name === 'polling') {
+        const clientIp = bunServer.requestIP(req);
+        if (clientIp) {
+          this.pollingClientIps.set(engineSocket.id, clientIp.address);
+        }
       }
     });
 
-    // Attach Socket.IO server to HTTP server
-    this.io = new SocketIOServer(this.httpServer, {
-      cors: this.config.cors,
-      allowUpgrades: true,
+    // Create Socket.IO server and bind to Bun engine
+    this.io = new SocketIOServer({
       transports: ['polling', 'websocket'],
       maxHttpBufferSize: this.config.maxHttpBufferSize,
     });
-    this.httpServer.listen(this.config.port);
+    this.io.bind(this.engine);
+
     this.setupSocketIOServer();
 
     if (this.rateLimiter.isEnabled()) {
@@ -167,6 +184,15 @@ export class UseAIServer {
         windowMs: this.config.rateLimitWindowMs,
       });
     }
+
+    // Auto-start Bun server
+    this.bunServer = Bun.serve(
+      createBunConfig(this.engine, {
+        port: this.config.port,
+        idleTimeout: this.config.idleTimeout,
+        cors: this.config.cors,
+      })
+    );
   }
 
   /**
@@ -228,8 +254,17 @@ export class UseAIServer {
     this.io.on('connection', (socket: Socket) => {
       const clientId = `client-${++this.clientIdCounter}`;
       const threadId = uuidv4();
-      const ipAddress = socket.handshake.address || socket.id;
-      const transport = socket.conn.transport.name;
+      // Note: Type assertions needed because socket.io uses engine.io types,
+      // but we use bun-engine which has different type definitions
+      const conn = socket.conn as unknown as { id: string; transport: { name: string; socket?: { remoteAddress?: string } } };
+      // Get IP address for rate limiting (Bun-native implementation):
+      // - WebSocket: BunWebSocket.remoteAddress
+      // - Polling: pollingClientIps map (captured in engine connection event)
+      const ipAddress =
+        conn.transport.socket?.remoteAddress ||
+        this.pollingClientIps.get(conn.id) ||
+        socket.id; // fallback to socket.id if IP cannot be determined
+      const transport = conn.transport.name;
       logger.info('Client connected', { clientId, threadId, ipAddress, transport });
 
       // Log transport upgrades
@@ -285,6 +320,9 @@ export class UseAIServer {
       socket.on('disconnect', () => {
         logger.info('Client disconnected', { clientId, ipAddress });
 
+        // Clean up polling IP entry
+        this.pollingClientIps.delete(conn.id);
+
         // Call plugin lifecycle hooks
         for (const plugin of this.plugins) {
           plugin.onClientDisconnect?.(session);
@@ -295,7 +333,7 @@ export class UseAIServer {
       });
     });
 
-    logger.info('UseAI server listening', { port: this.config.port });
+    logger.info('UseAI server ready', { port: this.config.port });
   }
 
   private async handleClientMessage(socket: Socket, message: UseAIClientMessage) {
@@ -815,6 +853,9 @@ export class UseAIServer {
     this.mcpEndpoints.forEach(endpoint => endpoint.destroy());
 
     this.io.close();
-    this.httpServer.close();
+    if (this.bunServer) {
+      this.bunServer.stop();
+      this.bunServer = null;
+    }
   }
 }

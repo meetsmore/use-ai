@@ -65,7 +65,7 @@
     },
     "packages/client": {
       "name": "@meetsmore-oss/use-ai-client",
-      "version": "1.2.3",
+      "version": "1.3.0",
       "dependencies": {
         "@meetsmore-oss/use-ai-core": "workspace:*",
         "react-markdown": "^8.0.0",
@@ -92,7 +92,7 @@
     },
     "packages/core": {
       "name": "@meetsmore-oss/use-ai-core",
-      "version": "1.2.3",
+      "version": "1.3.0",
       "dependencies": {
         "@ag-ui/core": "^0.0.41",
       },
@@ -103,28 +103,29 @@
     },
     "packages/plugin-workflows": {
       "name": "@meetsmore-oss/use-ai-plugin-workflows",
-      "version": "1.2.3",
+      "version": "1.3.0",
       "dependencies": {
-        "@meetsmore-oss/use-ai-core": "1.2.3",
+        "@meetsmore-oss/use-ai-core": "1.3.0",
         "ai": "6.0.0-beta.116",
         "uuid": "^11.0.3",
       },
       "devDependencies": {
-        "@meetsmore-oss/use-ai-server": "1.2.3",
+        "@meetsmore-oss/use-ai-server": "1.3.0",
         "@types/uuid": "^10.0.0",
         "typescript": "^5.9.3",
       },
       "peerDependencies": {
-        "@meetsmore-oss/use-ai-server": "1.2.3",
+        "@meetsmore-oss/use-ai-server": "1.3.0",
       },
     },
     "packages/server": {
       "name": "@meetsmore-oss/use-ai-server",
-      "version": "1.2.3",
+      "version": "1.3.0",
       "dependencies": {
         "@ai-sdk/anthropic": "3.0.0-beta.59",
         "@ai-sdk/openai": "3.0.0-beta.66",
-        "@meetsmore-oss/use-ai-core": "1.2.3",
+        "@meetsmore-oss/use-ai-core": "1.3.0",
+        "@socket.io/bun-engine": "^0.1.0",
         "ai": "6.0.0-beta.116",
         "picomatch": "^4.0.3",
         "socket.io": "^4.8.1",
@@ -391,6 +392,8 @@
     "@rollup/rollup-win32-x64-gnu": ["@rollup/rollup-win32-x64-gnu@4.53.3", "", { "os": "win32", "cpu": "x64" }, "sha512-J9QDiOIZlZLdcot5NXEepDkstocktoVjkaKUtqzgzpt2yWjGlbYiKyp05rWwk4nypbYUNoFAztEgixoLaSETkg=="],
 
     "@rollup/rollup-win32-x64-msvc": ["@rollup/rollup-win32-x64-msvc@4.53.3", "", { "os": "win32", "cpu": "x64" }, "sha512-UhTd8u31dXadv0MopwGgNOBpUVROFKWVQgAg5N1ESyCz8AuBcMqm4AuTjrwgQKGDfoFuz02EuMRHQIw/frmYKQ=="],
+
+    "@socket.io/bun-engine": ["@socket.io/bun-engine@0.1.0", "", { "peerDependencies": { "typescript": "^5" } }, "sha512-B1z6GuAxZlfvjgaa3BHZBOfqHJNfnpebTw15p+Un1HuBL4YM7wUxO9sJa7K4NDTe7XbUBeqLIwTDA5tOOjffog=="],
 
     "@socket.io/component-emitter": ["@socket.io/component-emitter@3.1.2", "", {}, "sha512-9BCxFwvbGg/RsZK9tjXd8s4UcwR0MWeFQ1XEKIQVVvAGJyINdrqKMcTRyLoK8Rse1GjzLV9cwjWV1olXRWEXVA=="],
 
@@ -1394,9 +1397,9 @@
 
     "@isaacs/cliui/wrap-ansi": ["wrap-ansi@8.1.0", "", { "dependencies": { "ansi-styles": "^6.1.0", "string-width": "^5.0.1", "strip-ansi": "^7.0.1" } }, "sha512-si7QWI6zUMq56bESFvagtmzMdGOtoxfR+Sez11Mobfc7tm+VkUckk9bW2UeffTGVUbOksxmSw0AA2gs8g71NCQ=="],
 
-    "@meetsmore-oss/use-ai-core/@types/bun": ["@types/bun@1.3.6", "", { "dependencies": { "bun-types": "1.3.6" } }, "sha512-uWCv6FO/8LcpREhenN1d1b6fcspAB+cefwD7uti8C8VffIv0Um08TKMn98FynpTiU38+y2dUO55T11NgDt8VAA=="],
+    "@meetsmore-oss/use-ai-core/@types/bun": ["@types/bun@1.3.7", "", { "dependencies": { "bun-types": "1.3.7" } }, "sha512-lmNuMda+Z9b7tmhA0tohwy8ZWFSnmQm1UDWXtH5r9F7wZCfkeO3Jx7wKQ1EOiKq43yHts7ky6r8SDJQWRNupkA=="],
 
-    "@meetsmore-oss/use-ai-server/@types/bun": ["@types/bun@1.3.6", "", { "dependencies": { "bun-types": "1.3.6" } }, "sha512-uWCv6FO/8LcpREhenN1d1b6fcspAB+cefwD7uti8C8VffIv0Um08TKMn98FynpTiU38+y2dUO55T11NgDt8VAA=="],
+    "@meetsmore-oss/use-ai-server/@types/bun": ["@types/bun@1.3.7", "", { "dependencies": { "bun-types": "1.3.7" } }, "sha512-lmNuMda+Z9b7tmhA0tohwy8ZWFSnmQm1UDWXtH5r9F7wZCfkeO3Jx7wKQ1EOiKq43yHts7ky6r8SDJQWRNupkA=="],
 
     "@meetsmore-oss/use-ai-server/zod": ["zod@3.25.76", "", {}, "sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ=="],
 
@@ -1498,9 +1501,9 @@
 
     "@isaacs/cliui/wrap-ansi/ansi-styles": ["ansi-styles@6.2.3", "", {}, "sha512-4Dj6M28JB+oAH8kFkTLUo+a2jwOFkuqb3yucU0CANcRRUbxS0cP0nZYCGjcc3BNXwRIsUVmDGgzawme7zvJHvg=="],
 
-    "@meetsmore-oss/use-ai-core/@types/bun/bun-types": ["bun-types@1.3.6", "", { "dependencies": { "@types/node": "*" } }, "sha512-OlFwHcnNV99r//9v5IIOgQ9Uk37gZqrNMCcqEaExdkVq3Avwqok1bJFmvGMCkCE0FqzdY8VMOZpfpR3lwI+CsQ=="],
+    "@meetsmore-oss/use-ai-core/@types/bun/bun-types": ["bun-types@1.3.7", "", { "dependencies": { "@types/node": "*" } }, "sha512-qyschsA03Qz+gou+apt6HNl6HnI+sJJLL4wLDke4iugsE6584CMupOtTY1n+2YC9nGVrEKUlTs99jjRLKgWnjQ=="],
 
-    "@meetsmore-oss/use-ai-server/@types/bun/bun-types": ["bun-types@1.3.6", "", { "dependencies": { "@types/node": "*" } }, "sha512-OlFwHcnNV99r//9v5IIOgQ9Uk37gZqrNMCcqEaExdkVq3Avwqok1bJFmvGMCkCE0FqzdY8VMOZpfpR3lwI+CsQ=="],
+    "@meetsmore-oss/use-ai-server/@types/bun/bun-types": ["bun-types@1.3.7", "", { "dependencies": { "@types/node": "*" } }, "sha512-qyschsA03Qz+gou+apt6HNl6HnI+sJJLL4wLDke4iugsE6584CMupOtTY1n+2YC9nGVrEKUlTs99jjRLKgWnjQ=="],
 
     "@types/ssh2/@types/node/undici-types": ["undici-types@5.26.5", "", {}, "sha512-JlCMO+ehdEIKqlFxk6IfVoAUVmgz7cU7zD/h9XZ0qzeosSHmUJVOzSQvvYSYWXkFXC+IfLKSIffhv0sVZup6pA=="],
 

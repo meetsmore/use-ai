@@ -168,11 +168,23 @@ export function sendToolResult(
 }
 
 /**
- * Create a Socket.IO client connected to the test server
+ * Create a Socket.IO client connected to the test server (WebSocket transport)
  */
 export async function createTestClient(port: number): Promise<Socket> {
   const socket = io(`http://localhost:${port}`, {
     transports: ['websocket'],
+  });
+  await waitForConnection(socket);
+  return socket;
+}
+
+/**
+ * Create a Socket.IO client connected to the test server (Polling transport only)
+ */
+export async function createPollingTestClient(port: number): Promise<Socket> {
+  const socket = io(`http://localhost:${port}`, {
+    transports: ['polling'],
+    upgrade: false, // Prevent upgrade to WebSocket
   });
   await waitForConnection(socket);
   return socket;

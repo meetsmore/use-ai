@@ -185,7 +185,12 @@ logger.info('Starting UseAI server', { logFormat });
             methods: ['GET', 'POST'],
             credentials: true,
           }
-        : undefined,
+        : {
+            origin: true, // Allow all origins by default for local development
+            methods: ['GET', 'POST'],
+            credentials: true,
+          },
+      idleTimeout: 30, // Must be greater than pingInterval (25s)
     });
 
     // Initialize MCP endpoints
@@ -207,3 +212,4 @@ logger.info('Starting UseAI server', { logFormat });
     process.exit(1);
   }
 })();
+

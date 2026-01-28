@@ -14,7 +14,7 @@
   "type": "module",
   "scripts": {
     "clean": "rm -rf dist *.tsbuildinfo",
-    "build": "bun build src/index.ts --outdir dist --target node --format esm",
+    "build": "bun build src/index.ts --outdir dist --target bun --format esm",
     "start": "bun src/index.ts",
     "dev": "bun --watch src/index.ts"
   },
