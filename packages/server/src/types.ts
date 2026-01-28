@@ -1,85 +1,37 @@
 /**
- * Allowed origin types for CORS configuration.
- * Supports boolean, string, RegExp, or an array of these types.
- *
- * Note: Function-based origins (CustomOrigin from cors package) are not supported
- * because Bun's fetch handler is synchronous and cannot handle callback-based APIs.
+ * CORS configuration options.
  *
  * @example
  * ```typescript
- * // Allow all origins
- * origin: true
- *
- * // Allow specific origin
- * origin: 'https://example.com'
- *
- * // Allow origins matching a pattern
- * origin: /\.example\.com$/
- *
- * // Allow multiple origins
- * origin: ['https://app.example.com', 'https://admin.example.com']
- *
- * // Allow origins matching multiple patterns
- * origin: [/\.example\.com$/, 'https://trusted-site.com']
+ * cors: {
+ *   origin: true,                    // Allow all origins
+ *   origin: 'https://example.com',   // Allow specific origin
+ *   origin: /\.example\.com$/,       // Allow origins matching pattern
+ *   origin: ['https://a.com', /\.b\.com$/], // Allow multiple
+ *   methods: ['GET', 'POST'],
+ *   credentials: true,
+ * }
  * ```
- */
-export type CorsOrigin = boolean | string | RegExp | (boolean | string | RegExp)[];
-
-/**
- * CORS configuration options.
- * Based on the cors package but excludes function-based origins which are not supported
- * in Bun's synchronous fetch handler.
- *
- * @see https://github.com/expressjs/cors#configuration-options
  */
 export interface CorsOptions {
   /**
    * Configures the Access-Control-Allow-Origin header.
-   * - `true`: Reflects the request origin (allows all origins)
-   * - `false`: Disables CORS
+   * - `true` or `'*'`: Reflects the request origin (allows all origins)
    * - `string`: Sets a specific origin (e.g., 'https://example.com')
    * - `RegExp`: Allows origins matching the pattern
-   * - `Array`: Allows origins matching any of the values/patterns
-   *
-   * @default '*'
+   * - `Array`: Allows origins matching any of the string/RegExp values
    */
-  origin?: CorsOrigin;
+  origin?: boolean | string | RegExp | (string | RegExp)[];
   /**
-   * Configures the Access-Control-Allow-Methods header.
-   * @default 'GET,HEAD,PUT,PATCH,POST,DELETE'
+   * Configures the Access-Control-Allow-Methods header for preflight requests.
+   * @default ['GET', 'POST']
    */
   methods?: string | string[];
-  /**
-   * Configures the Access-Control-Allow-Headers header.
-   * If not specified, reflects the headers specified in the request's
-   * Access-Control-Request-Headers header.
-   */
-  allowedHeaders?: string | string[];
-  /**
-   * Configures the Access-Control-Expose-Headers header.
-   * No custom headers are exposed by default.
-   */
-  exposedHeaders?: string | string[];
   /**
    * Configures the Access-Control-Allow-Credentials header.
    * Set to true to pass the header, otherwise it is omitted.
    */
   credentials?: boolean;
-  /**
-   * Configures the Access-Control-Max-Age header.
-   * Set to an integer to pass the header, otherwise it is omitted.
-   */
-  maxAge?: number;
-  /**
-   * Pass the CORS preflight response to the next handler.
-   * @default false
-   */
-  preflightContinue?: boolean;
-  /**
-   * Provides a status code to use for successful OPTIONS requests.
-   * @default 204
-   */
-  optionsSuccessStatus?: number;
 }
 
 /**
