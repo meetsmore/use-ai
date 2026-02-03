@@ -1,0 +1,23 @@
+README.md
+  99da73825bcc253c 47,730-779
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.42",
+  "base_commit_sha": "8c97bee156537b6569dce366a0e569e00903ddcc",
+  "prompts": {
+    "99da73825bcc253c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3f98011f-dddb-450b-a604-58a1b50d64dd",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "yuma.ito@meetsmore.com",
+      "messages": [],
+      "total_additions": 53,
+      "total_deletions": 1,
+      "accepted_lines": 53,
+      "overriden_lines": 0
+    }
+  }
+}
