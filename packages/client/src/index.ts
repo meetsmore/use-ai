@@ -41,7 +41,7 @@ export type {
   ChatPanelProps,
   UseAIProviderProps,
 } from './providers/useAIProvider';
-export type { SendMessageOptions } from './hooks/useChatManagement';
+export type { SendMessageOptions, PreTransformedAttachment } from './hooks/useChatManagement';
 export type { DefinedTool, ToolsDefinition, ToolOptions } from './defineTool';
 
 // Chat persistence

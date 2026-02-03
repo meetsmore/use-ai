@@ -9,7 +9,7 @@ import { UseAIClient } from '../client';
 import { convertToolsToDefinitions, executeDefinedTool, type ToolsDefinition } from '../defineTool';
 import type { ChatRepository, Chat, ChatMetadata, CreateChatOptions, PersistedMessageContent, PersistedContentPart } from './chatRepository/types';
 import { LocalStorageChatRepository } from './chatRepository/LocalStorageChatRepository';
-import type { FileAttachment, FileUploadConfig } from '../fileUpload/types';
+import type { FileAttachment, FileUploadConfig, FileProcessingState } from '../fileUpload/types';
 import { processAttachments } from '../fileUpload/processAttachments';
 import { EmbedFileUploadBackend } from '../fileUpload/EmbedFileUploadBackend';
 import type { MultimodalContent } from '@meetsmore-oss/use-ai-core';
@@ -418,6 +418,7 @@ export function UseAIProvider({
   const [connected, setConnected] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [fileProcessingState, setFileProcessingState] = useState<FileProcessingState | null>(null);
 
   // Wrapper for setIsChatOpen that also calls onOpenChange callback
   const handleSetChatOpen = useCallback((open: boolean) => {
@@ -709,27 +710,46 @@ export function UseAIProvider({
       }
       persistedContent = persistedParts;
 
-      // Build multimodal content from attachments
-      const fileContent = await processAttachments(attachments, {
-        getCurrentChat,
-        backend: fileUploadConfig?.backend,
-        transformers: fileUploadConfig?.transformers,
-      });
-
-      multimodalContent = [];
-      if (message.trim()) {
-        multimodalContent.push({ type: 'text', text: message });
+      // Save user message first so the UI shows it immediately
+      if (activeChatId) {
+        await saveUserMessage(activeChatId, persistedContent);
       }
-      multimodalContent.push(...fileContent);
-    }
 
-    // Save user message to storage
-    if (activeChatId) {
-      await saveUserMessage(activeChatId, persistedContent);
+      // Show loading state before processing (may be slow for transformers like OCR)
+      setLoading(true);
+
+      try {
+        // Build multimodal content from attachments
+        // onFileProgress updates fileProcessingState only when a transformer runs
+        const fileContent = await processAttachments(attachments, {
+          getCurrentChat,
+          backend: fileUploadConfig?.backend,
+          transformers: fileUploadConfig?.transformers,
+          onFileProgress: (_fileId, state) => {
+            setFileProcessingState(state);
+          },
+        });
+
+        multimodalContent = [];
+        if (message.trim()) {
+          multimodalContent.push({ type: 'text', text: message });
+        }
+        multimodalContent.push(...fileContent);
+      } catch (error) {
+        setLoading(false);
+        throw error;
+      } finally {
+        setFileProcessingState(null);
+      }
+    } else {
+      // No attachments — save user message
+      if (activeChatId) {
+        await saveUserMessage(activeChatId, persistedContent);
+      }
+      setLoading(true);
     }
 
     // State is already up-to-date via updatePrompt calls from useAI hooks
-    setLoading(true);
     await clientRef.current.sendPrompt(message, multimodalContent);
   }, [activatePendingChat, currentChatId, saveUserMessage, fileUploadConfig, getCurrentChat]);
 
@@ -788,6 +808,7 @@ export function UseAIProvider({
     streamingText: effectiveStreamingText,
     suggestions: aggregatedSuggestions,
     fileUploadConfig,
+    fileProcessing: fileProcessingState,
     history: {
       currentId: displayedChatId,
       create: createNewChat,
@@ -838,6 +859,7 @@ export function UseAIProvider({
     selectedAgent,
     onAgentChange: setAgent,
     fileUploadConfig,
+    fileProcessing: fileProcessingState,
     commands,
     onSaveCommand: saveCommand,
     onRenameCommand: renameCommand,
