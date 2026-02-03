@@ -4,6 +4,10 @@ import { logger } from './logger.js';
 // Store trace IDs by runId for feedback linking
 const traceIdByRunId = new Map<string, string>();
 
+// Initialize Langfuse observability using OpenTelemetry.
+// Only activates if LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY are set.
+export const langfuse = _initializeLangfuse();
+
 export interface LangfuseApi {
   enabled: boolean;
   /** Langfuse SDK client for score operations */
@@ -33,8 +37,9 @@ export function popTraceIdForRun(runId: string): string | undefined {
 /**
  * Initializes Langfuse observability using OpenTelemetry.
  * Only activates if LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY are set.
+ * Only exported for testing purposes, you should use the `langfuse` singleton.
  */
-export function initializeLangfuse(): LangfuseApi {
+export function _initializeLangfuse(): LangfuseApi {
   const enabled = Boolean(
     process.env.LANGFUSE_PUBLIC_KEY &&
     process.env.LANGFUSE_SECRET_KEY

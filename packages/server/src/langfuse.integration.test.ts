@@ -5,7 +5,7 @@
  */
 
 import { describe, expect, test, beforeEach, afterEach } from 'bun:test';
-import { initializeLangfuse } from './instrumentation';
+import { _initializeLangfuse } from './instrumentation';
 
 describe('Langfuse Integration', () => {
   // Store original env vars
@@ -45,7 +45,7 @@ describe('Langfuse Integration', () => {
   });
 
   test('should not enable Langfuse when env vars are not set', () => {
-    const config = initializeLangfuse();
+    const config = _initializeLangfuse();
 
     expect(config.enabled).toBe(false);
     expect(config.client).toBeUndefined();
@@ -55,7 +55,7 @@ describe('Langfuse Integration', () => {
   test('should not enable Langfuse when only public key is set', () => {
     process.env.LANGFUSE_PUBLIC_KEY = 'pk-lf-test';
 
-    const config = initializeLangfuse();
+    const config = _initializeLangfuse();
 
     expect(config.enabled).toBe(false);
   });
@@ -63,7 +63,7 @@ describe('Langfuse Integration', () => {
   test('should not enable Langfuse when only secret key is set', () => {
     process.env.LANGFUSE_SECRET_KEY = 'sk-lf-test';
 
-    const config = initializeLangfuse();
+    const config = _initializeLangfuse();
 
     expect(config.enabled).toBe(false);
   });
@@ -72,7 +72,7 @@ describe('Langfuse Integration', () => {
     process.env.LANGFUSE_PUBLIC_KEY = 'pk-lf-test';
     process.env.LANGFUSE_SECRET_KEY = 'sk-lf-test';
 
-    const config = initializeLangfuse();
+    const config = _initializeLangfuse();
 
     expect(config.enabled).toBe(true);
     expect(config.client).toBeDefined();
@@ -84,7 +84,7 @@ describe('Langfuse Integration', () => {
     process.env.LANGFUSE_SECRET_KEY = 'sk-lf-test';
     process.env.LANGFUSE_BASE_URL = 'https://custom.langfuse.com';
 
-    const config = initializeLangfuse();
+    const config = _initializeLangfuse();
 
     expect(config.enabled).toBe(true);
     expect(config.client).toBeDefined();

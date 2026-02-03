@@ -23,7 +23,7 @@ import type {
   StepFinishedEvent,
 } from '../types';
 import { logger } from '../logger';
-import { initializeLangfuse, popTraceIdForRun, type LangfuseApi } from '../instrumentation';
+import { langfuse, popTraceIdForRun, type LangfuseApi } from '../instrumentation';
 import { applyCacheBreakpoints, type CacheBreakpointFn } from './anthropicCache';
 
 /**
@@ -273,7 +273,7 @@ export class AISDKAgent implements Agent {
     this.cacheBreakpoint = config.cacheBreakpoint;
     this.maxOutputTokens = config.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS;
     // Initialize Langfuse observability (automatically reads env vars)
-    this.langfuse = initializeLangfuse();
+    this.langfuse = langfuse;
   }
 
   getName(): string {

@@ -1,9 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { UseAIClient } from '../client';
-import type { FeedbackValue, AGUIEvent, RunFinishedEvent } from '../types';
+import type { FeedbackValue } from '../types';
 import type { ChatRepository } from '../providers/chatRepository/types';
 import type { Message } from '../components/UseAIChatPanel';
-import { EventType } from '../types';
 
 export interface UseFeedbackOptions {
   /** Reference to the UseAIClient */
@@ -19,10 +18,6 @@ export interface UseFeedbackOptions {
 export interface UseFeedbackReturn {
   /** Whether Langfuse feedback is enabled on the server */
   enabled: boolean;
-  /** Gets the current run's traceId (captured from RUN_FINISHED) */
-  getTraceId: () => string | null;
-  /** Clears the current traceId (call after saving AI response) */
-  clearTraceId: () => void;
   /** Submits feedback for a message (updates storage and sends to server) */
   submitFeedback: (messageId: string, traceId: string, feedback: FeedbackValue) => void;
 }
@@ -54,7 +49,6 @@ export function useFeedback({
 }: UseFeedbackOptions): UseFeedbackReturn {
   const [enabled, setEnabled] = useState(false);
   const enabledRef = useRef(false);
-  const currentTraceIdRef = useRef<string | null>(null);
 
   // Keep enabledRef in sync with state
   useEffect(() => {
@@ -72,29 +66,6 @@ export function useFeedback({
 
     return unsubscribe;
   }, [clientRef.current]);
-
-  // Subscribe to RUN_FINISHED events to capture traceId
-  useEffect(() => {
-    const client = clientRef.current;
-    if (!client) return;
-
-    const unsubscribe = client.onEvent('feedback', (event: AGUIEvent) => {
-      if (event.type === EventType.RUN_FINISHED) {
-        const finishedEvent = event as RunFinishedEvent;
-        currentTraceIdRef.current = finishedEvent.runId;
-      }
-    });
-
-    return unsubscribe;
-  }, [clientRef.current]);
-
-  const getTraceId = useCallback(() => {
-    return currentTraceIdRef.current;
-  }, []);
-
-  const clearTraceId = useCallback(() => {
-    currentTraceIdRef.current = null;
-  }, []);
 
   /**
    * Updates feedback in storage and local state.
@@ -155,8 +126,6 @@ export function useFeedback({
 
   return {
     enabled,
-    getTraceId,
-    clearTraceId,
     submitFeedback,
   };
 }
