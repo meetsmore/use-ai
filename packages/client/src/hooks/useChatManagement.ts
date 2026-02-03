@@ -6,22 +6,13 @@ import type { Message as AGUIMessage } from '../types';
 import type { FileAttachment } from '../fileUpload/types';
 
 /**
- * A file attachment that has already been transformed (e.g., OCR processed).
- * When transformedContent is set, the file transformer pipeline is skipped.
- */
-export interface PreTransformedAttachment {
-  file: File;
-  transformedContent: string;
-}
-
-/**
  * Options for programmatically sending a message via sendMessage().
  */
 export interface SendMessageOptions {
   /** Start a new chat before sending. Default: false (continue existing chat) */
   newChat?: boolean;
-  /** File attachments to include with the message. Pass File for normal attachments, or PreTransformedAttachment to skip the transformer. */
-  attachments?: Array<File | PreTransformedAttachment>;
+  /** File attachments to include with the message */
+  attachments?: File[];
   /** Open the chat panel after sending. Default: true */
   openChat?: boolean;
   /** Metadata to set on the new chat (only used when newChat: true) */
@@ -569,11 +560,9 @@ export function useChatManagement({
         await createNewChat({ metadata });
       }
 
-      // Convert attachments to FileAttachment[]
+      // Convert File[] to FileAttachment[]
       const fileAttachments: FileAttachment[] = await Promise.all(
-        attachments.map(async (item) => {
-          const file = item instanceof File ? item : item.file;
-          const transformedContent = item instanceof File ? undefined : item.transformedContent;
+        attachments.map(async (file) => {
           let preview: string | undefined;
           if (file.type.startsWith('image/')) {
             preview = await new Promise<string | undefined>((resolve) => {
@@ -587,7 +576,6 @@ export function useChatManagement({
             id: crypto.randomUUID(),
             file,
             preview,
-            transformedContent,
           };
         })
       );
