@@ -200,7 +200,15 @@ export interface AISDKAgentConfig {
    * ```
    */
   cacheBreakpoint?: CacheBreakpointFn;
+
+  /**
+   * Maximum number of tokens the model can output per response.
+   * @default 4096
+   */
+  maxOutputTokens?: number;
 }
+
+const DEFAULT_MAX_OUTPUT_TOKENS = 4096;
 
 /**
  * Agent implementation for AI SDK models (Anthropic, OpenAI, Google, etc.).
@@ -254,6 +262,7 @@ export class AISDKAgent implements Agent {
   private toolFilter?: (tool: ToolDefinition) => boolean;
   private systemPrompt?: string | (() => string | Promise<string>);
   private cacheBreakpoint?: CacheBreakpointFn;
+  private maxOutputTokens: number;
 
   constructor(config: AISDKAgentConfig) {
     this.model = config.model;
@@ -262,6 +271,7 @@ export class AISDKAgent implements Agent {
     this.toolFilter = config.toolFilter;
     this.systemPrompt = config.systemPrompt;
     this.cacheBreakpoint = config.cacheBreakpoint;
+    this.maxOutputTokens = config.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS;
     // Initialize Langfuse observability (automatically reads env vars)
     this.langfuse = initializeLangfuse();
   }
@@ -366,7 +376,7 @@ export class AISDKAgent implements Agent {
             ? (this.sanitizeToolsForAPI(this.filterTools(tools), session) as any)
             : undefined,
         stopWhen: stepCountIs(10), // Allow AI SDK to handle multi-step tool execution automatically
-        maxOutputTokens: 4096,
+        maxOutputTokens: this.maxOutputTokens,
         abortSignal: session.abortController?.signal,
         experimental_telemetry: this.langfuse?.enabled
           ? {
