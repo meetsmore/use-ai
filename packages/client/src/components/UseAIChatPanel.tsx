@@ -85,6 +85,8 @@ export interface UseAIChatPanelProps {
   onDeleteCommand?: (id: string) => Promise<void>;
   /** Optional close button to render in header (for floating mode) */
   closeButton?: React.ReactNode;
+  /** Currently executing tool info for status display */
+  executingTool?: { displayText: string } | null;
 }
 
 /**
@@ -114,6 +116,7 @@ export function UseAIChatPanel({
   onRenameCommand,
   onDeleteCommand,
   closeButton,
+  executingTool,
 }: UseAIChatPanelProps) {
   const strings = useStrings();
   const theme = useTheme();
@@ -868,10 +871,7 @@ export function UseAIChatPanel({
               {streamingText ? (
                 <MarkdownContent content={streamingText} />
               ) : (
-                <>
-                  <span style={{ opacity: 0.6 }}>{strings.input.thinking}</span>
-                  <span className="dots" style={{ marginLeft: '4px' }}>...</span>
-                </>
+                <span className="dots" style={{ opacity: 0.6 }}>...</span>
               )}
             </div>
           </div>
@@ -959,7 +959,13 @@ export function UseAIChatPanel({
             value={input}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
-            placeholder={connected ? strings.input.placeholder : strings.input.connectingPlaceholder}
+            placeholder={
+              !connected
+                ? strings.input.connectingPlaceholder
+                : loading
+                  ? `${executingTool?.displayText ?? strings.input.thinking}...`
+                  : strings.input.placeholder
+            }
             disabled={!connected || loading}
             rows={1}
             style={{

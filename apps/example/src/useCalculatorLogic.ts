@@ -80,13 +80,15 @@ export function useCalculatorLogic() {
       z.object({
         expression: z.string().describe('The mathematical expression to evaluate (e.g., "2 + 2", "10 * 5 - 3", "(8 + 2) / 2")'),
       }),
-      (input) => calculateFn(input.expression)
+      (input) => calculateFn(input.expression),
+      { annotations: { title: 'Calculating' } }
     ),
 
     clearCalculator: defineTool(
       'Clear the calculator display and history',
       z.object({}),
-      () => clearCalculatorFn()
+      () => clearCalculatorFn(),
+      { annotations: { title: 'Clearing Calculator' } }
     ),
   };
 

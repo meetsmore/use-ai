@@ -82,7 +82,8 @@ export function useTodoLogic() {
       z.object({
         text: z.string().describe('The text content of the todo item'),
       }),
-      (input) => addTodoFn(input.text)
+      (input) => addTodoFn(input.text),
+      { annotations: { title: 'Adding Todo' } }
     ),
 
     deleteTodo: defineTool(
@@ -91,7 +92,7 @@ export function useTodoLogic() {
         id: z.number().describe('The ID of the todo item to delete'),
       }),
       (input) => deleteTodoFn(input.id),
-      { confirmationRequired: true }
+      { annotations: { title: 'Deleting Todo', destructiveHint: true } }
     ),
 
     toggleTodo: defineTool(
@@ -99,14 +100,15 @@ export function useTodoLogic() {
       z.object({
         id: z.number().describe('The ID of the todo item to toggle'),
       }),
-      (input) => toggleTodoFn(input.id)
+      (input) => toggleTodoFn(input.id),
+      { annotations: { title: 'Toggling Todo' } }
     ),
 
     clearCompleted: defineTool(
       'Remove all completed todos from the list',
       z.object({}),
       () => clearCompletedFn(),
-      { confirmationRequired: true }
+      { annotations: { title: 'Clearing Completed', destructiveHint: true } }
     ),
   };
 

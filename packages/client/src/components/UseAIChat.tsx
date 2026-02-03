@@ -70,6 +70,8 @@ export interface ChatUIContextValue {
     /** Set the chat open state */
     setOpen: (open: boolean) => void;
   };
+  /** Currently executing tool info for status display */
+  executingTool: { displayText: string } | null;
 }
 
 /**
@@ -154,6 +156,7 @@ export function UseAIChat({ floating = false }: UseAIChatProps) {
     onSaveCommand: ctx.commands.save,
     onRenameCommand: ctx.commands.rename,
     onDeleteCommand: ctx.commands.delete,
+    executingTool: ctx.executingTool,
   };
 
   if (floating) {

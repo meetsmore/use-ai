@@ -169,36 +169,37 @@ describe('Tools can be defined without parameters', () => {
   });
 });
 
-describe('Tools can be marked as requiring confirmation before execution', () => {
-  test('includes confirmationRequired flag in tool options', () => {
+describe('Tools support MCP-aligned annotations', () => {
+  test('includes annotations in tool options', () => {
     const tool = defineTool(
       'Dangerous operation',
       () => 'deleted',
-      { confirmationRequired: true }
+      { annotations: { destructiveHint: true, title: 'Delete Item' } }
     );
 
-    expect(tool._options.confirmationRequired).toBe(true);
+    expect(tool._options.annotations?.destructiveHint).toBe(true);
+    expect(tool._options.annotations?.title).toBe('Delete Item');
   });
 
-  test('includes confirmationRequired in AG-UI tool definition when set', () => {
+  test('includes confirmationRequired in AG-UI tool definition when destructiveHint is set', () => {
     const tool = defineTool(
       'Delete account',
       () => 'deleted',
-      { confirmationRequired: true }
+      { annotations: { destructiveHint: true } }
     );
 
     const definition = tool._toToolDefinition('deleteAccount');
     expect(definition.confirmationRequired).toBe(true);
   });
 
-  test('omits confirmationRequired from definition when not set', () => {
+  test('omits confirmationRequired from definition when destructiveHint is not set', () => {
     const tool = defineTool('Safe operation', () => 'done');
 
     const definition = tool._toToolDefinition('safeOp');
     expect(definition.confirmationRequired).toBeUndefined();
   });
 
-  test('supports confirmationRequired with parameterized tools', () => {
+  test('supports annotations with parameterized tools', () => {
     const schema = z.object({
       userId: z.string(),
     });
@@ -207,19 +208,42 @@ describe('Tools can be marked as requiring confirmation before execution', () =>
       'Delete user',
       schema,
       (input) => `Deleted user ${input.userId}`,
-      { confirmationRequired: true }
+      { annotations: { destructiveHint: true, title: 'Delete User' } }
     );
 
-    expect(tool._options.confirmationRequired).toBe(true);
+    expect(tool._options.annotations?.destructiveHint).toBe(true);
+    expect(tool._options.annotations?.title).toBe('Delete User');
 
     const definition = tool._toToolDefinition('deleteUser');
     expect(definition.confirmationRequired).toBe(true);
   });
 
-  test('defaults confirmationRequired to undefined when not specified', () => {
+  test('defaults annotations to undefined when not specified', () => {
     const tool = defineTool('Regular operation', () => 'done');
 
-    expect(tool._options.confirmationRequired).toBeUndefined();
+    expect(tool._options.annotations).toBeUndefined();
+  });
+
+  test('supports all MCP annotation hints', () => {
+    const tool = defineTool(
+      'Complex operation',
+      () => 'done',
+      {
+        annotations: {
+          title: 'Complex Op',
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: false,
+        }
+      }
+    );
+
+    expect(tool._options.annotations?.title).toBe('Complex Op');
+    expect(tool._options.annotations?.readOnlyHint).toBe(true);
+    expect(tool._options.annotations?.destructiveHint).toBe(false);
+    expect(tool._options.annotations?.idempotentHint).toBe(true);
+    expect(tool._options.annotations?.openWorldHint).toBe(false);
   });
 });
 
