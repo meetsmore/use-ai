@@ -1,0 +1,23 @@
+packages/client/src/providers/useAIProvider.tsx
+  56b4d97e65d5f025 738-740
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.42",
+  "base_commit_sha": "0d35b78071efc60a04ad07c52f4cf0c9a3a95775",
+  "prompts": {
+    "56b4d97e65d5f025": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "15d646cb-caac-4f44-bc64-723eb9619633",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "yuma.ito@meetsmore.com",
+      "messages": [],
+      "total_additions": 6,
+      "total_deletions": 3,
+      "accepted_lines": 6,
+      "overriden_lines": 0
+    }
+  }
+}
