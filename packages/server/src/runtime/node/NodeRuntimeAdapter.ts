@@ -1,8 +1,47 @@
-import { createServer, type Server as HttpServer } from 'http';
+import { createServer, type Server as HttpServer, type IncomingMessage, type ServerResponse } from 'http';
 import type { Server as SocketIOServer } from 'socket.io';
 import type { RuntimeServerConfig, RuntimeServerHandle } from '../types';
 import { BaseRuntimeAdapter } from '../BaseRuntimeAdapter';
-import { setCorsHeaders, handleCorsPreflight } from './cors';
+import { resolveCorsHeaders, resolvePreflightHeaders } from '../cors';
+
+/**
+ * Sets CORS headers on a Node.js HTTP response.
+ */
+function setCorsHeaders(headers: Record<string, string>, res: ServerResponse): void {
+  for (const [key, value] of Object.entries(headers)) {
+    if (value) {
+      res.setHeader(key, value);
+    }
+  }
+}
+
+/**
+ * Handles CORS preflight OPTIONS request.
+ * Returns true if the request was handled, false otherwise.
+ */
+function handleCorsPreflight(
+  req: IncomingMessage,
+  res: ServerResponse,
+  config: RuntimeServerConfig
+): boolean {
+  if (req.method !== 'OPTIONS' || !config.cors) {
+    return false;
+  }
+
+  const requestOrigin = req.headers.origin;
+  const requestedHeaders = req.headers['access-control-request-headers'];
+  const headers = resolvePreflightHeaders(
+    requestOrigin,
+    typeof requestedHeaders === 'string' ? requestedHeaders : undefined,
+    config.cors
+  );
+
+  setCorsHeaders(headers, res);
+  res.setHeader('Content-Length', '0');
+  res.statusCode = 204;
+  res.end();
+  return true;
+}
 
 /**
  * Runtime adapter for Node.js.
@@ -15,15 +54,19 @@ export class NodeRuntimeAdapter extends BaseRuntimeAdapter {
     // Create Node.js HTTP server
     const httpServer: HttpServer = createServer((req, res) => {
       const url = new URL(req.url || '/', `http://localhost:${config.port}`);
+      const requestOrigin = req.headers.origin;
 
       // Handle CORS preflight
-      if (handleCorsPreflight(req, res, config.cors)) {
+      if (handleCorsPreflight(req, res, config)) {
         return;
       }
 
+      // Get CORS headers for non-preflight requests
+      const corsHeaders = resolveCorsHeaders(requestOrigin, config.cors);
+
       // Health check endpoint
       if (url.pathname === '/health') {
-        setCorsHeaders(req, res, config.cors);
+        setCorsHeaders(corsHeaders, res);
         res.setHeader('Content-Type', 'application/json');
         res.statusCode = 200;
         res.end(JSON.stringify({ status: 'ok' }));
@@ -33,7 +76,7 @@ export class NodeRuntimeAdapter extends BaseRuntimeAdapter {
       // Let Socket.IO handle /socket.io/ paths
       // Other paths return 404
       if (!url.pathname.startsWith('/socket.io/')) {
-        setCorsHeaders(req, res, config.cors);
+        setCorsHeaders(corsHeaders, res);
         res.statusCode = 404;
         res.end('Not Found');
       }

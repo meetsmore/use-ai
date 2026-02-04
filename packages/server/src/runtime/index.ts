@@ -11,7 +11,7 @@ export type {
 } from './types';
 export { detectRuntime } from './detection';
 export { BaseRuntimeAdapter } from './BaseRuntimeAdapter';
-export { getAllowedOrigin, resolveCorsHeaders, resolvePreflightHeaders, type CorsHeaders } from './cors';
+export { getAllowedOrigin, resolveCorsHeaders, resolvePreflightHeaders } from './cors';
 
 /**
  * Creates a runtime adapter for the specified or detected runtime.

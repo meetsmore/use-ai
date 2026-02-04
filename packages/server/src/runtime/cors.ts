@@ -31,24 +31,14 @@ export function getAllowedOrigin(
 }
 
 /**
- * CORS headers to be set on a response.
- */
-export interface CorsHeaders {
-  'Access-Control-Allow-Origin'?: string;
-  'Access-Control-Allow-Credentials'?: string;
-  'Access-Control-Allow-Methods'?: string;
-  'Access-Control-Allow-Headers'?: string;
-}
-
-/**
  * Resolves CORS headers based on request origin and CORS configuration.
  * Returns an object with header key-value pairs to be set.
  */
 export function resolveCorsHeaders(
   requestOrigin: string | undefined,
   cors?: CorsOptions
-): CorsHeaders {
-  const headers: CorsHeaders = {};
+): Record<string, string> {
+  const headers: Record<string, string> = {};
 
   if (!cors) return headers;
 
@@ -71,7 +61,7 @@ export function resolvePreflightHeaders(
   requestOrigin: string | undefined,
   requestedHeaders: string | undefined,
   cors?: CorsOptions
-): CorsHeaders {
+): Record<string, string> {
   const headers = resolveCorsHeaders(requestOrigin, cors);
 
   if (!cors) return headers;
