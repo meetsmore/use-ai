@@ -1,0 +1,27 @@
+packages/server/src/plugins/FeedbackPlugin.test.ts
+  4bfbd61f6f45ec86 2,7,9,13-25,27-28,31-32,34,41,46-48,68,210
+packages/server/src/feedback.integration.test.ts
+  4bfbd61f6f45ec86 20,22,26-31,49,79,111,152,189,221,290
+packages/server/src/plugins/FeedbackPlugin.disabled.test.ts
+  4bfbd61f6f45ec86 1-2,4-106
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.42",
+  "base_commit_sha": "e131a8a9ab20f9a58669d35e63edeff49c806d40",
+  "prompts": {
+    "4bfbd61f6f45ec86": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "91450491-f89e-4b24-b38f-5d1f3955c3a4",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 365,
+      "total_deletions": 197,
+      "accepted_lines": 347,
+      "overriden_lines": 0
+    }
+  }
+}
