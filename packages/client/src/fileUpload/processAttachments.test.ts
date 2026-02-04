@@ -277,9 +277,31 @@ describe('processAttachments', () => {
   });
 
   describe('progress callbacks', () => {
-    it('calls onFileProgress with status updates', async () => {
+    it('calls onFileProgress with status updates when transformer runs', async () => {
       const progressUpdates: Array<{ fileId: string; state: FileProcessingState }> = [];
 
+      const transformer: FileTransformer = {
+        transform: async (file, _context) => `Transformed: ${file.name}`,
+      };
+
+      const attachment = createAttachment('1', 'test.pdf', 'application/pdf');
+      await processAttachments([attachment], {
+        getCurrentChat: testGetCurrentChat,
+        transformers: { 'application/pdf': transformer },
+        onFileProgress: (fileId, state) => {
+          progressUpdates.push({ fileId, state });
+        },
+      });
+
+      expect(progressUpdates.length).toBeGreaterThanOrEqual(2);
+      expect(progressUpdates[0]).toEqual({ fileId: '1', state: { status: 'processing' } });
+      expect(progressUpdates[progressUpdates.length - 1]).toEqual({ fileId: '1', state: { status: 'done' } });
+    });
+
+    it('does not call onFileProgress when no transformer matches', async () => {
+      const progressUpdates: Array<{ fileId: string; state: FileProcessingState }> = [];
+
+      // Image file with no transformer configured
       const attachment = createAttachment('1', 'photo.png', 'image/png');
       await processAttachments([attachment], {
         getCurrentChat: testGetCurrentChat,
@@ -289,9 +311,8 @@ describe('processAttachments', () => {
         },
       });
 
-      expect(progressUpdates.length).toBeGreaterThanOrEqual(2);
-      expect(progressUpdates[0]).toEqual({ fileId: '1', state: { status: 'processing' } });
-      expect(progressUpdates[progressUpdates.length - 1]).toEqual({ fileId: '1', state: { status: 'done' } });
+      // No transformer matched, so onFileProgress should not be called
+      expect(progressUpdates).toHaveLength(0);
     });
 
     it('reports progress from transformer', async () => {
