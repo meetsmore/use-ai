@@ -1,5 +1,4 @@
 import { Server as SocketIOServer, Socket } from 'socket.io';
-import { Server as BunEngine } from '@socket.io/bun-engine';
 import { ModelMessage, ToolModelMessage } from 'ai';
 import { createHash } from 'crypto';
 import { EventType, type McpHeadersMap } from '@meetsmore-oss/use-ai-core';
@@ -24,7 +23,11 @@ import type { ClientSession } from './agents/types';
 import type { UseAIServerPlugin, MessageHandler } from './plugins/types';
 import { RemoteMcpToolsProvider, type RemoteToolDefinition } from './mcp';
 import { findMatch } from './utils/patternMatcher';
-import { createBunConfig } from './bun-config';
+import {
+  createRuntimeAdapter,
+  type RuntimeAdapter,
+  type RuntimeServerHandle,
+} from './runtime';
 
 // Re-export ClientSession type for external use
 export type { ClientSession } from './agents/types';
@@ -78,12 +81,13 @@ export type { ClientSession } from './agents/types';
  */
 export class UseAIServer {
   private io: SocketIOServer;
-  private engine: BunEngine;
+  private runtimeAdapter: RuntimeAdapter;
+  private serverHandle: RuntimeServerHandle | null = null;
   private agent: Agent; // Default agent for chat (run_agent)
   private defaultAgentId: string; // ID of the default agent
   private agents: Record<string, Agent>; // Registry of all agents
   private clients: Map<string, ClientSession> = new Map();
-  private config: Required<Omit<UseAIServerConfig, 'defaultAgent' | 'agents' | 'plugins' | 'mcpEndpoints' | 'maxHttpBufferSize' | 'cors' | 'idleTimeout'>> & {
+  private config: Required<Omit<UseAIServerConfig, 'defaultAgent' | 'agents' | 'plugins' | 'mcpEndpoints' | 'maxHttpBufferSize' | 'cors' | 'idleTimeout' | 'runtime'>> & {
     maxHttpBufferSize: number;
     cors?: CorsOptions;
     idleTimeout: number;
@@ -94,9 +98,8 @@ export class UseAIServer {
   private plugins: UseAIServerPlugin[] = [];
   private messageHandlers: Map<string, MessageHandler> = new Map();
   private mcpEndpoints: RemoteMcpToolsProvider[] = [];
-  private bunServer: ReturnType<typeof Bun.serve> | null = null;
   // Store client IP addresses for polling transport (keyed by session ID)
-  // WebSocket transport can use BunWebSocket.remoteAddress directly
+  // WebSocket transport can access remoteAddress directly
   private pollingClientIps: Map<string, string> = new Map();
 
   /**
@@ -150,31 +153,15 @@ export class UseAIServer {
     this.plugins = config.plugins ?? [];
     this.initializePlugins();
 
-    // Create Bun-native engine
-    // Note: bun-engine has its own CORS handling separate from socket.io
-    this.engine = new BunEngine({
-      path: '/socket.io/',
-    });
+    // Create runtime adapter based on configuration
+    this.runtimeAdapter = createRuntimeAdapter(config.runtime ?? 'auto');
+    logger.info('Using runtime adapter', { runtime: this.runtimeAdapter.name });
 
-    // Capture client IP for polling transport at engine connection time
-    // For WebSocket, BunWebSocket.remoteAddress is available directly (no need to store here)
-    // For polling, server.requestIP() works because there's no WebSocket upgrade
-    this.engine.on('connection', (engineSocket, req, bunServer) => {
-      // Only store for polling - WebSocket uses BunWebSocket.remoteAddress
-      if (engineSocket.transport?.name === 'polling') {
-        const clientIp = bunServer.requestIP(req);
-        if (clientIp) {
-          this.pollingClientIps.set(engineSocket.id, clientIp.address);
-        }
-      }
-    });
-
-    // Create Socket.IO server and bind to Bun engine
+    // Create Socket.IO server
     this.io = new SocketIOServer({
       transports: ['polling', 'websocket'],
       maxHttpBufferSize: this.config.maxHttpBufferSize,
     });
-    this.io.bind(this.engine);
 
     this.setupSocketIOServer();
 
@@ -185,14 +172,16 @@ export class UseAIServer {
       });
     }
 
-    // Auto-start Bun server
-    this.bunServer = Bun.serve(
-      createBunConfig(this.engine, {
-        port: this.config.port,
-        idleTimeout: this.config.idleTimeout,
-        cors: this.config.cors,
-      })
-    );
+    // Start server using runtime adapter
+    this.serverHandle = this.runtimeAdapter.createServer(this.io, {
+      port: this.config.port,
+      idleTimeout: this.config.idleTimeout,
+      cors: this.config.cors,
+      maxHttpBufferSize: this.config.maxHttpBufferSize,
+      onPollingConnection: (sessionId, ip) => {
+        this.pollingClientIps.set(sessionId, ip);
+      },
+    });
   }
 
   /**
@@ -254,16 +243,14 @@ export class UseAIServer {
     this.io.on('connection', (socket: Socket) => {
       const clientId = `client-${++this.clientIdCounter}`;
       const threadId = uuidv4();
-      // Note: Type assertions needed because socket.io uses engine.io types,
-      // but we use bun-engine which has different type definitions
+      // Get connection info for IP address resolution
       const conn = socket.conn as unknown as { id: string; transport: { name: string; socket?: { remoteAddress?: string } } };
-      // Get IP address for rate limiting (Bun-native implementation):
-      // - WebSocket: BunWebSocket.remoteAddress
-      // - Polling: pollingClientIps map (captured in engine connection event)
+      // Get IP address for rate limiting using runtime adapter
       const ipAddress =
-        conn.transport.socket?.remoteAddress ||
-        this.pollingClientIps.get(conn.id) ||
-        socket.id; // fallback to socket.id if IP cannot be determined
+        this.runtimeAdapter.getClientIp({
+          conn,
+          pollingClientIps: this.pollingClientIps,
+        }) || socket.id; // fallback to socket.id if IP cannot be determined
       const transport = conn.transport.name;
       logger.info('Client connected', { clientId, threadId, ipAddress, transport });
 
@@ -853,9 +840,9 @@ export class UseAIServer {
     this.mcpEndpoints.forEach(endpoint => endpoint.destroy());
 
     this.io.close();
-    if (this.bunServer) {
-      this.bunServer.stop();
-      this.bunServer = null;
+    if (this.serverHandle) {
+      this.serverHandle.stop();
+      this.serverHandle = null;
     }
   }
 }

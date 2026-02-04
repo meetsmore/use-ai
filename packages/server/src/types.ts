@@ -111,11 +111,20 @@ export interface UseAIServerConfig<TAgents extends Record<string, import('./agen
    */
   cors?: CorsOptions;
   /**
-   * Idle timeout in seconds for the Bun server.
+   * Idle timeout in seconds for the HTTP server.
+   * Only used by the Bun runtime (ignored by Node.js).
    * Must be greater than the pingInterval option (25 seconds by default).
-   * Default: 30
+   * @default 30
    */
   idleTimeout?: number;
+  /**
+   * The runtime to use for the server.
+   * - 'auto': Automatically detect the runtime (Bun or Node.js)
+   * - 'bun': Force Bun runtime (will throw if not running on Bun)
+   * - 'node': Force Node.js runtime (will throw if not running on Node.js)
+   * @default 'auto'
+   */
+  runtime?: 'auto' | 'bun' | 'node';
 }
 
 // Re-export all types from @meetsmore-oss/use-ai-core

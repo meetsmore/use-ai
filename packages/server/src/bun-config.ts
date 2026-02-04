@@ -1,3 +1,8 @@
+/**
+ * @deprecated This file is deprecated. Use the runtime abstraction layer instead.
+ * The functionality has been moved to `./runtime/bun/`.
+ * This file is kept for backward compatibility but will be removed in a future version.
+ */
 import type { Server as BunEngine } from '@socket.io/bun-engine';
 import type { CorsOptions } from './types';
 
@@ -9,6 +14,7 @@ interface BunServerConfig {
 
 /**
  * Get Access-Control-Allow-Origin header value based on cors config and request origin.
+ * @deprecated Use `getAllowedOrigin` from `./runtime/bun/cors` instead.
  */
 function getAllowedOrigin(
   requestOrigin: string | undefined,
@@ -39,6 +45,7 @@ function getAllowedOrigin(
 
 /**
  * Creates Bun server configuration for use with Bun.serve().
+ * @deprecated Use `BunRuntimeAdapter` from `./runtime/bun` instead.
  */
 export function createBunConfig(
   engine: BunEngine,
