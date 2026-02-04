@@ -249,8 +249,13 @@ export class UseAIServer {
       const threadId = uuidv4();
       // Get connection info for IP address resolution
       const conn = socket.conn as unknown as { id: string; transport: { name: string; socket?: { remoteAddress?: string } } };
-      // Get IP address for rate limiting using client IP tracker
-      const ipAddress = this.clientIpTracker.getClientIp(conn) || socket.id; // fallback to socket.id if IP cannot be determined
+      // Get IP address for rate limiting:
+      // 1. Try clientIpTracker (works for polling transport)
+      // 2. Fall back to socket.handshake.address (works for WebSocket)
+      // 3. Last resort: use socket.id
+      const ipAddress = this.clientIpTracker.getClientIp(conn)
+        || socket.handshake.address
+        || socket.id;
       const transport = conn.transport.name;
       logger.info('Client connected', { clientId, threadId, ipAddress, transport });
 
