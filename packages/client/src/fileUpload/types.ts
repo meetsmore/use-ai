@@ -68,10 +68,46 @@ export interface FileTransformerContext {
 
 /**
  * A transformer that converts files into string representations for the AI.
+ *
+ * ## Single vs Batch Processing
+ *
+ * By default, each file is processed individually via `transform()`.
+ * For use cases where multiple files should be processed together
+ * (e.g., multi-page OCR), implement `transformBatch()`.
+ *
+ * ### Processing Logic
+ *
+ * When multiple files are attached:
+ * 1. If `transformBatch` is implemented:
+ *    - Call `shouldBatch()` to determine if batch processing should be used
+ *    - If `shouldBatch` returns true (or is undefined), use `transformBatch()`
+ *    - If `shouldBatch` returns false, fall back to individual `transform()` calls
+ * 2. If `transformBatch` is not implemented:
+ *    - Process each file individually via `transform()`
+ *
+ * @example
+ * ```typescript
+ * // Simple transformer (single file only)
+ * const pdfTransformer: FileTransformer = {
+ *   transform: async (file, context) => extractText(file),
+ * };
+ *
+ * // Batch-capable transformer with conditional batching
+ * const ocrTransformer: FileTransformer = {
+ *   transform: async (file, context) => singleOcr(file),
+ *   shouldBatch: (context) => !!context.chat?.metadata?.targetType,
+ *   transformBatch: async (files, context) => batchOcr(files),
+ * };
+ * ```
  */
 export interface FileTransformer {
   /**
-   * Transform the file into a string representation for the AI.
+   * Transform a single file into a string representation for the AI.
+   *
+   * Called when:
+   * - Only one file is attached, OR
+   * - `transformBatch` is not implemented, OR
+   * - `shouldBatch` returns false
    *
    * @param file - The file to transform
    * @param context - Context including the current chat and its metadata
@@ -85,6 +121,56 @@ export interface FileTransformer {
     context: FileTransformerContext,
     onProgress?: (progress: number) => void
   ): Promise<string>;
+
+  /**
+   * Determine whether to use batch processing for multiple files.
+   *
+   * Only called when `transformBatch` is implemented AND multiple files
+   * match this transformer. Use this to conditionally enable batch processing
+   * based on context (e.g., chat metadata).
+   *
+   * @param context - Context including the current chat and its metadata
+   * @returns true to use batch processing, false to process individually
+   * @default true (if undefined and transformBatch exists, batch processing is used)
+   *
+   * @example
+   * ```typescript
+   * // Only batch when chat has OCR metadata
+   * shouldBatch: (context) => !!context.chat?.metadata?.targetType
+   * ```
+   */
+  shouldBatch?(context: FileTransformerContext): boolean;
+
+  /**
+   * Transform multiple files together in a single batch operation.
+   *
+   * Called when:
+   * 1. This method is implemented
+   * 2. Multiple files match this transformer
+   * 3. `shouldBatch()` returns true (or is undefined)
+   *
+   * Use this for operations where processing files together improves
+   * accuracy or efficiency (e.g., multi-page document OCR).
+   *
+   * @param files - Array of files to transform together
+   * @param context - Context including the current chat and its metadata
+   * @param onProgress - Optional callback for reporting overall progress (0-100)
+   * @returns Array of transformed strings, one per input file (same order)
+   * @throws If transformation fails
+   *
+   * @example
+   * ```typescript
+   * transformBatch: async (files, context, onProgress) => {
+   *   const results = await batchOcrApi(files, { onProgress });
+   *   return results; // ['text1', 'text2', 'text3']
+   * }
+   * ```
+   */
+  transformBatch?(
+    files: File[],
+    context: FileTransformerContext,
+    onProgress?: (progress: number) => void
+  ): Promise<string[]>;
 }
 
 /**

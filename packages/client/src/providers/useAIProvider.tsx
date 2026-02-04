@@ -763,12 +763,16 @@ export function UseAIProvider({
 
       try {
         // Build multimodal content from attachments
-        // onFileProgress updates fileProcessingState only when a transformer runs
+        // onFileProgress updates fileProcessingState for individual file processing
+        // onBatchProgress updates fileProcessingState for batch processing (e.g., multi-page OCR)
         const fileContent = await processAttachments(attachments, {
           getCurrentChat,
           backend: fileUploadConfig?.backend,
           transformers: fileUploadConfig?.transformers,
           onFileProgress: (_fileId, state) => {
+            setFileProcessingState(state);
+          },
+          onBatchProgress: (state) => {
             setFileProcessingState(state);
           },
         });

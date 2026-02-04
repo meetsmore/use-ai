@@ -779,6 +779,54 @@ Transformers receive a `context` object containing:
 
 This allows transformers to access chat metadata for context-aware processing (e.g., document type hints).
 
+**Batch Processing:**
+
+For use cases where multiple files should be processed together (e.g., multi-page OCR), implement `transformBatch()` and optionally `shouldBatch()`:
+
+```tsx
+const ocrTransformer: FileTransformer = {
+  // Required: Single file processing (fallback)
+  transform: async (file, context, onProgress) => {
+    return await singleOcr(file);
+  },
+
+  // Optional: Determine if batch processing should be used
+  // Only called when transformBatch exists AND multiple files match
+  shouldBatch: (context) => {
+    // Batch only when chat has OCR metadata
+    return !!context.chat?.metadata?.targetType;
+  },
+
+  // Optional: Process multiple files together
+  transformBatch: async (files, context, onProgress) => {
+    const results = await batchOcrApi(files, { onProgress });
+    return results; // Must return same number of strings as input files
+  },
+};
+```
+
+Batch processing logic:
+1. If `transformBatch` is not implemented → individual `transform()` calls
+2. If only one file matches → individual `transform()` call
+3. If `shouldBatch()` returns `false` → individual `transform()` calls
+4. Otherwise → `transformBatch()` is used
+
+Files are grouped by transformer instance. To batch process JPEG and PNG together, use the same transformer instance:
+
+```tsx
+const imageTransformer = createOcrTransformer();
+
+<UseAIProvider
+  fileUploadConfig={{
+    transformers: {
+      'application/pdf': createOcrTransformer(),  // Separate instance for PDF
+      'image/jpeg': imageTransformer,  // Same instance
+      'image/png': imageTransformer,   // → JPEG and PNG are batched together
+    }
+  }}
+>
+```
+
 ### Theme Customization
 
 Customize the chat UI appearance:

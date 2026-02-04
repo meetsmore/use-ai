@@ -371,4 +371,369 @@ describe('processAttachments', () => {
       expect(errorUpdate).toBeDefined();
     });
   });
+
+  describe('batch processing', () => {
+    it('uses transformBatch when available and multiple files match', async () => {
+      let batchCalled = false;
+      let transformCalled = false;
+
+      const transformer: FileTransformer = {
+        transform: async (file, _context) => {
+          transformCalled = true;
+          return `Single: ${file.name}`;
+        },
+        transformBatch: async (files, _context) => {
+          batchCalled = true;
+          return files.map((f) => `Batch: ${f.name}`);
+        },
+      };
+
+      const attachments = [
+        createAttachment('1', 'doc1.pdf', 'application/pdf'),
+        createAttachment('2', 'doc2.pdf', 'application/pdf'),
+      ];
+
+      const result = await processAttachments(attachments, {
+        getCurrentChat: testGetCurrentChat,
+        transformers: { 'application/pdf': transformer },
+      });
+
+      expect(batchCalled).toBe(true);
+      expect(transformCalled).toBe(false);
+      expect(result).toHaveLength(2);
+      expect((result[0] as { text: string }).text).toBe('Batch: doc1.pdf');
+      expect((result[1] as { text: string }).text).toBe('Batch: doc2.pdf');
+    });
+
+    it('uses transform when only one file matches', async () => {
+      let batchCalled = false;
+      let transformCalled = false;
+
+      const transformer: FileTransformer = {
+        transform: async (file, _context) => {
+          transformCalled = true;
+          return `Single: ${file.name}`;
+        },
+        transformBatch: async (files, _context) => {
+          batchCalled = true;
+          return files.map((f) => `Batch: ${f.name}`);
+        },
+      };
+
+      const attachments = [createAttachment('1', 'doc1.pdf', 'application/pdf')];
+
+      const result = await processAttachments(attachments, {
+        getCurrentChat: testGetCurrentChat,
+        transformers: { 'application/pdf': transformer },
+      });
+
+      expect(batchCalled).toBe(false);
+      expect(transformCalled).toBe(true);
+      expect(result).toHaveLength(1);
+      expect((result[0] as { text: string }).text).toBe('Single: doc1.pdf');
+    });
+
+    it('respects shouldBatch returning false', async () => {
+      let batchCalled = false;
+      let transformCallCount = 0;
+
+      const transformer: FileTransformer = {
+        transform: async (file, _context) => {
+          transformCallCount++;
+          return `Single: ${file.name}`;
+        },
+        shouldBatch: (_context) => false,
+        transformBatch: async (files, _context) => {
+          batchCalled = true;
+          return files.map((f) => `Batch: ${f.name}`);
+        },
+      };
+
+      const attachments = [
+        createAttachment('1', 'doc1.pdf', 'application/pdf'),
+        createAttachment('2', 'doc2.pdf', 'application/pdf'),
+      ];
+
+      const result = await processAttachments(attachments, {
+        getCurrentChat: testGetCurrentChat,
+        transformers: { 'application/pdf': transformer },
+      });
+
+      expect(batchCalled).toBe(false);
+      expect(transformCallCount).toBe(2);
+      expect(result).toHaveLength(2);
+      expect((result[0] as { text: string }).text).toBe('Single: doc1.pdf');
+      expect((result[1] as { text: string }).text).toBe('Single: doc2.pdf');
+    });
+
+    it('uses batch when shouldBatch returns true', async () => {
+      let batchCalled = false;
+
+      const transformer: FileTransformer = {
+        transform: async (file, _context) => `Single: ${file.name}`,
+        shouldBatch: (_context) => true,
+        transformBatch: async (files, _context) => {
+          batchCalled = true;
+          return files.map((f) => `Batch: ${f.name}`);
+        },
+      };
+
+      const attachments = [
+        createAttachment('1', 'doc1.pdf', 'application/pdf'),
+        createAttachment('2', 'doc2.pdf', 'application/pdf'),
+      ];
+
+      await processAttachments(attachments, {
+        getCurrentChat: testGetCurrentChat,
+        transformers: { 'application/pdf': transformer },
+      });
+
+      expect(batchCalled).toBe(true);
+    });
+
+    it('passes context to shouldBatch', async () => {
+      const mockChat = {
+        id: 'test-chat',
+        title: 'Test',
+        messages: [],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        metadata: { targetType: 'ocr' },
+      };
+
+      let receivedContext: unknown = null;
+
+      const transformer: FileTransformer = {
+        transform: async (file, _context) => `Single: ${file.name}`,
+        shouldBatch: (context) => {
+          receivedContext = context;
+          return false;
+        },
+        transformBatch: async (files, _context) => files.map((f) => `Batch: ${f.name}`),
+      };
+
+      const attachments = [
+        createAttachment('1', 'doc1.pdf', 'application/pdf'),
+        createAttachment('2', 'doc2.pdf', 'application/pdf'),
+      ];
+
+      await processAttachments(attachments, {
+        getCurrentChat: async () => mockChat,
+        transformers: { 'application/pdf': transformer },
+      });
+
+      expect((receivedContext as { chat: typeof mockChat }).chat).toBe(mockChat);
+    });
+
+    it('conditionally batches based on metadata', async () => {
+      let batchCalled = false;
+
+      const transformer: FileTransformer = {
+        transform: async (file, _context) => `Single: ${file.name}`,
+        shouldBatch: (context) => !!context.chat?.metadata?.targetType,
+        transformBatch: async (files, _context) => {
+          batchCalled = true;
+          return files.map((f) => `Batch: ${f.name}`);
+        },
+      };
+
+      const attachments = [
+        createAttachment('1', 'doc1.pdf', 'application/pdf'),
+        createAttachment('2', 'doc2.pdf', 'application/pdf'),
+      ];
+
+      // Without targetType - should NOT batch
+      await processAttachments(attachments, {
+        getCurrentChat: async () => ({
+          id: 'test',
+          title: 'Test',
+          messages: [],
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }),
+        transformers: { 'application/pdf': transformer },
+      });
+
+      expect(batchCalled).toBe(false);
+
+      // With targetType - should batch
+      clearTransformationCache();
+      await processAttachments(attachments, {
+        getCurrentChat: async () => ({
+          id: 'test',
+          title: 'Test',
+          messages: [],
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          metadata: { targetType: 'ocr' },
+        }),
+        transformers: { 'application/pdf': transformer },
+      });
+
+      expect(batchCalled).toBe(true);
+    });
+
+    it('caches batch results', async () => {
+      let batchCallCount = 0;
+
+      const transformer: FileTransformer = {
+        transform: async (file, _context) => `Single: ${file.name}`,
+        transformBatch: async (files, _context) => {
+          batchCallCount++;
+          return files.map((f) => `Batch: ${f.name}`);
+        },
+      };
+
+      const file1 = createMockFile('doc1.pdf', 'application/pdf');
+      const file2 = createMockFile('doc2.pdf', 'application/pdf');
+      const attachments: FileAttachment[] = [
+        { id: '1', file: file1 },
+        { id: '2', file: file2 },
+      ];
+
+      const config = {
+        getCurrentChat: testGetCurrentChat,
+        transformers: { 'application/pdf': transformer },
+      };
+
+      // First call
+      await processAttachments(attachments, config);
+      expect(batchCallCount).toBe(1);
+
+      // Second call with same files - should use cache
+      await processAttachments(attachments, config);
+      expect(batchCallCount).toBe(1); // Still 1, not 2
+    });
+
+    it('calls onBatchProgress during batch processing', async () => {
+      const batchProgressUpdates: Array<FileProcessingState & { fileCount?: number }> = [];
+
+      const transformer: FileTransformer = {
+        transform: async (file, _context) => `Single: ${file.name}`,
+        transformBatch: async (files, _context, onProgress) => {
+          onProgress?.(50);
+          onProgress?.(100);
+          return files.map((f) => `Batch: ${f.name}`);
+        },
+      };
+
+      const attachments = [
+        createAttachment('1', 'doc1.pdf', 'application/pdf'),
+        createAttachment('2', 'doc2.pdf', 'application/pdf'),
+      ];
+
+      await processAttachments(attachments, {
+        getCurrentChat: testGetCurrentChat,
+        transformers: { 'application/pdf': transformer },
+        onBatchProgress: (state) => {
+          batchProgressUpdates.push(state);
+        },
+      });
+
+      expect(batchProgressUpdates.length).toBeGreaterThanOrEqual(2);
+      expect(batchProgressUpdates[0].status).toBe('processing');
+      expect(batchProgressUpdates[0].fileCount).toBe(2);
+      expect(batchProgressUpdates[batchProgressUpdates.length - 1].status).toBe('done');
+    });
+
+    it('reports error status on batch failure', async () => {
+      const fileProgressUpdates: Array<{ fileId: string; state: FileProcessingState }> = [];
+      const batchProgressUpdates: Array<FileProcessingState & { fileCount?: number }> = [];
+
+      const transformer: FileTransformer = {
+        transform: async (file, _context) => `Single: ${file.name}`,
+        transformBatch: async (_files, _context) => {
+          throw new Error('Batch failed');
+        },
+      };
+
+      const attachments = [
+        createAttachment('1', 'doc1.pdf', 'application/pdf'),
+        createAttachment('2', 'doc2.pdf', 'application/pdf'),
+      ];
+
+      try {
+        await processAttachments(attachments, {
+          getCurrentChat: testGetCurrentChat,
+          transformers: { 'application/pdf': transformer },
+          onFileProgress: (fileId, state) => {
+            fileProgressUpdates.push({ fileId, state });
+          },
+          onBatchProgress: (state) => {
+            batchProgressUpdates.push(state);
+          },
+        });
+      } catch {
+        // Expected to throw
+      }
+
+      // All files should be marked as error
+      const errorUpdates = fileProgressUpdates.filter((u) => u.state.status === 'error');
+      expect(errorUpdates).toHaveLength(2);
+
+      // Batch should be marked as error
+      const batchError = batchProgressUpdates.find((u) => u.status === 'error');
+      expect(batchError).toBeDefined();
+    });
+
+    it('throws if transformBatch returns wrong number of results', async () => {
+      const transformer: FileTransformer = {
+        transform: async (file, _context) => `Single: ${file.name}`,
+        transformBatch: async (_files, _context) => {
+          return ['only one result']; // Wrong! Should return 2
+        },
+      };
+
+      const attachments = [
+        createAttachment('1', 'doc1.pdf', 'application/pdf'),
+        createAttachment('2', 'doc2.pdf', 'application/pdf'),
+      ];
+
+      await expect(
+        processAttachments(attachments, {
+          getCurrentChat: testGetCurrentChat,
+          transformers: { 'application/pdf': transformer },
+        })
+      ).rejects.toThrow('transformBatch returned 1 results for 2 files');
+    });
+
+    it('groups files by transformer for batch processing', async () => {
+      let pdfBatchFiles: string[] = [];
+      let imageBatchFiles: string[] = [];
+
+      const pdfTransformer: FileTransformer = {
+        transform: async (file, _context) => `PDF: ${file.name}`,
+        transformBatch: async (files, _context) => {
+          pdfBatchFiles = files.map((f) => f.name);
+          return files.map((f) => `PDF Batch: ${f.name}`);
+        },
+      };
+
+      const imageTransformer: FileTransformer = {
+        transform: async (file, _context) => `Image: ${file.name}`,
+        transformBatch: async (files, _context) => {
+          imageBatchFiles = files.map((f) => f.name);
+          return files.map((f) => `Image Batch: ${f.name}`);
+        },
+      };
+
+      const attachments = [
+        createAttachment('1', 'doc1.pdf', 'application/pdf'),
+        createAttachment('2', 'img1.png', 'image/png'),
+        createAttachment('3', 'doc2.pdf', 'application/pdf'),
+        createAttachment('4', 'img2.png', 'image/png'),
+      ];
+
+      await processAttachments(attachments, {
+        getCurrentChat: testGetCurrentChat,
+        transformers: {
+          'application/pdf': pdfTransformer,
+          'image/png': imageTransformer,
+        },
+      });
+
+      expect(pdfBatchFiles).toEqual(['doc1.pdf', 'doc2.pdf']);
+      expect(imageBatchFiles).toEqual(['img1.png', 'img2.png']);
+    });
+  });
 });
