@@ -10,6 +10,8 @@ export type {
   ConnectionContext,
 } from './types';
 export { detectRuntime } from './detection';
+export { BaseRuntimeAdapter } from './BaseRuntimeAdapter';
+export { getAllowedOrigin, resolveCorsHeaders, resolvePreflightHeaders, type CorsHeaders } from './cors';
 
 /**
  * Creates a runtime adapter for the specified or detected runtime.

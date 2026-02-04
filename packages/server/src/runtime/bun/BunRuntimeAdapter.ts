@@ -1,18 +1,14 @@
 import type { Server as SocketIOServer } from 'socket.io';
 import { Server as BunEngine } from '@socket.io/bun-engine';
-import type {
-  RuntimeAdapter,
-  RuntimeServerConfig,
-  RuntimeServerHandle,
-  ConnectionContext,
-} from '../types';
-import { addCorsHeaders } from './cors';
+import type { RuntimeServerConfig, RuntimeServerHandle } from '../types';
+import { BaseRuntimeAdapter } from '../BaseRuntimeAdapter';
+import { addCorsHeaders, resolvePreflightHeaders } from './cors';
 
 /**
  * Runtime adapter for Bun.
  * Uses @socket.io/bun-engine for native Bun WebSocket support.
  */
-export class BunRuntimeAdapter implements RuntimeAdapter {
+export class BunRuntimeAdapter extends BaseRuntimeAdapter {
   readonly name = 'bun' as const;
 
   private engine: BunEngine | null = null;
@@ -24,10 +20,7 @@ export class BunRuntimeAdapter implements RuntimeAdapter {
     });
 
     // Capture client IP for polling transport at engine connection time
-    // For WebSocket, BunWebSocket.remoteAddress is available directly (no need to store here)
-    // For polling, server.requestIP() works because there's no WebSocket upgrade
     this.engine.on('connection', (engineSocket, req, bunServer) => {
-      // Only store for polling - WebSocket uses BunWebSocket.remoteAddress
       if (engineSocket.transport?.name === 'polling' && config.onPollingConnection) {
         const clientIp = bunServer.requestIP(req);
         if (clientIp) {
@@ -51,16 +44,13 @@ export class BunRuntimeAdapter implements RuntimeAdapter {
 
         // Handle CORS preflight
         if (req.method === 'OPTIONS' && config.cors) {
-          const methods = config.cors.methods ?? ['GET', 'POST'];
-          const requestedHeaders = req.headers.get('Access-Control-Request-Headers');
+          const requestOrigin = req.headers.get('Origin') || undefined;
+          const requestedHeaders = req.headers.get('Access-Control-Request-Headers') || undefined;
+          const headers = resolvePreflightHeaders(requestOrigin, requestedHeaders, config.cors);
 
           return new Response(null, {
             status: 204,
-            headers: addCorsHeaders(req, {
-              'Access-Control-Allow-Methods': Array.isArray(methods) ? methods.join(',') : methods,
-              ...(requestedHeaders && { 'Access-Control-Allow-Headers': requestedHeaders }),
-              'Content-Length': '0',
-            }, config.cors),
+            headers: { ...headers, 'Content-Length': '0' },
           });
         }
 
@@ -104,17 +94,5 @@ export class BunRuntimeAdapter implements RuntimeAdapter {
       },
       server: bunServer,
     };
-  }
-
-  getClientIp(context: ConnectionContext): string | undefined {
-    // For WebSocket transport, BunWebSocket.remoteAddress is available directly
-    if (context.conn.transport.socket?.remoteAddress) {
-      return context.conn.transport.socket.remoteAddress;
-    }
-    // For polling transport, use the stored IP from pollingClientIps map
-    if (context.pollingClientIps) {
-      return context.pollingClientIps.get(context.conn.id);
-    }
-    return undefined;
   }
 }

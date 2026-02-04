@@ -1,18 +1,14 @@
 import { createServer, type Server as HttpServer } from 'http';
 import type { Server as SocketIOServer } from 'socket.io';
-import type {
-  RuntimeAdapter,
-  RuntimeServerConfig,
-  RuntimeServerHandle,
-  ConnectionContext,
-} from '../types';
+import type { RuntimeServerConfig, RuntimeServerHandle } from '../types';
+import { BaseRuntimeAdapter } from '../BaseRuntimeAdapter';
 import { setCorsHeaders, handleCorsPreflight } from './cors';
 
 /**
  * Runtime adapter for Node.js.
  * Uses http.createServer with standard Socket.IO integration.
  */
-export class NodeRuntimeAdapter implements RuntimeAdapter {
+export class NodeRuntimeAdapter extends BaseRuntimeAdapter {
   readonly name = 'node' as const;
 
   createServer(io: SocketIOServer, config: RuntimeServerConfig): RuntimeServerHandle {
@@ -56,13 +52,11 @@ export class NodeRuntimeAdapter implements RuntimeAdapter {
     });
 
     // Capture client IP for polling connections
-    // In Node.js, we need to listen to the engine's connection event
     if (config.onPollingConnection) {
       const engine = (io as unknown as { engine?: { on?: (event: string, handler: (socket: { id: string; transport?: { name: string }; request?: { socket?: { remoteAddress?: string } }; headers?: { 'x-forwarded-for'?: string } }) => void) => void } }).engine;
       if (engine?.on) {
         engine.on('connection', (socket) => {
           if (socket.transport?.name === 'polling') {
-            // Get IP from x-forwarded-for header or socket remote address
             const xForwardedFor = socket.headers?.['x-forwarded-for'];
             const ip = typeof xForwardedFor === 'string'
               ? xForwardedFor.split(',')[0].trim()
@@ -84,17 +78,5 @@ export class NodeRuntimeAdapter implements RuntimeAdapter {
       },
       server: httpServer,
     };
-  }
-
-  getClientIp(context: ConnectionContext): string | undefined {
-    // For WebSocket transport, socket.remoteAddress is available
-    if (context.conn.transport.socket?.remoteAddress) {
-      return context.conn.transport.socket.remoteAddress;
-    }
-    // For polling transport, use the stored IP from pollingClientIps map
-    if (context.pollingClientIps) {
-      return context.pollingClientIps.get(context.conn.id);
-    }
-    return undefined;
   }
 }
