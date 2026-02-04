@@ -22,7 +22,7 @@ afterAll(() => {
 
 describe('Core Architecture', () => {
   let server: UseAIServer;
-  const testPort = 9301;
+  const testPort = 9001;
 
   beforeAll(() => {
     server = new UseAIServer(createServerConfig(testPort));

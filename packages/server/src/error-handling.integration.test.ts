@@ -37,7 +37,7 @@ describe('Error Handling', () => {
 
   test('Server emits RUN_ERROR events when agent execution fails', async () => {
     // Create a custom server with failing mock
-    const errorPort = 9302;
+    const errorPort = 9200;
     const errorMockModel = createErrorMockModel('Agent execution failed');
 
     const errorAgent = new AISDKAgent({ model: errorMockModel });
