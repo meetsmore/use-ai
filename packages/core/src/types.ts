@@ -247,14 +247,38 @@ export type WorkflowStatus = 'idle' | 'running' | 'completed' | 'error';
 /**
  * Extended message type for use-ai.
  * Includes AG-UI protocol messages ('run_agent', 'tool_result', 'abort_run')
- * plus use-ai-specific extensions ('run_workflow').
+ * plus use-ai-specific extensions ('run_workflow', 'message_feedback').
  *
  * Note: This extends beyond AG-UI protocol to support headless workflow triggers.
  * For AG-UI compliance, use ClientMessage instead.
  */
 export interface UseAIClientMessage {
-  type: 'run_agent' | 'tool_result' | 'abort_run' | 'run_workflow';
+  type: 'run_agent' | 'tool_result' | 'abort_run' | 'run_workflow' | 'message_feedback';
   data: unknown;
+}
+
+/**
+ * Feedback value for AI messages.
+ * - 'upvote': Positive feedback (thumbs up)
+ * - 'downvote': Negative feedback (thumbs down)
+ * - null: No feedback / remove feedback
+ */
+export type FeedbackValue = 'upvote' | 'downvote' | null;
+
+/**
+ * Message sent from client to server with user feedback on an AI message.
+ * Used to track user satisfaction and send feedback to Langfuse.
+ */
+export interface FeedbackMessage {
+  type: 'message_feedback';
+  data: {
+    /** Client-side message ID for local state updates */
+    messageId: string;
+    /** Langfuse trace ID (runId from RUN_FINISHED event) */
+    traceId: string;
+    /** Feedback value: 'upvote' for positive, 'downvote' for negative, null to remove */
+    feedback: FeedbackValue;
+  };
 }
 
 /**
