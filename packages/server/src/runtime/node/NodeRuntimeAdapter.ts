@@ -48,20 +48,17 @@ export class NodeRuntimeAdapter implements RuntimeAdapter {
 
     // Capture client IP for polling connections
     if (config.onPollingConnection) {
-      const engine = (io as unknown as { engine?: { on?: (event: string, handler: (socket: { id: string; transport?: { name: string }; request?: { socket?: { remoteAddress?: string } }; headers?: { 'x-forwarded-for'?: string } }) => void) => void } }).engine;
-      if (engine?.on) {
-        engine.on('connection', (socket) => {
-          if (socket.transport?.name === 'polling') {
-            const xForwardedFor = socket.headers?.['x-forwarded-for'];
-            const ip = typeof xForwardedFor === 'string'
-              ? xForwardedFor.split(',')[0].trim()
-              : socket.request?.socket?.remoteAddress;
-            if (ip) {
-              config.onPollingConnection!(socket.id, ip);
-            }
+      io.engine.on('connection', (socket) => {
+        if (socket.transport.name === 'polling') {
+          const xForwardedFor = socket.request.headers['x-forwarded-for'];
+          const ip = typeof xForwardedFor === 'string'
+            ? xForwardedFor.split(',')[0].trim()
+            : socket.request.socket?.remoteAddress;
+          if (ip) {
+            config.onPollingConnection!(socket.id, ip);
           }
-        });
-      }
+        }
+      });
     }
 
     // Start listening
