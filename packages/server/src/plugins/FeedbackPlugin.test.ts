@@ -1,74 +1,51 @@
 /**
- * Unit tests for FeedbackPlugin.
+ * Unit tests for FeedbackPlugin with Langfuse singleton enabled.
  */
 
-import { describe, expect, test, beforeEach, mock, spyOn } from 'bun:test';
-import { FeedbackPlugin } from './FeedbackPlugin';
+import { describe, expect, test, beforeEach, mock } from 'bun:test';
 import type { ClientSession } from '../agents/types';
+import type { Langfuse } from 'langfuse';
 
-// Mock Langfuse
+// Mock Langfuse client factory
 const mockScore = mock(() => {});
 const mockFlushAsync = mock(() => Promise.resolve());
 
-mock.module('langfuse', () => ({
-  Langfuse: class MockLangfuse {
-    score = mockScore;
-    flushAsync = mockFlushAsync;
+function createMockLangfuseClient(): Langfuse {
+  return {
+    score: mockScore,
+    flushAsync: mockFlushAsync,
+  } as unknown as Langfuse;
+}
+
+// Mock the instrumentation module with an enabled singleton
+const mockSingletonClient = createMockLangfuseClient();
+mock.module('../instrumentation', () => ({
+  langfuse: {
+    enabled: true,
+    client: mockSingletonClient,
   },
+  pushTraceIdForRun: () => {},
+  popTraceIdForRun: () => undefined,
 }));
 
-describe('FeedbackPlugin', () => {
+// Import after mocking
+import { FeedbackPlugin } from './FeedbackPlugin';
+
+describe('FeedbackPlugin (singleton enabled)', () => {
   beforeEach(() => {
     mockScore.mockClear();
     mockFlushAsync.mockClear();
-    // Clear env vars
-    delete process.env.LANGFUSE_PUBLIC_KEY;
-    delete process.env.LANGFUSE_SECRET_KEY;
-    delete process.env.LANGFUSE_BASE_URL;
   });
 
   describe('initialization', () => {
-    test('is disabled when no credentials provided', () => {
-      const plugin = new FeedbackPlugin();
-      expect(plugin.isEnabled()).toBe(false);
-    });
-
-    test('is disabled when only public key provided', () => {
-      process.env.LANGFUSE_PUBLIC_KEY = 'pk-test';
-      const plugin = new FeedbackPlugin();
-      expect(plugin.isEnabled()).toBe(false);
-    });
-
-    test('is disabled when only secret key provided', () => {
-      process.env.LANGFUSE_SECRET_KEY = 'sk-test';
-      const plugin = new FeedbackPlugin();
-      expect(plugin.isEnabled()).toBe(false);
-    });
-
-    test('is enabled when both keys provided via env vars', () => {
-      process.env.LANGFUSE_PUBLIC_KEY = 'pk-test';
-      process.env.LANGFUSE_SECRET_KEY = 'sk-test';
+    test('uses singleton client by default', () => {
       const plugin = new FeedbackPlugin();
       expect(plugin.isEnabled()).toBe(true);
     });
 
-    test('is enabled when both keys provided via config', () => {
-      const plugin = new FeedbackPlugin({
-        publicKey: 'pk-config',
-        secretKey: 'sk-config',
-      });
-      expect(plugin.isEnabled()).toBe(true);
-    });
-
-    test('config takes precedence over env vars', () => {
-      process.env.LANGFUSE_PUBLIC_KEY = 'pk-env';
-      process.env.LANGFUSE_SECRET_KEY = 'sk-env';
-
-      const plugin = new FeedbackPlugin({
-        publicKey: 'pk-config',
-        secretKey: 'sk-config',
-      });
-
+    test('explicit client overrides singleton', () => {
+      const explicitClient = createMockLangfuseClient();
+      const plugin = new FeedbackPlugin(explicitClient);
       expect(plugin.isEnabled()).toBe(true);
     });
   });
@@ -88,10 +65,7 @@ describe('FeedbackPlugin', () => {
   });
 
   describe('onClientConnect', () => {
-    test('emits langfuseEnabled config to client when enabled', () => {
-      process.env.LANGFUSE_PUBLIC_KEY = 'pk-test';
-      process.env.LANGFUSE_SECRET_KEY = 'sk-test';
-
+    test('emits langfuseEnabled=true when using singleton', () => {
       const plugin = new FeedbackPlugin();
       const mockEmit = mock(() => {});
       const session = {
@@ -104,27 +78,10 @@ describe('FeedbackPlugin', () => {
         langfuseEnabled: true,
       });
     });
-
-    test('emits langfuseEnabled=false when disabled', () => {
-      const plugin = new FeedbackPlugin();
-      const mockEmit = mock(() => {});
-      const session = {
-        socket: { emit: mockEmit },
-      } as unknown as ClientSession;
-
-      plugin.onClientConnect(session);
-
-      expect(mockEmit).toHaveBeenCalledWith('config', {
-        langfuseEnabled: false,
-      });
-    });
   });
 
   describe('handleFeedback', () => {
     test('submits score to Langfuse for thumbs up', async () => {
-      process.env.LANGFUSE_PUBLIC_KEY = 'pk-test';
-      process.env.LANGFUSE_SECRET_KEY = 'sk-test';
-
       const plugin = new FeedbackPlugin();
       let feedbackHandler: Function;
 
@@ -157,9 +114,6 @@ describe('FeedbackPlugin', () => {
     });
 
     test('submits score to Langfuse for thumbs down', async () => {
-      process.env.LANGFUSE_PUBLIC_KEY = 'pk-test';
-      process.env.LANGFUSE_SECRET_KEY = 'sk-test';
-
       const plugin = new FeedbackPlugin();
       let feedbackHandler: Function;
 
@@ -192,9 +146,6 @@ describe('FeedbackPlugin', () => {
     });
 
     test('does not submit score when feedback is null (removed)', async () => {
-      process.env.LANGFUSE_PUBLIC_KEY = 'pk-test';
-      process.env.LANGFUSE_SECRET_KEY = 'sk-test';
-
       const plugin = new FeedbackPlugin();
       let feedbackHandler: Function;
 
@@ -221,38 +172,7 @@ describe('FeedbackPlugin', () => {
       expect(mockScore).not.toHaveBeenCalled();
     });
 
-    test('does not submit score when plugin is disabled', async () => {
-      // No credentials = disabled
-      const plugin = new FeedbackPlugin();
-      let feedbackHandler: Function;
-
-      plugin.registerHandlers({
-        registerMessageHandler: (type: string, handler: Function) => {
-          if (type === 'message_feedback') {
-            feedbackHandler = handler;
-          }
-        },
-      });
-
-      const session = {} as ClientSession;
-      const message = {
-        type: 'message_feedback',
-        data: {
-          messageId: 'msg-000',
-          traceId: 'trace-000',
-          feedback: 'upvote',
-        },
-      };
-
-      await feedbackHandler!(session, message);
-
-      expect(mockScore).not.toHaveBeenCalled();
-    });
-
     test('uses idempotent score ID based on messageId', async () => {
-      process.env.LANGFUSE_PUBLIC_KEY = 'pk-test';
-      process.env.LANGFUSE_SECRET_KEY = 'sk-test';
-
       const plugin = new FeedbackPlugin();
       let feedbackHandler: Function;
 
@@ -287,21 +207,11 @@ describe('FeedbackPlugin', () => {
   });
 
   describe('close', () => {
-    test('flushes Langfuse events when enabled', async () => {
-      process.env.LANGFUSE_PUBLIC_KEY = 'pk-test';
-      process.env.LANGFUSE_SECRET_KEY = 'sk-test';
-
+    test('flushes Langfuse events', async () => {
       const plugin = new FeedbackPlugin();
       await plugin.close();
 
       expect(mockFlushAsync).toHaveBeenCalled();
-    });
-
-    test('does nothing when disabled', async () => {
-      const plugin = new FeedbackPlugin();
-      await plugin.close();
-
-      expect(mockFlushAsync).not.toHaveBeenCalled();
     });
   });
 });

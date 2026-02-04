@@ -8,7 +8,7 @@ export { AISDKAgent, type AISDKAgentConfig, type MessageWithCacheContext, type C
 
 // Export plugin types and built-in plugins
 export type { UseAIServerPlugin, MessageHandler } from './plugins';
-export { FeedbackPlugin, type FeedbackPluginConfig } from './plugins';
+export { FeedbackPlugin } from './plugins';
 
 // Export logger for plugins
 export { logger } from './logger';

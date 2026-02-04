@@ -3,26 +3,7 @@ import type { UseAIServerPlugin, MessageHandler } from './types';
 import type { ClientSession } from '../agents/types';
 import type { UseAIClientMessage, FeedbackMessage } from '@meetsmore-oss/use-ai-core';
 import { logger } from '../logger';
-
-/**
- * Configuration for FeedbackPlugin.
- */
-export interface FeedbackPluginConfig {
-  /**
-   * Langfuse public key. If not provided, falls back to LANGFUSE_PUBLIC_KEY env var.
-   */
-  publicKey?: string;
-
-  /**
-   * Langfuse secret key. If not provided, falls back to LANGFUSE_SECRET_KEY env var.
-   */
-  secretKey?: string;
-
-  /**
-   * Langfuse base URL. Defaults to LANGFUSE_BASE_URL env var or 'https://cloud.langfuse.com'.
-   */
-  baseUrl?: string;
-}
+import { langfuse } from '../instrumentation';
 
 /**
  * Plugin for user feedback on AI messages.
@@ -44,43 +25,23 @@ export interface FeedbackPluginConfig {
  *   defaultAgent: 'claude',
  *   plugins: [
  *     new FeedbackPlugin(),
- *     // Or with explicit config:
- *     // new FeedbackPlugin({
- *     //   publicKey: 'pk-...',
- *     //   secretKey: 'sk-...',
- *     // }),
+ *     // Or with explicit client:
+ *     // new FeedbackPlugin(myLangfuseClient),
  *   ],
  * });
  * ```
  */
 export class FeedbackPlugin implements UseAIServerPlugin {
   private langfuseClient: Langfuse | null = null;
-  private enabled = false;
 
-  constructor(config: FeedbackPluginConfig = {}) {
-    const publicKey = config.publicKey || process.env.LANGFUSE_PUBLIC_KEY;
-    const secretKey = config.secretKey || process.env.LANGFUSE_SECRET_KEY;
-    const baseUrl = config.baseUrl || process.env.LANGFUSE_BASE_URL || 'https://cloud.langfuse.com';
-
-    if (!publicKey || !secretKey) {
-      logger.debug('[FeedbackPlugin] Langfuse credentials not configured - feedback disabled');
-      return;
+  constructor(client: Langfuse | undefined = langfuse.client) {
+    if (!client) {
+      logger.debug('[FeedbackPlugin] Langfuse not enabled - feedback disabled');
+      return
     }
 
-    try {
-      this.langfuseClient = new Langfuse({
-        publicKey,
-        secretKey,
-        baseUrl,
-      });
-
-      this.enabled = true;
-      logger.info('[FeedbackPlugin] Initialized', { baseUrl });
-    } catch (error) {
-      logger.warn('[FeedbackPlugin] Failed to initialize Langfuse client', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-      });
-    }
+    this.langfuseClient = client
+    logger.info('[FeedbackPlugin] Initialized', { baseUrl: client.baseUrl });
   }
 
   getName(): string {
@@ -91,7 +52,7 @@ export class FeedbackPlugin implements UseAIServerPlugin {
    * Returns whether feedback is enabled (Langfuse is configured).
    */
   isEnabled(): boolean {
-    return this.enabled;
+    return !!this.langfuseClient;
   }
 
   registerHandlers(server: { registerMessageHandler(type: string, handler: MessageHandler): void }): void {
@@ -101,7 +62,7 @@ export class FeedbackPlugin implements UseAIServerPlugin {
   onClientConnect(session: ClientSession): void {
     // Emit feedback config to client
     session.socket.emit('config', {
-      langfuseEnabled: this.enabled,
+      langfuseEnabled: this.isEnabled(),
     });
   }
 

@@ -17,17 +17,18 @@ import {
   sendRunAgent,
   collectEventsUntil,
 } from '../test/test-utils';
+import type { Langfuse } from 'langfuse';
 
-// Mock Langfuse before imports that use it
+// Mock Langfuse client factory
 const mockScore = mock(() => {});
 const mockFlushAsync = mock(() => Promise.resolve());
 
-mock.module('langfuse', () => ({
-  Langfuse: class MockLangfuse {
-    score = mockScore;
-    flushAsync = mockFlushAsync;
-  },
-}));
+function createMockLangfuseClient(): Langfuse {
+  return {
+    score: mockScore,
+    flushAsync: mockFlushAsync,
+  } as unknown as Langfuse;
+}
 
 const cleanup = new TestCleanupManager();
 
@@ -45,11 +46,7 @@ describe('Feedback Integration', () => {
     test('client receives langfuseEnabled=true when FeedbackPlugin is enabled', async () => {
       const port = 9100;
 
-      // Set up env vars for Langfuse
-      process.env.LANGFUSE_PUBLIC_KEY = 'pk-test-integration';
-      process.env.LANGFUSE_SECRET_KEY = 'sk-test-integration';
-
-      const feedbackPlugin = new FeedbackPlugin();
+      const feedbackPlugin = new FeedbackPlugin(createMockLangfuseClient());
       expect(feedbackPlugin.isEnabled()).toBe(true);
 
       const server = new UseAIServer({
@@ -74,20 +71,12 @@ describe('Feedback Integration', () => {
 
       socket.disconnect();
       server.close();
-
-      // Clean up env vars
-      delete process.env.LANGFUSE_PUBLIC_KEY;
-      delete process.env.LANGFUSE_SECRET_KEY;
     });
 
     test('client receives langfuseEnabled=false when FeedbackPlugin is disabled', async () => {
       const port = 9101;
 
-      // Ensure no Langfuse credentials
-      delete process.env.LANGFUSE_PUBLIC_KEY;
-      delete process.env.LANGFUSE_SECRET_KEY;
-
-      const feedbackPlugin = new FeedbackPlugin();
+      const feedbackPlugin = new FeedbackPlugin(undefined);
       expect(feedbackPlugin.isEnabled()).toBe(false);
 
       const server = new UseAIServer({
@@ -119,10 +108,7 @@ describe('Feedback Integration', () => {
     test('feedback message triggers Langfuse score submission', async () => {
       const port = 9102;
 
-      process.env.LANGFUSE_PUBLIC_KEY = 'pk-test-feedback';
-      process.env.LANGFUSE_SECRET_KEY = 'sk-test-feedback';
-
-      const feedbackPlugin = new FeedbackPlugin();
+      const feedbackPlugin = new FeedbackPlugin(createMockLangfuseClient());
       const server = new UseAIServer({
         port,
         agents: { test: createTestAgent() },
@@ -158,18 +144,12 @@ describe('Feedback Integration', () => {
 
       socket.disconnect();
       server.close();
-
-      delete process.env.LANGFUSE_PUBLIC_KEY;
-      delete process.env.LANGFUSE_SECRET_KEY;
     });
 
     test('thumbs down feedback submits value 0', async () => {
       const port = 9103;
 
-      process.env.LANGFUSE_PUBLIC_KEY = 'pk-test-down';
-      process.env.LANGFUSE_SECRET_KEY = 'sk-test-down';
-
-      const feedbackPlugin = new FeedbackPlugin();
+      const feedbackPlugin = new FeedbackPlugin(createMockLangfuseClient());
       const server = new UseAIServer({
         port,
         agents: { test: createTestAgent() },
@@ -201,18 +181,12 @@ describe('Feedback Integration', () => {
 
       socket.disconnect();
       server.close();
-
-      delete process.env.LANGFUSE_PUBLIC_KEY;
-      delete process.env.LANGFUSE_SECRET_KEY;
     });
 
     test('null feedback (removal) does not submit to Langfuse', async () => {
       const port = 9104;
 
-      process.env.LANGFUSE_PUBLIC_KEY = 'pk-test-null';
-      process.env.LANGFUSE_SECRET_KEY = 'sk-test-null';
-
-      const feedbackPlugin = new FeedbackPlugin();
+      const feedbackPlugin = new FeedbackPlugin(createMockLangfuseClient());
       const server = new UseAIServer({
         port,
         agents: { test: createTestAgent() },
@@ -239,19 +213,12 @@ describe('Feedback Integration', () => {
 
       socket.disconnect();
       server.close();
-
-      delete process.env.LANGFUSE_PUBLIC_KEY;
-      delete process.env.LANGFUSE_SECRET_KEY;
     });
 
     test('feedback is not submitted when plugin is disabled', async () => {
       const port = 9105;
 
-      // Ensure no credentials
-      delete process.env.LANGFUSE_PUBLIC_KEY;
-      delete process.env.LANGFUSE_SECRET_KEY;
-
-      const feedbackPlugin = new FeedbackPlugin();
+      const feedbackPlugin = new FeedbackPlugin(undefined);
       const server = new UseAIServer({
         port,
         agents: { test: createTestAgent() },
@@ -320,10 +287,7 @@ describe('Feedback Integration', () => {
     test('updating feedback uses the same score ID', async () => {
       const port = 9107;
 
-      process.env.LANGFUSE_PUBLIC_KEY = 'pk-test-update';
-      process.env.LANGFUSE_SECRET_KEY = 'sk-test-update';
-
-      const feedbackPlugin = new FeedbackPlugin();
+      const feedbackPlugin = new FeedbackPlugin(createMockLangfuseClient());
       const server = new UseAIServer({
         port,
         agents: { test: createTestAgent() },
@@ -372,9 +336,6 @@ describe('Feedback Integration', () => {
 
       socket.disconnect();
       server.close();
-
-      delete process.env.LANGFUSE_PUBLIC_KEY;
-      delete process.env.LANGFUSE_SECRET_KEY;
     });
   });
 });
