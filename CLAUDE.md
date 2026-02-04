@@ -89,11 +89,11 @@ const addTodo = defineTool(
 // No arguments
 const logout = defineTool('Log the user out', () => { /* ... */ });
 
-// Requires confirmation
+// Requires user approval (destructive action)
 const deleteAccount = defineTool(
   'Delete account permanently',
   () => { /* ... */ },
-  { confirmationRequired: true }
+  { annotations: { destructiveHint: true } }
 );
 ```
 
@@ -235,7 +235,7 @@ Optional Langfuse integration tracks Claude API calls, token usage, tool calls, 
 - **Rate limiting**: Per-IP address (configured via env vars)
 - **Client-only scope**: AI can only see/manipulate what's on the page
 - **No backend API access**: V1 intentionally limits security risks
-- **confirmationRequired**: Prompts AI for confirmation (not 100% foolproof)
+- **destructiveHint**: Tools with `annotations: { destructiveHint: true }` require explicit user approval via UI before execution
 
 Following [Simon Willison's "Lethal Trifecta"](https://simonwillison.net/2025/Jun/16/the-lethal-trifecta/) mitigations.
 
