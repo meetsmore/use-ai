@@ -40,7 +40,7 @@ export class NodeRuntimeAdapter implements RuntimeAdapter {
       transports: ['polling', 'websocket'],
       maxHttpBufferSize: config.maxHttpBufferSize,
       cors: config.cors ? {
-        origin: config.cors.origin, // Pass directly, no conversion
+        origin: config.cors.origin,
         methods: config.cors.methods ?? ['GET', 'POST'],
         credentials: config.cors.credentials,
       } : undefined,
