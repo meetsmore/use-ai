@@ -20,6 +20,7 @@ export { createClientIpTracker, type ClientIpTracker, type ClientIpConnection } 
  *
  * Note: Node.js runtime works on Bun due to Bun's Node.js compatibility layer,
  * so `runtime: 'node'` is allowed when running on Bun.
+ * However, WebSocket connections may not work correctly with the Node adapter on Bun.
  */
 export function createRuntimeAdapter(runtime: 'auto' | RuntimeType = 'auto'): RuntimeAdapter {
   const detected = detectRuntime();
