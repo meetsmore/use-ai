@@ -28,8 +28,9 @@ afterAll(() => {
 const RUNTIMES: ('bun' | 'node')[] = ['bun', 'node'];
 
 // Port offset for each runtime to avoid conflicts
+// bun: +2000, node: +1000 (ranges don't overlap)
 const getPort = (basePort: number, runtime: 'bun' | 'node') =>
-  basePort + (runtime === 'node' ? 1000 : 0);
+  basePort + (runtime === 'node' ? 1000 : 2000);
 
 describe.each(RUNTIMES)('Connection Management [%s runtime]', (runtime) => {
   const testPort = getPort(8081, runtime);
