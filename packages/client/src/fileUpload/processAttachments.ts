@@ -94,8 +94,6 @@ export async function processAttachments(
   const context: FileTransformerContext = { chat };
 
   for (const attachment of attachments) {
-    onFileProgress?.(attachment.id, { status: 'processing' });
-
     try {
       // Check for pre-transformed content first (transformation at attach time)
       if (attachment.transformedContent !== undefined) {
@@ -108,7 +106,6 @@ export async function processAttachments(
             size: attachment.file.size,
           },
         });
-        onFileProgress?.(attachment.id, { status: 'done' });
         continue;
       }
 
@@ -116,6 +113,8 @@ export async function processAttachments(
       const transformer = findTransformer(attachment.file.type, transformers);
 
       if (transformer) {
+        // Notify processing only when a transformer actually runs (may be slow)
+        onFileProgress?.(attachment.id, { status: 'processing' });
         // Transform file - let errors propagate
         const transformedText = await getTransformedContent(
           attachment.file,
@@ -134,8 +133,9 @@ export async function processAttachments(
             size: attachment.file.size,
           },
         });
+        onFileProgress?.(attachment.id, { status: 'done' });
       } else {
-        // No transformer - use URL encoding
+        // No transformer - use URL encoding (fast, no progress needed)
         const url = await backend.prepareForSend(attachment.file);
         if (attachment.file.type.startsWith('image/')) {
           contentParts.push({ type: 'image', url });
@@ -148,8 +148,6 @@ export async function processAttachments(
           });
         }
       }
-
-      onFileProgress?.(attachment.id, { status: 'done' });
     } catch (error) {
       onFileProgress?.(attachment.id, { status: 'error' });
       throw error;
