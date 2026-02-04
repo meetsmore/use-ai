@@ -1,14 +1,13 @@
 import type { Server as SocketIOServer } from 'socket.io';
 import { Server as BunEngine } from '@socket.io/bun-engine';
-import type { RuntimeServerConfig, RuntimeServerHandle } from '../types';
-import { BaseRuntimeAdapter } from '../BaseRuntimeAdapter';
+import type { RuntimeAdapter, RuntimeServerConfig, RuntimeServerHandle } from '../types';
 import { resolveCorsHeaders, resolvePreflightHeaders } from '../cors';
 
 /**
  * Runtime adapter for Bun.
  * Uses @socket.io/bun-engine for native Bun WebSocket support.
  */
-export class BunRuntimeAdapter extends BaseRuntimeAdapter {
+export class BunRuntimeAdapter implements RuntimeAdapter {
   readonly name = 'bun' as const;
 
   private engine: BunEngine | null = null;

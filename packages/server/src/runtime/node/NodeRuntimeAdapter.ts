@@ -1,82 +1,33 @@
-import { createServer, type Server as HttpServer, type IncomingMessage, type ServerResponse } from 'http';
+import { createServer, type Server as HttpServer } from 'http';
 import type { Server as SocketIOServer } from 'socket.io';
-import type { RuntimeServerConfig, RuntimeServerHandle } from '../types';
-import { BaseRuntimeAdapter } from '../BaseRuntimeAdapter';
-import { resolveCorsHeaders, resolvePreflightHeaders } from '../cors';
-
-/**
- * Sets CORS headers on a Node.js HTTP response.
- */
-function setCorsHeaders(headers: Record<string, string>, res: ServerResponse): void {
-  for (const [key, value] of Object.entries(headers)) {
-    if (value) {
-      res.setHeader(key, value);
-    }
-  }
-}
-
-/**
- * Handles CORS preflight OPTIONS request.
- * Returns true if the request was handled, false otherwise.
- */
-function handleCorsPreflight(
-  req: IncomingMessage,
-  res: ServerResponse,
-  config: RuntimeServerConfig
-): boolean {
-  if (req.method !== 'OPTIONS' || !config.cors) {
-    return false;
-  }
-
-  const requestOrigin = req.headers.origin;
-  const requestedHeaders = req.headers['access-control-request-headers'];
-  const headers = resolvePreflightHeaders(
-    requestOrigin,
-    typeof requestedHeaders === 'string' ? requestedHeaders : undefined,
-    config.cors
-  );
-
-  setCorsHeaders(headers, res);
-  res.setHeader('Content-Length', '0');
-  res.statusCode = 204;
-  res.end();
-  return true;
-}
+import type { RuntimeAdapter, RuntimeServerConfig, RuntimeServerHandle } from '../types';
 
 /**
  * Runtime adapter for Node.js.
  * Uses http.createServer with standard Socket.IO integration.
+ *
+ * CORS handling is delegated entirely to Socket.IO's built-in CORS support.
+ * This avoids redundancy and ensures consistent behavior with credentials.
  */
-export class NodeRuntimeAdapter extends BaseRuntimeAdapter {
+export class NodeRuntimeAdapter implements RuntimeAdapter {
   readonly name = 'node' as const;
 
   createServer(io: SocketIOServer, config: RuntimeServerConfig): RuntimeServerHandle {
     // Create Node.js HTTP server
     const httpServer: HttpServer = createServer((req, res) => {
       const url = new URL(req.url || '/', `http://localhost:${config.port}`);
-      const requestOrigin = req.headers.origin;
 
-      // Handle CORS preflight
-      if (handleCorsPreflight(req, res, config)) {
-        return;
-      }
-
-      // Get CORS headers for non-preflight requests
-      const corsHeaders = resolveCorsHeaders(requestOrigin, config.cors);
-
-      // Health check endpoint
+      // Health check endpoint (no CORS needed - used by K8s probes)
       if (url.pathname === '/health') {
-        setCorsHeaders(corsHeaders, res);
         res.setHeader('Content-Type', 'application/json');
         res.statusCode = 200;
         res.end(JSON.stringify({ status: 'ok' }));
         return;
       }
 
-      // Let Socket.IO handle /socket.io/ paths
+      // Socket.IO handles /socket.io/* paths (including CORS)
       // Other paths return 404
       if (!url.pathname.startsWith('/socket.io/')) {
-        setCorsHeaders(corsHeaders, res);
         res.statusCode = 404;
         res.end('Not Found');
       }
@@ -84,11 +35,12 @@ export class NodeRuntimeAdapter extends BaseRuntimeAdapter {
     });
 
     // Attach Socket.IO to the HTTP server
+    // Socket.IO handles CORS internally for /socket.io/* paths
     io.attach(httpServer, {
       transports: ['polling', 'websocket'],
       maxHttpBufferSize: config.maxHttpBufferSize,
       cors: config.cors ? {
-        origin: config.cors.origin === true ? '*' : config.cors.origin,
+        origin: config.cors.origin, // Pass directly, no conversion
         methods: config.cors.methods ?? ['GET', 'POST'],
         credentials: config.cors.credentials,
       } : undefined,

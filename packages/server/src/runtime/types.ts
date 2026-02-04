@@ -40,24 +40,6 @@ export interface RuntimeServerHandle {
 }
 
 /**
- * Context for getting client IP address.
- */
-export interface ConnectionContext {
-  /** Engine.io connection object */
-  conn: {
-    id: string;
-    transport: {
-      name: string;
-      socket?: {
-        remoteAddress?: string;
-      };
-    };
-  };
-  /** Map of polling client IPs (keyed by session ID) */
-  pollingClientIps?: Map<string, string>;
-}
-
-/**
  * Adapter interface for runtime-specific server implementations.
  * Abstracts the differences between Bun and Node.js runtimes.
  */
@@ -73,12 +55,4 @@ export interface RuntimeAdapter {
    * @returns Handle to the running server
    */
   createServer(io: SocketIOServer, config: RuntimeServerConfig): RuntimeServerHandle;
-
-  /**
-   * Gets the client IP address from a connection context.
-   *
-   * @param context - Connection context with transport information
-   * @returns The client IP address, or undefined if not available
-   */
-  getClientIp(context: ConnectionContext): string | undefined;
 }

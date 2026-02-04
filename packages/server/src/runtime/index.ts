@@ -7,10 +7,9 @@ export type {
   RuntimeType,
   RuntimeServerConfig,
   RuntimeServerHandle,
-  ConnectionContext,
 } from './types';
 export { detectRuntime } from './detection';
-export { BaseRuntimeAdapter } from './BaseRuntimeAdapter';
+export { createClientIpTracker, type ClientIpTracker, type ClientIpConnection } from './clientIp';
 export { getAllowedOrigin, resolveCorsHeaders, resolvePreflightHeaders } from './cors';
 
 /**
@@ -18,17 +17,19 @@ export { getAllowedOrigin, resolveCorsHeaders, resolvePreflightHeaders } from '.
  *
  * @param runtime - The runtime to use: 'auto' (detect), 'bun', or 'node'
  * @returns The appropriate RuntimeAdapter for the runtime
- * @throws Error if the specified runtime doesn't match the actual runtime
+ * @throws Error if 'bun' runtime is requested but running on Node.js
+ *
+ * Note: Node.js runtime works on Bun due to Bun's Node.js compatibility layer,
+ * so `runtime: 'node'` is allowed when running on Bun.
  */
 export function createRuntimeAdapter(runtime: 'auto' | RuntimeType = 'auto'): RuntimeAdapter {
   const detected = detectRuntime();
   const target = runtime === 'auto' ? detected : runtime;
 
-  // Validate that requested runtime matches detected runtime
-  if (runtime !== 'auto' && runtime !== detected) {
-    throw new Error(
-      `Runtime mismatch: requested '${runtime}' but running on '${detected}'`
-    );
+  // Only error when requesting Bun runtime on Node.js
+  // Node.js runtime works on Bun due to compatibility layer
+  if (runtime === 'bun' && detected === 'node') {
+    throw new Error('Cannot use Bun runtime adapter on Node.js');
   }
 
   if (target === 'bun') {

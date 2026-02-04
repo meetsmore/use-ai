@@ -25,8 +25,10 @@ import { RemoteMcpToolsProvider, type RemoteToolDefinition } from './mcp';
 import { findMatch } from './utils/patternMatcher';
 import {
   createRuntimeAdapter,
+  createClientIpTracker,
   type RuntimeAdapter,
   type RuntimeServerHandle,
+  type ClientIpTracker,
 } from './runtime';
 
 // Re-export ClientSession type for external use
@@ -98,9 +100,8 @@ export class UseAIServer {
   private plugins: UseAIServerPlugin[] = [];
   private messageHandlers: Map<string, MessageHandler> = new Map();
   private mcpEndpoints: RemoteMcpToolsProvider[] = [];
-  // Store client IP addresses for polling transport (keyed by session ID)
-  // WebSocket transport can access remoteAddress directly
-  private pollingClientIps: Map<string, string> = new Map();
+  // Tracks client IP addresses for both WebSocket and polling transports
+  private clientIpTracker: ClientIpTracker;
 
   /**
    * Creates a new UseAI server instance.
@@ -135,6 +136,9 @@ export class UseAIServer {
       maxRequests: this.config.rateLimitMaxRequests,
       windowMs: this.config.rateLimitWindowMs,
     });
+
+    // Create client IP tracker
+    this.clientIpTracker = createClientIpTracker();
 
     this.cleanupInterval = setInterval(() => {
       this.rateLimiter.cleanup();
@@ -179,7 +183,7 @@ export class UseAIServer {
       cors: this.config.cors,
       maxHttpBufferSize: this.config.maxHttpBufferSize,
       onPollingConnection: (sessionId, ip) => {
-        this.pollingClientIps.set(sessionId, ip);
+        this.clientIpTracker.trackPollingConnection(sessionId, ip);
       },
     });
   }
@@ -245,12 +249,8 @@ export class UseAIServer {
       const threadId = uuidv4();
       // Get connection info for IP address resolution
       const conn = socket.conn as unknown as { id: string; transport: { name: string; socket?: { remoteAddress?: string } } };
-      // Get IP address for rate limiting using runtime adapter
-      const ipAddress =
-        this.runtimeAdapter.getClientIp({
-          conn,
-          pollingClientIps: this.pollingClientIps,
-        }) || socket.id; // fallback to socket.id if IP cannot be determined
+      // Get IP address for rate limiting using client IP tracker
+      const ipAddress = this.clientIpTracker.getClientIp(conn) || socket.id; // fallback to socket.id if IP cannot be determined
       const transport = conn.transport.name;
       logger.info('Client connected', { clientId, threadId, ipAddress, transport });
 
@@ -308,7 +308,7 @@ export class UseAIServer {
         logger.info('Client disconnected', { clientId, ipAddress });
 
         // Clean up polling IP entry
-        this.pollingClientIps.delete(conn.id);
+        this.clientIpTracker.removePollingConnection(conn.id);
 
         // Call plugin lifecycle hooks
         for (const plugin of this.plugins) {
