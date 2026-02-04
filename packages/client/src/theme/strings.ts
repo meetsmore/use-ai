@@ -45,6 +45,8 @@ export const defaultStrings = {
     connectingPlaceholder: 'Connecting...',
     /** Loading indicator text */
     thinking: 'Thinking',
+    /** File processing indicator text (shown during file transformation like OCR) */
+    processingFile: 'Processing file...',
   },
 
   // File upload

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import type { Chat, PersistedMessageContent, PersistedContentPart } from '../providers/chatRepository/types';
 import type { AgentInfo } from '../types';
-import type { FileAttachment, FileUploadConfig } from '../fileUpload/types';
+import type { FileAttachment, FileUploadConfig, FileProcessingState } from '../fileUpload/types';
 import { MarkdownContent } from './MarkdownContent';
 import { FileChip, FilePlaceholder } from './FileChip';
 import type { SavedCommand } from '../commands/types';
@@ -79,6 +79,8 @@ export interface UseAIChatPanelProps {
   selectedAgent?: string | null;
   onAgentChange?: (agentId: string | null) => void;
   fileUploadConfig?: FileUploadConfig;
+  /** File processing state for send-time transformations (e.g., OCR) */
+  fileProcessing?: FileProcessingState | null;
   commands?: SavedCommand[];
   onSaveCommand?: (name: string, text: string) => Promise<string>;
   onRenameCommand?: (id: string, newName: string) => Promise<void>;
@@ -109,6 +111,7 @@ export function UseAIChatPanel({
   selectedAgent,
   onAgentChange,
   fileUploadConfig,
+  fileProcessing,
   commands = [],
   onSaveCommand,
   onRenameCommand,
@@ -867,6 +870,35 @@ export function UseAIChatPanel({
             >
               {streamingText ? (
                 <MarkdownContent content={streamingText} />
+              ) : fileProcessing && fileProcessing.status === 'processing' ? (
+                <div>
+                  <span style={{ opacity: 0.6 }}>{strings.input.processingFile}</span>
+                  {fileProcessing.progress != null && (
+                    <>
+                      <span style={{ opacity: 0.6, marginLeft: '4px' }}>
+                        {Math.round(fileProcessing.progress)}%
+                      </span>
+                      <div style={{
+                        marginTop: '6px',
+                        height: '4px',
+                        borderRadius: '2px',
+                        background: theme.borderColor,
+                        overflow: 'hidden',
+                      }}>
+                        <div style={{
+                          height: '100%',
+                          width: `${fileProcessing.progress}%`,
+                          borderRadius: '2px',
+                          background: theme.primaryColor,
+                          transition: 'width 0.3s ease',
+                        }} />
+                      </div>
+                    </>
+                  )}
+                  {fileProcessing.progress == null && (
+                    <span className="dots" style={{ marginLeft: '4px' }}>...</span>
+                  )}
+                </div>
               ) : (
                 <>
                   <span style={{ opacity: 0.6 }}>{strings.input.thinking}</span>

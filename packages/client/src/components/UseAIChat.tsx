@@ -3,7 +3,7 @@ import { UseAIChatPanel } from './UseAIChatPanel';
 import { UseAIFloatingChatWrapper, CloseButton } from './UseAIFloatingChatWrapper';
 import type { Message } from './UseAIChatPanel';
 import type { AgentInfo } from '../types';
-import type { FileUploadConfig, FileAttachment } from '../fileUpload/types';
+import type { FileUploadConfig, FileAttachment, FileProcessingState } from '../fileUpload/types';
 import type { SavedCommand } from '../commands/types';
 import type { Chat } from '../providers/chatRepository/types';
 
@@ -63,6 +63,8 @@ export interface ChatUIContextValue {
     /** Deletes a command by ID */
     delete: (id: string) => Promise<void>;
   };
+  /** File processing state for send-time transformations (e.g., OCR) */
+  fileProcessing: FileProcessingState | null;
   /** UI state for floating chat */
   ui: {
     /** Whether the floating chat is open */
@@ -150,6 +152,7 @@ export function UseAIChat({ floating = false }: UseAIChatProps) {
     selectedAgent: ctx.agents.selected,
     onAgentChange: ctx.agents.set,
     fileUploadConfig: ctx.fileUploadConfig,
+    fileProcessing: ctx.fileProcessing,
     commands: ctx.commands.list,
     onSaveCommand: ctx.commands.save,
     onRenameCommand: ctx.commands.rename,
