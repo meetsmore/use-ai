@@ -123,38 +123,39 @@ describe('Tool Definition & Registration', () => {
     });
   });
 
-  describe('Tools can be marked as requiring confirmation before execution', () => {
-    it('should mark tools with confirmationRequired flag', () => {
+  describe('Tools can be marked as requiring confirmation before execution (via destructiveHint)', () => {
+    it('should mark tools with destructiveHint annotation', () => {
       const deleteAccount = defineTool(
         'Delete account permanently',
         z.object({ userId: z.string() }),
         (input) => ({ success: true }),
-        { confirmationRequired: true }
+        { annotations: { destructiveHint: true } }
       );
 
-      expect(deleteAccount._options.confirmationRequired).toBe(true);
+      expect(deleteAccount._options.annotations?.destructiveHint).toBe(true);
     });
 
-    it('should not mark tools without confirmationRequired flag', () => {
+    it('should not have annotations when not set', () => {
       const getTodo = defineTool(
         'Get a todo',
         z.object({ id: z.string() }),
         () => ({ id: '1', text: 'Sample' })
       );
 
-      expect(getTodo._options.confirmationRequired).toBeUndefined();
+      expect(getTodo._options.annotations).toBeUndefined();
     });
 
-    it('should support both confirmationRequired and other options', () => {
+    it('should support multiple annotations', () => {
       const destructiveAction = defineTool(
         'Perform destructive action',
         z.object({ targetId: z.string() }),
         (input) => ({ success: true }),
-        { confirmationRequired: true }
+        { annotations: { destructiveHint: true, title: 'Delete Item' } }
       );
 
-      expect(destructiveAction._options).toEqual({
-        confirmationRequired: true,
+      expect(destructiveAction._options.annotations).toEqual({
+        destructiveHint: true,
+        title: 'Delete Item',
       });
     });
   });

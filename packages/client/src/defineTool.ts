@@ -1,23 +1,8 @@
 import { z } from 'zod';
-import type { ToolDefinition } from '@meetsmore-oss/use-ai-core';
+import type { ToolDefinition, ToolAnnotations } from '@meetsmore-oss/use-ai-core';
 
-/**
- * Tool annotations following the MCP (Model Context Protocol) specification.
- * These are optional hints about tool behavior for UX purposes.
- * @see https://modelcontextprotocol.io/specification/2025-06-18/server/tools
- */
-export interface ToolAnnotations {
-  /** Human-readable title for the tool, shown in UI while executing */
-  title?: string;
-  /** If true, the tool does not modify its environment (default: false) */
-  readOnlyHint?: boolean;
-  /** If true, the tool may perform destructive updates and requires confirmation (default: false) */
-  destructiveHint?: boolean;
-  /** If true, calling repeatedly with same args has no additional effect (default: false) */
-  idempotentHint?: boolean;
-  /** If true, tool interacts with external/unpredictable entities (default: true) */
-  openWorldHint?: boolean;
-}
+// Re-export ToolAnnotations for convenience
+export type { ToolAnnotations };
 
 /**
  * Options for configuring tool behavior.
@@ -174,8 +159,9 @@ export function defineTool<T extends z.ZodType>(
         parameters,
       };
 
-      if (this._options.annotations?.destructiveHint) {
-        toolDef.confirmationRequired = true;
+      // Pass through annotations if present
+      if (this._options.annotations) {
+        toolDef.annotations = this._options.annotations;
       }
 
       return toolDef;

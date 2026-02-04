@@ -181,7 +181,7 @@ describe('Tools support MCP-aligned annotations', () => {
     expect(tool._options.annotations?.title).toBe('Delete Item');
   });
 
-  test('includes confirmationRequired in AG-UI tool definition when destructiveHint is set', () => {
+  test('includes annotations in tool definition when destructiveHint is set', () => {
     const tool = defineTool(
       'Delete account',
       () => 'deleted',
@@ -189,14 +189,14 @@ describe('Tools support MCP-aligned annotations', () => {
     );
 
     const definition = tool._toToolDefinition('deleteAccount');
-    expect(definition.confirmationRequired).toBe(true);
+    expect(definition.annotations?.destructiveHint).toBe(true);
   });
 
-  test('omits confirmationRequired from definition when destructiveHint is not set', () => {
+  test('omits annotations from definition when not set', () => {
     const tool = defineTool('Safe operation', () => 'done');
 
     const definition = tool._toToolDefinition('safeOp');
-    expect(definition.confirmationRequired).toBeUndefined();
+    expect(definition.annotations).toBeUndefined();
   });
 
   test('supports annotations with parameterized tools', () => {
@@ -215,7 +215,8 @@ describe('Tools support MCP-aligned annotations', () => {
     expect(tool._options.annotations?.title).toBe('Delete User');
 
     const definition = tool._toToolDefinition('deleteUser');
-    expect(definition.confirmationRequired).toBe(true);
+    expect(definition.annotations?.destructiveHint).toBe(true);
+    expect(definition.annotations?.title).toBe('Delete User');
   });
 
   test('defaults annotations to undefined when not specified', () => {

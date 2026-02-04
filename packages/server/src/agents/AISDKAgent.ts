@@ -21,6 +21,7 @@ import type {
   MessagesSnapshotEvent,
   StepStartedEvent,
   StepFinishedEvent,
+  ToolCallStartExtensions,
 } from '../types';
 import { logger } from '../logger';
 import { initializeLangfuse, type LangfuseConfig } from '../instrumentation';
@@ -451,15 +452,23 @@ export class AISDKAgent implements Agent {
 
           case 'tool-input-start': {
             hasAnyContent = true;
-            // Emit TOOL_CALL_START when tool call begins streaming
+            // Find the tool definition to get annotations (for MCP tools)
+            const toolDef = tools.find(t => t.name === chunk.toolName);
+            const annotations = (toolDef as RemoteToolDefinition)?._remote?.annotations;
+
+            // Emit TOOL_CALL_START with use-ai extensions (annotations only if present)
             // AI SDK v6 uses 'id' as the toolCallId
-            events.emit<ToolCallStartEvent>({
+            const toolCallStartEvent: ToolCallStartEvent & ToolCallStartExtensions = {
               type: EventType.TOOL_CALL_START,
               toolCallId: chunk.id,
               toolCallName: chunk.toolName,
               parentMessageId: messageId ?? uuidv4(),
               timestamp: Date.now(),
-            });
+            };
+            if (annotations) {
+              toolCallStartEvent.annotations = annotations;
+            }
+            events.emit(toolCallStartEvent);
             activeToolCalls.set(chunk.id, { name: chunk.toolName, args: '' });
             break;
           }

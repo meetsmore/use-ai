@@ -117,6 +117,8 @@ export type {
   ActivityDeltaEvent,
   AGUIEvent,
   // use-ai extensions
+  ToolAnnotations,
+  ToolCallStartExtensions,
   WorkflowStatus,
   UseAIClientMessage,
   RunWorkflowMessage,

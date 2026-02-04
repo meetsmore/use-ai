@@ -89,6 +89,36 @@ You can help the user test these tools by calling them with various inputs.`,
         </p>
       </div>
 
+      <div style={styles.annotationsCard}>
+        <h2 style={styles.subtitle}>Tool Annotations (Status Display)</h2>
+        <p style={styles.text}>
+          Each MCP tool has <code style={styles.code}>annotations</code> that include a{' '}
+          <code style={styles.code}>title</code> field. While a tool is executing, the chat UI
+          displays this title (e.g., "Adding Numbers...", "Fetching Weather...").
+        </p>
+        <p style={styles.text}>
+          Annotations follow the{' '}
+          <a href="https://modelcontextprotocol.io/specification/2025-06-18/server/tools" style={styles.link}>
+            MCP specification
+          </a>{' '}
+          and can include hints like <code style={styles.code}>readOnlyHint</code>,{' '}
+          <code style={styles.code}>destructiveHint</code>, etc.
+        </p>
+        <div style={styles.codeBlock}>
+          <pre style={styles.pre}>
+{`@Tool({
+  name: 'add',
+  description: 'Add two numbers',
+  parameters: z.object({ ... }),
+  annotations: {
+    title: 'Adding Numbers',  // Shown in UI during execution
+    readOnlyHint: true,
+  },
+})`}
+          </pre>
+        </div>
+      </div>
+
       <div style={styles.statusCard}>
         <h3 style={styles.subtitle}>MCP Server Status</h3>
         <p style={styles.text}>
@@ -147,6 +177,18 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: '8px',
     padding: '20px',
     border: '1px solid #e0e0e0',
+  },
+  annotationsCard: {
+    background: '#fefce8',
+    borderRadius: '8px',
+    padding: '24px',
+    marginBottom: '20px',
+    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+    border: '1px solid #fde047',
+  },
+  link: {
+    color: '#2563eb',
+    textDecoration: 'underline',
   },
   text: {
     fontSize: '14px',

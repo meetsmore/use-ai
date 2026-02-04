@@ -14,6 +14,10 @@ export class ToolsService {
       a: z.number().describe('The first number'),
       b: z.number().describe('The second number'),
     }),
+    annotations: {
+      title: 'Adding Numbers',
+      readOnlyHint: true,
+    },
   })
   async add({ a, b }: { a: number; b: number }) {
     return {
@@ -33,6 +37,10 @@ export class ToolsService {
       a: z.number().describe('The first number'),
       b: z.number().describe('The second number'),
     }),
+    annotations: {
+      title: 'Multiplying Numbers',
+      readOnlyHint: true,
+    },
   })
   async multiply({ a, b }: { a: number; b: number }) {
     return {
@@ -51,6 +59,10 @@ export class ToolsService {
     parameters: z.object({
       name: z.string().describe('The name of the person to greet'),
     }),
+    annotations: {
+      title: 'Greeting User',
+      readOnlyHint: true,
+    },
   })
   async greet({ name }: { name: string }) {
     return {
@@ -69,6 +81,11 @@ export class ToolsService {
     parameters: z.object({
       location: z.string().describe('The location to get weather for'),
     }),
+    annotations: {
+      title: 'Fetching Weather',
+      readOnlyHint: true,
+      openWorldHint: true,
+    },
   })
   async getWeather({ location }: { location: string }) {
     const weatherData = {
@@ -93,6 +110,10 @@ export class ToolsService {
     parameters: z.object({
       dataId: z.string().describe('The ID of the data to retrieve'),
     }),
+    annotations: {
+      title: 'Accessing Secure Data',
+      readOnlyHint: true,
+    },
   })
   async getSecureData({ dataId }: { dataId: string }) {
     const apiKey = this.request.headers['x-api-key'];

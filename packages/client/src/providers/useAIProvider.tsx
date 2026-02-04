@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
-import type { UseAIConfig, AGUIEvent, ToolCallStartEvent, ToolCallEndEvent, RunErrorEvent, AgentInfo, TextMessageContentEvent } from '../types';
+import type { UseAIConfig, AGUIEvent, ToolCallStartEvent, ToolCallEndEvent, RunErrorEvent, AgentInfo, TextMessageContentEvent, ToolCallStartExtensions } from '../types';
 import { EventType, ErrorCode } from '../types';
 import { UseAIFloatingButton } from '../components/UseAIFloatingButton';
 import { UseAIChatPanel, type Message } from '../components/UseAIChatPanel';
@@ -540,9 +540,15 @@ export function UseAIProvider({
 
     const unsubscribe = client.onEvent('globalChat', async (event: AGUIEvent) => {
       if (event.type === EventType.TOOL_CALL_START) {
-        const e = event as ToolCallStartEvent;
+        // Cast to include use-ai extensions (optional, for AG-UI compatibility)
+        const e = event as ToolCallStartEvent & Partial<ToolCallStartExtensions>;
+
+        // Get title from:
+        // 1. Event annotations (use-ai server with MCP tools)
+        // 2. Local tool definition (client-side tools via defineTool)
+        // 3. `null` == will fallback to a generic message.`
         const tool = aggregatedToolsRef.current[e.toolCallName];
-        const title = tool?._options?.annotations?.title ?? null;
+        const title = e.annotations?.title ?? tool?._options?.annotations?.title ?? null;
 
         if (!title) {
           const fallbacks = strings.toolExecution.fallbackMessages;

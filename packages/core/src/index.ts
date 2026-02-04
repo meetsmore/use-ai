@@ -1,6 +1,7 @@
 export type {
   // Tool definitions
   ToolDefinition,
+  ToolAnnotations,
   // Client to server messages (AG-UI protocol)
   ClientMessage,
   RunAgentMessage,
@@ -36,6 +37,7 @@ export type {
   ActivityDeltaEvent,
   AGUIEvent,
   // use-ai extensions
+  ToolCallStartExtensions,
   WorkflowStatus,
   UseAIClientMessage,
   RunWorkflowMessage,

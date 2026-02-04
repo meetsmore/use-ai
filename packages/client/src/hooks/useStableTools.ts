@@ -10,7 +10,7 @@ import type { z } from 'zod';
  *
  * 1. Tool object references remain stable as long as tool names don't change
  * 2. Handler calls are proxied through refs to always use the latest closure
- * 3. Metadata (description, schema, confirmationRequired) updates in-place
+ * 3. Metadata (description, schema, annotations) updates in-place
  *
  * @param tools - The tools definition from the user (potentially unstable references)
  * @returns Stabilized tools definition that won't cause effect re-runs
