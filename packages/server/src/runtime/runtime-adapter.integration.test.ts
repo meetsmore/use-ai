@@ -68,7 +68,7 @@ describe.each(RUNTIMES)('Runtime Adapter: %s', (runtime) => {
     const socket = await cleanup.createTestClient(basePort);
 
     // Check transport name
-    const transport = (socket.io as unknown as { engine: { transport: { name: string } } }).engine.transport.name;
+    const transport = socket.io.engine.transport.name;
     expect(transport).toBe('websocket');
 
     socket.disconnect();
@@ -78,7 +78,7 @@ describe.each(RUNTIMES)('Runtime Adapter: %s', (runtime) => {
     const socket = await cleanup.createPollingTestClient(basePort);
 
     // Check transport name
-    const transport = (socket.io as unknown as { engine: { transport: { name: string } } }).engine.transport.name;
+    const transport = socket.io.engine.transport.name;
     expect(transport).toBe('polling');
 
     // Verify we can still communicate
