@@ -1,0 +1,67 @@
+packages/client/src/hooks/useChatManagement.ts
+  3f2f65bcba0c7c06 111-112,194,556-561,609,611,613,616,620
+packages/client/src/components/UseAIChat.tsx
+  3f2f65bcba0c7c06 5,75-93,186,189-191
+packages/server/src/types.ts
+  3f2f65bcba0c7c06 172-174,177
+packages/core/src/index.ts
+  3f2f65bcba0c7c06 50-52,62
+apps/example/src/components/ListItem.tsx
+  3f2f65bcba0c7c06 104
+docs/plans/confirmation-v3.md
+  3f2f65bcba0c7c06 1-678
+packages/server/src/index.ts
+  3f2f65bcba0c7c06 20
+packages/client/src/theme/strings.ts
+  3f2f65bcba0c7c06 111-130
+apps/example/src/useCalculatorLogic.ts
+  3f2f65bcba0c7c06 91
+packages/core/src/types.ts
+  3f2f65bcba0c7c06 211-256,323,329
+packages/client/src/hooks/useToolExecution.ts
+  3f2f65bcba0c7c06 1-221
+apps/example/test/tool-approval.e2e.test.ts
+  3f2f65bcba0c7c06 1-220
+packages/client/src/types.ts
+  3f2f65bcba0c7c06 56-58,67
+packages/server/src/agents/toolApproval.ts
+  3f2f65bcba0c7c06 1-109
+packages/server/src/agents/index.ts
+  3f2f65bcba0c7c06 16-23
+packages/client/src/components/ToolApprovalDialog.tsx
+  3f2f65bcba0c7c06 1-72,77-78,80-81,84-90,94-97,99,101-103,105-108,110,112,114,117-119,128-130,136-140,144-178,180-185,187-190,214-215,218-224,231-236,239-244,247-249,251-254
+packages/client/src/providers/useAIProvider.tsx
+  3f2f65bcba0c7c06 2-3,23,482-491,502,603-604,609-615,617-623,866-873,912-914
+packages/client/src/components/UseAIChatPanel.tsx
+  3f2f65bcba0c7c06 3,13,188-198,232-234,1107-1109,1113-1116,1118-1129,1131-1132,1135-1139,1142-1143,1145-1148,1152-1153,1160-1161,1163-1164,1170,1176-1180,1183-1184,1187,1193,1199,1207-1213,1228-1243,1250-1251,1256-1257,1259
+packages/server/src/server.ts
+  3f2f65bcba0c7c06 14,360-362,648-649,664-665,667-669,671-684,687
+apps/example/src/pages/MultiListPage.tsx
+  3f2f65bcba0c7c06 77-78
+packages/client/src/client.ts
+  3f2f65bcba0c7c06 15,390,442-460
+packages/server/src/agents/AISDKAgent.ts
+  3f2f65bcba0c7c06 10,31,370,451,543,790-791,804-813
+packages/server/src/agents/types.ts
+  3f2f65bcba0c7c06 3,38,64-68,74-75
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.42",
+  "base_commit_sha": "7e3e36bdfe8fd4267cf6fdebf6cb6e3d463065d0",
+  "prompts": {
+    "3f2f65bcba0c7c06": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "668f7dd2-c676-4d7f-b03f-7eb2a4b6f1ae",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 3328,
+      "total_deletions": 1451,
+      "accepted_lines": 2029,
+      "overriden_lines": 40
+    }
+  }
+}
