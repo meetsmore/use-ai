@@ -1,6 +1,6 @@
 import type { Socket } from 'socket.io';
 import type { ModelMessage } from 'ai';
-import type { ToolDefinition, AGUIEvent } from '../types';
+import type { ToolDefinition, AGUIEvent, ToolApprovalRequestEvent } from '../types';
 
 /**
  * Context for a single client session.
@@ -35,6 +35,8 @@ export interface ClientSession {
   mcpHeadersHash?: string;
   /** Timestamp when MCP tools cache was populated (for TTL-based invalidation) */
   mcpToolsCacheTimestamp?: number;
+  /** Map of pending tool approvals awaiting user decision. Key: toolCallId, Value: resolver function */
+  pendingToolApprovals: Map<string, (result: { approved: boolean; reason?: string }) => void>;
 }
 
 /**
@@ -59,12 +61,18 @@ export interface AgentInput {
 }
 
 /**
+ * All event types that can be emitted by agents.
+ * Includes AG-UI events and use-ai extension events.
+ */
+export type AGUIEventExtended = AGUIEvent | ToolApprovalRequestEvent;
+
+/**
  * Interface for emitting AG-UI protocol events.
  * All agents must use this to communicate results to clients.
  */
 export interface EventEmitter {
-  /** Emit an AG-UI event to the client */
-  emit<T extends AGUIEvent = AGUIEvent>(event: T): void;
+  /** Emit an event to the client (AG-UI or use-ai extension) */
+  emit<T extends AGUIEventExtended = AGUIEventExtended>(event: T): void;
 }
 
 /**

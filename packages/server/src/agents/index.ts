@@ -13,3 +13,11 @@ export {
   type CacheBreakpointResult,
   type CacheBreakpointFn,
 } from './anthropicCache';
+export {
+  toolNeedsApproval,
+  createApprovalWrapper,
+  waitForApproval,
+  type ToolArguments,
+  type ToolResult,
+  type ToolExecutor,
+} from './toolApproval';

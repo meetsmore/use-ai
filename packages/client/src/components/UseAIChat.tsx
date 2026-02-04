@@ -2,7 +2,7 @@ import React, { createContext, useContext } from 'react';
 import { UseAIChatPanel } from './UseAIChatPanel';
 import { UseAIFloatingChatWrapper, CloseButton } from './UseAIFloatingChatWrapper';
 import type { Message } from './UseAIChatPanel';
-import type { AgentInfo, FeedbackValue } from '../types';
+import type { AgentInfo, FeedbackValue, ToolAnnotations } from '../types';
 import type { FileUploadConfig, FileAttachment, FileProcessingState } from '../fileUpload/types';
 import type { SavedCommand } from '../commands/types';
 import type { Chat } from '../providers/chatRepository/types';
@@ -72,8 +72,25 @@ export interface ChatUIContextValue {
     /** Set the chat open state */
     setOpen: (open: boolean) => void;
   };
-  /** Currently executing tool info for status display */
-  executingTool: { displayText: string } | null;
+  /** Tool execution and approval state */
+  tools: {
+    /** Currently executing tool info for status display */
+    executing: { displayText: string } | null;
+    /** Pending tool approval */
+    pending: {
+      /** All tools awaiting approval */
+      tools: Array<{
+        toolCallId: string;
+        toolCallName: string;
+        toolCallArgs: Record<string, unknown>;
+        annotations?: ToolAnnotations;
+      }>;
+      /** Approve all pending tool calls */
+      approveAll: () => void;
+      /** Reject all pending tool calls with optional reason */
+      rejectAll: (reason?: string) => void;
+    };
+  };
   /** Feedback functionality */
   feedback?: {
     /** Whether feedback is enabled (requires Langfuse on server) */
@@ -166,9 +183,12 @@ export function UseAIChat({ floating = false }: UseAIChatProps) {
     onSaveCommand: ctx.commands.save,
     onRenameCommand: ctx.commands.rename,
     onDeleteCommand: ctx.commands.delete,
-    executingTool: ctx.executingTool,
+    executingTool: ctx.tools.executing,
     feedbackEnabled: ctx.feedback?.enabled,
     onFeedback: ctx.feedback?.submit,
+    pendingApprovals: ctx.tools.pending.tools,
+    onApproveToolCall: ctx.tools.pending.tools.length > 0 ? ctx.tools.pending.approveAll : undefined,
+    onRejectToolCall: ctx.tools.pending.tools.length > 0 ? ctx.tools.pending.rejectAll : undefined,
   };
 
   if (floating) {

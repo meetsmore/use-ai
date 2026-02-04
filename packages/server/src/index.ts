@@ -17,6 +17,7 @@ export { logger } from './logger';
 export {
   createClientToolExecutor,
   isRemoteTool,
+  getToolAnnotations,
   createGlobFilter,
   and,
   or,
