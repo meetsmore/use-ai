@@ -1,4 +1,4 @@
-import type { CorsOptions } from '../types';
+import type { CorsOptions } from '../../types';
 
 /**
  * Get Access-Control-Allow-Origin header value based on cors config and request origin.

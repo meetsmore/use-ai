@@ -1,7 +1,7 @@
 import type { Server as SocketIOServer } from 'socket.io';
 import { Server as BunEngine } from '@socket.io/bun-engine';
 import type { RuntimeAdapter, RuntimeServerConfig, RuntimeServerHandle } from '../types';
-import { resolveCorsHeaders, resolvePreflightHeaders } from '../cors';
+import { resolveCorsHeaders, resolvePreflightHeaders } from './cors';
 
 /**
  * Runtime adapter for Bun.

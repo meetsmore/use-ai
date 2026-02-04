@@ -10,7 +10,6 @@ export type {
 } from './types';
 export { detectRuntime } from './detection';
 export { createClientIpTracker, type ClientIpTracker, type ClientIpConnection } from './clientIp';
-export { getAllowedOrigin, resolveCorsHeaders, resolvePreflightHeaders } from './cors';
 
 /**
  * Creates a runtime adapter for the specified or detected runtime.
