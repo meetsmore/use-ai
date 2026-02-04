@@ -1,0 +1,23 @@
+packages/server/src/runtime/index.ts
+  66f7004513f37b93 23
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.42",
+  "base_commit_sha": "328cce4e287e24119050340d32620358b385821d",
+  "prompts": {
+    "66f7004513f37b93": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e36127d8-ca69-40da-9b57-8d7b7f630b3b",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 2,
+      "total_deletions": 2,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    }
+  }
+}
