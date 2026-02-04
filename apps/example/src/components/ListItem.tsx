@@ -27,7 +27,8 @@ export default function ListItem({ id, initialLabel, initialColor, onDelete }: L
           message: `Updated ${id} label to: ${input.text}`,
           itemId: id
         };
-      }
+      },
+      { annotations: { title: `Updating ${id} Label` } }
     ),
 
     setColor: defineTool(
@@ -42,7 +43,8 @@ export default function ListItem({ id, initialLabel, initialColor, onDelete }: L
           message: `Changed ${id} color to: ${input.color}`,
           itemId: id
         };
-      }
+      },
+      { annotations: { title: `Changing ${id} Color` } }
     ),
 
     incrementCounter: defineTool(
@@ -63,7 +65,8 @@ export default function ListItem({ id, initialLabel, initialColor, onDelete }: L
           itemId: id,
           newValue
         };
-      }
+      },
+      { annotations: { title: `Incrementing ${id}` } }
     ),
 
     decrementCounter: defineTool(
@@ -84,7 +87,8 @@ export default function ListItem({ id, initialLabel, initialColor, onDelete }: L
           itemId: id,
           newValue
         };
-      }
+      },
+      { annotations: { title: `Decrementing ${id}` } }
     ),
 
     resetCounter: defineTool(
@@ -96,7 +100,8 @@ export default function ListItem({ id, initialLabel, initialColor, onDelete }: L
           message: `Reset ${id} counter to 0`,
           itemId: id
         };
-      }
+      },
+      { annotations: { title: `Resetting ${id}` } }
     ),
 
     getState: defineTool(
@@ -109,7 +114,8 @@ export default function ListItem({ id, initialLabel, initialColor, onDelete }: L
           color,
           timestamp: new Date().toISOString()
         };
-      }
+      },
+      { annotations: { title: `Reading ${id} State`, readOnlyHint: true } }
     ),
   };
 

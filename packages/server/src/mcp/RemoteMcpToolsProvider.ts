@@ -1,4 +1,4 @@
-import type { ToolDefinition, McpHeadersMap } from '@meetsmore-oss/use-ai-core';
+import type { ToolDefinition, McpHeadersMap, ToolAnnotations } from '@meetsmore-oss/use-ai-core';
 import type { McpEndpointConfig } from '../types';
 import { logger } from '../logger';
 import { findMatch } from '../utils/patternMatcher';
@@ -6,6 +6,7 @@ import { findMatch } from '../utils/patternMatcher';
 /**
  * Schema format returned by MCP endpoints.
  * Based on Model Context Protocol specification.
+ * @see https://modelcontextprotocol.io/specification/2025-06-18/server/tools
  */
 interface McpToolSchema {
   name: string;
@@ -16,6 +17,8 @@ interface McpToolSchema {
     required?: string[];
     [key: string]: unknown;
   };
+  /** MCP tool annotations for UI hints */
+  annotations?: ToolAnnotations;
 }
 
 interface McpSchemaResponse {
@@ -34,6 +37,8 @@ export interface RemoteToolDefinition extends ToolDefinition {
     provider: RemoteMcpToolsProvider;
     /** The original tool name (before namespace prefix) */
     originalName: string;
+    /** MCP tool annotations (title, hints, etc.) */
+    annotations?: ToolAnnotations;
   };
 }
 
@@ -153,8 +158,14 @@ export class RemoteMcpToolsProvider {
         _remote: {
           provider: this,
           originalName: tool.name,
+          annotations: tool.annotations,
         },
       };
+
+      // Pass through annotations if present
+      if (tool.annotations) {
+        toolDef.annotations = tool.annotations;
+      }
 
       return toolDef;
     });

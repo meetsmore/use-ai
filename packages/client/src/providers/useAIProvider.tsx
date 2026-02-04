@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
-import type { UseAIConfig, AGUIEvent, ToolCallEndEvent, RunErrorEvent, RunFinishedEvent, AgentInfo, TextMessageContentEvent } from '../types';
+import type { UseAIConfig, AGUIEvent, ToolCallStartEvent, ToolCallEndEvent, RunErrorEvent, RunFinishedEvent, AgentInfo, TextMessageContentEvent, ToolCallStartExtensions } from '../types';
 import { EventType, ErrorCode } from '../types';
 import { UseAIFloatingButton } from '../components/UseAIFloatingButton';
 import { UseAIChatPanel, type Message } from '../components/UseAIChatPanel';
@@ -431,6 +431,13 @@ export function UseAIProvider({
   // Track which chat the current streaming text belongs to
   const streamingChatIdRef = useRef<string | null>(null);
 
+  // Track currently executing tool for UI status display
+  const [executingTool, setExecutingTool] = useState<{
+    toolCallId: string;
+    title: string | null;
+  } | null>(null);
+  const executingToolFallbackRef = useRef<string | null>(null);
+
   const clientRef = useRef<UseAIClient | null>(null);
   const repositoryRef = useRef<ChatRepository>(
     chatRepository || new LocalStorageChatRepository()
@@ -544,9 +551,29 @@ export function UseAIProvider({
     client.connect();
 
     const unsubscribe = client.onEvent('globalChat', async (event: AGUIEvent) => {
-      if (event.type === EventType.TOOL_CALL_END) {
+      if (event.type === EventType.TOOL_CALL_START) {
+        // Cast to include use-ai extensions (optional, for AG-UI compatibility)
+        const e = event as ToolCallStartEvent & Partial<ToolCallStartExtensions>;
+
+        // Get title from:
+        // 1. Event annotations (use-ai server with MCP tools)
+        // 2. Local tool definition (client-side tools via defineTool)
+        // 3. `null` == will fallback to a generic message.`
+        const tool = aggregatedToolsRef.current[e.toolCallName];
+        const title = e.annotations?.title ?? tool?._options?.annotations?.title ?? null;
+
+        if (!title) {
+          const fallbacks = strings.toolExecution.fallbackMessages;
+          executingToolFallbackRef.current = fallbacks[Math.floor(Math.random() * fallbacks.length)];
+        }
+
+        setExecutingTool({ toolCallId: e.toolCallId, title });
+      } else if (event.type === EventType.TOOL_CALL_END) {
         const toolCallEnd = event as ToolCallEndEvent;
         const toolCallId = toolCallEnd.toolCallId;
+
+        // Clear executing tool state if this is the tool that was executing
+        setExecutingTool(prev => prev?.toolCallId === toolCallId ? null : prev);
 
         // Get the accumulated tool call data
         const toolCallData = client['currentToolCalls'].get(toolCallId);
@@ -815,6 +842,11 @@ export function UseAIProvider({
   // This prevents streaming from a previous chat appearing when switching chats
   const effectiveStreamingText = streamingChatIdRef.current === displayedChatId ? streamingText : '';
 
+  // Compute executing tool display value for UI
+  const executingToolDisplay = executingTool ? {
+    displayText: executingTool.title ?? executingToolFallbackRef.current ?? strings.toolExecution.fallbackMessages[0],
+  } : null;
+
   // Chat UI context value - used by UseAIChat component
   const chatUIContextValue: ChatUIContextValue = {
     connected,
@@ -849,6 +881,7 @@ export function UseAIProvider({
       isOpen: isChatOpen,
       setOpen: handleSetChatOpen,
     },
+    executingTool: executingToolDisplay,
     feedback: {
       enabled: feedback.enabled,
       submit: feedback.submitFeedback,
@@ -884,6 +917,7 @@ export function UseAIProvider({
     onSaveCommand: saveCommand,
     onRenameCommand: renameCommand,
     onDeleteCommand: deleteCommand,
+    executingTool: executingToolDisplay,
     feedbackEnabled: feedback.enabled,
     onFeedback: feedback.submitFeedback,
   };

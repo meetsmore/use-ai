@@ -640,7 +640,7 @@ export class UseAIServer {
       parts.push('Use the available tools to interact with and modify the UI based on user requests.');
     }
 
-    const confirmationTools = session.tools.filter(tool => tool.confirmationRequired);
+    const confirmationTools = session.tools.filter(tool => tool.annotations?.destructiveHint);
     if (confirmationTools.length > 0) {
       if (parts.length > 0) {
         parts.push('');

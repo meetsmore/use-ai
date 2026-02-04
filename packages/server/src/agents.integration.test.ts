@@ -257,7 +257,7 @@ describe('Agent System', () => {
     stateServer.close();
   });
 
-  test('System instructs AI to ask for confirmation on confirmationRequired tools', async () => {
+  test('System instructs AI to ask for confirmation on destructiveHint tools', async () => {
     // Create a custom server that verifies confirmation instructions
     const confirmPort = 9102;
     const confirmMockModel = createSystemPromptValidatorMockModel((messages) => {
@@ -284,7 +284,7 @@ describe('Agent System', () => {
         name: 'delete_account',
         description: 'Delete user account',
         parameters: { type: 'object', properties: {} },
-        confirmationRequired: true,
+        annotations: { destructiveHint: true },
       },
     ];
 

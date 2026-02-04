@@ -42,7 +42,7 @@ export type {
   UseAIProviderProps,
 } from './providers/useAIProvider';
 export type { SendMessageOptions } from './hooks/useChatManagement';
-export type { DefinedTool, ToolsDefinition, ToolOptions } from './defineTool';
+export type { DefinedTool, ToolsDefinition, ToolOptions, ToolAnnotations } from './defineTool';
 
 // Chat persistence
 export { LocalStorageChatRepository } from './providers/chatRepository/LocalStorageChatRepository';

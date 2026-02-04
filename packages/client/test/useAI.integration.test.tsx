@@ -392,13 +392,13 @@ describe('useAI Integration Tests', () => {
     });
   });
 
-  describe('confirmationRequired can be set to instruct the backend to confirm operations', () => {
-    it('should include confirmationRequired in tool definition when set', async () => {
+  describe('destructiveHint annotation instructs the backend to confirm operations', () => {
+    it('should include destructiveHint in annotations when set', async () => {
       const deleteTodo = defineTool(
         'Delete a todo',
         z.object({ id: z.string() }),
         () => ({ success: true }),
-        { confirmationRequired: true }
+        { annotations: { destructiveHint: true } }
       );
 
       const TestComponent = () => {
@@ -412,12 +412,12 @@ describe('useAI Integration Tests', () => {
           <TestComponent />
         </UseAIProvider>
       );
-      // confirmationRequired is part of tool definition (verified in defineTool tests)
+      // destructiveHint is part of annotations (verified in defineTool tests)
       // Just verify component renders
-      expect(deleteTodo._options.confirmationRequired).toBe(true);
+      expect(deleteTodo._options.annotations?.destructiveHint).toBe(true);
     });
 
-    it('should not include confirmationRequired when not set', async () => {
+    it('should not include annotations when not set', async () => {
       const getTodo = defineTool(
         'Get a todo',
         z.object({ id: z.string() }),
@@ -436,7 +436,7 @@ describe('useAI Integration Tests', () => {
         </UseAIProvider>
       );
 
-      expect(getTodo._options.confirmationRequired).toBeUndefined();
+      expect(getTodo._options.annotations).toBeUndefined();
     });
   });
 

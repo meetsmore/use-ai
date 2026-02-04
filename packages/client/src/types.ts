@@ -9,6 +9,7 @@ export interface UseAIConfig {
 // Re-export all types from @meetsmore-oss/use-ai-core for convenience
 export type {
   ToolDefinition,
+  ToolAnnotations,
   // AG-UI types
   Tool,
   Message,
@@ -42,6 +43,7 @@ export type {
   ActivityDeltaEvent,
   AGUIEvent,
   // use-ai extensions
+  ToolCallStartExtensions,
   WorkflowStatus,
   UseAIClientMessage,
   RunWorkflowMessage,

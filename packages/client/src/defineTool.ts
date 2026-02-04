@@ -1,12 +1,15 @@
 import { z } from 'zod';
-import type { ToolDefinition } from '@meetsmore-oss/use-ai-core';
+import type { ToolDefinition, ToolAnnotations } from '@meetsmore-oss/use-ai-core';
+
+// Re-export ToolAnnotations for convenience
+export type { ToolAnnotations };
 
 /**
  * Options for configuring tool behavior.
  */
 export interface ToolOptions {
-  /** Whether the tool asks the AI for explicit user confirmation before execution */
-  confirmationRequired?: boolean;
+  /** MCP-aligned annotations for tool behavior hints */
+  annotations?: ToolAnnotations;
 }
 
 /**
@@ -156,8 +159,9 @@ export function defineTool<T extends z.ZodType>(
         parameters,
       };
 
-      if (this._options.confirmationRequired) {
-        toolDef.confirmationRequired = true;
+      // Pass through annotations if present
+      if (this._options.annotations) {
+        toolDef.annotations = this._options.annotations;
       }
 
       return toolDef;

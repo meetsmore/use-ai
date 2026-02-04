@@ -162,8 +162,8 @@ describe('useStableTools - Unit', () => {
   });
 
   test('updates options without changing reference', () => {
-    const tool1 = defineTool('Tool', z.object({}), () => ({}), { confirmationRequired: false });
-    const tool2 = defineTool('Tool', z.object({}), () => ({}), { confirmationRequired: true });
+    const tool1 = defineTool('Tool', z.object({}), () => ({}), { annotations: { readOnlyHint: true } });
+    const tool2 = defineTool('Tool', z.object({}), () => ({}), { annotations: { destructiveHint: true } });
 
     const tools1: ToolsDefinition = { foo: tool1 };
     const tools2: ToolsDefinition = { foo: tool2 };
@@ -174,14 +174,14 @@ describe('useStableTools - Unit', () => {
     );
 
     const firstResult = result.current;
-    expect(firstResult!.foo._options.confirmationRequired).toBe(false);
+    expect(firstResult!.foo._options.annotations?.readOnlyHint).toBe(true);
 
     rerender({ tools: tools2 });
 
     // Same reference
     expect(result.current).toBe(firstResult);
     // But updated options
-    expect(result.current!.foo._options.confirmationRequired).toBe(true);
+    expect(result.current!.foo._options.annotations?.destructiveHint).toBe(true);
   });
 
   test('throws error when calling handler for removed tool', () => {

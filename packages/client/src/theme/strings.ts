@@ -102,6 +102,12 @@ export const defaultStrings = {
     /** Error for unknown/unexpected errors */
     UNKNOWN_ERROR: 'An unexpected error occurred. Please try again.',
   },
+
+  // Tool execution status
+  toolExecution: {
+    /** Fallback messages when no tool title is provided (one randomly selected) */
+    fallbackMessages: ['Working', 'Processing', 'Thinking'],
+  },
 };
 
 /**
