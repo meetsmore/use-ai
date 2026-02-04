@@ -1,0 +1,23 @@
+packages/server/src/runtime/node/NodeRuntimeAdapter.ts
+  179d87336b449c2e 51-53,56,58,61
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.42",
+  "base_commit_sha": "7d5ae54e2f5a47fb69fe86e1db7b075e18b2d1d5",
+  "prompts": {
+    "179d87336b449c2e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f1239f6d-27f3-4c5e-859e-05a2f18fbe7e",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 10,
+      "total_deletions": 13,
+      "accepted_lines": 6,
+      "overriden_lines": 0
+    }
+  }
+}
