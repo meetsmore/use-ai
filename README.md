@@ -44,6 +44,7 @@ A React client/framework for easily enabling AI to control your users frontend.
     - [Custom UI](#custom-ui)
     - [Slash Commands](#slash-commands)
     - [File Upload](#file-upload)
+    - [File Transformers](#file-transformers)
     - [Multimodal Support](#multimodal-support)
     - [Theme Customization](#theme-customization)
     - [Internationalization](#internationalization)
@@ -54,6 +55,7 @@ A React client/framework for easily enabling AI to control your users frontend.
     - [External MCPs](#external-mcps)
     - [Rate Limiting](#rate-limiting)
     - [Langfuse](#langfuse)
+    - [Feedback](#feedback)
   - [Plugins](#plugins)
     - [`@meetsmore-oss/use-ai-plugin-workflows`](#meetsmore-use-ai-plugin-workflows)
 
@@ -726,6 +728,57 @@ Enable file uploads in chat:
 >
 ```
 
+### File Transformers
+
+File transformers allow you to preprocess files before sending them to the AI. This is useful for extracting text from PDFs, performing OCR on images, or any other file-to-text conversion.
+
+```tsx
+import { UseAIProvider, FileTransformer } from '@meetsmore-oss/use-ai-client';
+
+// Define a custom transformer
+const pdfTransformer: FileTransformer = {
+  transform: async (file, context, onProgress) => {
+    // context.chat contains the current chat with metadata
+    onProgress?.(10); // Report progress (shows progress bar in UI)
+
+    const text = await extractTextFromPDF(file); // Your extraction logic
+
+    onProgress?.(100);
+    return text; // This text is sent to the AI instead of the raw file
+  }
+};
+
+<UseAIProvider
+  serverUrl="ws://localhost:8081"
+  fileUploadConfig={{
+    transformers: {
+      'application/pdf': pdfTransformer,      // Exact MIME type match
+      'image/*': imageOcrTransformer,         // Wildcard match for all images
+    }
+  }}
+>
+```
+
+**MIME Type Matching:**
+
+When multiple patterns match a file, the most specific one wins:
+1. Exact match (`application/pdf`)
+2. Partial wildcard (`image/*`)
+3. Global wildcard (`*`)
+
+**Progress Reporting:**
+
+- If `onProgress` is called, the UI shows a progress bar
+- If `onProgress` is never called, the UI shows a spinner
+- Progress values should be 0-100
+
+**Transformer Context:**
+
+Transformers receive a `context` object containing:
+- `chat`: The current chat object (includes metadata set via `chat.updateMetadata()`)
+
+This allows transformers to access chat metadata for context-aware processing (e.g., document type hints).
+
 ### Theme Customization
 
 Customize the chat UI appearance:
@@ -923,6 +976,20 @@ The `use-ai` `AISDKAgent` supports this out of the box, just set these environme
 LANGFUSE_PUBLIC_KEY='your-langfuse-public-key'
 LANGFUSE_SECRET_KEY='your-langfuse-secret-key'
 ```
+
+### Feedback
+
+Enable thumbs up/down feedback buttons on AI messages to collect user ratings. Feedback is submitted to Langfuse as scores linked to the corresponding trace.
+
+**Server setup:**
+
+The plugin reads Langfuse credentials from `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY` environment variables by default.
+
+If these are set, the `FeedbackPlugin` will be enabled automatically.
+
+**Client setup:**
+
+The built-in chat UI includes feedback buttons automatically when the server has `FeedbackPlugin` enabled.
 
 ### Bundled Client Library (optional)
 

@@ -24,7 +24,7 @@ import type {
   ToolCallStartExtensions,
 } from '../types';
 import { logger } from '../logger';
-import { initializeLangfuse, type LangfuseConfig } from '../instrumentation';
+import { langfuse, popTraceIdForRun, type LangfuseApi } from '../instrumentation';
 import { applyCacheBreakpoints, type CacheBreakpointFn } from './anthropicCache';
 
 /**
@@ -259,7 +259,7 @@ export class AISDKAgent implements Agent {
   private model: LanguageModel;
   private name: string;
   private annotation?: string;
-  private langfuse: LangfuseConfig;
+  private langfuse: LangfuseApi;
   private toolFilter?: (tool: ToolDefinition) => boolean;
   private systemPrompt?: string | (() => string | Promise<string>);
   private cacheBreakpoint?: CacheBreakpointFn;
@@ -274,7 +274,7 @@ export class AISDKAgent implements Agent {
     this.cacheBreakpoint = config.cacheBreakpoint;
     this.maxOutputTokens = config.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS;
     // Initialize Langfuse observability (automatically reads env vars)
-    this.langfuse = initializeLangfuse();
+    this.langfuse = langfuse;
   }
 
   getName(): string {
@@ -382,6 +382,7 @@ export class AISDKAgent implements Agent {
         experimental_telemetry: this.langfuse?.enabled
           ? {
               isEnabled: true,
+              functionId: 'use-ai',
               metadata: {
                 sessionId: session.clientId,
                 threadId: session.threadId,
@@ -625,11 +626,14 @@ export class AISDKAgent implements Agent {
         logger.aiResponse([finalText]);
       }
 
-      // Emit RUN_FINISHED
+      // Get trace ID captured by span processor (for Langfuse feedback linking)
+      const traceId = popTraceIdForRun(runId);
+
+      // Emit RUN_FINISHED with trace ID if available, otherwise original runId
       events.emit<RunFinishedEvent>({
         type: EventType.RUN_FINISHED,
         threadId: session.threadId,
-        runId,
+        runId: traceId || runId,
         result: finalText,
         timestamp: Date.now(),
       });

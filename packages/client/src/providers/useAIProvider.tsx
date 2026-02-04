@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
-import type { UseAIConfig, AGUIEvent, ToolCallStartEvent, ToolCallEndEvent, RunErrorEvent, AgentInfo, TextMessageContentEvent, ToolCallStartExtensions } from '../types';
+import type { UseAIConfig, AGUIEvent, ToolCallStartEvent, ToolCallEndEvent, RunErrorEvent, RunFinishedEvent, AgentInfo, TextMessageContentEvent, ToolCallStartExtensions } from '../types';
 import { EventType, ErrorCode } from '../types';
 import { UseAIFloatingButton } from '../components/UseAIFloatingButton';
 import { UseAIChatPanel, type Message } from '../components/UseAIChatPanel';
@@ -9,7 +9,7 @@ import { UseAIClient } from '../client';
 import { convertToolsToDefinitions, executeDefinedTool, type ToolsDefinition } from '../defineTool';
 import type { ChatRepository, Chat, ChatMetadata, CreateChatOptions, PersistedMessageContent, PersistedContentPart } from './chatRepository/types';
 import { LocalStorageChatRepository } from './chatRepository/LocalStorageChatRepository';
-import type { FileAttachment, FileUploadConfig } from '../fileUpload/types';
+import type { FileAttachment, FileUploadConfig, FileProcessingState } from '../fileUpload/types';
 import { processAttachments } from '../fileUpload/processAttachments';
 import { EmbedFileUploadBackend } from '../fileUpload/EmbedFileUploadBackend';
 import type { MultimodalContent } from '@meetsmore-oss/use-ai-core';
@@ -19,6 +19,7 @@ import { useAgentSelection } from '../hooks/useAgentSelection';
 import { useCommandManagement } from '../hooks/useCommandManagement';
 import { useToolRegistry } from '../hooks/useToolRegistry';
 import { usePromptState } from '../hooks/usePromptState';
+import { useFeedback } from '../hooks/useFeedback';
 import { ThemeContext, StringsContext, defaultTheme, defaultStrings } from '../theme';
 import type { UseAITheme, UseAIStrings } from '../theme';
 
@@ -418,6 +419,8 @@ export function UseAIProvider({
   const [connected, setConnected] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [fileProcessingState, setFileProcessingState] = useState<FileProcessingState | null>(null);
 
   // Wrapper for setIsChatOpen that also calls onOpenChange callback
   const handleSetChatOpen = useCallback((open: boolean) => {
@@ -479,6 +482,8 @@ export function UseAIProvider({
   const chatManagement = useChatManagement({
     repository: repositoryRef.current,
     clientRef,
+    messages,
+    setMessages,
     onSendMessage: stableSendMessage,
     setOpen: handleSetChatOpen,
     connected,
@@ -488,7 +493,6 @@ export function UseAIProvider({
   const {
     currentChatId,
     pendingChatId,
-    messages,
     displayedChatId,
     createNewChat,
     loadChat,
@@ -502,6 +506,14 @@ export function UseAIProvider({
     getCurrentChat,
     updateMetadata,
   } = chatManagement;
+
+  // Initialize feedback hook
+  const feedback = useFeedback({
+    clientRef,
+    repository: repositoryRef.current,
+    getDisplayedChatId: () => displayedChatId,
+    setMessages,
+  });
 
   // Initialize agent selection hook
   const {
@@ -632,14 +644,19 @@ export function UseAIProvider({
         const contentEvent = event as TextMessageContentEvent;
         setStreamingText(prev => prev + contentEvent.delta);
       } else if (event.type === EventType.TEXT_MESSAGE_END) {
+        // Content will be saved on RUN_FINISHED to include traceId
+        // Just clear streaming UI state here
+        setStreamingText('');
+        streamingChatIdRef.current = null;
+      } else if (event.type === EventType.RUN_FINISHED) {
         const content = client.currentMessageContent;
         if (content) {
-          console.log('[Provider] Received text message:', content.substring(0, 100));
-          saveAIResponse(content); // Fire-and-forget is intentional here
-          setStreamingText(''); // Clear streaming text now that message is complete
-          streamingChatIdRef.current = null; // Clear streaming chat association
-          setLoading(false);
+          // Extract traceId directly from the event (runId is the trace ID)
+          const finishedEvent = event as RunFinishedEvent;
+          const traceId = finishedEvent.runId;
+          saveAIResponse(content, undefined, traceId);
         }
+        setLoading(false);
       } else if (event.type === EventType.RUN_ERROR) {
         const errorEvent = event as RunErrorEvent;
         const errorCode = errorEvent.message as ErrorCode;
@@ -736,27 +753,46 @@ export function UseAIProvider({
       }
       persistedContent = persistedParts;
 
-      // Build multimodal content from attachments
-      const fileContent = await processAttachments(attachments, {
-        getCurrentChat,
-        backend: fileUploadConfig?.backend,
-        transformers: fileUploadConfig?.transformers,
-      });
-
-      multimodalContent = [];
-      if (message.trim()) {
-        multimodalContent.push({ type: 'text', text: message });
+      // Save user message first so the UI shows it immediately
+      if (activeChatId) {
+        await saveUserMessage(activeChatId, persistedContent);
       }
-      multimodalContent.push(...fileContent);
-    }
 
-    // Save user message to storage
-    if (activeChatId) {
-      await saveUserMessage(activeChatId, persistedContent);
+      // Show loading state before processing (may be slow for transformers like OCR)
+      setLoading(true);
+
+      try {
+        // Build multimodal content from attachments
+        // onFileProgress updates fileProcessingState only when a transformer runs
+        const fileContent = await processAttachments(attachments, {
+          getCurrentChat,
+          backend: fileUploadConfig?.backend,
+          transformers: fileUploadConfig?.transformers,
+          onFileProgress: (_fileId, state) => {
+            setFileProcessingState(state);
+          },
+        });
+
+        multimodalContent = [];
+        if (message.trim()) {
+          multimodalContent.push({ type: 'text', text: message });
+        }
+        multimodalContent.push(...fileContent);
+      } catch (error) {
+        setLoading(false);
+        throw error;
+      } finally {
+        setFileProcessingState(null);
+      }
+    } else {
+      // No attachments — save user message
+      if (activeChatId) {
+        await saveUserMessage(activeChatId, persistedContent);
+      }
+      setLoading(true);
     }
 
     // State is already up-to-date via updatePrompt calls from useAI hooks
-    setLoading(true);
     await clientRef.current.sendPrompt(message, multimodalContent);
   }, [activatePendingChat, currentChatId, saveUserMessage, fileUploadConfig, getCurrentChat]);
 
@@ -820,6 +856,7 @@ export function UseAIProvider({
     streamingText: effectiveStreamingText,
     suggestions: aggregatedSuggestions,
     fileUploadConfig,
+    fileProcessing: fileProcessingState,
     history: {
       currentId: displayedChatId,
       create: createNewChat,
@@ -845,6 +882,10 @@ export function UseAIProvider({
       setOpen: handleSetChatOpen,
     },
     executingTool: executingToolDisplay,
+    feedback: {
+      enabled: feedback.enabled,
+      submit: feedback.submitFeedback,
+    },
   };
 
   // Use custom components if provided, or defaults (unless explicitly null to disable UI)
@@ -871,11 +912,14 @@ export function UseAIProvider({
     selectedAgent,
     onAgentChange: setAgent,
     fileUploadConfig,
+    fileProcessing: fileProcessingState,
     commands,
     onSaveCommand: saveCommand,
     onRenameCommand: renameCommand,
     onDeleteCommand: deleteCommand,
     executingTool: executingToolDisplay,
+    feedbackEnabled: feedback.enabled,
+    onFeedback: feedback.submitFeedback,
   };
 
   // Render function for default floating chat UI

@@ -24,8 +24,16 @@ afterAll(() => {
   cleanup.cleanup();
 });
 
-describe('Connection Management', () => {
-  const testPort = 8081;
+// Test both runtime adapters
+const RUNTIMES: ('bun' | 'node')[] = ['bun', 'node'];
+
+// Port offset for each runtime to avoid conflicts
+// bun: +2000, node: +1000 (ranges don't overlap)
+const getPort = (basePort: number, runtime: 'bun' | 'node') =>
+  basePort + (runtime === 'node' ? 1000 : 2000);
+
+describe.each(RUNTIMES)('Connection Management [%s runtime]', (runtime) => {
+  const testPort = getPort(8081, runtime);
 
   test('client can connect to the server', async () => {
     const mockModel = createSequentialMockModel([{ text: 'Hello' }]);
@@ -34,6 +42,7 @@ describe('Connection Management', () => {
       port: testPort,
       agents: { test: agent },
       defaultAgent: 'test',
+      runtime,
     });
     cleanup.trackServer(server);
 
@@ -49,6 +58,7 @@ describe('Connection Management', () => {
       port: testPort + 1,
       agents: { test: agent },
       defaultAgent: 'test',
+      runtime,
     });
     cleanup.trackServer(server);
 
@@ -63,9 +73,9 @@ describe('Connection Management', () => {
   });
 });
 
-describe('Tool Use', () => {
+describe.each(RUNTIMES)('Tool Use [%s runtime]', (runtime) => {
   test('tools can be registered and invoked by the AI', async () => {
-    const toolPort = 8182;
+    const toolPort = getPort(8182, runtime);
     const toolMockModel = createSequentialMockModel([
       {
         toolCalls: [{ toolCallId: 'toolu_123', toolName: 'add_todo', input: { text: 'Buy milk' } }],
@@ -80,6 +90,7 @@ describe('Tool Use', () => {
       port: toolPort,
       agents: { test: toolAgent },
       defaultAgent: 'test',
+      runtime,
     });
     cleanup.trackServer(toolServer);
 
@@ -128,7 +139,7 @@ describe('Tool Use', () => {
   });
 
   test('the AI can invoke a tool on the client and receive a response', async () => {
-    const tool2Port = 8183;
+    const tool2Port = getPort(8183, runtime);
     const tool2MockModel = createSequentialMockModel([
       {
         toolCalls: [{ toolCallId: 'toolu_456', toolName: 'get_data', input: { id: '123' } }],
@@ -143,6 +154,7 @@ describe('Tool Use', () => {
       port: tool2Port,
       agents: { test: tool2Agent },
       defaultAgent: 'test',
+      runtime,
     });
     cleanup.trackServer(tool2Server);
 
@@ -193,7 +205,7 @@ describe('Tool Use', () => {
   });
 
   test('server emits proper AG-UI event sequence', async () => {
-    const seqPort = 8184;
+    const seqPort = getPort(8184, runtime);
     const seqMockModel = createSequentialMockModel([{ text: 'Hello world' }]);
 
     const seqAgent = new AISDKAgent({ model: seqMockModel });
@@ -201,6 +213,7 @@ describe('Tool Use', () => {
       port: seqPort,
       agents: { test: seqAgent },
       defaultAgent: 'test',
+      runtime,
     });
     cleanup.trackServer(seqServer);
 
@@ -234,9 +247,9 @@ describe('Tool Use', () => {
   });
 });
 
-describe('Multiple Tool Use', () => {
+describe.each(RUNTIMES)('Multiple Tool Use [%s runtime]', (runtime) => {
   test('AI can invoke multiple tools in sequence', async () => {
-    const multiPort = 8185;
+    const multiPort = getPort(8185, runtime);
     const multiMockModel = createSequentialMockModel([
       {
         toolCalls: [
@@ -254,6 +267,7 @@ describe('Multiple Tool Use', () => {
       port: multiPort,
       agents: { test: multiAgent },
       defaultAgent: 'test',
+      runtime,
     });
     cleanup.trackServer(multiServer);
 
@@ -323,9 +337,9 @@ describe('Multiple Tool Use', () => {
   });
 });
 
-describe('Error Handling', () => {
+describe.each(RUNTIMES)('Error Handling [%s runtime]', (runtime) => {
   test('server emits error event when AI call fails', async () => {
-    const errorPort = 8186;
+    const errorPort = getPort(8186, runtime);
     const errorMockModel = createErrorMockModel('API Error');
 
     const errorAgent = new AISDKAgent({ model: errorMockModel });
@@ -333,6 +347,7 @@ describe('Error Handling', () => {
       port: errorPort,
       agents: { test: errorAgent },
       defaultAgent: 'test',
+      runtime,
     });
     cleanup.trackServer(errorServer);
 
@@ -352,9 +367,9 @@ describe('Error Handling', () => {
   });
 });
 
-describe('State Management', () => {
+describe.each(RUNTIMES)('State Management [%s runtime]', (runtime) => {
   test('server includes state in STATE_SNAPSHOT event', async () => {
-    const statePort = 8187;
+    const statePort = getPort(8187, runtime);
     const stateMockModel = createSequentialMockModel([{ text: 'OK' }]);
 
     const stateAgent = new AISDKAgent({ model: stateMockModel });
@@ -362,6 +377,7 @@ describe('State Management', () => {
       port: statePort,
       agents: { test: stateAgent },
       defaultAgent: 'test',
+      runtime,
     });
     cleanup.trackServer(stateServer);
 
@@ -385,9 +401,9 @@ describe('State Management', () => {
   });
 });
 
-describe('Rate Limiting', () => {
+describe.each(RUNTIMES)('Rate Limiting [%s runtime]', (runtime) => {
   test('server allows requests within rate limit', async () => {
-    const ratePort = 8188;
+    const ratePort = getPort(8188, runtime);
     const rateMockModel = createSequentialMockModel([
       { text: 'OK' },
       { text: 'OK' },
@@ -400,6 +416,7 @@ describe('Rate Limiting', () => {
       defaultAgent: 'test',
       rateLimitMaxRequests: 2,
       rateLimitWindowMs: 1000,
+      runtime,
     });
     cleanup.trackServer(rateServer);
 
@@ -427,7 +444,7 @@ describe('Rate Limiting', () => {
   });
 
   test('server blocks requests exceeding rate limit', async () => {
-    const blockPort = 8189;
+    const blockPort = getPort(8189, runtime);
     const blockMockModel = createSequentialMockModel([
       { text: 'OK' },
       { text: 'OK' },
@@ -440,6 +457,7 @@ describe('Rate Limiting', () => {
       defaultAgent: 'test',
       rateLimitMaxRequests: 2,
       rateLimitWindowMs: 1000,
+      runtime,
     });
     cleanup.trackServer(blockServer);
 
@@ -463,7 +481,7 @@ describe('Rate Limiting', () => {
   });
 
   test('rate limit resets after time window expires', async () => {
-    const resetPort = 8190;
+    const resetPort = getPort(8190, runtime);
     const resetMockModel = createSequentialMockModel([
       { text: 'OK' },
       { text: 'OK' },
@@ -477,6 +495,7 @@ describe('Rate Limiting', () => {
       defaultAgent: 'test',
       rateLimitMaxRequests: 2,
       rateLimitWindowMs: 1000,
+      runtime,
     });
     cleanup.trackServer(resetServer);
 
@@ -506,7 +525,7 @@ describe('Rate Limiting', () => {
   });
 
   test('clients from same IP share rate limit', async () => {
-    const indepPort = 8191;
+    const indepPort = getPort(8191, runtime);
     const indepMockModel = createSequentialMockModel([
       { text: 'OK' },
       { text: 'OK' },
@@ -519,6 +538,7 @@ describe('Rate Limiting', () => {
       defaultAgent: 'test',
       rateLimitMaxRequests: 2,
       rateLimitWindowMs: 1000,
+      runtime,
     });
     cleanup.trackServer(indepServer);
 

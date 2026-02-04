@@ -47,6 +47,8 @@ export type {
   WorkflowStatus,
   UseAIClientMessage,
   RunWorkflowMessage,
+  FeedbackMessage,
+  FeedbackValue,
   McpHeadersConfig,
   McpHeadersMap,
   AgentInfo,

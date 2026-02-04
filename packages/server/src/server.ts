@@ -1,6 +1,5 @@
 import { Server as SocketIOServer, Socket } from 'socket.io';
 import { ModelMessage, ToolModelMessage } from 'ai';
-import { createServer } from 'http';
 import { createHash } from 'crypto';
 import { EventType, type McpHeadersMap } from '@meetsmore-oss/use-ai-core';
 import type {
@@ -22,8 +21,16 @@ import { v4 as uuidv4 } from 'uuid';
 import type { Agent, EventEmitter } from './agents/types';
 import type { ClientSession } from './agents/types';
 import type { UseAIServerPlugin, MessageHandler } from './plugins/types';
+import { FeedbackPlugin } from './plugins/FeedbackPlugin';
 import { RemoteMcpToolsProvider, type RemoteToolDefinition } from './mcp';
 import { findMatch } from './utils/patternMatcher';
+import {
+  createRuntimeAdapter,
+  createClientIpTracker,
+  type RuntimeAdapter,
+  type RuntimeServerHandle,
+  type ClientIpTracker,
+} from './runtime';
 
 // Re-export ClientSession type for external use
 export type { ClientSession } from './agents/types';
@@ -77,18 +84,25 @@ export type { ClientSession } from './agents/types';
  */
 export class UseAIServer {
   private io: SocketIOServer;
-  private httpServer: ReturnType<typeof createServer>;
+  private runtimeAdapter: RuntimeAdapter;
+  private serverHandle: RuntimeServerHandle | null = null;
   private agent: Agent; // Default agent for chat (run_agent)
   private defaultAgentId: string; // ID of the default agent
   private agents: Record<string, Agent>; // Registry of all agents
   private clients: Map<string, ClientSession> = new Map();
-  private config: Required<Omit<UseAIServerConfig, 'defaultAgent' | 'agents' | 'plugins' | 'mcpEndpoints' | 'maxHttpBufferSize' | 'cors'>> & { maxHttpBufferSize: number; cors?: CorsOptions };
+  private config: Required<Omit<UseAIServerConfig, 'defaultAgent' | 'agents' | 'plugins' | 'mcpEndpoints' | 'maxHttpBufferSize' | 'cors' | 'idleTimeout' | 'runtime'>> & {
+    maxHttpBufferSize: number;
+    cors?: CorsOptions;
+    idleTimeout: number;
+  };
   private rateLimiter: RateLimiter;
   private cleanupInterval: NodeJS.Timeout;
   private clientIdCounter = 0;
   private plugins: UseAIServerPlugin[] = [];
   private messageHandlers: Map<string, MessageHandler> = new Map();
   private mcpEndpoints: RemoteMcpToolsProvider[] = [];
+  // Tracks client IP addresses for both WebSocket and polling transports
+  private clientIpTracker: ClientIpTracker;
 
   /**
    * Creates a new UseAI server instance.
@@ -103,6 +117,7 @@ export class UseAIServer {
       rateLimitWindowMs: config.rateLimitWindowMs ?? 60000,
       maxHttpBufferSize: config.maxHttpBufferSize ?? 20 * 1024 * 1024, // 20MB default
       cors: config.cors,
+      idleTimeout: config.idleTimeout ?? 30,
     };
 
     // Set agents registry
@@ -123,6 +138,9 @@ export class UseAIServer {
       windowMs: this.config.rateLimitWindowMs,
     });
 
+    // Create client IP tracker
+    this.clientIpTracker = createClientIpTracker();
+
     this.cleanupInterval = setInterval(() => {
       this.rateLimiter.cleanup();
     }, this.config.rateLimitWindowMs);
@@ -140,25 +158,16 @@ export class UseAIServer {
     this.plugins = config.plugins ?? [];
     this.initializePlugins();
 
-    // Create HTTP server for health checks
-    this.httpServer = createServer((req, res) => {
-      if (req.url === '/health') {
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ status: 'ok' }));
-      } else {
-        res.writeHead(404);
-        res.end();
-      }
-    });
+    // Create runtime adapter based on configuration
+    this.runtimeAdapter = createRuntimeAdapter(config.runtime ?? 'auto');
+    logger.info('Using runtime adapter', { runtime: this.runtimeAdapter.name });
 
-    // Attach Socket.IO server to HTTP server
-    this.io = new SocketIOServer(this.httpServer, {
-      cors: this.config.cors,
-      allowUpgrades: true,
+    // Create Socket.IO server
+    this.io = new SocketIOServer({
       transports: ['polling', 'websocket'],
       maxHttpBufferSize: this.config.maxHttpBufferSize,
     });
-    this.httpServer.listen(this.config.port);
+
     this.setupSocketIOServer();
 
     if (this.rateLimiter.isEnabled()) {
@@ -167,6 +176,17 @@ export class UseAIServer {
         windowMs: this.config.rateLimitWindowMs,
       });
     }
+
+    // Start server using runtime adapter
+    this.serverHandle = this.runtimeAdapter.createServer(this.io, {
+      port: this.config.port,
+      idleTimeout: this.config.idleTimeout,
+      cors: this.config.cors,
+      maxHttpBufferSize: this.config.maxHttpBufferSize,
+      onPollingConnection: (sessionId, ip) => {
+        this.clientIpTracker.trackPollingConnection(sessionId, ip);
+      },
+    });
   }
 
   /**
@@ -199,6 +219,13 @@ export class UseAIServer {
    * This allows plugins to register custom message handlers.
    */
   private initializePlugins() {
+
+    // Auto-enable FeedbackPlugin if Langfuse env vars are set and not already configured
+    const hasFeedbackPlugin = this.plugins.some(p => p.getName() === 'feedback');
+    if (!hasFeedbackPlugin && process.env.LANGFUSE_PUBLIC_KEY && process.env.LANGFUSE_SECRET_KEY) {
+      this.plugins.push(new FeedbackPlugin());
+    }
+
     for (const plugin of this.plugins) {
       logger.info('Initializing plugin', { pluginName: plugin.getName() });
 
@@ -228,8 +255,16 @@ export class UseAIServer {
     this.io.on('connection', (socket: Socket) => {
       const clientId = `client-${++this.clientIdCounter}`;
       const threadId = uuidv4();
-      const ipAddress = socket.handshake.address || socket.id;
-      const transport = socket.conn.transport.name;
+      // Get connection info for IP address resolution
+      const conn = socket.conn as unknown as { id: string; transport: { name: string; socket?: { remoteAddress?: string } } };
+      // Get IP address for rate limiting:
+      // 1. Try clientIpTracker (works for polling transport)
+      // 2. Fall back to socket.handshake.address (works for WebSocket)
+      // 3. Last resort: use socket.id
+      const ipAddress = this.clientIpTracker.getClientIp(conn)
+        || socket.handshake.address
+        || socket.id;
+      const transport = conn.transport.name;
       logger.info('Client connected', { clientId, threadId, ipAddress, transport });
 
       // Log transport upgrades
@@ -285,6 +320,9 @@ export class UseAIServer {
       socket.on('disconnect', () => {
         logger.info('Client disconnected', { clientId, ipAddress });
 
+        // Clean up polling IP entry
+        this.clientIpTracker.removePollingConnection(conn.id);
+
         // Call plugin lifecycle hooks
         for (const plugin of this.plugins) {
           plugin.onClientDisconnect?.(session);
@@ -295,7 +333,7 @@ export class UseAIServer {
       });
     });
 
-    logger.info('UseAI server listening', { port: this.config.port });
+    logger.info('UseAI server ready', { port: this.config.port });
   }
 
   private async handleClientMessage(socket: Socket, message: UseAIClientMessage) {
@@ -808,13 +846,21 @@ export class UseAIServer {
    * Closes the server and cleans up resources.
    * Stops accepting new connections and terminates all existing connections.
    */
-  public close() {
+  public async close() {
     clearInterval(this.cleanupInterval);
 
     // Clean up all MCP endpoints
     this.mcpEndpoints.forEach(endpoint => endpoint.destroy());
 
+    // Close all plugins
+    await Promise.all(
+      this.plugins.map(plugin => plugin.close?.())
+    );
+
     this.io.close();
-    this.httpServer.close();
+    if (this.serverHandle) {
+      this.serverHandle.stop();
+      this.serverHandle = null;
+    }
   }
 }

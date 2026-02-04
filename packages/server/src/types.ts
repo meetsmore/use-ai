@@ -1,6 +1,38 @@
-// Import and re-export CorsOptions from cors package (used by Socket.IO internally)
-import type { CorsOptions } from 'cors';
-export type { CorsOptions };
+/**
+ * CORS configuration options.
+ *
+ * @example
+ * ```typescript
+ * cors: {
+ *   origin: true,                    // Allow all origins
+ *   origin: 'https://example.com',   // Allow specific origin
+ *   origin: /\.example\.com$/,       // Allow origins matching pattern
+ *   origin: ['https://a.com', /\.b\.com$/], // Allow multiple
+ *   methods: ['GET', 'POST'],
+ *   credentials: true,
+ * }
+ * ```
+ */
+export interface CorsOptions {
+  /**
+   * Configures the Access-Control-Allow-Origin header.
+   * - `true` or `'*'`: Reflects the request origin (allows all origins)
+   * - `string`: Sets a specific origin (e.g., 'https://example.com')
+   * - `RegExp`: Allows origins matching the pattern
+   * - `Array`: Allows origins matching any of the string/RegExp values
+   */
+  origin?: boolean | string | RegExp | (string | RegExp)[];
+  /**
+   * Configures the Access-Control-Allow-Methods header for preflight requests.
+   * @default ['GET', 'POST']
+   */
+  methods?: string | string[];
+  /**
+   * Configures the Access-Control-Allow-Credentials header.
+   * Set to true to pass the header, otherwise it is omitted.
+   */
+  credentials?: boolean;
+}
 
 /**
  * Configuration for an MCP (Model Context Protocol) endpoint.
@@ -78,6 +110,21 @@ export interface UseAIServerConfig<TAgents extends Record<string, import('./agen
    * @see https://socket.io/docs/v4/using-multiple-nodes/
    */
   cors?: CorsOptions;
+  /**
+   * Idle timeout in seconds for the HTTP server.
+   * Only used by the Bun runtime (ignored by Node.js).
+   * Must be greater than the pingInterval option (25 seconds by default).
+   * @default 30
+   */
+  idleTimeout?: number;
+  /**
+   * The runtime to use for the server.
+   * - 'auto': Automatically detect the runtime (Bun or Node.js)
+   * - 'bun': Force Bun runtime (will throw if not running on Bun)
+   * - 'node': Force Node.js runtime (will throw if not running on Node.js)
+   * @default 'auto'
+   */
+  runtime?: 'auto' | 'bun' | 'node';
 }
 
 // Re-export all types from @meetsmore-oss/use-ai-core
