@@ -389,6 +389,8 @@ export class AISDKAgent implements Agent {
                 runId,
                 ipAddress: session.ipAddress,
                 toolCount: tools.length,
+                // Merge custom metadata from forwardedProps (for eval tracing, etc.)
+                ...(originalInput.forwardedProps?.langfuseMetadata || {}),
               },
             }
           : undefined,

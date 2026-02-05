@@ -295,4 +295,98 @@ describe('UseAIClient', () => {
       expect(client.isConnected()).toBe(false);
     });
   });
+
+  describe('sendPrompt()', () => {
+    test('sends message without forwardedProps when not provided', async () => {
+      const client = new UseAIClient('http://localhost:8081');
+      client.connect();
+
+      mockSocket.connected = true;
+      emitSocketEvent('connect');
+
+      await client.sendPrompt('Hello');
+
+      expect(mockSocket.emit).toHaveBeenCalledWith('message', expect.objectContaining({
+        type: 'run_agent',
+        data: expect.objectContaining({
+          forwardedProps: {},
+        }),
+      }));
+    });
+
+    test('sends message with langfuseMetadata in forwardedProps', async () => {
+      const client = new UseAIClient('http://localhost:8081');
+      client.connect();
+
+      mockSocket.connected = true;
+      emitSocketEvent('connect');
+
+      await client.sendPrompt('Hello', undefined, {
+        langfuseMetadata: { userId: 'user-123', evaluationId: 'eval-456' },
+      });
+
+      expect(mockSocket.emit).toHaveBeenCalledWith('message', expect.objectContaining({
+        type: 'run_agent',
+        data: expect.objectContaining({
+          forwardedProps: {
+            langfuseMetadata: { userId: 'user-123', evaluationId: 'eval-456' },
+          },
+        }),
+      }));
+    });
+
+    test('merges forwardedProps with MCP headers', async () => {
+      const client = new UseAIClient('http://localhost:8081');
+      client.connect();
+
+      mockSocket.connected = true;
+      emitSocketEvent('connect');
+
+      // Set MCP headers provider
+      client.setMcpHeadersProvider(() => ({
+        'https://api.example.com': { headers: { 'Authorization': 'Bearer token' } },
+      }));
+
+      await client.sendPrompt('Hello', undefined, {
+        langfuseMetadata: { userId: 'user-123' },
+      });
+
+      expect(mockSocket.emit).toHaveBeenCalledWith('message', expect.objectContaining({
+        type: 'run_agent',
+        data: expect.objectContaining({
+          forwardedProps: {
+            mcpHeaders: {
+              'https://api.example.com': { headers: { 'Authorization': 'Bearer token' } },
+            },
+            langfuseMetadata: { userId: 'user-123' },
+          },
+        }),
+      }));
+    });
+
+    test('merges forwardedProps with selected agent', async () => {
+      const client = new UseAIClient('http://localhost:8081');
+      client.connect();
+
+      mockSocket.connected = true;
+      emitSocketEvent('connect');
+
+      // Set selected agent
+      client.setAgent('claude-opus');
+
+      await client.sendPrompt('Hello', undefined, {
+        langfuseMetadata: { userId: 'user-123' },
+      });
+
+      expect(mockSocket.emit).toHaveBeenCalledWith('message', expect.objectContaining({
+        type: 'run_agent',
+        data: expect.objectContaining({
+          forwardedProps: {
+            agent: 'claude-opus',
+            langfuseMetadata: { userId: 'user-123' },
+          },
+        }),
+      }));
+    });
+  });
 });

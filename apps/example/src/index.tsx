@@ -17,6 +17,10 @@ root.render(
         headers: { 'X-API-Key': 'secret-api-key-123' },
       },
     })}
+    langfuseMetadataProvider={() => ({
+      userId: 'dummy',
+      tenantId: 'example-tenant',
+    })}
   >
     <InvisibleAIProvider>
       <App />

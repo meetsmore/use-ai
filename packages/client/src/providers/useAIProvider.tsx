@@ -349,6 +349,26 @@ export interface UseAIProviderProps extends UseAIConfig {
    * ```
    */
   onOpenChange?: (isOpen: boolean) => void;
+  /**
+   * Provider function for Langfuse metadata (for observability and eval tracing).
+   * Called before each message is sent. Can be async.
+   * Metadata from this provider is merged with message-level langfuseMetadata,
+   * with message-level taking precedence.
+   *
+   * @example
+   * ```tsx
+   * <UseAIProvider
+   *   serverUrl="wss://your-server.com"
+   *   langfuseMetadataProvider={async () => ({
+   *     userId: currentUser.id,
+   *     tenantId: tenant.id,
+   *   })}
+   * >
+   *   <App />
+   * </UseAIProvider>
+   * ```
+   */
+  langfuseMetadataProvider?: () => Record<string, unknown> | Promise<Record<string, unknown>>;
 }
 
 /**
@@ -406,6 +426,7 @@ export function UseAIProvider({
   strings: customStrings,
   visibleAgentIds,
   onOpenChange,
+  langfuseMetadataProvider,
 }: UseAIProviderProps) {
   // Compute effective file upload config: use default if undefined, disable if false
   const fileUploadConfig = fileUploadConfigProp === false
@@ -444,7 +465,7 @@ export function UseAIProvider({
   );
 
   // Ref for handleSendMessage to break circular dependency with useChatManagement
-  const handleSendMessageRef = useRef<((message: string, attachments?: FileAttachment[]) => Promise<void>) | null>(null);
+  const handleSendMessageRef = useRef<((message: string, attachments?: FileAttachment[], langfuseMetadata?: Record<string, unknown>) => Promise<void>) | null>(null);
 
   // Initialize tool registry hook
   const {
@@ -472,9 +493,9 @@ export function UseAIProvider({
   });
 
   // Stable callback that uses the ref (for useChatManagement)
-  const stableSendMessage = useCallback(async (message: string, attachments?: FileAttachment[]) => {
+  const stableSendMessage = useCallback(async (message: string, attachments?: FileAttachment[], langfuseMetadata?: Record<string, unknown>) => {
     if (handleSendMessageRef.current) {
-      await handleSendMessageRef.current(message, attachments);
+      await handleSendMessageRef.current(message, attachments, langfuseMetadata);
     }
   }, []);
 
@@ -718,7 +739,7 @@ export function UseAIProvider({
     }
   }, [hasTools, aggregatedTools, connected]);
 
-  const handleSendMessage = useCallback(async (message: string, attachments?: FileAttachment[]) => {
+  const handleSendMessage = useCallback(async (message: string, attachments?: FileAttachment[], customLangfuseMetadata?: Record<string, unknown>) => {
     if (!clientRef.current) return;
 
     // Clear any previous streaming text when starting a new message
@@ -792,9 +813,25 @@ export function UseAIProvider({
       setLoading(true);
     }
 
+    // Get provider-level langfuseMetadata (async supported)
+    const providerMetadata = langfuseMetadataProvider ? await langfuseMetadataProvider() : {};
+
+    // Merge: provider-level + message-level (message-level takes precedence)
+    const mergedLangfuseMetadata = {
+      ...providerMetadata,
+      ...customLangfuseMetadata,
+    };
+
     // State is already up-to-date via updatePrompt calls from useAI hooks
-    await clientRef.current.sendPrompt(message, multimodalContent);
-  }, [activatePendingChat, currentChatId, saveUserMessage, fileUploadConfig, getCurrentChat]);
+    // Only pass langfuseMetadata if there's any metadata to send
+    await clientRef.current.sendPrompt(
+      message,
+      multimodalContent,
+      Object.keys(mergedLangfuseMetadata).length > 0
+        ? { langfuseMetadata: mergedLangfuseMetadata }
+        : undefined
+    );
+  }, [activatePendingChat, currentChatId, saveUserMessage, fileUploadConfig, getCurrentChat, langfuseMetadataProvider]);
 
   // Update the ref so useChatManagement's sendMessage can use it
   handleSendMessageRef.current = handleSendMessage;

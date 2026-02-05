@@ -17,6 +17,11 @@ export interface SendMessageOptions {
   openChat?: boolean;
   /** Metadata to set on the new chat (only used when newChat: true) */
   metadata?: ChatMetadata;
+  /**
+   * Langfuse metadata for observability (e.g., eval tracing).
+   * This is merged with provider-level langfuseMetadata (message-level takes precedence).
+   */
+  langfuseMetadata?: Record<string, unknown>;
 }
 
 // Constants
@@ -101,7 +106,7 @@ export interface UseChatManagementOptions {
   /** Setter for messages state (owned by provider) */
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
   /** Callback to send a message (from UseAIProvider) */
-  onSendMessage?: (message: string, attachments?: FileAttachment[]) => Promise<void>;
+  onSendMessage?: (message: string, attachments?: FileAttachment[], langfuseMetadata?: Record<string, unknown>) => Promise<void>;
   /** Callback to open/close the chat panel */
   setOpen?: (open: boolean) => void;
   /** Whether the client is connected */
@@ -562,7 +567,7 @@ export function useChatManagement({
 
     while (pendingMessagesRef.current.length > 0) {
       const { message, options } = pendingMessagesRef.current.shift()!;
-      const { newChat = false, attachments = [], openChat = true, metadata } = options ?? {};
+      const { newChat = false, attachments = [], openChat = true, metadata, langfuseMetadata } = options ?? {};
 
       // Optionally create new chat with metadata
       if (newChat) {
@@ -589,8 +594,8 @@ export function useChatManagement({
         })
       );
 
-      // Send the message
-      await onSendMessage(message, fileAttachments.length > 0 ? fileAttachments : undefined);
+      // Send the message with optional langfuseMetadata
+      await onSendMessage(message, fileAttachments.length > 0 ? fileAttachments : undefined, langfuseMetadata);
 
       // Open chat panel if requested
       if (openChat && setOpen) {
