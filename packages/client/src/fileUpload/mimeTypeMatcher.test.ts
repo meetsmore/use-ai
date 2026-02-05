@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'bun:test';
 import { matchesMimeType, findTransformer } from './mimeTypeMatcher';
-import type { FileTransformerMap } from './types';
+import type { FileTransformer, FileTransformerMap } from './types';
 
 describe('matchesMimeType', () => {
   it('matches exact MIME type', () => {
@@ -36,13 +36,25 @@ describe('matchesMimeType', () => {
 });
 
 describe('findTransformer', () => {
-  // Dummy transformers (values don't matter — findTransformer returns the key)
-  const stub = { transform: async () => [] } as unknown as FileTransformerMap[string];
+  // findTransformer returns the matched pattern key, not the transformer instance.
+  // Named transformers are kept for readability in the transformer maps.
+  const pdfTransformer: FileTransformer = {
+    transform: async (files) => files.map(() => 'pdf content'),
+  };
+  const imageTransformer: FileTransformer = {
+    transform: async (files) => files.map(() => 'image content'),
+  };
+  const pngTransformer: FileTransformer = {
+    transform: async (files) => files.map(() => 'png content'),
+  };
+  const fallbackTransformer: FileTransformer = {
+    transform: async (files) => files.map(() => 'fallback content'),
+  };
 
   it('returns exact match over wildcard', () => {
     const transformers: FileTransformerMap = {
-      'image/*': stub,
-      'image/png': stub,
+      'image/*': imageTransformer,
+      'image/png': pngTransformer,
     };
 
     expect(findTransformer('image/png', transformers)).toBe('image/png');
@@ -50,8 +62,8 @@ describe('findTransformer', () => {
 
   it('returns partial wildcard over global wildcard', () => {
     const transformers: FileTransformerMap = {
-      '*/*': stub,
-      'image/*': stub,
+      '*/*': fallbackTransformer,
+      'image/*': imageTransformer,
     };
 
     expect(findTransformer('image/jpeg', transformers)).toBe('image/*');
@@ -59,8 +71,8 @@ describe('findTransformer', () => {
 
   it('returns global wildcard when no better match', () => {
     const transformers: FileTransformerMap = {
-      '*/*': stub,
-      'image/*': stub,
+      '*/*': fallbackTransformer,
+      'image/*': imageTransformer,
     };
 
     expect(findTransformer('text/plain', transformers)).toBe('*/*');
@@ -68,7 +80,7 @@ describe('findTransformer', () => {
 
   it('returns undefined when no match', () => {
     const transformers: FileTransformerMap = {
-      'application/pdf': stub,
+      'application/pdf': pdfTransformer,
     };
 
     expect(findTransformer('text/plain', transformers)).toBeUndefined();
@@ -76,7 +88,7 @@ describe('findTransformer', () => {
 
   it('returns single wildcard match', () => {
     const transformers: FileTransformerMap = {
-      '*': stub,
+      '*': fallbackTransformer,
     };
 
     expect(findTransformer('application/pdf', transformers)).toBe('*');
@@ -84,8 +96,8 @@ describe('findTransformer', () => {
 
   it('returns more specific wildcard', () => {
     const transformers: FileTransformerMap = {
-      '*': stub,
-      'application/*': stub,
+      '*': fallbackTransformer,
+      'application/*': pdfTransformer,
     };
 
     expect(findTransformer('application/json', transformers)).toBe('application/*');
@@ -97,10 +109,10 @@ describe('findTransformer', () => {
 
   it('handles complex specificity scenario', () => {
     const transformers: FileTransformerMap = {
-      '*': stub,
-      'image/*': stub,
-      'image/png': stub,
-      'application/pdf': stub,
+      '*': fallbackTransformer,
+      'image/*': imageTransformer,
+      'image/png': pngTransformer,
+      'application/pdf': pdfTransformer,
     };
 
     // Exact match wins
