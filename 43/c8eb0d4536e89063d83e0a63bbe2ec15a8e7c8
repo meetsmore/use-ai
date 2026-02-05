@@ -1,0 +1,53 @@
+packages/core/src/index.ts
+  0e47ff16275b4a0b 4,40
+apps/example/src/pages/RemoteMcpToolsPage.tsx
+  0e47ff16275b4a0b 92-121,181-192
+packages/client/test/useAI.integration.test.tsx
+  0e47ff16275b4a0b 395-396,401,415,417,420,439
+packages/client/src/providers/useAIProvider.tsx
+  0e47ff16275b4a0b 2,543-548,551
+packages/client/src/hooks/useStableTools.ts
+  0e47ff16275b4a0b 13
+packages/client/src/defineTool.test.ts
+  0e47ff16275b4a0b 184,192,195,199,218-219
+packages/core/src/types.ts
+  0e47ff16275b4a0b 81,94-95,185-210
+packages/server/src/agents.integration.test.ts
+  0e47ff16275b4a0b 260,287
+packages/client/src/hooks/useStableTools.test.ts
+  0e47ff16275b4a0b 165-166,177,184
+packages/server/src/types.ts
+  0e47ff16275b4a0b 120-121
+apps/example-nest-mcp-server/src/tools.service.ts
+  0e47ff16275b4a0b 17-20,40-43,62-65,84-88,113-116
+packages/server/src/agents/AISDKAgent.ts
+  0e47ff16275b4a0b 24,455-459,461,467-469,471
+packages/client/test/tool-definition.integration.test.tsx
+  0e47ff16275b4a0b 126-127,132,135,138,145,148,153,156-158
+packages/server/src/mcp/RemoteMcpToolsProvider.ts
+  0e47ff16275b4a0b 1,9,20-21,40-41,161,165-168
+packages/client/src/defineTool.ts
+  0e47ff16275b4a0b 2,4-5,162-164
+packages/server/src/server.ts
+  0e47ff16275b4a0b 605
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.42",
+  "base_commit_sha": "43c8eb0d4536e89063d83e0a63bbe2ec15a8e7c8",
+  "prompts": {
+    "0e47ff16275b4a0b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e5486854-f04e-489c-9958-525e38201b3b",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 186,
+      "total_deletions": 78,
+      "accepted_lines": 167,
+      "overriden_lines": 1
+    }
+  }
+}
