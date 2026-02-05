@@ -5,6 +5,10 @@
 export { createClientToolExecutor } from './toolConverter';
 
 export {
+  getToolAnnotations
+} from './toolAnnotations'
+
+export {
   isRemoteTool,
   createGlobFilter,
   and,

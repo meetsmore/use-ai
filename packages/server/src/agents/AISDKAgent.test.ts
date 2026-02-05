@@ -1,8 +1,8 @@
 import { describe, expect, test, mock } from 'bun:test';
 import { AISDKAgent } from './AISDKAgent';
-import type { AgentInput, EventEmitter } from './types';
+import type { AgentInput, EventEmitter, AGUIEventExtended } from './types';
 import { EventType, ErrorCode } from '../types';
-import type { AGUIEvent, ToolDefinition } from '../types';
+import type { ToolDefinition } from '../types';
 import type { RemoteToolDefinition } from '../mcp';
 import { v4 as uuidv4 } from 'uuid';
 import { MockLanguageModelV3, simulateReadableStream } from 'ai/test';
@@ -93,6 +93,7 @@ function createTestInput(overrides: Partial<AgentInput> = {}): AgentInput {
       tools: [],
       state: null,
       pendingToolCalls: new Map(),
+      pendingToolApprovals: new Map(),
       conversationHistory: [],
       ipAddress: '127.0.0.1',
     },
@@ -135,7 +136,7 @@ describe('AISDKAgent', () => {
     const mockModel = createStreamingTextMockModel('Hello');
     const agent = new AISDKAgent({ model: mockModel });
 
-    const emittedEvents: AGUIEvent[] = [];
+    const emittedEvents: AGUIEventExtended[] = [];
     const eventEmitter: EventEmitter = {
       emit: (event) => emittedEvents.push(event),
     };
@@ -152,7 +153,7 @@ describe('AISDKAgent', () => {
     const mockModel = createStreamingTextMockModel('Hello world');
     const agent = new AISDKAgent({ model: mockModel });
 
-    const emittedEvents: AGUIEvent[] = [];
+    const emittedEvents: AGUIEventExtended[] = [];
     const eventEmitter: EventEmitter = {
       emit: (event) => emittedEvents.push(event),
     };
@@ -174,7 +175,7 @@ describe('AISDKAgent', () => {
     const mockModel = createMultiDeltaStreamingMockModel(['Hello ', 'world', '!']);
     const agent = new AISDKAgent({ model: mockModel });
 
-    const emittedEvents: AGUIEvent[] = [];
+    const emittedEvents: AGUIEventExtended[] = [];
     const eventEmitter: EventEmitter = {
       emit: (event) => emittedEvents.push(event),
     };
@@ -194,7 +195,7 @@ describe('AISDKAgent', () => {
     const mockModel = createStreamingTextMockModel('Done');
     const agent = new AISDKAgent({ model: mockModel });
 
-    const emittedEvents: AGUIEvent[] = [];
+    const emittedEvents: AGUIEventExtended[] = [];
     const eventEmitter: EventEmitter = {
       emit: (event) => emittedEvents.push(event),
     };
@@ -216,7 +217,7 @@ describe('AISDKAgent', () => {
 
     const agent = new AISDKAgent({ model: mockModel });
 
-    const emittedEvents: AGUIEvent[] = [];
+    const emittedEvents: AGUIEventExtended[] = [];
     const eventEmitter: EventEmitter = {
       emit: (event) => emittedEvents.push(event),
     };
@@ -304,7 +305,7 @@ describe('AISDKAgent', () => {
 
     const agent = new AISDKAgent({ model: mockModel });
 
-    const emittedEvents: AGUIEvent[] = [];
+    const emittedEvents: AGUIEventExtended[] = [];
     const eventEmitter: EventEmitter = {
       emit: (event) => {
         emittedEvents.push(event);
@@ -448,7 +449,7 @@ describe('AISDKAgent', () => {
 
     const agent = new AISDKAgent({ model: mockModel });
 
-    const emittedEvents: AGUIEvent[] = [];
+    const emittedEvents: AGUIEventExtended[] = [];
     const eventEmitter: EventEmitter = {
       emit: (event) => {
         emittedEvents.push(event);
@@ -519,7 +520,7 @@ describe('AISDKAgent', () => {
     const mockModel = createStreamingTextMockModel('Response text');
     const agent = new AISDKAgent({ model: mockModel });
 
-    const emittedEvents: AGUIEvent[] = [];
+    const emittedEvents: AGUIEventExtended[] = [];
     const eventEmitter: EventEmitter = {
       emit: (event) => emittedEvents.push(event),
     };
@@ -612,7 +613,7 @@ describe('AISDKAgent', () => {
       const mockModel = createStreamingTextMockModel('Final response after tool execution');
       const agent = new AISDKAgent({ model: mockModel });
 
-      const emittedEvents: AGUIEvent[] = [];
+      const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = {
         emit: (event) => emittedEvents.push(event),
       };
@@ -720,7 +721,7 @@ describe('AISDKAgent', () => {
       const mockModel = createStreamingTextMockModel('Final response after tool execution');
       const agent = new AISDKAgent({ model: mockModel });
 
-      const emittedEvents: AGUIEvent[] = [];
+      const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = {
         emit: (event) => emittedEvents.push(event),
       };
@@ -797,7 +798,7 @@ describe('AISDKAgent', () => {
       const mockModel = createStreamingTextMockModel('Response');
       const agent = new AISDKAgent({ model: mockModel });
 
-      const emittedEvents: AGUIEvent[] = [];
+      const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = {
         emit: (event) => emittedEvents.push(event),
       };
@@ -874,7 +875,7 @@ describe('AISDKAgent', () => {
 
       const agent = new AISDKAgent({ model: mockModel });
 
-      const emittedEvents: AGUIEvent[] = [];
+      const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = {
         emit: (event) => emittedEvents.push(event),
       };
@@ -914,7 +915,7 @@ describe('AISDKAgent', () => {
 
       const agent = new AISDKAgent({ model: mockModel });
 
-      const emittedEvents: AGUIEvent[] = [];
+      const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = {
         emit: (event) => emittedEvents.push(event),
       };
@@ -954,7 +955,7 @@ describe('AISDKAgent', () => {
 
       const agent = new AISDKAgent({ model: mockModel });
 
-      const emittedEvents: AGUIEvent[] = [];
+      const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = {
         emit: (event) => emittedEvents.push(event),
       };
@@ -1016,7 +1017,7 @@ describe('AISDKAgent', () => {
         systemPrompt: 'You are a helpful assistant.',
       });
 
-      const emittedEvents: AGUIEvent[] = [];
+      const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
 
       const input = createTestInput();
@@ -1036,7 +1037,7 @@ describe('AISDKAgent', () => {
         systemPrompt: 'You are a helpful assistant.',
       });
 
-      const emittedEvents: AGUIEvent[] = [];
+      const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
 
       const input = createTestInput({
@@ -1062,7 +1063,7 @@ describe('AISDKAgent', () => {
         // No systemPrompt in config
       });
 
-      const emittedEvents: AGUIEvent[] = [];
+      const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
 
       const input = createTestInput({
@@ -1083,7 +1084,7 @@ describe('AISDKAgent', () => {
         model: mockModel,
       });
 
-      const emittedEvents: AGUIEvent[] = [];
+      const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
 
       const input = createTestInput();
@@ -1104,7 +1105,7 @@ describe('AISDKAgent', () => {
         systemPrompt: () => dynamicPromptValue,
       });
 
-      const emittedEvents: AGUIEvent[] = [];
+      const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
 
       // First run with initial prompt
@@ -1134,7 +1135,7 @@ describe('AISDKAgent', () => {
         systemPrompt: () => '',
       });
 
-      const emittedEvents: AGUIEvent[] = [];
+      const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
 
       const input = createTestInput({
@@ -1162,7 +1163,7 @@ describe('AISDKAgent', () => {
         },
       });
 
-      const emittedEvents: AGUIEvent[] = [];
+      const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
 
       const input = createTestInput();
@@ -1187,7 +1188,7 @@ describe('AISDKAgent', () => {
         },
       });
 
-      const emittedEvents: AGUIEvent[] = [];
+      const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
 
       // First run
@@ -1214,7 +1215,7 @@ describe('AISDKAgent', () => {
         },
       });
 
-      const emittedEvents: AGUIEvent[] = [];
+      const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
 
       const input = createTestInput({
@@ -1297,7 +1298,7 @@ describe('AISDKAgent', () => {
       // No toolFilter specified
       const agent = new AISDKAgent({ model: mockModel });
 
-      const emittedEvents: AGUIEvent[] = [];
+      const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
 
       const input = createTestInput({
@@ -1323,7 +1324,7 @@ describe('AISDKAgent', () => {
         toolFilter: createGlobFilter(['db_*']),
       });
 
-      const emittedEvents: AGUIEvent[] = [];
+      const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
 
       const input = createTestInput({
@@ -1355,7 +1356,7 @@ describe('AISDKAgent', () => {
         ),
       });
 
-      const emittedEvents: AGUIEvent[] = [];
+      const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
 
       const input = createTestInput({
@@ -1387,7 +1388,7 @@ describe('AISDKAgent', () => {
         ),
       });
 
-      const emittedEvents: AGUIEvent[] = [];
+      const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
 
       const input = createTestInput({
@@ -1421,7 +1422,7 @@ describe('AISDKAgent', () => {
         ),
       });
 
-      const emittedEvents: AGUIEvent[] = [];
+      const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
 
       const input = createTestInput({
@@ -1503,7 +1504,7 @@ describe('AISDKAgent', () => {
       const mockModel = createAnthropicMockModel();
       const agent = new AISDKAgent({ model: mockModel });
 
-      const emittedEvents: AGUIEvent[] = [];
+      const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
 
       const input = createTestInput({
@@ -1540,7 +1541,7 @@ describe('AISDKAgent', () => {
         cacheBreakpoint: (msg) => msg.role === 'system' || msg.isLast,
       });
 
-      const emittedEvents: AGUIEvent[] = [];
+      const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
 
       const input = createTestInput({
@@ -1603,7 +1604,7 @@ describe('AISDKAgent', () => {
         },
       });
 
-      const emittedEvents: AGUIEvent[] = [];
+      const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
 
       const input = createTestInput({
@@ -1664,7 +1665,7 @@ describe('AISDKAgent', () => {
         cacheBreakpoint: (msg) => msg.isLast,
       });
 
-      const emittedEvents: AGUIEvent[] = [];
+      const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
 
       const input = createTestInput({
@@ -1702,7 +1703,7 @@ describe('AISDKAgent', () => {
         cacheBreakpoint: (msg) => msg.role === 'system' ? '1h' : false,
       });
 
-      const emittedEvents: AGUIEvent[] = [];
+      const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
 
       const input = createTestInput({
@@ -1743,7 +1744,7 @@ describe('AISDKAgent', () => {
         cacheBreakpoint: (msg) => msg.role === 'system',
       });
 
-      const emittedEvents: AGUIEvent[] = [];
+      const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
 
       const input = createTestInput({

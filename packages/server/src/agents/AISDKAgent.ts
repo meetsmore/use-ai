@@ -7,6 +7,7 @@ import type { ToolDefinition } from '../types';
 import type { RemoteToolDefinition } from '../mcp';
 import { EventType, ErrorCode } from '../types';
 import { createClientToolExecutor } from '../utils/toolConverter';
+import { isRemoteTool } from '../utils/toolFilters';
 import type {
   TextMessageStartEvent,
   TextMessageContentEvent,
@@ -26,16 +27,8 @@ import type {
 import { logger } from '../logger';
 import { langfuse, popTraceIdForRun, type LangfuseApi } from '../instrumentation';
 import { applyCacheBreakpoints, type CacheBreakpointFn } from './anthropicCache';
-
-/**
- * Generic tool arguments type - tools receive key-value pairs
- */
-type ToolArguments = Record<string, unknown>;
-
-/**
- * Generic tool result type - tools can return any value
- */
-type ToolResult = unknown;
+import { getToolAnnotations } from '../utils';
+import { toolNeedsApproval, createApprovalWrapper, type ToolArguments, type ToolResult } from './toolApproval';
 
 /**
  * API error structure for error handling
@@ -374,7 +367,7 @@ export class AISDKAgent implements Agent {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         tools:
           tools.length > 0
-            ? (this.sanitizeToolsForAPI(this.filterTools(tools), session) as any)
+            ? (this.sanitizeToolsForAPI(this.filterTools(tools), session, events) as any)
             : undefined,
         stopWhen: stepCountIs(10), // Allow AI SDK to handle multi-step tool execution automatically
         maxOutputTokens: this.maxOutputTokens,
@@ -453,9 +446,9 @@ export class AISDKAgent implements Agent {
 
           case 'tool-input-start': {
             hasAnyContent = true;
-            // Find the tool definition to get annotations (for MCP tools)
+            // Find the tool definition to get annotations
             const toolDef = tools.find(t => t.name === chunk.toolName);
-            const annotations = (toolDef as RemoteToolDefinition)?._remote?.annotations;
+            const annotations = getToolAnnotations(toolDef);
 
             // Emit TOOL_CALL_START with use-ai extensions (annotations only if present)
             // AI SDK v6 uses 'id' as the toolCallId
@@ -547,7 +540,7 @@ export class AISDKAgent implements Agent {
           // 'reasoning-start', 'reasoning-end' - we handle reasoning-delta
           // 'tool-input-end' - we emit TOOL_CALL_END on 'tool-call' instead
           // 'tool-error', 'tool-output-denied' - error cases
-          // 'tool-approval-request' - approval workflow
+          // 'tool-approval-request' - handled in execute wrapper via createApprovalWrapper
           // 'abort' - handled after loop
           // 'raw' - raw provider data
         }
@@ -733,13 +726,6 @@ export class AISDKAgent implements Agent {
   }
 
   /**
-   * Type guard to check if a tool is a remote MCP tool.
-   */
-  private isRemoteTool(tool: ToolDefinition): tool is RemoteToolDefinition {
-    return (tool as RemoteToolDefinition)._remote !== undefined;
-  }
-
-  /**
    * Filters tools using the configured filter function.
    * If no filter is configured, returns all tools.
    */
@@ -801,7 +787,8 @@ export class AISDKAgent implements Agent {
 
   private sanitizeToolsForAPI(
     tools: ToolDefinition[],
-    session: ClientSession
+    session: ClientSession,
+    events: EventEmitter
   ): Record<string, unknown> {
     const toolsObject: Record<string, unknown> = {};
     const clientToolExecutor = createClientToolExecutor(session);
@@ -814,12 +801,20 @@ export class AISDKAgent implements Agent {
         ? { ...rawParams, type: ((rawParams as Record<string, unknown>).type || 'object') as 'object' }
         : { type: 'object' as const, properties: {} };
 
+      // Get the base executor
+      const baseExecutor = isRemoteTool(toolDef)
+        ? this.createMcpToolExecutor(toolDef, session)
+        : clientToolExecutor;
+
+      // Wrap with approval handling if tool needs confirmation
+      const execute = toolNeedsApproval(toolDef)
+        ? createApprovalWrapper(toolDef, session, events, baseExecutor)
+        : baseExecutor;
+
       toolsObject[toolDef.name] = {
         description: toolDef.description,
         inputSchema: jsonSchema(inputSchema as JSONSchema7),
-        execute: this.isRemoteTool(toolDef)
-          ? this.createMcpToolExecutor(toolDef, session)
-          : clientToolExecutor,
+        execute,
       };
     }
 
