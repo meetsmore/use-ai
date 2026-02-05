@@ -12,6 +12,20 @@ import { findTransformer } from './mimeTypeMatcher';
 import { EmbedFileUploadBackend } from './EmbedFileUploadBackend';
 
 /**
+ * Group items by a key derived from each item.
+ * Based on the Map.groupBy proposal polyfill.
+ */
+function groupBy<K, V>(items: Iterable<V>, keyFn: (item: V) => K): Map<K, V[]> {
+  const map = new Map<K, V[]>();
+  for (const item of items) {
+    const key = keyFn(item);
+    const list = map.get(key);
+    list ? list.push(item) : map.set(key, [item]);
+  }
+  return map;
+}
+
+/**
  * Configuration for processing file attachments.
  */
 export interface ProcessAttachmentsConfig {
@@ -138,7 +152,7 @@ export async function processAttachments(
   const context: FileTransformerContext = { chat };
 
   // Group attachments by transformer pattern key (null = no transformer)
-  const groups = Map.groupBy(attachments, (attachment) =>
+  const groups = groupBy(attachments, (attachment) =>
     attachment.transformedContent !== undefined
       ? null
       : findTransformer(attachment.file.type, transformers) ?? null
