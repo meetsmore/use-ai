@@ -732,7 +732,7 @@ Enable file uploads in chat:
 
 File transformers allow you to preprocess files before sending them to the AI. This is useful for extracting text from PDFs, performing OCR on images, or any other file-to-text conversion.
 
-`transform()` receives all files matched to this transformer instance, and returns an array of strings (one per file, same order).
+`transform()` receives an array of files matching the MIME pattern, and returns an array of strings (one per file, same order).
 
 ```tsx
 import { UseAIProvider, FileTransformer } from '@meetsmore-oss/use-ai-client';
@@ -764,17 +764,14 @@ When multiple patterns match a file, the most specific one wins:
 2. Partial wildcard (`image/*`)
 3. Global wildcard (`*`)
 
-Files matching the same transformer instance are grouped together and passed as a single array:
+Files matching the same MIME pattern key are grouped together and passed as a single array. For example, two `image/*` files are grouped into one `transform()` call:
 
 ```tsx
-const imageTransformer = createOcrTransformer();
-
 <UseAIProvider
   fileUploadConfig={{
     transformers: {
-      'application/pdf': createOcrTransformer(),  // Separate instance for PDF
-      'image/jpeg': imageTransformer,  // Same instance
-      'image/png': imageTransformer,   // → grouped together
+      'application/pdf': pdfTransformer,  // PDF files grouped separately
+      'image/*': imageTransformer,        // All image files grouped together
     }
   }}
 >
