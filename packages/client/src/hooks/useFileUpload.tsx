@@ -2,7 +2,7 @@ import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import type { FileAttachment, FileUploadConfig, FileProcessingState, FileTransformerContext, FileTransformerMap } from '../fileUpload/types';
 import type { Chat } from '../providers/chatRepository/types';
 import { DEFAULT_MAX_FILE_SIZE } from '../fileUpload/types';
-import { findTransformer } from '../fileUpload/mimeTypeMatcher';
+import { findTransformerPattern } from '../fileUpload/mimeTypeMatcher';
 import { getTransformedContent } from '../fileUpload/processAttachments';
 import { v4 as uuidv4 } from 'uuid';
 import { useTheme, useStrings } from '../theme';
@@ -256,7 +256,7 @@ export function useFileUpload({
       setAttachments(prev => [...prev, attachment]);
 
       // Check for transformer and start transformation immediately
-      const transformerKey = findTransformer(file.type, transformers);
+      const transformerKey = findTransformerPattern(file.type, transformers);
       if (transformerKey) {
         // Run transformer in background (don't await - let it update state as it progresses)
         runTransformer(attachmentId, file, transformerKey);

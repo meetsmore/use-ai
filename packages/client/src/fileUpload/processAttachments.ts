@@ -8,7 +8,7 @@ import type {
   FileProcessingState,
 } from './types';
 import type { Chat } from '../providers/chatRepository/types';
-import { findTransformer } from './mimeTypeMatcher';
+import { findTransformerPattern } from './mimeTypeMatcher';
 import { EmbedFileUploadBackend } from './EmbedFileUploadBackend';
 
 /**
@@ -41,15 +41,34 @@ export interface ProcessAttachmentsConfig {
 
 /**
  * In-memory cache for transformed file content.
- * Keyed by the combined identity of the file group.
+ * Keyed by a SHA-256 hash of the file group identity.
  */
 const transformationCache = new Map<string, string[]>();
 
 /**
- * Generate a cache key for a file based on its identity.
+ * Generate a cache key fragment for a single file based on its identity.
  */
 function getFileCacheKey(file: File): string {
   return `${file.name}:${file.size}:${file.lastModified}`;
+}
+
+/**
+ * Hash a group of files into a fixed-length cache key.
+ * Each file is identified by name, size, and lastModified, then the
+ * combined string is hashed with SHA-256 to keep key size constant
+ * regardless of how many files are in the group.
+ *
+ * @example
+ * // Input:  ["report.pdf:1024:1700000000", "scan.pdf:2048:1700000001"]
+ * // Hashed: "a3f1...b7c2" (64-char hex string)
+ */
+async function hashGroupCacheKey(files: File[]): Promise<string> {
+  const raw = files.map(getFileCacheKey).join(', ');
+  const data = new TextEncoder().encode(raw);
+  const hash = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(hash))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
 }
 
 /**
@@ -72,7 +91,7 @@ export async function getTransformedContent(
     return [];
   }
 
-  const cacheKey = files.map(getFileCacheKey).join('|');
+  const cacheKey = await hashGroupCacheKey(files);
   const cached = transformationCache.get(cacheKey);
   if (cached) {
     return cached;
@@ -155,7 +174,7 @@ export async function processAttachments(
   const groups = groupBy(attachments, (attachment) =>
     attachment.transformedContent !== undefined
       ? null
-      : findTransformer(attachment.file.type, transformers) ?? null
+      : findTransformerPattern(attachment.file.type, transformers) ?? null
   );
 
   for (const [key, groupAttachments] of groups) {

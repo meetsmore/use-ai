@@ -40,7 +40,7 @@ export function matchesMimeType(mimeType: string, pattern: string): boolean {
  * - 'image/*' (length 7, second)
  * - '*' (length 1, last)
  */
-export function findTransformer(
+export function findTransformerPattern(
   mimeType: string,
   transformers: FileTransformerMap | undefined
 ): string | undefined {

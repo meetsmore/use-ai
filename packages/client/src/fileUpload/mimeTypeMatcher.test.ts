@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'bun:test';
-import { matchesMimeType, findTransformer } from './mimeTypeMatcher';
+import { matchesMimeType, findTransformerPattern } from './mimeTypeMatcher';
 import type { FileTransformer, FileTransformerMap } from './types';
 
 describe('matchesMimeType', () => {
@@ -35,8 +35,7 @@ describe('matchesMimeType', () => {
   });
 });
 
-describe('findTransformer', () => {
-  // findTransformer returns the matched pattern key, not the transformer instance.
+describe('findTransformerPattern', () => {
   // Named transformers are kept for readability in the transformer maps.
   const pdfTransformer: FileTransformer = {
     transform: async (files) => files.map(() => 'pdf content'),
@@ -57,7 +56,7 @@ describe('findTransformer', () => {
       'image/png': pngTransformer,
     };
 
-    const result = findTransformer('image/png', transformers);
+    const result = findTransformerPattern('image/png', transformers);
     expect(result).toBe('image/png');
   });
 
@@ -67,7 +66,7 @@ describe('findTransformer', () => {
       'image/*': imageTransformer,
     };
 
-    const result = findTransformer('image/jpeg', transformers);
+    const result = findTransformerPattern('image/jpeg', transformers);
     expect(result).toBe('image/*');
   });
 
@@ -77,7 +76,7 @@ describe('findTransformer', () => {
       'image/*': imageTransformer,
     };
 
-    const result = findTransformer('text/plain', transformers);
+    const result = findTransformerPattern('text/plain', transformers);
     expect(result).toBe('*/*');
   });
 
@@ -86,7 +85,7 @@ describe('findTransformer', () => {
       'application/pdf': pdfTransformer,
     };
 
-    const result = findTransformer('text/plain', transformers);
+    const result = findTransformerPattern('text/plain', transformers);
     expect(result).toBeUndefined();
   });
 
@@ -95,7 +94,7 @@ describe('findTransformer', () => {
       '*': fallbackTransformer,
     };
 
-    const result = findTransformer('application/pdf', transformers);
+    const result = findTransformerPattern('application/pdf', transformers);
     expect(result).toBe('*');
   });
 
@@ -105,12 +104,12 @@ describe('findTransformer', () => {
       'application/*': pdfTransformer,
     };
 
-    const result = findTransformer('application/json', transformers);
+    const result = findTransformerPattern('application/json', transformers);
     expect(result).toBe('application/*');
   });
 
   it('handles empty transformer map', () => {
-    const result = findTransformer('image/png', {});
+    const result = findTransformerPattern('image/png', {});
     expect(result).toBeUndefined();
   });
 
@@ -123,13 +122,13 @@ describe('findTransformer', () => {
     };
 
     // Exact match wins
-    expect(findTransformer('image/png', transformers)).toBe('image/png');
-    expect(findTransformer('application/pdf', transformers)).toBe('application/pdf');
+    expect(findTransformerPattern('image/png', transformers)).toBe('image/png');
+    expect(findTransformerPattern('application/pdf', transformers)).toBe('application/pdf');
 
     // Partial wildcard wins over global
-    expect(findTransformer('image/jpeg', transformers)).toBe('image/*');
+    expect(findTransformerPattern('image/jpeg', transformers)).toBe('image/*');
 
     // Global wildcard when no better match
-    expect(findTransformer('text/plain', transformers)).toBe('*');
+    expect(findTransformerPattern('text/plain', transformers)).toBe('*');
   });
 });
