@@ -1,0 +1,23 @@
+packages/client/src/providers/useAIProvider.tsx
+  5952b44ad113293c 352-373,431,744,818-826,828-829
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.42",
+  "base_commit_sha": "7ec56310b23c9192576d8d852655587128658df4",
+  "prompts": {
+    "5952b44ad113293c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "69dcfa3d-f5f4-4644-b4dc-8192691ec1c9",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 35,
+      "total_deletions": 3,
+      "accepted_lines": 35,
+      "overriden_lines": 0
+    }
+  }
+}
