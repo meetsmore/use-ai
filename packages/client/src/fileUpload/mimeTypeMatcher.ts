@@ -1,4 +1,4 @@
-import type { FileTransformer, FileTransformerMap } from './types';
+import type { FileTransformerMap } from './types';
 
 /**
  * Check if a MIME type matches a pattern.
@@ -28,7 +28,8 @@ export function matchesMimeType(mimeType: string, pattern: string): boolean {
 }
 
 /**
- * Find the most specific transformer for a MIME type.
+ * Find the most specific transformer pattern key for a MIME type.
+ * Returns the pattern string (e.g., 'application/pdf', 'image/*') or undefined.
  *
  * Specificity rules:
  * 1. Exact match (no wildcard) always wins
@@ -42,16 +43,16 @@ export function matchesMimeType(mimeType: string, pattern: string): boolean {
 export function findTransformer(
   mimeType: string,
   transformers: FileTransformerMap | undefined
-): FileTransformer | undefined {
+): string | undefined {
   if (!transformers) {
     return undefined;
   }
 
-  let bestMatch: FileTransformer | undefined;
+  let bestKey: string | undefined;
   let bestIsExact = false;
   let bestLength = -1;
 
-  for (const [pattern, transformer] of Object.entries(transformers)) {
+  for (const pattern of Object.keys(transformers)) {
     if (!matchesMimeType(mimeType, pattern)) {
       continue;
     }
@@ -60,7 +61,7 @@ export function findTransformer(
 
     // Exact match always wins over wildcard
     if (isExact && !bestIsExact) {
-      bestMatch = transformer;
+      bestKey = pattern;
       bestIsExact = true;
       bestLength = pattern.length;
       continue;
@@ -68,10 +69,10 @@ export function findTransformer(
 
     // If both are exact or both are wildcard, longer pattern wins
     if (isExact === bestIsExact && pattern.length > bestLength) {
-      bestMatch = transformer;
+      bestKey = pattern;
       bestLength = pattern.length;
     }
   }
 
-  return bestMatch;
+  return bestKey;
 }

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'bun:test';
 import { matchesMimeType, findTransformer } from './mimeTypeMatcher';
-import type { FileTransformer, FileTransformerMap } from './types';
+import type { FileTransformerMap } from './types';
 
 describe('matchesMimeType', () => {
   it('matches exact MIME type', () => {
@@ -36,98 +36,81 @@ describe('matchesMimeType', () => {
 });
 
 describe('findTransformer', () => {
-  const pdfTransformer: FileTransformer = {
-    transform: async () => 'pdf content',
-  };
-  const imageTransformer: FileTransformer = {
-    transform: async () => 'image content',
-  };
-  const pngTransformer: FileTransformer = {
-    transform: async () => 'png content',
-  };
-  const fallbackTransformer: FileTransformer = {
-    transform: async () => 'fallback content',
-  };
+  // Dummy transformers (values don't matter — findTransformer returns the key)
+  const stub = { transform: async () => [] } as unknown as FileTransformerMap[string];
 
   it('returns exact match over wildcard', () => {
     const transformers: FileTransformerMap = {
-      'image/*': imageTransformer,
-      'image/png': pngTransformer,
+      'image/*': stub,
+      'image/png': stub,
     };
 
-    const result = findTransformer('image/png', transformers);
-    expect(result).toBe(pngTransformer);
+    expect(findTransformer('image/png', transformers)).toBe('image/png');
   });
 
   it('returns partial wildcard over global wildcard', () => {
     const transformers: FileTransformerMap = {
-      '*/*': fallbackTransformer,
-      'image/*': imageTransformer,
+      '*/*': stub,
+      'image/*': stub,
     };
 
-    const result = findTransformer('image/jpeg', transformers);
-    expect(result).toBe(imageTransformer);
+    expect(findTransformer('image/jpeg', transformers)).toBe('image/*');
   });
 
   it('returns global wildcard when no better match', () => {
     const transformers: FileTransformerMap = {
-      '*/*': fallbackTransformer,
-      'image/*': imageTransformer,
+      '*/*': stub,
+      'image/*': stub,
     };
 
-    const result = findTransformer('text/plain', transformers);
-    expect(result).toBe(fallbackTransformer);
+    expect(findTransformer('text/plain', transformers)).toBe('*/*');
   });
 
   it('returns undefined when no match', () => {
     const transformers: FileTransformerMap = {
-      'application/pdf': pdfTransformer,
+      'application/pdf': stub,
     };
 
-    const result = findTransformer('text/plain', transformers);
-    expect(result).toBeUndefined();
+    expect(findTransformer('text/plain', transformers)).toBeUndefined();
   });
 
   it('returns single wildcard match', () => {
     const transformers: FileTransformerMap = {
-      '*': fallbackTransformer,
+      '*': stub,
     };
 
-    const result = findTransformer('application/pdf', transformers);
-    expect(result).toBe(fallbackTransformer);
+    expect(findTransformer('application/pdf', transformers)).toBe('*');
   });
 
   it('returns more specific wildcard', () => {
     const transformers: FileTransformerMap = {
-      '*': fallbackTransformer,
-      'application/*': pdfTransformer,
+      '*': stub,
+      'application/*': stub,
     };
 
-    const result = findTransformer('application/json', transformers);
-    expect(result).toBe(pdfTransformer);
+    expect(findTransformer('application/json', transformers)).toBe('application/*');
   });
 
   it('handles empty transformer map', () => {
-    const result = findTransformer('image/png', {});
-    expect(result).toBeUndefined();
+    expect(findTransformer('image/png', {})).toBeUndefined();
   });
 
   it('handles complex specificity scenario', () => {
     const transformers: FileTransformerMap = {
-      '*': fallbackTransformer,
-      'image/*': imageTransformer,
-      'image/png': pngTransformer,
-      'application/pdf': pdfTransformer,
+      '*': stub,
+      'image/*': stub,
+      'image/png': stub,
+      'application/pdf': stub,
     };
 
     // Exact match wins
-    expect(findTransformer('image/png', transformers)).toBe(pngTransformer);
-    expect(findTransformer('application/pdf', transformers)).toBe(pdfTransformer);
+    expect(findTransformer('image/png', transformers)).toBe('image/png');
+    expect(findTransformer('application/pdf', transformers)).toBe('application/pdf');
 
     // Partial wildcard wins over global
-    expect(findTransformer('image/jpeg', transformers)).toBe(imageTransformer);
+    expect(findTransformer('image/jpeg', transformers)).toBe('image/*');
 
     // Global wildcard when no better match
-    expect(findTransformer('text/plain', transformers)).toBe(fallbackTransformer);
+    expect(findTransformer('text/plain', transformers)).toBe('*');
   });
 });

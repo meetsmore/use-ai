@@ -137,22 +137,16 @@ export async function processAttachments(
   const chat = await getCurrentChat();
   const context: FileTransformerContext = { chat };
 
-  // Group attachments by transformer
-  const groups = new Map<FileTransformer | null, FileAttachment[]>();
-  for (const attachment of attachments) {
-    const key = attachment.transformedContent !== undefined
+  // Group attachments by transformer pattern key (null = no transformer)
+  const groups = Map.groupBy(attachments, (attachment) =>
+    attachment.transformedContent !== undefined
       ? null
-      : findTransformer(attachment.file.type, transformers) ?? null;
-    const group = groups.get(key);
-    if (group) {
-      group.push(attachment);
-    } else {
-      groups.set(key, [attachment]);
-    }
-  }
+      : findTransformer(attachment.file.type, transformers) ?? null
+  );
 
-  for (const [transformer, groupAttachments] of groups) {
-    if (transformer === null) {
+  for (const [key, groupAttachments] of groups) {
+    // No transformer matched — convert directly (fast, no progress needed)
+    if (key === null) {
       const parts = await Promise.all(
         groupAttachments.map((a) => toContentPart(a, backend))
       );
@@ -160,6 +154,8 @@ export async function processAttachments(
       continue;
     }
 
+    // Run the matching transformer for this group
+    const transformer = transformers[key];
     const files = groupAttachments.map((a) => a.file);
     groupAttachments.forEach((a) => onFileProgress?.(a.id, { status: 'processing' }));
 

@@ -635,12 +635,12 @@ describe('processAttachments', () => {
       expect(transformCalls[1]).toEqual(['doc1.pdf', 'doc2.pdf', 'doc3.pdf']);
     });
 
-    it('groups files by transformer instance across MIME types', async () => {
-      let receivedFiles: string[] = [];
+    it('groups by pattern key, not transformer instance', async () => {
+      const calls: string[][] = [];
 
       const sharedTransformer: FileTransformer = {
         transform: async (files, _context) => {
-          receivedFiles = files.map((f) => f.name);
+          calls.push(files.map((f) => f.name));
           return files.map((f) => `Result: ${f.name}`);
         },
       };
@@ -658,7 +658,35 @@ describe('processAttachments', () => {
         },
       });
 
-      // Same instance → grouped into a single transform call
+      // Different keys → separate transform calls, even with same instance
+      expect(calls).toHaveLength(2);
+      expect(calls[0]).toEqual(['photo.jpg']);
+      expect(calls[1]).toEqual(['scan.png']);
+    });
+
+    it('groups files under same wildcard key', async () => {
+      let receivedFiles: string[] = [];
+
+      const imageTransformer: FileTransformer = {
+        transform: async (files, _context) => {
+          receivedFiles = files.map((f) => f.name);
+          return files.map((f) => `Result: ${f.name}`);
+        },
+      };
+
+      const attachments = [
+        createAttachment('1', 'photo.jpg', 'image/jpeg'),
+        createAttachment('2', 'scan.png', 'image/png'),
+      ];
+
+      await processAttachments(attachments, {
+        getCurrentChat: testGetCurrentChat,
+        transformers: {
+          'image/*': imageTransformer,
+        },
+      });
+
+      // Same key 'image/*' → grouped into a single transform call
       expect(receivedFiles).toEqual(['photo.jpg', 'scan.png']);
     });
   });
