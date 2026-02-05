@@ -57,7 +57,8 @@ describe('findTransformer', () => {
       'image/png': pngTransformer,
     };
 
-    expect(findTransformer('image/png', transformers)).toBe('image/png');
+    const result = findTransformer('image/png', transformers);
+    expect(result).toBe('image/png');
   });
 
   it('returns partial wildcard over global wildcard', () => {
@@ -66,7 +67,8 @@ describe('findTransformer', () => {
       'image/*': imageTransformer,
     };
 
-    expect(findTransformer('image/jpeg', transformers)).toBe('image/*');
+    const result = findTransformer('image/jpeg', transformers);
+    expect(result).toBe('image/*');
   });
 
   it('returns global wildcard when no better match', () => {
@@ -75,7 +77,8 @@ describe('findTransformer', () => {
       'image/*': imageTransformer,
     };
 
-    expect(findTransformer('text/plain', transformers)).toBe('*/*');
+    const result = findTransformer('text/plain', transformers);
+    expect(result).toBe('*/*');
   });
 
   it('returns undefined when no match', () => {
@@ -83,7 +86,8 @@ describe('findTransformer', () => {
       'application/pdf': pdfTransformer,
     };
 
-    expect(findTransformer('text/plain', transformers)).toBeUndefined();
+    const result = findTransformer('text/plain', transformers);
+    expect(result).toBeUndefined();
   });
 
   it('returns single wildcard match', () => {
@@ -91,7 +95,8 @@ describe('findTransformer', () => {
       '*': fallbackTransformer,
     };
 
-    expect(findTransformer('application/pdf', transformers)).toBe('*');
+    const result = findTransformer('application/pdf', transformers);
+    expect(result).toBe('*');
   });
 
   it('returns more specific wildcard', () => {
@@ -100,11 +105,13 @@ describe('findTransformer', () => {
       'application/*': pdfTransformer,
     };
 
-    expect(findTransformer('application/json', transformers)).toBe('application/*');
+    const result = findTransformer('application/json', transformers);
+    expect(result).toBe('application/*');
   });
 
   it('handles empty transformer map', () => {
-    expect(findTransformer('image/png', {})).toBeUndefined();
+    const result = findTransformer('image/png', {});
+    expect(result).toBeUndefined();
   });
 
   it('handles complex specificity scenario', () => {
