@@ -402,7 +402,7 @@ describe('processAttachments', () => {
       expect((result[2] as { text: string }).text).toBe('Result: doc3.pdf');
     });
 
-    it('caches results per file', async () => {
+    it('caches results per group', async () => {
       let callCount = 0;
 
       const transformer: FileTransformer = {
@@ -570,26 +570,6 @@ describe('processAttachments', () => {
       expect((receivedContext as { chat: typeof mockChat }).chat.metadata).toEqual({ targetType: 'ocr' });
     });
 
-    it('throws if transformer returns wrong number of results', async () => {
-      const transformer: FileTransformer = {
-        transform: async (_files, _context) => {
-          return ['only one result']; // Wrong! Should return 2
-        },
-      };
-
-      const attachments = [
-        createAttachment('1', 'doc1.pdf', 'application/pdf'),
-        createAttachment('2', 'doc2.pdf', 'application/pdf'),
-      ];
-
-      await expect(
-        processAttachments(attachments, {
-          getCurrentChat: testGetCurrentChat,
-          transformers: { 'application/pdf': transformer },
-        })
-      ).rejects.toThrow('Transformer returned 1 results for 2 files');
-    });
-
     it('handles empty attachments array', async () => {
       const result = await processAttachments([], {
         getCurrentChat: testGetCurrentChat,
@@ -599,7 +579,7 @@ describe('processAttachments', () => {
       expect(result).toHaveLength(0);
     });
 
-    it('re-transforms all files when any file in the group is uncached', async () => {
+    it('caches by group composition — different group is a cache miss', async () => {
       const transformCalls: string[][] = [];
       const transformer: FileTransformer = {
         transform: async (files, _context) => {
@@ -617,16 +597,14 @@ describe('processAttachments', () => {
         transformers: { 'application/pdf': transformer },
       };
 
-      // First call: cache file1 and file2
+      // First call: [file1, file2]
       await processAttachments(
         [{ id: '1', file: file1 }, { id: '2', file: file2 }],
         config
       );
       expect(transformCalls).toHaveLength(1);
-      expect(transformCalls[0]).toEqual(['doc1.pdf', 'doc2.pdf']);
 
-      // Second call: file1 and file2 are cached, but file3 is new
-      // All-or-nothing: all 3 should be sent to transformer
+      // Second call: different group [file1, file2, file3] → cache miss
       await processAttachments(
         [{ id: '1', file: file1 }, { id: '2', file: file2 }, { id: '3', file: file3 }],
         config

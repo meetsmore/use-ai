@@ -27,9 +27,9 @@ export interface ProcessAttachmentsConfig {
 
 /**
  * In-memory cache for transformed file content.
- * Keyed by file identity (name + size + lastModified).
+ * Keyed by the combined identity of the file group.
  */
-const transformationCache = new Map<string, string>();
+const transformationCache = new Map<string, string[]>();
 
 /**
  * Generate a cache key for a file based on its identity.
@@ -40,9 +40,7 @@ function getFileCacheKey(file: File): string {
 
 /**
  * Get transformed content for files, using cache when possible.
- *
- * Cache is "all-or-nothing": if every file is cached, returns cached results.
- * Otherwise all files are passed to the transformer together.
+ * Results are cached per group (same set of files in the same order = cache hit).
  */
 export async function getTransformedContent(
   files: File[],
@@ -54,21 +52,15 @@ export async function getTransformedContent(
     return [];
   }
 
-  // Check if all files are cached
-  const allCached = files.every((f) => transformationCache.has(getFileCacheKey(f)));
-  if (allCached) {
-    return files.map((f) => transformationCache.get(getFileCacheKey(f))!);
+  const cacheKey = files.map(getFileCacheKey).join('|');
+  const cached = transformationCache.get(cacheKey);
+  if (cached) {
+    return cached;
   }
 
   const results = await transformer.transform(files, context, onProgress);
 
-  if (results.length !== files.length) {
-    throw new Error(
-      `Transformer returned ${results.length} results for ${files.length} files`
-    );
-  }
-
-  files.forEach((f, i) => transformationCache.set(getFileCacheKey(f), results[i]));
+  transformationCache.set(cacheKey, results);
 
   return results;
 }
