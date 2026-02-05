@@ -1,0 +1,112 @@
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.42",
+  "base_commit_sha": "d5820d8c6c04b951fd8f1e96e8ff97be07371e8a",
+  "prompts": {
+    "30b843135b9ca9c7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2f5f9ba0-d82b-4052-85bd-c9337e62cc5a",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 67,
+      "total_deletions": 13,
+      "accepted_lines": 59,
+      "overriden_lines": 0
+    },
+    "631490222e119f8c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cb1b8600-3f5b-44a0-a5cd-c1bc7b01880c",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 61,
+      "total_deletions": 0,
+      "accepted_lines": 34,
+      "overriden_lines": 0
+    },
+    "83d001bac3beac38": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "64e3199b-82ff-4adf-850f-e2a4ccaedcce",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 68,
+      "total_deletions": 35,
+      "accepted_lines": 67,
+      "overriden_lines": 0
+    },
+    "95f722c23c7021e5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "99b4e0ff-fd61-4e6a-a331-ec323bbe2d81",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 798,
+      "total_deletions": 36,
+      "accepted_lines": 757,
+      "overriden_lines": 0
+    },
+    "99da73825bcc253c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3f98011f-dddb-450b-a604-58a1b50d64dd",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "yuma.ito@meetsmore.com",
+      "messages": [],
+      "total_additions": 53,
+      "total_deletions": 1,
+      "accepted_lines": 53,
+      "overriden_lines": 0
+    },
+    "cdae58660ead1854": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5bfc182b-6c91-4a79-90b1-d50c7f2dddd6",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 54,
+      "total_deletions": 0,
+      "accepted_lines": 46,
+      "overriden_lines": 0
+    },
+    "f5c649f5434b4571": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0e81313e-4593-436c-bc57-1ac4ae561957",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 57,
+      "total_deletions": 1,
+      "accepted_lines": 8,
+      "overriden_lines": 0
+    },
+    "fac02d3ca1b2ba53": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bc2210b1-8e5f-40fe-9ee6-1e4006354a1f",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 25,
+      "total_deletions": 11,
+      "accepted_lines": 0,
+      "overriden_lines": 0
+    }
+  }
+}
