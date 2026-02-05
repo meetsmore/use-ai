@@ -39,35 +39,79 @@ function getFileCacheKey(file: File): string {
 }
 
 /**
- * Get transformed content for a file, using cache if available.
- * @param file - The file to transform
- * @param transformer - The transformer to use
- * @param context - Context for the transformer (including current chat)
- * @param onProgress - Optional progress callback
- * @returns The transformed text content
- * @throws If transformation fails
+ * Get transformed content for files, using cache when possible.
+ *
+ * Cache is "all-or-nothing": if every file is cached, returns cached results.
+ * Otherwise all files are passed to the transformer together.
  */
 export async function getTransformedContent(
-  file: File,
+  files: File[],
   transformer: FileTransformer,
   context: FileTransformerContext,
   onProgress?: (progress: number) => void
-): Promise<string> {
-  const cacheKey = getFileCacheKey(file);
-  const cached = transformationCache.get(cacheKey);
-
-  if (cached !== undefined) {
-    return cached;
+): Promise<string[]> {
+  if (files.length === 0) {
+    return [];
   }
 
-  const result = await transformer.transform(file, context, onProgress);
-  transformationCache.set(cacheKey, result);
-  return result;
+  // Check if all files are cached
+  const allCached = files.every((f) => transformationCache.has(getFileCacheKey(f)));
+  if (allCached) {
+    return files.map((f) => transformationCache.get(getFileCacheKey(f))!);
+  }
+
+  const results = await transformer.transform(files, context, onProgress);
+
+  if (results.length !== files.length) {
+    throw new Error(
+      `Transformer returned ${results.length} results for ${files.length} files`
+    );
+  }
+
+  files.forEach((f, i) => transformationCache.set(getFileCacheKey(f), results[i]));
+
+  return results;
+}
+
+/**
+ * Convert a single attachment (without transformer) to a content part.
+ */
+async function toContentPart(
+  attachment: FileAttachment,
+  backend: FileUploadBackend
+): Promise<MultimodalContent> {
+  if (attachment.transformedContent !== undefined) {
+    return {
+      type: 'transformed_file',
+      text: attachment.transformedContent,
+      originalFile: {
+        name: attachment.file.name,
+        mimeType: attachment.file.type,
+        size: attachment.file.size,
+      },
+    };
+  }
+
+  const url = await backend.prepareForSend(attachment.file);
+
+  if (attachment.file.type.startsWith('image/')) {
+    return { type: 'image', url };
+  }
+
+  return {
+    type: 'file',
+    url,
+    mimeType: attachment.file.type,
+    name: attachment.file.name,
+  };
 }
 
 /**
  * Process file attachments into multimodal content for AI.
  * Handles transformation (with caching) or URL encoding.
+ *
+ * Files matching the same transformer are grouped and passed together
+ * to `transformer.transform()`.
  *
  * @param attachments - The file attachments to process
  * @param config - Processing configuration
@@ -93,63 +137,56 @@ export async function processAttachments(
   const chat = await getCurrentChat();
   const context: FileTransformerContext = { chat };
 
+  // Group attachments by transformer
+  const groups = new Map<FileTransformer | null, FileAttachment[]>();
   for (const attachment of attachments) {
+    const key = attachment.transformedContent !== undefined
+      ? null
+      : findTransformer(attachment.file.type, transformers) ?? null;
+    const group = groups.get(key);
+    if (group) {
+      group.push(attachment);
+    } else {
+      groups.set(key, [attachment]);
+    }
+  }
+
+  for (const [transformer, groupAttachments] of groups) {
+    if (transformer === null) {
+      const parts = await Promise.all(
+        groupAttachments.map((a) => toContentPart(a, backend))
+      );
+      contentParts.push(...parts);
+      continue;
+    }
+
+    const files = groupAttachments.map((a) => a.file);
+    groupAttachments.forEach((a) => onFileProgress?.(a.id, { status: 'processing' }));
+
     try {
-      // Check for pre-transformed content first (transformation at attach time)
-      if (attachment.transformedContent !== undefined) {
-        contentParts.push({
-          type: 'transformed_file',
-          text: attachment.transformedContent,
-          originalFile: {
-            name: attachment.file.name,
-            mimeType: attachment.file.type,
-            size: attachment.file.size,
-          },
-        });
-        continue;
-      }
-
-      // Look for a transformer to apply at send time
-      const transformer = findTransformer(attachment.file.type, transformers);
-
-      if (transformer) {
-        // Notify processing only when a transformer actually runs (may be slow)
-        onFileProgress?.(attachment.id, { status: 'processing' });
-        // Transform file - let errors propagate
-        const transformedText = await getTransformedContent(
-          attachment.file,
-          transformer,
-          context,
-          (progress) => {
-            onFileProgress?.(attachment.id, { status: 'processing', progress });
-          }
-        );
-        contentParts.push({
-          type: 'transformed_file',
-          text: transformedText,
-          originalFile: {
-            name: attachment.file.name,
-            mimeType: attachment.file.type,
-            size: attachment.file.size,
-          },
-        });
-        onFileProgress?.(attachment.id, { status: 'done' });
-      } else {
-        // No transformer - use URL encoding (fast, no progress needed)
-        const url = await backend.prepareForSend(attachment.file);
-        if (attachment.file.type.startsWith('image/')) {
-          contentParts.push({ type: 'image', url });
-        } else {
-          contentParts.push({
-            type: 'file',
-            url,
-            mimeType: attachment.file.type,
-            name: attachment.file.name,
-          });
+      const results = await getTransformedContent(
+        files,
+        transformer,
+        context,
+        (progress) => {
+          groupAttachments.forEach((a) => onFileProgress?.(a.id, { status: 'processing', progress }));
         }
-      }
+      );
+
+      results.forEach((text, i) => {
+        contentParts.push({
+          type: 'transformed_file',
+          text,
+          originalFile: {
+            name: files[i].name,
+            mimeType: files[i].type,
+            size: files[i].size,
+          },
+        });
+        onFileProgress?.(groupAttachments[i].id, { status: 'done' });
+      });
     } catch (error) {
-      onFileProgress?.(attachment.id, { status: 'error' });
+      groupAttachments.forEach((a) => onFileProgress?.(a.id, { status: 'error' }));
       throw error;
     }
   }

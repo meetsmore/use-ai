@@ -194,7 +194,7 @@ export function useFileUpload({
       const chat = await getCurrentChat();
       const context: FileTransformerContext = { chat };
 
-      const transformedContent = await getTransformedContent(file, transformer, context, (progress) => {
+      const [transformedContent] = await getTransformedContent([file], transformer, context, (progress) => {
         setProcessingState(prev => new Map(prev).set(attachmentId, {
           status: 'processing',
           progress,
