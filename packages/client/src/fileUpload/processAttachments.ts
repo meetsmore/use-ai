@@ -41,6 +41,12 @@ function getFileCacheKey(file: File): string {
 /**
  * Get transformed content for files, using cache when possible.
  * Results are cached per group (same set of files in the same order = cache hit).
+ *
+ * @param files - The files to transform (must all belong to the same transformer)
+ * @param transformer - The transformer to use
+ * @param context - Context for the transformer (including current chat)
+ * @param onProgress - Optional progress callback (0-100)
+ * @returns Transformer results (one or more strings, depending on the transformer)
  */
 export async function getTransformedContent(
   files: File[],
@@ -66,12 +72,13 @@ export async function getTransformedContent(
 }
 
 /**
- * Convert a single attachment (without transformer) to a content part.
+ * Convert a single attachment to a multimodal content part.
  */
 async function toContentPart(
   attachment: FileAttachment,
   backend: FileUploadBackend
 ): Promise<MultimodalContent> {
+  // Pre-transformed content (transformation at attach time)
   if (attachment.transformedContent !== undefined) {
     return {
       type: 'transformed_file',
@@ -84,6 +91,7 @@ async function toContentPart(
     };
   }
 
+  // No transformer — use URL encoding (fast, no progress needed)
   const url = await backend.prepareForSend(attachment.file);
 
   if (attachment.file.type.startsWith('image/')) {
@@ -161,6 +169,7 @@ export async function processAttachments(
         }
       );
 
+      // Build content parts from transformer results and notify completion
       results.forEach((text, i) => {
         contentParts.push({
           type: 'transformed_file',
