@@ -1,0 +1,23 @@
+apps/example/src/index.tsx
+  3440c0d0445645ce 20-23
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.42",
+  "base_commit_sha": "47798c34618ba946918778c309d4389b65c6b210",
+  "prompts": {
+    "3440c0d0445645ce": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2b280446-5642-4dd3-b200-97e08bc836f4",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 4,
+      "total_deletions": 0,
+      "accepted_lines": 4,
+      "overriden_lines": 0
+    }
+  }
+}
