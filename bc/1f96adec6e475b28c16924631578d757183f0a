@@ -1,0 +1,84 @@
+apps/example/src/pages/FileTransformersPage.tsx
+  c3daa2f3fe190d14 9,51
+apps/example/playwright.config.ts
+  09a2bf1b0d355bf0 53-54
+apps/use-ai-server-app/src/index.ts
+  09a2bf1b0d355bf0 35-38
+apps/example/src/pages/ProgrammaticChatPage.tsx
+  c3daa2f3fe190d14 12,19,26,59,67,75,86
+apps/example/src/providers/NavigationAIProvider.tsx
+  09a2bf1b0d355bf0 1-80
+apps/example/src/Calculator.tsx
+  09a2bf1b0d355bf0 35
+apps/example/src/TodoList.tsx
+  09a2bf1b0d355bf0 54,56
+packages/client/src/hooks/useToolRegistry.ts
+  09a2bf1b0d355bf0 24-36,42-48,56-57,59-61,72-73,99-102,104-108,120,123-125,147-213,222-224
+packages/server/src/server.ts
+  09a2bf1b0d355bf0 669-699
+packages/client/src/providers/useAIProvider.tsx
+  09a2bf1b0d355bf0 95-96,158,461-462,630-640,814
+apps/example/test/mid-run-tool-registration.e2e.test.ts
+  09a2bf1b0d355bf0 1-131
+apps/example/src/App.tsx
+  09a2bf1b0d355bf0 13,95-96,98-99
+packages/core/src/types.ts
+  09a2bf1b0d355bf0 133-137,141-157
+packages/client/src/client.ts
+  09a2bf1b0d355bf0 424-429
+packages/core/src/index.ts
+  09a2bf1b0d355bf0 9
+packages/client/test-setup.ts
+  09a2bf1b0d355bf0 51-63
+packages/client/src/useAI.ts
+  09a2bf1b0d355bf0 1,78,165-168,178-181,189
+packages/client/test/disabling-at-runtime.integration.test.tsx
+  09a2bf1b0d355bf0 141,197,252
+apps/example/test/remote-mcp-tools.e2e.test.ts
+  c3daa2f3fe190d14 131
+packages/client/src/components/UseAIChatPanel.tsx
+  c3daa2f3fe190d14 453-463
+apps/example/src/useTodoLogic.ts
+  09a2bf1b0d355bf0 1,11-31,33-34,37-40,56-58
+apps/example/test/dynamic-tool-registration.e2e.test.ts
+  c3daa2f3fe190d14 170
+apps/example/test/programmatic-chat.e2e.test.ts
+  c3daa2f3fe190d14 217-219,271-277
+packages/server/src/agents/AISDKAgent.ts
+  09a2bf1b0d355bf0 210-218,276,286,312-318,359-361,378,384,386-393,395-399,401-416,420-426,433-438,442-445,447-458,461,464-479,482-485,489-492,495-502,505,507-508,510-513,519-530,537,540,549-558,562,565-567,571-577,581-582,585-589,597,599-606,609-629,657-660
+apps/example/test/chat-history.e2e.test.ts
+  c3daa2f3fe190d14 653,666-670,673-677
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.42",
+  "base_commit_sha": "bc1f96adec6e475b28c16924631578d757183f0a",
+  "prompts": {
+    "09a2bf1b0d355bf0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2a662cbc-b2c1-45e8-bb26-b0e86258e567",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 1032,
+      "total_deletions": 514,
+      "accepted_lines": 678,
+      "overriden_lines": 0
+    },
+    "c3daa2f3fe190d14": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4f434d27-2127-4323-9fe4-702dba2ae1aa",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 53,
+      "total_deletions": 30,
+      "accepted_lines": 44,
+      "overriden_lines": 0
+    }
+  }
+}
