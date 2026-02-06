@@ -1,0 +1,25 @@
+packages/client/src/fileUpload/processAttachments.ts
+  66e28924eb2ef582 15-27
+packages/client/tsconfig.json
+  66e28924eb2ef582 8
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.42",
+  "base_commit_sha": "691e87a89d454033610ab348fd145f6f7fa18f0c",
+  "prompts": {
+    "66e28924eb2ef582": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b8125d80-c7b3-47c2-90f5-37b010e1e45c",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "yuma.ito@meetsmore.com",
+      "messages": [],
+      "total_additions": 16,
+      "total_deletions": 2,
+      "accepted_lines": 15,
+      "overriden_lines": 0
+    }
+  }
+}
