@@ -25,7 +25,7 @@ import type {
   ToolCallStartExtensions,
 } from '../types';
 import { logger } from '../logger';
-import { langfuse, popTraceIdForRun, type LangfuseApi } from '../instrumentation';
+import { langfuse, popTraceIdForRun, recordErrorTrace, type LangfuseApi } from '../instrumentation';
 import { applyCacheBreakpoints, type CacheBreakpointFn } from './anthropicCache';
 import { getToolAnnotations } from '../utils';
 import { toolNeedsApproval, createApprovalWrapper, type ToolArguments, type ToolResult } from './toolApproval';
@@ -321,6 +321,8 @@ export class AISDKAgent implements Agent {
       timestamp: Date.now(),
     });
 
+    let streamTextStarted = false;
+
     try {
       logger.info('Sending to AI SDK model (streaming)', {
         clientId: session.clientId,
@@ -360,6 +362,7 @@ export class AISDKAgent implements Agent {
         this.model
       );
 
+      streamTextStarted = true;
       const stream = streamText({
         model: this.model,
         messages: messagesWithCache,
@@ -636,6 +639,9 @@ export class AISDKAgent implements Agent {
         conversationHistory: session.conversationHistory,
       };
     } catch (error) {
+      // Clean up trace ID to prevent memory leak on error paths
+      popTraceIdForRun(runId);
+
       logger.error('Error calling AI SDK model', {
         error: error instanceof Error ? error.message : 'Unknown error',
         clientId: session.clientId,
@@ -665,6 +671,20 @@ export class AISDKAgent implements Agent {
         if (isRateLimited) {
           errorCode = ErrorCode.RATE_LIMITED;
         }
+      }
+
+      // Record pre-streamText errors to Langfuse (post-streamText errors are captured by AI SDK OTEL)
+      if (!streamTextStarted) {
+        recordErrorTrace({
+          runId,
+          errorCategory: 'pre_stream_error',
+          errorMessage,
+          sessionId: session.clientId,
+          threadId: session.threadId,
+          ipAddress: session.ipAddress,
+          // TODO[masuda]: add telemetry metadata https://github.com/meetsmore/use-ai/pull/26
+          metadata: { errorCode, toolCount: tools.length, messageCount: messages.length },
+        });
       }
 
       events.emit<RunErrorEvent>({

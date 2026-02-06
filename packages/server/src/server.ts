@@ -18,6 +18,7 @@ import type {
 } from './types';
 import { RateLimiter } from './rateLimiter';
 import { logger } from './logger';
+import { recordErrorTrace } from './instrumentation';
 import { v4 as uuidv4 } from 'uuid';
 import type { Agent, EventEmitter, AGUIEventExtended } from './agents/types';
 import type { ClientSession } from './agents/types';
@@ -311,6 +312,17 @@ export class UseAIServer {
             error: error instanceof Error ? error.message : 'Unknown error',
             clientId,
           });
+          if (message.type === 'run_agent') {
+            const runAgentData = (message as RunAgentMessage).data;
+            recordErrorTrace({
+              runId: runAgentData?.runId || socket.id,
+              errorCategory: 'unhandled_error',
+              errorMessage: error instanceof Error ? error.message : 'Unknown error',
+              sessionId: clientId,
+              threadId: runAgentData?.threadId,
+              ipAddress: session?.ipAddress,
+            });
+          }
           this.sendEvent(socket, {
             type: EventType.RUN_ERROR,
             message: error instanceof Error ? error.message : 'Unknown error',
@@ -321,6 +333,9 @@ export class UseAIServer {
 
       socket.on('disconnect', () => {
         logger.info('Client disconnected', { clientId, ipAddress });
+
+        // Abort any pending tool calls/approvals for this session
+        session.abortController?.abort();
 
         // Clean up polling IP entry
         this.clientIpTracker.removePollingConnection(conn.id);
@@ -388,6 +403,15 @@ export class UseAIServer {
           requested: requestedAgent,
           available: availableAgents,
         });
+        recordErrorTrace({
+          runId,
+          errorCategory: 'agent_not_found',
+          errorMessage: `Agent "${requestedAgent}" not found`,
+          sessionId: session.clientId,
+          threadId,
+          ipAddress: session.ipAddress,
+          metadata: { requestedAgent, availableAgents },
+        });
         this.sendEvent(session.socket, {
           type: EventType.RUN_ERROR,
           message: `Agent "${requestedAgent}" not found. Available agents: ${availableAgents.join(', ')}`,
@@ -401,6 +425,15 @@ export class UseAIServer {
     const rateLimitCheck = this.rateLimiter.checkLimit(session.ipAddress);
     if (!rateLimitCheck.allowed) {
       const retryAfterSeconds = Math.ceil((rateLimitCheck.retryAfterMs || 0) / 1000);
+      recordErrorTrace({
+        runId,
+        errorCategory: 'rate_limit_exceeded',
+        errorMessage: 'Rate limit exceeded',
+        sessionId: session.clientId,
+        threadId,
+        ipAddress: session.ipAddress,
+        metadata: { retryAfterSeconds },
+      });
       this.sendEvent(session.socket, {
         type: EventType.RUN_ERROR,
         message: `Rate limit exceeded. Please try again in ${retryAfterSeconds} seconds.`,
@@ -420,6 +453,9 @@ export class UseAIServer {
     }
     session.threadId = threadId;
     session.currentRunId = runId;
+
+    // Create AbortController for this run (used to cancel pending tool calls/approvals on disconnect)
+    session.abortController = new AbortController();
 
     // Store MCP headers for this request (will be cleared after run completes)
     session.currentMcpHeaders = mcpHeaders;
@@ -684,6 +720,8 @@ export class UseAIServer {
 
   private handleAbortRun(session: ClientSession, message: AbortRunMessage) {
     const { runId } = message.data;
+    // Abort pending tool calls/approvals via AbortController (rejects their promises)
+    session.abortController?.abort();
     // Clear pending tool calls and approvals for this run
     session.pendingToolCalls.clear();
     session.pendingToolApprovals.clear();
@@ -859,6 +897,11 @@ export class UseAIServer {
 
     // Clean up all MCP endpoints
     this.mcpEndpoints.forEach(endpoint => endpoint.destroy());
+
+    // Flush telemetry from all agents before closing
+    await Promise.all(
+      Object.values(this.agents).map(agent => agent.flushTelemetry?.())
+    );
 
     // Close all plugins
     await Promise.all(
