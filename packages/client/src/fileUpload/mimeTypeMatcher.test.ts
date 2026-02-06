@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'bun:test';
-import { matchesMimeType, findTransformer } from './mimeTypeMatcher';
+import { matchesMimeType, findTransformerPattern } from './mimeTypeMatcher';
 import type { FileTransformer, FileTransformerMap } from './types';
 
 describe('matchesMimeType', () => {
@@ -35,18 +35,19 @@ describe('matchesMimeType', () => {
   });
 });
 
-describe('findTransformer', () => {
+describe('findTransformerPattern', () => {
+  // Named transformers are kept for readability in the transformer maps.
   const pdfTransformer: FileTransformer = {
-    transform: async () => 'pdf content',
+    transform: async (files) => files.map(() => 'pdf content'),
   };
   const imageTransformer: FileTransformer = {
-    transform: async () => 'image content',
+    transform: async (files) => files.map(() => 'image content'),
   };
   const pngTransformer: FileTransformer = {
-    transform: async () => 'png content',
+    transform: async (files) => files.map(() => 'png content'),
   };
   const fallbackTransformer: FileTransformer = {
-    transform: async () => 'fallback content',
+    transform: async (files) => files.map(() => 'fallback content'),
   };
 
   it('returns exact match over wildcard', () => {
@@ -55,8 +56,8 @@ describe('findTransformer', () => {
       'image/png': pngTransformer,
     };
 
-    const result = findTransformer('image/png', transformers);
-    expect(result).toBe(pngTransformer);
+    const result = findTransformerPattern('image/png', transformers);
+    expect(result).toBe('image/png');
   });
 
   it('returns partial wildcard over global wildcard', () => {
@@ -65,8 +66,8 @@ describe('findTransformer', () => {
       'image/*': imageTransformer,
     };
 
-    const result = findTransformer('image/jpeg', transformers);
-    expect(result).toBe(imageTransformer);
+    const result = findTransformerPattern('image/jpeg', transformers);
+    expect(result).toBe('image/*');
   });
 
   it('returns global wildcard when no better match', () => {
@@ -75,8 +76,8 @@ describe('findTransformer', () => {
       'image/*': imageTransformer,
     };
 
-    const result = findTransformer('text/plain', transformers);
-    expect(result).toBe(fallbackTransformer);
+    const result = findTransformerPattern('text/plain', transformers);
+    expect(result).toBe('*/*');
   });
 
   it('returns undefined when no match', () => {
@@ -84,7 +85,7 @@ describe('findTransformer', () => {
       'application/pdf': pdfTransformer,
     };
 
-    const result = findTransformer('text/plain', transformers);
+    const result = findTransformerPattern('text/plain', transformers);
     expect(result).toBeUndefined();
   });
 
@@ -93,8 +94,8 @@ describe('findTransformer', () => {
       '*': fallbackTransformer,
     };
 
-    const result = findTransformer('application/pdf', transformers);
-    expect(result).toBe(fallbackTransformer);
+    const result = findTransformerPattern('application/pdf', transformers);
+    expect(result).toBe('*');
   });
 
   it('returns more specific wildcard', () => {
@@ -103,12 +104,12 @@ describe('findTransformer', () => {
       'application/*': pdfTransformer,
     };
 
-    const result = findTransformer('application/json', transformers);
-    expect(result).toBe(pdfTransformer);
+    const result = findTransformerPattern('application/json', transformers);
+    expect(result).toBe('application/*');
   });
 
   it('handles empty transformer map', () => {
-    const result = findTransformer('image/png', {});
+    const result = findTransformerPattern('image/png', {});
     expect(result).toBeUndefined();
   });
 
@@ -121,13 +122,13 @@ describe('findTransformer', () => {
     };
 
     // Exact match wins
-    expect(findTransformer('image/png', transformers)).toBe(pngTransformer);
-    expect(findTransformer('application/pdf', transformers)).toBe(pdfTransformer);
+    expect(findTransformerPattern('image/png', transformers)).toBe('image/png');
+    expect(findTransformerPattern('application/pdf', transformers)).toBe('application/pdf');
 
     // Partial wildcard wins over global
-    expect(findTransformer('image/jpeg', transformers)).toBe(imageTransformer);
+    expect(findTransformerPattern('image/jpeg', transformers)).toBe('image/*');
 
     // Global wildcard when no better match
-    expect(findTransformer('text/plain', transformers)).toBe(fallbackTransformer);
+    expect(findTransformerPattern('text/plain', transformers)).toBe('*');
   });
 });

@@ -776,19 +776,17 @@ Enable file uploads in chat:
 
 File transformers allow you to preprocess files before sending them to the AI. This is useful for extracting text from PDFs, performing OCR on images, or any other file-to-text conversion.
 
+`transform()` receives an array of files matching the MIME pattern, and returns an array of strings (one per file, same order).
+
 ```tsx
 import { UseAIProvider, FileTransformer } from '@meetsmore-oss/use-ai-client';
 
-// Define a custom transformer
 const pdfTransformer: FileTransformer = {
-  transform: async (file, context, onProgress) => {
-    // context.chat contains the current chat with metadata
-    onProgress?.(10); // Report progress (shows progress bar in UI)
-
-    const text = await extractTextFromPDF(file); // Your extraction logic
-
-    onProgress?.(100);
-    return text; // This text is sent to the AI instead of the raw file
+  transform: async (files, context, onProgress) => {
+    return Promise.all(files.map(async (file) => {
+      const text = await extractTextFromPDF(file);
+      return text;
+    }));
   }
 };
 
@@ -797,7 +795,7 @@ const pdfTransformer: FileTransformer = {
   fileUploadConfig={{
     transformers: {
       'application/pdf': pdfTransformer,      // Exact MIME type match
-      'image/*': imageOcrTransformer,         // Wildcard match for all images
+      'image/*': ocrTransformer,              // Wildcard match for all images
     }
   }}
 >
@@ -810,6 +808,19 @@ When multiple patterns match a file, the most specific one wins:
 2. Partial wildcard (`image/*`)
 3. Global wildcard (`*`)
 
+Files matching the same MIME pattern key are grouped together and passed as a single array. For example, two `image/*` files are grouped into one `transform()` call:
+
+```tsx
+<UseAIProvider
+  fileUploadConfig={{
+    transformers: {
+      'application/pdf': pdfTransformer,  // PDF files grouped separately
+      'image/*': imageTransformer,        // All image files grouped together
+    }
+  }}
+>
+```
+
 **Progress Reporting:**
 
 - If `onProgress` is called, the UI shows a progress bar
@@ -821,7 +832,7 @@ When multiple patterns match a file, the most specific one wins:
 Transformers receive a `context` object containing:
 - `chat`: The current chat object (includes metadata set via `chat.updateMetadata()`)
 
-This allows transformers to access chat metadata for context-aware processing (e.g., document type hints).
+This allows transformers to access chat metadata (e.g., document type hints).
 
 ### Theme Customization
 
