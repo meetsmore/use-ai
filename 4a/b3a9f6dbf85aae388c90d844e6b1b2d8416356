@@ -1,0 +1,37 @@
+packages/server/src/agents/toolApproval.test.ts
+  e3e4948fc938e1d9 1-115
+packages/server/src/utils/toolConverter.ts
+  e3e4948fc938e1d9 26-32,34-39
+packages/server/src/server.ts
+  e3e4948fc938e1d9 325-327,427-429,693-694,871-875
+packages/server/src/agents/toolApproval.ts
+  e3e4948fc938e1d9 51-57,59-64
+packages/server/src/agents/AISDKAgent.ts
+  e3e4948fc938e1d9 639-641
+packages/server/src/utils/toolConverter.test.ts
+  e3e4948fc938e1d9 1-106
+packages/server/src/agents/types.ts
+  e3e4948fc938e1d9 165-170
+packages/server/src/agents/AISDKAgent.test.ts
+  e3e4948fc938e1d9 16,1773-1802
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.42",
+  "base_commit_sha": "4ab3a9f6dbf85aae388c90d844e6b1b2d8416356",
+  "prompts": {
+    "e3e4948fc938e1d9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e261be72-11c5-4198-9b3f-f28646807656",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 305,
+      "total_deletions": 7,
+      "accepted_lines": 300,
+      "overriden_lines": 0
+    }
+  }
+}
