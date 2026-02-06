@@ -1,0 +1,29 @@
+packages/server/src/instrumentation.test.ts
+  998b0478c8c77391 2,5-6,71-158
+packages/server/src/server.ts
+  998b0478c8c77391 21,315-325,406-414,428-436
+packages/server/src/agents/AISDKAgent.ts
+  998b0478c8c77391 28,324-325,365,676-688
+packages/server/src/instrumentation.ts
+  998b0478c8c77391 38-79
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.42",
+  "base_commit_sha": "7d18ad77c636f1e9beeb7d007496c4e354cc231c",
+  "prompts": {
+    "998b0478c8c77391": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9b39af1e-72bd-4b0e-b182-9cf078a973a1",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 182,
+      "total_deletions": 5,
+      "accepted_lines": 181,
+      "overriden_lines": 0
+    }
+  }
+}
