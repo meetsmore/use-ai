@@ -1,0 +1,100 @@
+packages/server/src/utils/toolConverter.test.ts
+  e3e4948fc938e1d9 1-106
+packages/server/src/instrumentation.ts
+  998b0478c8c77391 38-79
+packages/server/src/error-handling.integration.test.ts
+  379a2303b0e378e9 1-2,11-13,19,286-328,330,332-648
+  8626eda9985f20c7 7,31,44,72,128,181,190-192,197-198,203-213,226-270,280,284,329,331
+  09d5181b6a3efd89 199-202,214-225,271-279,281-283
+packages/server/src/agents/types.ts
+  e3e4948fc938e1d9 165-170
+packages/server/src/server.ts
+  e3e4948fc938e1d9 337-339,457-459,723-724,901-905
+  998b0478c8c77391 21,315-325,406-414,428-436
+packages/server/src/agents/AISDKAgent.test.ts
+  8626eda9985f20c7 16,1803-1866
+  e3e4948fc938e1d9 1773-1802
+packages/server/src/utils/toolConverter.ts
+  e3e4948fc938e1d9 26-32,34-39
+packages/server/src/agents/toolApproval.ts
+  e3e4948fc938e1d9 51-57,59-64
+packages/server/src/agents/AISDKAgent.ts
+  998b0478c8c77391 28,324-325,365,676-684,686-689
+  e3e4948fc938e1d9 642-644
+packages/server/src/agents/toolApproval.test.ts
+  e3e4948fc938e1d9 1-115
+packages/server/src/instrumentation.test.ts
+  998b0478c8c77391 2,5-6,71-158
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.42",
+  "base_commit_sha": "73e435a5d908a6727b61f1b9115ffe0eb06ed78f",
+  "prompts": {
+    "09d5181b6a3efd89": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e93f8b6b-d699-42e6-906b-062bf4e46963",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 28,
+      "overriden_lines": 0
+    },
+    "379a2303b0e378e9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "375956d6-3cdc-477c-9a85-9c268dfcb0cb",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 367,
+      "overriden_lines": 0
+    },
+    "8626eda9985f20c7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a8377fcd-ceba-4267-a262-95a49652518f",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 136,
+      "overriden_lines": 0
+    },
+    "998b0478c8c77391": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9b39af1e-72bd-4b0e-b182-9cf078a973a1",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 180,
+      "overriden_lines": 0
+    },
+    "e3e4948fc938e1d9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e261be72-11c5-4198-9b3f-f28646807656",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 299,
+      "overriden_lines": 0
+    }
+  }
+}
