@@ -169,6 +169,7 @@ export type {
   WorkflowStatus,
   UseAIClientMessage,
   RunWorkflowMessage,
+  UseAIForwardedProps,
   // Tool approval types
   ToolApprovalRequestEvent,
   ToolApprovalResponseMessage,
