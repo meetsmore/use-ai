@@ -6,7 +6,7 @@ import { UseAIProvider, UseAIChat, type FileTransformer } from '@meetsmore-oss/u
  * Shows the circular progress indicator filling up.
  */
 const pdfTransformer: FileTransformer = {
-  async transform(file, onProgress) {
+  async transform(file, _context, onProgress) {
     console.log(`[PDF Transformer] Starting to process: ${file.name}`);
 
     // Simulate processing in 5 steps
@@ -48,7 +48,7 @@ In summary, this PDF has been successfully processed.
  * Shows the infinite spinner (indeterminate progress).
  */
 const imageTransformer: FileTransformer = {
-  async transform(file) {
+  async transform(file, _context) {
     console.log(`[Image Transformer] Starting to process: ${file.name}`);
 
     // Simulate processing without progress updates (shows spinner)

@@ -450,6 +450,17 @@ export function UseAIChatPanel({
 
         {/* Right side: Actions */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          {/* Connection status dot */}
+          <div
+            title={connected ? strings.header.online : strings.header.offline}
+            style={{
+              width: '8px',
+              height: '8px',
+              borderRadius: '50%',
+              background: connected ? '#22c55e' : '#9ca3af',
+              flexShrink: 0,
+            }}
+          />
           {/* Model selector */}
           {availableAgents && availableAgents.length > 1 && onAgentChange && (
             <div style={{ position: 'relative' }}>

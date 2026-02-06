@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
 import { useAIContext } from './providers/useAIProvider';
 import { type ToolsDefinition } from './defineTool';
 import { useStableTools } from './hooks/useStableTools';
@@ -75,7 +75,7 @@ export interface UseAIResult {
 export function useAI(options: UseAIOptions = {}): UseAIResult {
   const { enabled = true } = options;
   const { connected, tools, client, prompts } = useAIContext();
-  const { register: registerTools, unregister: unregisterTools } = tools;
+  const { register: registerTools, unregister: unregisterTools, signalReady } = tools;
   const { update: updatePrompt, registerWaiter, unregisterWaiter } = prompts;
   const [response, setResponse] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -162,8 +162,10 @@ export function useAI(options: UseAIOptions = {}): UseAIResult {
     };
   }, []);
 
-  // Register tools
-  useEffect(() => {
+  // Register tools using useLayoutEffect for deterministic timing
+  // This runs synchronously after DOM mutations, allowing waitForToolsToStabilize
+  // to reliably detect when all components have finished registering.
+  useLayoutEffect(() => {
     if (!enabled) return;
     if (stableTools) {
       const componentId = options.id || componentRef.current?.id;
@@ -173,6 +175,10 @@ export function useAI(options: UseAIOptions = {}): UseAIResult {
 
       registerTools(hookId.current, toolsToRegister, { invisible: options.invisible });
       toolsRef.current = toolsToRegister;
+
+      // Signal that this component has finished registering its tools
+      // This is used by waitForToolsToStabilize to know when all components are ready
+      signalReady(hookId.current);
     }
 
     return () => {
@@ -180,7 +186,7 @@ export function useAI(options: UseAIOptions = {}): UseAIResult {
         unregisterTools(hookId.current);
       }
     };
-  }, [enabled, toolsKey, stableTools, options.id, options.invisible, registerTools, unregisterTools]);
+  }, [enabled, toolsKey, stableTools, options.id, options.invisible, registerTools, unregisterTools, signalReady]);
 
   useEffect(() => {
     if (!enabled || !client) return;

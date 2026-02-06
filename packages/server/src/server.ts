@@ -666,7 +666,37 @@ export class UseAIServer {
   }
 
   private handleToolResult(session: ClientSession, message: ToolResultMessage) {
-    const { toolCallId, content } = message.data;
+    const { toolCallId, content, forwardedProps } = message.data;
+
+    // Extract use-ai extensions from forwardedProps
+    const tools = forwardedProps?.tools;
+    const state = forwardedProps?.state;
+
+    // Update session tools if client sent updated tools
+    // This allows mid-run tool updates (e.g., after navigation to a new page)
+    if (tools && tools.length > 0) {
+      // Ensure parameters have required structure
+      session.tools = tools.map(t => ({
+        ...t,
+        parameters: t.parameters || { type: 'object', properties: {}, required: [] },
+      })) as ToolDefinition[];
+
+      logger.debug('Tools updated mid-run', {
+        clientId: session.clientId,
+        toolCount: session.tools.length,
+        toolNames: session.tools.map(t => t.name),
+      });
+    }
+
+    // Update session state if client sent updated state
+    // This allows mid-run state updates (e.g., after navigation to a new page)
+    if (state !== undefined) {
+      session.state = state;
+      logger.debug('State updated mid-run', {
+        clientId: session.clientId,
+      });
+    }
+
     const resolver = session.pendingToolCalls.get(toolCallId);
 
     if (resolver) {

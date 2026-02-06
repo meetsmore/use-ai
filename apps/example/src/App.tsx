@@ -10,6 +10,7 @@ import RemoteMcpToolsPage from './pages/RemoteMcpToolsPage';
 import EmbeddedChatPage from './pages/EmbeddedChatPage';
 import ProgrammaticChatPage from './pages/ProgrammaticChatPage';
 import FileTransformersPage from './pages/FileTransformersPage';
+import { NavigationAIProvider } from './providers/NavigationAIProvider';
 
 function Navigation() {
   const { navigate, currentRoute } = useRouter();
@@ -91,9 +92,11 @@ function AppContent() {
 export default function App() {
   return (
     <Router>
-      <div style={styles.app}>
-        <AppContent />
-      </div>
+      <NavigationAIProvider>
+        <div style={styles.app}>
+          <AppContent />
+        </div>
+      </NavigationAIProvider>
     </Router>
   );
 }

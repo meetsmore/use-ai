@@ -421,6 +421,12 @@ export class UseAIClient {
         toolCallId,
         content: JSON.stringify(result),
         role: 'tool',
+        // use-ai extension: include current tools and state for mid-run updates
+        // (e.g., when navigation causes new components to mount)
+        forwardedProps: {
+          tools: this._tools,
+          state: this._state,
+        },
       },
     };
 

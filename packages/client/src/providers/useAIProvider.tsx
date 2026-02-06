@@ -92,6 +92,8 @@ export interface ToolRegistryContextValue {
   register: (id: string, tools: ToolsDefinition, options?: { invisible?: boolean }) => void;
   /** Unregisters tools for a specific component */
   unregister: (id: string) => void;
+  /** Signals that a component has completed registration in useLayoutEffect */
+  signalReady: (id: string) => void;
 }
 
 /**
@@ -153,6 +155,7 @@ const noOpContextValue: UseAIContextValue = {
   tools: {
     register: () => {},
     unregister: () => {},
+    signalReady: () => {},
   },
   prompts: {
     update: () => {},
@@ -455,6 +458,8 @@ export function UseAIProvider({
     hasTools,
     aggregatedToolsRef,
     toolOwnershipRef,
+    signalReady,
+    waitForToolsToStabilize,
   } = useToolRegistry();
 
   // Initialize prompt state hook
@@ -622,17 +627,17 @@ export function UseAIProvider({
             console.log('[useAI] Component is invisible, skipping prompt wait');
           }
 
-          // Build updated state
-          let updatedState: unknown = null;
-          if (ownerId) {
-            const prompt = promptsRef.current.get(ownerId);
-            if (prompt) {
-              updatedState = { context: prompt };
-              console.log(`[useAI] Updated state from ${ownerId}`);
-            }
-          }
+          // Wait for tools to stabilize after execution
+          // This is crucial for tools that cause navigation/component mount-unmount
+          // (e.g., new page components registering their tools)
+          console.log('[useAI] Waiting for tools to stabilize...');
+          await waitForToolsToStabilize();
+          console.log('[useAI] Tools stabilized');
 
-          client.sendToolResponse(toolCallId, result, updatedState);
+          // Send tool response - the client's _state is already up-to-date
+          // because updatePrompt() calls updateState(buildStateFromPrompts())
+          // which aggregates prompts from ALL components
+          client.sendToolResponse(toolCallId, result);
         } catch (err) {
           console.error('Tool execution error:', err);
           client.sendToolResponse(toolCallId, {
@@ -806,6 +811,7 @@ export function UseAIProvider({
     tools: {
       register: registerTools,
       unregister: unregisterTools,
+      signalReady,
     },
     prompts: {
       update: updatePrompt,

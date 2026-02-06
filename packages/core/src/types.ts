@@ -130,7 +130,31 @@ export interface ToolResultMessage {
     content: string;
     /** Role is always 'tool' for tool results */
     role: 'tool';
+    /**
+     * use-ai extension point for mid-run updates.
+     * Follows the same pattern as AG-UI's forwardedProps on RunAgentInput.
+     */
+    forwardedProps?: ToolResultForwardedProps;
   };
+}
+
+/**
+ * use-ai extension props for tool results.
+ * Allows mid-run updates to tools and state (e.g., after navigation).
+ */
+export interface ToolResultForwardedProps {
+  /**
+   * Current tool definitions from the client.
+   * Sent with each tool result to allow mid-run tool updates
+   * (e.g., when navigation causes new components to mount).
+   */
+  tools?: ToolDefinition[];
+  /**
+   * Current application state from all components.
+   * Sent with each tool result to allow mid-run state updates
+   * (e.g., when navigation causes new components with different state to mount).
+   */
+  state?: unknown;
 }
 
 /**

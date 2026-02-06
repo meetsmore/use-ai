@@ -167,6 +167,6 @@ test.describe('Dynamic Tool Registration', () => {
     await expect(page.getByTestId('chat-message-assistant').last()).toBeVisible({ timeout: 30000 });
 
     // Verify the label was updated
-    await expect(page.locator('text=Updated Label')).toBeVisible();
+    await expect(page.locator('#Item-A').locator('text=Updated Label')).toBeVisible();
   });
 });

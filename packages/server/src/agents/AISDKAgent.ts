@@ -207,6 +207,15 @@ export interface AISDKAgentConfig {
    * @default 4096
    */
   maxOutputTokens?: number;
+
+  /**
+   * Temperature for model responses.
+   * Lower values (e.g., 0) make responses more deterministic.
+   * Higher values (e.g., 1) make responses more creative/random.
+   * Useful for testing where deterministic behavior is desired.
+   * @default undefined (uses model's default)
+   */
+  temperature?: number;
 }
 
 const DEFAULT_MAX_OUTPUT_TOKENS = 4096;
@@ -264,6 +273,7 @@ export class AISDKAgent implements Agent {
   private systemPrompt?: string | (() => string | Promise<string>);
   private cacheBreakpoint?: CacheBreakpointFn;
   private maxOutputTokens: number;
+  private temperature?: number;
 
   constructor(config: AISDKAgentConfig) {
     this.model = config.model;
@@ -273,6 +283,7 @@ export class AISDKAgent implements Agent {
     this.systemPrompt = config.systemPrompt;
     this.cacheBreakpoint = config.cacheBreakpoint;
     this.maxOutputTokens = config.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS;
+    this.temperature = config.temperature;
     // Initialize Langfuse observability (automatically reads env vars)
     this.langfuse = langfuse;
   }
@@ -297,6 +308,13 @@ export class AISDKAgent implements Agent {
 
   async run(input: AgentInput, events: EventEmitter): Promise<AgentResult> {
     const { session, runId, messages, tools, state, systemPrompt: runtimeSystemPrompt, originalInput } = input;
+
+    // Sync session.tools with input.tools if not already set
+    // This ensures tools are available for step-by-step execution
+    // (In production, server sets session.tools before calling run; in tests, input.tools may differ)
+    if (session.tools.length === 0 && tools.length > 0) {
+      session.tools = tools;
+    }
 
     // Resolve config system prompt (may be async, e.g., fetched from Langfuse)
     const configSystemPrompt = await this.resolveSystemPrompt();
@@ -338,12 +356,9 @@ export class AISDKAgent implements Agent {
       // Sanitize messages before sending to ensure no provider-specific fields leak through (e.g. for Anthropic: 'tool_use_id')
       const sanitizedInputMessages = this.sanitizeMessages(messages);
 
-      // Prepend system messages to the messages array
-      // This allows multiple system messages to be sent as separate messages
-      const messagesWithSystem: ModelMessage[] = [
-        ...(systemMessages || []),
-        ...sanitizedInputMessages,
-      ];
+      // Start with just the user messages - system messages will be prepended in the loop
+      // (rebuilt with current state for each step)
+      let currentMessages: ModelMessage[] = [...sanitizedInputMessages];
 
       logger.apiRequest({
         tools: tools.map((t) => t.name),
@@ -360,207 +375,259 @@ export class AISDKAgent implements Agent {
         systemMessages: systemMessages?.map(m => m.content.substring(0, 80) + (m.content.length > 80 ? '...' : '')),
       });
 
-      // Apply cache breakpoints for Anthropic prompt caching
-      const messagesWithCache = applyCacheBreakpoints(
-        messagesWithSystem,
-        this.cacheBreakpoint,
-        this.model
-      );
-
-      const stream = streamText({
-        model: this.model,
-        messages: messagesWithCache,
-        // Note: system prompt is included in messages array to support cache breakpoints
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        tools:
-          tools.length > 0
-            ? (this.sanitizeToolsForAPI(this.filterTools(tools), session) as any)
-            : undefined,
-        stopWhen: stepCountIs(10), // Allow AI SDK to handle multi-step tool execution automatically
-        maxOutputTokens: this.maxOutputTokens,
-        abortSignal: session.abortController?.signal,
-        experimental_telemetry: this.langfuse?.enabled
-          ? {
-              isEnabled: true,
-              functionId: 'use-ai',
-              metadata: {
-                sessionId: session.clientId,
-                threadId: session.threadId,
-                runId,
-                ipAddress: session.ipAddress,
-                toolCount: tools.length,
-              },
-            }
-          : undefined,
-        onStepFinish: ({ usage, finishReason }) => {
-          logger.debug('Step finished', { usage, finishReason });
-        },
-      });
-
-      // Track streaming state
+      // Track streaming state across all steps
       let messageId: string | null = null;
       let hasEmittedTextStart = false;
       let finalText = '';
       let currentStepNumber = 0;
       let hasAnyContent = false;
+      const maxSteps = 10;
 
-      // Track active tool calls for streaming args
-      const activeToolCalls = new Map<string, { name: string; args: string }>();
+      // Step-by-step execution loop
+      // This allows tools and state to be refreshed between steps (e.g., after navigation)
+      // Each step runs ONE model invocation, then we check for updated tools/state
+      let response: Awaited<ReturnType<typeof streamText>['response']> | null = null;
 
-      // Process the stream
-      for await (const chunk of stream.fullStream) {
-        switch (chunk.type) {
-          case 'start-step': {
-            // New step beginning (for multi-step tool execution)
-            events.emit<StepStartedEvent>({
-              type: EventType.STEP_STARTED,
-              stepName: `step-${currentStepNumber++}`,
-              timestamp: Date.now(),
-            });
-            break;
-          }
+      for (let stepIteration = 0; stepIteration < maxSteps; stepIteration++) {
+        // Get current tools from session (may have been updated by tool_result handler)
+        const currentTools = session.tools;
 
-          case 'text-delta': {
-            hasAnyContent = true;
-            // Start text message on first text chunk
-            if (!hasEmittedTextStart) {
-              messageId = uuidv4();
-              events.emit<TextMessageStartEvent>({
-                type: EventType.TEXT_MESSAGE_START,
-                messageId,
-                role: 'assistant',
-                timestamp: Date.now(),
-              });
-              hasEmittedTextStart = true;
-            }
-
-            // Emit delta (AI SDK v6 uses 'text' property)
-            events.emit<TextMessageContentEvent>({
-              type: EventType.TEXT_MESSAGE_CONTENT,
-              messageId: messageId!,
-              delta: chunk.text,
-              timestamp: Date.now(),
-            });
-            finalText += chunk.text;
-            break;
-          }
-
-          case 'reasoning-delta': {
-            // Extended thinking (Claude) - log for now, future AG-UI support
-            logger.debug('Reasoning', { text: chunk.text });
-            break;
-          }
-
-          case 'tool-input-start': {
-            hasAnyContent = true;
-            // Find the tool definition to get annotations (for MCP tools)
-            const toolDef = tools.find(t => t.name === chunk.toolName);
-            const annotations = (toolDef as RemoteToolDefinition)?._remote?.annotations;
-
-            // Emit TOOL_CALL_START with use-ai extensions (annotations only if present)
-            // AI SDK v6 uses 'id' as the toolCallId
-            const toolCallStartEvent: ToolCallStartEvent & ToolCallStartExtensions = {
-              type: EventType.TOOL_CALL_START,
-              toolCallId: chunk.id,
-              toolCallName: chunk.toolName,
-              parentMessageId: messageId ?? uuidv4(),
-              timestamp: Date.now(),
-            };
-            if (annotations) {
-              toolCallStartEvent.annotations = annotations;
-            }
-            events.emit(toolCallStartEvent);
-            activeToolCalls.set(chunk.id, { name: chunk.toolName, args: '' });
-            break;
-          }
-
-          case 'tool-input-delta': {
-            // Stream tool arguments
-            const toolCall = activeToolCalls.get(chunk.id);
-            if (toolCall) {
-              toolCall.args += chunk.delta;
-              events.emit<ToolCallArgsEvent>({
-                type: EventType.TOOL_CALL_ARGS,
-                toolCallId: chunk.id,
-                delta: chunk.delta,
-                timestamp: Date.now(),
-              });
-            }
-            break;
-          }
-
-          case 'tool-call': {
-            // Tool call complete - emit TOOL_CALL_END
-            // AI SDK will call execute() and stream pauses until it returns
-            const toolCall = activeToolCalls.get(chunk.toolCallId);
-            const finalArgs = JSON.stringify(chunk.input);
-
-            // If no args were streamed at all (tool-input-delta was never called),
-            // send the complete args as a single delta.
-            // This handles cases where AI SDK skips streaming for empty args.
-            // Note: We only handle the case where NO streaming happened.
-            // If partial streaming occurred, we trust that data and the client
-            // will receive valid JSON through the normal streaming path.
-            if (toolCall && toolCall.args.length === 0) {
-              events.emit<ToolCallArgsEvent>({
-                type: EventType.TOOL_CALL_ARGS,
-                toolCallId: chunk.toolCallId,
-                delta: finalArgs,
-                timestamp: Date.now(),
-              });
-              toolCall.args = finalArgs;
-            }
-
-            events.emit<ToolCallEndEvent>({
-              type: EventType.TOOL_CALL_END,
-              toolCallId: chunk.toolCallId,
-              timestamp: Date.now(),
-            });
-            break;
-          }
-
-          case 'tool-result': {
-            // Tool execution completed (by execute function)
-            logger.toolResult(chunk.toolName, JSON.stringify(chunk.output));
-            break;
-          }
-
-          case 'finish-step': {
-            // Step completed - has usage info for telemetry
-            events.emit<StepFinishedEvent>({
-              type: EventType.STEP_FINISHED,
-              stepName: `step-${currentStepNumber - 1}`,
-              timestamp: Date.now(),
-            });
-            break;
-          }
-
-          case 'error': {
-            throw chunk.error;
-          }
-
-          // Ignored chunk types:
-          // 'start', 'finish' - internal stream lifecycle
-          // 'source' - RAG sources (future)
-          // 'file' - generated files (future)
-          // 'text-start', 'text-end' - we handle text-delta instead
-          // 'reasoning-start', 'reasoning-end' - we handle reasoning-delta
-          // 'tool-input-end' - we emit TOOL_CALL_END on 'tool-call' instead
-          // 'tool-error', 'tool-output-denied' - error cases
-          // 'tool-approval-request' - approval workflow
-          // 'abort' - handled after loop
-          // 'raw' - raw provider data
-        }
-      }
-
-      // Check if stream was aborted
-      if (session.abortController?.signal.aborted) {
-        events.emit<RunErrorEvent>({
-          type: EventType.RUN_ERROR,
-          message: 'Run aborted by user',
-          timestamp: Date.now(),
+        logger.debug('Starting step iteration', {
+          stepIteration,
+          toolCount: currentTools.length,
+          toolNames: currentTools.map(t => t.name),
         });
-        return { success: false, error: 'Run aborted', conversationHistory: session.conversationHistory };
+
+        // Build messages with system prompt
+        const messagesForStep: ModelMessage[] = [
+          ...(systemMessages || []),
+          ...currentMessages,
+        ];
+
+        // Apply cache breakpoints for Anthropic prompt caching
+        const messagesWithCache = applyCacheBreakpoints(
+          messagesForStep,
+          this.cacheBreakpoint,
+          this.model
+        );
+
+        const stream = streamText({
+          model: this.model,
+          messages: messagesWithCache,
+          // Note: system prompt is included in messages array to support cache breakpoints
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          tools:
+            currentTools.length > 0
+              ? (this.sanitizeToolsForAPI(this.filterTools(currentTools), session) as any)
+              : undefined,
+          // Run ONE step at a time to allow tool refresh between steps
+          stopWhen: stepCountIs(1),
+          maxOutputTokens: this.maxOutputTokens,
+          temperature: this.temperature,
+          abortSignal: session.abortController?.signal,
+          experimental_telemetry: this.langfuse?.enabled
+            ? {
+                isEnabled: true,
+                functionId: 'use-ai',
+                metadata: {
+                  sessionId: session.clientId,
+                  threadId: session.threadId,
+                  runId,
+                  ipAddress: session.ipAddress,
+                  toolCount: currentTools.length,
+                  stepIteration,
+                },
+              }
+            : undefined,
+          onStepFinish: ({ usage, finishReason }) => {
+            logger.debug('Step finished', { usage, finishReason, stepIteration });
+          },
+        });
+
+        // Track active tool calls for streaming args (per-step)
+        const activeToolCalls = new Map<string, { name: string; args: string }>();
+        let stepHadToolCalls = false;
+
+        // Process the stream for this step
+        for await (const chunk of stream.fullStream) {
+          switch (chunk.type) {
+            case 'start-step': {
+              // New step beginning (for multi-step tool execution)
+              events.emit<StepStartedEvent>({
+                type: EventType.STEP_STARTED,
+                stepName: `step-${currentStepNumber++}`,
+                timestamp: Date.now(),
+              });
+              break;
+            }
+
+            case 'text-delta': {
+              hasAnyContent = true;
+              // Start text message on first text chunk
+              if (!hasEmittedTextStart) {
+                messageId = uuidv4();
+                events.emit<TextMessageStartEvent>({
+                  type: EventType.TEXT_MESSAGE_START,
+                  messageId,
+                  role: 'assistant',
+                  timestamp: Date.now(),
+                });
+                hasEmittedTextStart = true;
+              }
+
+              // Emit delta (AI SDK v6 uses 'text' property)
+              events.emit<TextMessageContentEvent>({
+                type: EventType.TEXT_MESSAGE_CONTENT,
+                messageId: messageId!,
+                delta: chunk.text,
+                timestamp: Date.now(),
+              });
+              finalText += chunk.text;
+              break;
+            }
+
+            case 'reasoning-delta': {
+              // Extended thinking (Claude) - log for now, future AG-UI support
+              logger.debug('Reasoning', { text: chunk.text });
+              break;
+            }
+
+            case 'tool-input-start': {
+              hasAnyContent = true;
+              stepHadToolCalls = true;
+              // Find the tool definition to get annotations (for MCP tools)
+              const toolDef = currentTools.find(t => t.name === chunk.toolName);
+              const annotations = (toolDef as RemoteToolDefinition)?._remote?.annotations;
+
+              // Emit TOOL_CALL_START with use-ai extensions (annotations only if present)
+              // AI SDK v6 uses 'id' as the toolCallId
+              const toolCallStartEvent: ToolCallStartEvent & ToolCallStartExtensions = {
+                type: EventType.TOOL_CALL_START,
+                toolCallId: chunk.id,
+                toolCallName: chunk.toolName,
+                parentMessageId: messageId ?? uuidv4(),
+                timestamp: Date.now(),
+              };
+              if (annotations) {
+                toolCallStartEvent.annotations = annotations;
+              }
+              events.emit(toolCallStartEvent);
+              activeToolCalls.set(chunk.id, { name: chunk.toolName, args: '' });
+              break;
+            }
+
+            case 'tool-input-delta': {
+              // Stream tool arguments
+              const toolCall = activeToolCalls.get(chunk.id);
+              if (toolCall) {
+                toolCall.args += chunk.delta;
+                events.emit<ToolCallArgsEvent>({
+                  type: EventType.TOOL_CALL_ARGS,
+                  toolCallId: chunk.id,
+                  delta: chunk.delta,
+                  timestamp: Date.now(),
+                });
+              }
+              break;
+            }
+
+            case 'tool-call': {
+              // Tool call complete - emit TOOL_CALL_END
+              // AI SDK will call execute() and stream pauses until it returns
+              stepHadToolCalls = true;
+              const toolCall = activeToolCalls.get(chunk.toolCallId);
+              const finalArgs = JSON.stringify(chunk.input);
+
+              // If no args were streamed at all (tool-input-delta was never called),
+              // send the complete args as a single delta.
+              // This handles cases where AI SDK skips streaming for empty args.
+              // Note: We only handle the case where NO streaming happened.
+              // If partial streaming occurred, we trust that data and the client
+              // will receive valid JSON through the normal streaming path.
+              if (toolCall && toolCall.args.length === 0) {
+                events.emit<ToolCallArgsEvent>({
+                  type: EventType.TOOL_CALL_ARGS,
+                  toolCallId: chunk.toolCallId,
+                  delta: finalArgs,
+                  timestamp: Date.now(),
+                });
+                toolCall.args = finalArgs;
+              }
+
+              events.emit<ToolCallEndEvent>({
+                type: EventType.TOOL_CALL_END,
+                toolCallId: chunk.toolCallId,
+                timestamp: Date.now(),
+              });
+              break;
+            }
+
+            case 'tool-result': {
+              // Tool execution completed (by execute function)
+              logger.toolResult(chunk.toolName, JSON.stringify(chunk.output));
+              break;
+            }
+
+            case 'finish-step': {
+              // Step completed - has usage info for telemetry
+              events.emit<StepFinishedEvent>({
+                type: EventType.STEP_FINISHED,
+                stepName: `step-${currentStepNumber - 1}`,
+                timestamp: Date.now(),
+              });
+              break;
+            }
+
+            case 'error': {
+              throw chunk.error;
+            }
+
+            // Ignored chunk types:
+            // 'start', 'finish' - internal stream lifecycle
+            // 'source' - RAG sources (future)
+            // 'file' - generated files (future)
+            // 'text-start', 'text-end' - we handle text-delta instead
+            // 'reasoning-start', 'reasoning-end' - we handle reasoning-delta
+            // 'tool-input-end' - we emit TOOL_CALL_END on 'tool-call' instead
+            // 'tool-error', 'tool-output-denied' - error cases
+            // 'tool-approval-request' - approval workflow
+            // 'abort' - handled after loop
+            // 'raw' - raw provider data
+          }
+        }
+
+        // Check if stream was aborted
+        if (session.abortController?.signal.aborted) {
+          events.emit<RunErrorEvent>({
+            type: EventType.RUN_ERROR,
+            message: 'Run aborted by user',
+            timestamp: Date.now(),
+          });
+          return { success: false, error: 'Run aborted', conversationHistory: session.conversationHistory };
+        }
+
+        // Get the response for this step
+        response = await stream.response;
+
+        // If no tool calls were made in this step, we're done
+        if (!stepHadToolCalls) {
+          logger.debug('Step had no tool calls, finishing run', { stepIteration });
+          break;
+        }
+
+        // Tool calls were made - prepare for next iteration
+        // Update messages with the response from this step (includes tool calls and results)
+        // Sanitize to remove provider-specific fields
+        // Note: System messages will be rebuilt with updated state at the start of next iteration
+        currentMessages = [
+          ...this.sanitizeMessages(response.messages),
+        ];
+
+        logger.debug('Continuing to next step after tool calls', {
+          stepIteration,
+          newMessageCount: currentMessages.length,
+          updatedToolCount: session.tools.length,
+        });
       }
 
       // End text message if we started one
@@ -587,9 +654,10 @@ export class AISDKAgent implements Agent {
         };
       }
 
-      // Get final result for conversation history
-      // In AI SDK v6, response is a Promise
-      const response = await stream.response;
+      // response should be set from the last step
+      if (!response) {
+        throw new Error('No response from AI SDK');
+      }
 
       // Update conversation history with all messages from AI SDK
       const responseMessages = response.messages;
