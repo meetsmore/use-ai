@@ -101,7 +101,7 @@ export default function ListItem({ id, initialLabel, initialColor, onDelete }: L
           itemId: id
         };
       },
-      { annotations: { title: `Resetting ${id}` } }
+      { annotations: { title: `Resetting ${id}`, destructiveHint: true } }
     ),
 
     getState: defineTool(

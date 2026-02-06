@@ -1,12 +1,12 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
-import type { UseAIConfig, AGUIEvent, ToolCallStartEvent, ToolCallEndEvent, RunErrorEvent, RunFinishedEvent, AgentInfo, TextMessageContentEvent, ToolCallStartExtensions } from '../types';
-import { EventType, ErrorCode } from '../types';
+import type { UseAIConfig, AGUIEvent, ToolCallStartEvent, ToolCallEndEvent, RunErrorEvent, RunFinishedEvent, AgentInfo, TextMessageContentEvent, ToolCallStartExtensions, ToolApprovalRequestEvent } from '../types';
+import { EventType, ErrorCode, TOOL_APPROVAL_REQUEST } from '../types';
 import { UseAIFloatingButton } from '../components/UseAIFloatingButton';
 import { UseAIChatPanel, type Message } from '../components/UseAIChatPanel';
 import { UseAIFloatingChatWrapper, CloseButton } from '../components/UseAIFloatingChatWrapper';
 import { __UseAIChatContext, type ChatUIContextValue } from '../components/UseAIChat';
 import { UseAIClient } from '../client';
-import { convertToolsToDefinitions, executeDefinedTool, type ToolsDefinition } from '../defineTool';
+import { convertToolsToDefinitions, type ToolsDefinition } from '../defineTool';
 import type { ChatRepository, Chat, ChatMetadata, CreateChatOptions, PersistedMessageContent, PersistedContentPart } from './chatRepository/types';
 import { LocalStorageChatRepository } from './chatRepository/LocalStorageChatRepository';
 import type { FileAttachment, FileUploadConfig, FileProcessingState } from '../fileUpload/types';
@@ -20,6 +20,7 @@ import { useCommandManagement } from '../hooks/useCommandManagement';
 import { useToolRegistry } from '../hooks/useToolRegistry';
 import { usePromptState } from '../hooks/usePromptState';
 import { useFeedback } from '../hooks/useFeedback';
+import { useToolExecution } from '../hooks/useToolExecution';
 import { ThemeContext, StringsContext, defaultTheme, defaultStrings } from '../theme';
 import type { UseAITheme, UseAIStrings } from '../theme';
 
@@ -483,6 +484,16 @@ export function UseAIProvider({
     }
   }, []);
 
+  // Initialize tool execution hook (before chat management so we can pass pendingApproval)
+  const toolExecution = useToolExecution({
+    clientRef,
+    aggregatedToolsRef,
+    toolOwnershipRef,
+    promptsRef,
+    isInvisible,
+    getWaiter,
+  });
+
   // Initialize chat management hook
   const chatManagement = useChatManagement({
     repository: repositoryRef.current,
@@ -493,6 +504,7 @@ export function UseAIProvider({
     setOpen: handleSetChatOpen,
     connected,
     loading,
+    hasPendingApproval: toolExecution.pendingApprovals.length > 0,
   });
 
   const {
@@ -593,57 +605,27 @@ export function UseAIProvider({
         // Check if this tool belongs to a useAI hook (not a workflow)
         // If the tool doesn't exist in our aggregated tools, it's a workflow tool
         // and will be handled by useAIWorkflow's event listener
-        if (!aggregatedToolsRef.current[name]) {
+        const tool = aggregatedToolsRef.current[name];
+        if (!tool) {
           console.log(`[Provider] Tool "${name}" not found in useAI tools, skipping (likely a workflow tool)`);
           return;
         }
 
-        try {
-          const ownerId = toolOwnershipRef.current.get(name);
-          console.log(`[useAI] Tool "${name}" owned by component:`, ownerId);
-
-          console.log('[useAI] Executing tool...');
-          const result = await executeDefinedTool(aggregatedToolsRef.current, name, input);
-
-          // Check if result indicates an error - if so, skip waiting for prompt change
-          // Error results typically don't trigger state changes
-          const isErrorResult = result && typeof result === 'object' &&
-            ('error' in result || (result as Record<string, unknown>).success === false);
-
-          // Check if component is invisible (no visual state to wait for)
-          const ownerIsInvisible = ownerId ? isInvisible(ownerId) : false;
-
-          // Wait for prompt to update (via waiter registered by useAI) unless it's an error or invisible
-          if (ownerId && !isErrorResult && !ownerIsInvisible) {
-            const waiter = getWaiter(ownerId);
-            if (waiter) {
-              console.log(`[useAI] Waiting for prompt change from ${ownerId}...`);
-              await waiter();
-              console.log('[useAI] Prompt change wait complete');
-            }
-          } else if (isErrorResult) {
-            console.log('[useAI] Tool returned error, skipping prompt wait');
-          } else if (ownerIsInvisible) {
-            console.log('[useAI] Component is invisible, skipping prompt wait');
-          }
-
-          // Wait for tools to stabilize after execution
-          // This is crucial for tools that cause navigation/component mount-unmount
-          // (e.g., new page components registering their tools)
-          console.log('[useAI] Waiting for tools to stabilize...');
-          await waitForToolsToStabilize();
-          console.log('[useAI] Tools stabilized');
-
-          // Send tool response - the client's _state is already up-to-date
-          // because updatePrompt() calls updateState(buildStateFromPrompts())
-          // which aggregates prompts from ALL components
-          client.sendToolResponse(toolCallId, result);
-        } catch (err) {
-          console.error('Tool execution error:', err);
-          client.sendToolResponse(toolCallId, {
-            error: err instanceof Error ? err.message : 'Unknown error',
-          });
+        // Check if tool needs approval - if so, defer execution until approved
+        // The server will send TOOL_APPROVAL_REQUEST and we'll execute after approval
+        if (tool._options?.annotations?.destructiveHint === true) {
+          console.log(`[Provider] Tool "${name}" requires approval, deferring execution`);
+          // Store pending tool call data for later execution after approval
+          toolExecution.storePendingToolCall(toolCallId, name, input, toolCallData);
+          return;
         }
+
+        // Execute tool immediately (no approval needed)
+        await toolExecution.executeToolCall(toolCallId, name, input);
+      } else if ((event.type as string) === TOOL_APPROVAL_REQUEST) {
+        // Tool needs user approval before execution (use-ai extension event)
+        const e = event as unknown as ToolApprovalRequestEvent;
+        toolExecution.handleApprovalRequest(e);
       } else if (event.type === EventType.TEXT_MESSAGE_CONTENT) {
         // Update streaming text in real-time for UI display
         const contentEvent = event as TextMessageContentEvent;
@@ -887,7 +869,14 @@ export function UseAIProvider({
       isOpen: isChatOpen,
       setOpen: handleSetChatOpen,
     },
-    executingTool: executingToolDisplay,
+    tools: {
+      executing: executingToolDisplay,
+      pending: {
+        tools: toolExecution.pendingApprovals,
+        approveAll: toolExecution.approveAll,
+        rejectAll: toolExecution.rejectAll,
+      },
+    },
     feedback: {
       enabled: feedback.enabled,
       submit: feedback.submitFeedback,
@@ -926,6 +915,9 @@ export function UseAIProvider({
     executingTool: executingToolDisplay,
     feedbackEnabled: feedback.enabled,
     onFeedback: feedback.submitFeedback,
+    pendingApprovals: toolExecution.pendingApprovals,
+    onApproveToolCall: toolExecution.pendingApprovals.length > 0 ? toolExecution.approveAll : undefined,
+    onRejectToolCall: toolExecution.pendingApprovals.length > 0 ? toolExecution.rejectAll : undefined,
   };
 
   // Render function for default floating chat UI

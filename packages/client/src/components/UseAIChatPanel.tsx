@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import type { Chat, PersistedMessageContent, PersistedContentPart } from '../providers/chatRepository/types';
-import type { AgentInfo, FeedbackValue } from '../types';
+import type { AgentInfo, FeedbackValue, ToolAnnotations } from '../types';
 import type { FileAttachment, FileUploadConfig, FileProcessingState } from '../fileUpload/types';
 import { MarkdownContent } from './MarkdownContent';
 import { FileChip, FilePlaceholder } from './FileChip';
@@ -10,6 +10,7 @@ import { useFileUpload } from '../hooks/useFileUpload';
 import { useDropdownState } from '../hooks/useDropdownState';
 import { useTheme, useStrings } from '../theme';
 import type { UseAIStrings, UseAITheme } from '../theme';
+import { ToolApprovalDialog } from './ToolApprovalDialog';
 
 // Re-export types for backwards compatibility
 export type UseAIChatPanelStrings = UseAIStrings;
@@ -184,6 +185,17 @@ export interface UseAIChatPanelProps {
   feedbackEnabled?: boolean;
   /** Callback when user submits feedback on a message */
   onFeedback?: (messageId: string, traceId: string, feedback: FeedbackValue) => void;
+  /** Pending tool approvals awaiting user confirmation */
+  pendingApprovals?: Array<{
+    toolCallId: string;
+    toolCallName: string;
+    toolCallArgs: Record<string, unknown>;
+    annotations?: ToolAnnotations;
+  }>;
+  /** Callback to approve all pending tool calls */
+  onApproveToolCall?: () => void;
+  /** Callback to reject all pending tool calls */
+  onRejectToolCall?: (reason?: string) => void;
 }
 
 /**
@@ -217,6 +229,9 @@ export function UseAIChatPanel({
   executingTool,
   feedbackEnabled,
   onFeedback,
+  pendingApprovals = [],
+  onApproveToolCall,
+  onRejectToolCall,
 }: UseAIChatPanelProps) {
   const strings = useStrings();
   const theme = useTheme();
@@ -1100,144 +1115,159 @@ export function UseAIChatPanel({
           </div>
         )}
 
-        {/* Input container - single border around everything */}
-        <div
-          style={{
-            border: `1px solid ${theme.borderColor}`,
-            borderRadius: '12px',
-            background: theme.backgroundColor,
-            overflow: 'hidden',
-            position: 'relative',
-          }}
-        >
-          {/* Command Autocomplete */}
-          {slashCommands.AutocompleteComponent}
+        {/* Hidden file input - always rendered */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          data-testid="file-input"
+          style={{ display: 'none' }}
+          onChange={handleFileInputChange}
+          accept={acceptedTypes?.join(',')}
+        />
 
-          {/* Hidden file input */}
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            data-testid="file-input"
-            style={{ display: 'none' }}
-            onChange={handleFileInputChange}
-            accept={acceptedTypes?.join(',')}
+        {/* Tool approval dialog - replaces input when pending */}
+        {pendingApprovals.length > 0 && onApproveToolCall && onRejectToolCall ? (
+          <ToolApprovalDialog
+            toolCallName={pendingApprovals[0].toolCallName}
+            toolCallArgs={pendingApprovals[0].toolCallArgs}
+            annotations={pendingApprovals[0].annotations}
+            toolCount={pendingApprovals.length}
+            pendingTools={pendingApprovals}
+            onApprove={onApproveToolCall}
+            onReject={onRejectToolCall}
+            theme={theme}
+            strings={strings}
           />
-
-          {/* Textarea area */}
-          <textarea
-            ref={textareaRef}
-            data-testid="chat-input"
-            className="chat-input"
-            value={input}
-            onChange={handleInputChange}
-            onKeyDown={handleKeyDown}
-            placeholder={
-              !connected
-                ? strings.input.connectingPlaceholder
-                : loading
-                  ? `${executingTool?.displayText ?? strings.input.thinking}...`
-                  : strings.input.placeholder
-            }
-            disabled={!connected || loading}
-            rows={1}
-            style={{
-              width: '100%',
-              padding: '10px 14px 6px',
-              border: 'none',
-              fontSize: '14px',
-              lineHeight: '1.4',
-              resize: 'none',
-              maxHeight: `${maxTextareaHeight}px`,
-              fontFamily: 'inherit',
-              outline: 'none',
-              background: 'transparent',
-              overflowY: 'auto',
-              boxSizing: 'border-box',
-            }}
-          />
-
-          {/* Bottom toolbar - fixed */}
+        ) : (
+          /* Input container - single border around everything */
           <div
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '4px 8px',
+              border: `1px solid ${theme.borderColor}`,
+              borderRadius: '12px',
+              background: theme.backgroundColor,
+              overflow: 'hidden',
+              position: 'relative',
             }}
           >
-            {/* Left side - file picker */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              {fileUploadEnabled && (
-                <button
-                  data-testid="file-picker-button"
-                  onClick={openFilePicker}
-                  disabled={!connected || loading}
-                  style={{
-                    padding: '4px',
-                    background: 'transparent',
-                    border: `1px solid ${theme.borderColor}`,
-                    borderRadius: '50%',
-                    cursor: connected && !loading ? 'pointer' : 'not-allowed',
-                    color: theme.secondaryTextColor,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    width: '28px',
-                    height: '28px',
-                    transition: 'all 0.15s',
-                    opacity: connected && !loading ? 1 : 0.5,
-                  }}
-                  onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
-                    if (connected && !loading) {
-                      e.currentTarget.style.color = theme.primaryColor;
-                      e.currentTarget.style.borderColor = theme.primaryColor;
-                    }
-                  }}
-                  onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
-                    e.currentTarget.style.color = theme.secondaryTextColor;
-                    e.currentTarget.style.borderColor = theme.borderColor;
-                  }}
-                  title={strings.fileUpload.attachFiles}
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="12" y1="5" x2="12" y2="19" />
-                    <line x1="5" y1="12" x2="19" y2="12" />
-                  </svg>
-                </button>
-              )}
-            </div>
+            {/* Command Autocomplete */}
+            {slashCommands.AutocompleteComponent}
 
-            {/* Right side - send button */}
-            <button
-              data-testid="chat-send-button"
-              className="chat-send-button"
-              onClick={handleSend}
-              disabled={!connected || loading || (!input.trim() && attachments.length === 0)}
+            {/* Textarea area */}
+            <textarea
+              ref={textareaRef}
+              data-testid="chat-input"
+              className="chat-input"
+              value={input}
+              onChange={handleInputChange}
+              onKeyDown={handleKeyDown}
+              placeholder={
+                !connected
+                  ? strings.input.connectingPlaceholder
+                  : loading
+                    ? `${executingTool?.displayText ?? strings.input.thinking}...`
+                    : strings.input.placeholder
+              }
+              disabled={!connected || loading || pendingApprovals.length > 0}
+              rows={1}
               style={{
-                padding: '6px',
-                background: connected && !loading && (input.trim() || attachments.length > 0)
-                  ? theme.primaryGradient
-                  : theme.buttonDisabledBackground,
-                color: connected && !loading && (input.trim() || attachments.length > 0) ? 'white' : theme.secondaryTextColor,
+                width: '100%',
+                padding: '10px 14px 6px',
                 border: 'none',
-                borderRadius: '50%',
-                cursor: connected && !loading && (input.trim() || attachments.length > 0) ? 'pointer' : 'not-allowed',
+                fontSize: '14px',
+                lineHeight: '1.4',
+                resize: 'none',
+                maxHeight: `${maxTextareaHeight}px`,
+                fontFamily: 'inherit',
+                outline: 'none',
+                background: 'transparent',
+                overflowY: 'auto',
+                boxSizing: 'border-box',
+              }}
+            />
+
+            {/* Bottom toolbar - fixed */}
+            <div
+              style={{
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center',
-                width: '32px',
-                height: '32px',
-                transition: 'all 0.2s',
+                justifyContent: 'space-between',
+                padding: '4px 8px',
               }}
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="12" y1="19" x2="12" y2="5" />
-                <polyline points="5 12 12 5 19 12" />
-              </svg>
-            </button>
+              {/* Left side - file picker */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {fileUploadEnabled && (
+                  <button
+                    data-testid="file-picker-button"
+                    onClick={openFilePicker}
+                    disabled={!connected || loading || pendingApprovals.length > 0}
+                    style={{
+                      padding: '4px',
+                      background: 'transparent',
+                      border: `1px solid ${theme.borderColor}`,
+                      borderRadius: '50%',
+                      cursor: connected && !loading && pendingApprovals.length === 0 ? 'pointer' : 'not-allowed',
+                      color: theme.secondaryTextColor,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: '28px',
+                      height: '28px',
+                      transition: 'all 0.15s',
+                      opacity: connected && !loading && pendingApprovals.length === 0 ? 1 : 0.5,
+                    }}
+                    onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
+                      if (connected && !loading && pendingApprovals.length === 0) {
+                        e.currentTarget.style.color = theme.primaryColor;
+                        e.currentTarget.style.borderColor = theme.primaryColor;
+                      }
+                    }}
+                    onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
+                      e.currentTarget.style.color = theme.secondaryTextColor;
+                      e.currentTarget.style.borderColor = theme.borderColor;
+                    }}
+                    title={strings.fileUpload.attachFiles}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="12" y1="5" x2="12" y2="19" />
+                      <line x1="5" y1="12" x2="19" y2="12" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+
+              {/* Right side - send button */}
+              <button
+                data-testid="chat-send-button"
+                className="chat-send-button"
+                onClick={handleSend}
+                disabled={!connected || loading || pendingApprovals.length > 0 || (!input.trim() && attachments.length === 0)}
+                style={{
+                  padding: '6px',
+                  background: connected && !loading && pendingApprovals.length === 0 && (input.trim() || attachments.length > 0)
+                    ? theme.primaryGradient
+                    : theme.buttonDisabledBackground,
+                  color: connected && !loading && pendingApprovals.length === 0 && (input.trim() || attachments.length > 0) ? 'white' : theme.secondaryTextColor,
+                  border: 'none',
+                  borderRadius: '50%',
+                  cursor: connected && !loading && pendingApprovals.length === 0 && (input.trim() || attachments.length > 0) ? 'pointer' : 'not-allowed',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '32px',
+                  height: '32px',
+                  transition: 'all 0.2s',
+                }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="12" y1="19" x2="12" y2="5" />
+                  <polyline points="5 12 12 5 19 12" />
+                </svg>
+              </button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       <style>{`

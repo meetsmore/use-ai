@@ -68,23 +68,34 @@ export interface FileTransformerContext {
 
 /**
  * A transformer that converts files into string representations for the AI.
+ *
+ * Receives all files that were matched to this transformer instance
+ * and returns one string per file in the same order.
+ *
+ * @example
+ * ```typescript
+ * const pdfTransformer: FileTransformer = {
+ *   transform: async (files, context) =>
+ *     Promise.all(files.map(f => extractText(f))),
+ * };
+ * ```
  */
 export interface FileTransformer {
   /**
-   * Transform the file into a string representation for the AI.
+   * Transform files into string representations for the AI.
    *
-   * @param file - The file to transform
+   * @param files - The files to transform (all matched to this transformer instance)
    * @param context - Context including the current chat and its metadata
    * @param onProgress - Optional callback for reporting progress (0-100).
    *                     If called, UI shows progress bar; otherwise shows spinner.
-   * @returns A string representation the AI will receive
+   * @returns One string per input file, in the same order
    * @throws If transformation fails
    */
   transform(
-    file: File,
+    files: File[],
     context: FileTransformerContext,
     onProgress?: (progress: number) => void
-  ): Promise<string>;
+  ): Promise<string[]>;
 }
 
 /**

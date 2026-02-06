@@ -11,6 +11,7 @@ import type {
   RunWorkflowMessage,
   ToolResultMessage,
   AbortRunMessage,
+  ToolApprovalResponseMessage,
   Message,
   AGUIEvent,
   CorsOptions,
@@ -18,7 +19,7 @@ import type {
 import { RateLimiter } from './rateLimiter';
 import { logger } from './logger';
 import { v4 as uuidv4 } from 'uuid';
-import type { Agent, EventEmitter } from './agents/types';
+import type { Agent, EventEmitter, AGUIEventExtended } from './agents/types';
 import type { ClientSession } from './agents/types';
 import type { UseAIServerPlugin, MessageHandler } from './plugins/types';
 import { FeedbackPlugin } from './plugins/FeedbackPlugin';
@@ -281,6 +282,7 @@ export class UseAIServer {
         state: null,
         conversationHistory: [],
         pendingToolCalls: new Map(),
+        pendingToolApprovals: new Map(),
       };
 
       this.clients.set(socket.id, session);
@@ -354,6 +356,9 @@ export class UseAIServer {
         break;
       case 'tool_result':
         this.handleToolResult(session, message as ToolResultMessage);
+        break;
+      case 'tool_approval_response':
+        this.handleToolApprovalResponse(session, message as ToolApprovalResponseMessage);
         break;
       case 'abort_run':
         this.handleAbortRun(session, message as AbortRunMessage);
@@ -603,7 +608,7 @@ export class UseAIServer {
 
     // Create event emitter that forwards all events to client
     const eventEmitter: EventEmitter = {
-      emit: <T extends AGUIEvent>(event: T) => {
+      emit: <T extends AGUIEventExtended>(event: T) => {
         this.sendEvent(session.socket, event);
       },
     };
@@ -640,27 +645,8 @@ export class UseAIServer {
       parts.push('Use the available tools to interact with and modify the UI based on user requests.');
     }
 
-    const confirmationTools = session.tools.filter(tool => tool.annotations?.destructiveHint);
-    if (confirmationTools.length > 0) {
-      if (parts.length > 0) {
-        parts.push('');
-      }
-      parts.push('CRITICAL: The following tools require user confirmation EVERY TIME before execution:');
-      parts.push('');
-      confirmationTools.forEach(tool => {
-        parts.push(`- ${tool.name}`);
-      });
-      parts.push('');
-      parts.push('MANDATORY CONFIRMATION WORKFLOW:');
-      parts.push('1. First, explain to the user exactly what changes will be made');
-      parts.push('2. Then, explicitly ask: "Do you want me to proceed?" or similar confirmation question');
-      parts.push('3. STOP and WAIT for the user to respond with explicit confirmation');
-      parts.push('4. ONLY after receiving confirmation, call the tool');
-      parts.push('');
-      parts.push('NEVER ASSUME CONFIRMATION:');
-      parts.push('- Do NOT call these tools without receiving explicit confirmation');
-      parts.push('- Each destructive operation requires its own separate confirmation');
-    }
+    // Note: Confirmation for destructive tools is now handled via AI SDK's needsApproval
+    // mechanism in AISDKAgent, not via prompt injection.
 
     return parts.length > 0 ? parts.join('\n') : undefined;
   }
@@ -705,10 +691,32 @@ export class UseAIServer {
     }
   }
 
+  private handleToolApprovalResponse(session: ClientSession, message: ToolApprovalResponseMessage) {
+    const { toolCallId, approved, reason } = message.data;
+    const resolver = session.pendingToolApprovals.get(toolCallId);
+
+    if (resolver) {
+      resolver({ approved, reason });
+      session.pendingToolApprovals.delete(toolCallId);
+      logger.info('Tool approval response received', {
+        clientId: session.clientId,
+        toolCallId,
+        approved,
+        reason,
+      });
+    } else {
+      logger.warn('No pending approval found for tool call', {
+        clientId: session.clientId,
+        toolCallId,
+      });
+    }
+  }
+
   private handleAbortRun(session: ClientSession, message: AbortRunMessage) {
     const { runId } = message.data;
-    // Clear pending tool calls for this run
+    // Clear pending tool calls and approvals for this run
     session.pendingToolCalls.clear();
+    session.pendingToolApprovals.clear();
     session.currentRunId = undefined;
 
     logger.info('Run aborted', { clientId: session.clientId, runId });

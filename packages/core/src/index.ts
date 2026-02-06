@@ -48,6 +48,9 @@ export type {
   McpHeadersMap,
   AgentInfo,
   UseAIForwardedProps,
+  // Tool approval types
+  ToolApprovalRequestEvent,
+  ToolApprovalResponseMessage,
   // Multimodal content types
   TextContent,
   ImageContent,
@@ -57,4 +60,4 @@ export type {
   UserMessageContent,
 } from './types';
 
-export { EventType, ErrorCode } from './types';
+export { EventType, ErrorCode, TOOL_APPROVAL_REQUEST } from './types';

@@ -36,6 +36,7 @@ function createMockSession(sessionId: string = 'test-session'): ClientSession {
     tools: [],
     state: null,
     pendingToolCalls: new Map(),
+    pendingToolApprovals: new Map(),
     conversationHistory: [],
     ipAddress: '127.0.0.1',
   };

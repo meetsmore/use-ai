@@ -247,9 +247,9 @@ describe('useFileUpload', () => {
 
       let transformCallCount = 0;
       const mockTransformer: FileTransformer = {
-        transform: async (file) => {
+        transform: async (files) => {
           transformCallCount++;
-          return `Transformed: ${file.name}`;
+          return files.map((f) => `Transformed: ${f.name}`);
         },
       };
 
