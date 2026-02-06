@@ -77,8 +77,7 @@ export class WorkflowsPlugin implements UseAIServerPlugin {
     const { runner: runnerName, workflowId, inputs, tools, runId, threadId, forwardedProps } = workflowMessage.data;
 
     // Extract MCP headers from forwardedProps (AG-UI extension point)
-    const typedForwardedProps = forwardedProps as UseAIForwardedProps | undefined;
-    const mcpHeaders = typedForwardedProps?.mcpHeaders;
+    const mcpHeaders = forwardedProps?.mcpHeaders;
 
     logger.info('Running workflow', {
       runner: runnerName,
