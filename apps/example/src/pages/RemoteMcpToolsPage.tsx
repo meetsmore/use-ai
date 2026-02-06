@@ -19,7 +19,7 @@ The following tools are available remotely from the MCP server:
 - mcp_get_weather: Get weather information for a location
 - mcp_get_secure_data: Get secure data (requires authentication via X-API-Key header)
 
-The mcp_get_secure_data tool demonstrates authenticated MCP endpoints using the mcpHeadersProvider feature.
+The mcp_get_secure_data tool demonstrates authenticated MCP endpoints using the forwardedPropsProvider feature.
 This tool requires the X-API-Key header to be set correctly, which is handled automatically by the UseAIProvider.
 
 You can help the user test these tools by calling them with various inputs.`,
@@ -52,7 +52,7 @@ You can help the user test these tools by calling them with various inputs.`,
         <h2 style={styles.subtitle}>Authentication Example</h2>
         <p style={styles.text}>
           The <code style={styles.code}>mcp_get_secure_data</code> tool demonstrates the{' '}
-          <code style={styles.code}>mcpHeadersProvider</code> feature.
+          <code style={styles.code}>forwardedPropsProvider</code> feature.
         </p>
         <p style={styles.text}>
           This tool requires an <code style={styles.code}>X-API-Key</code> header to authenticate.
@@ -61,9 +61,11 @@ You can help the user test these tools by calling them with various inputs.`,
         </p>
         <div style={styles.codeBlock}>
           <pre style={styles.pre}>
-{`mcpHeadersProvider={() => ({
-  'http://localhost:3002': {
-    headers: { 'X-API-Key': 'secret-api-key-123' },
+{`forwardedPropsProvider={() => ({
+  mcpHeaders: {
+    'http://localhost:3002': {
+      headers: { 'X-API-Key': 'secret-api-key-123' },
+    },
   },
 })}`}
           </pre>

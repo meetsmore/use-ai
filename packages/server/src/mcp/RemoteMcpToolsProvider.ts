@@ -69,7 +69,7 @@ export class RemoteMcpToolsProvider {
    * Fetches tools from MCP endpoint with authentication headers.
    * Called on first run_agent request per session (lazy loading).
    *
-   * @param headers - User-specific auth headers from mcpHeadersProvider
+   * @param headers - User-specific auth headers from forwardedPropsProvider
    * @returns List of tools the user is authorized to access
    */
   async fetchToolsWithHeaders(headers: Record<string, string> = {}): Promise<RemoteToolDefinition[]> {

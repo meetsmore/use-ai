@@ -59,7 +59,7 @@ const { UseAIProvider, useAIContext } = await import('./useAIProvider');
 function TestConsumer({
   onReady,
 }: {
-  onReady: (sendMessage: (msg: string, opts?: { langfuseMetadata?: Record<string, unknown> }) => Promise<void>) => void;
+  onReady: (sendMessage: (msg: string, opts?: { forwardedProps?: Record<string, unknown> }) => Promise<void>) => void;
 }) {
   const { chat, connected } = useAIContext();
 
@@ -72,7 +72,7 @@ function TestConsumer({
   return <div data-testid="consumer">Connected: {String(connected)}</div>;
 }
 
-describe('UseAIProvider langfuseMetadata', () => {
+describe('UseAIProvider forwardedPropsProvider', () => {
   beforeEach(() => {
     createMockSocket();
   });
@@ -81,15 +81,17 @@ describe('UseAIProvider langfuseMetadata', () => {
     capturedEmitCalls = [];
   });
 
-  test('sends langfuseMetadata from provider only', async () => {
-    let sendMessage: ((msg: string, opts?: { langfuseMetadata?: Record<string, unknown> }) => Promise<void>) | null = null;
+  test('sends telemetryMetadata from provider only', async () => {
+    let sendMessage: ((msg: string, opts?: { forwardedProps?: Record<string, unknown> }) => Promise<void>) | null = null;
 
     render(
       <UseAIProvider
         serverUrl="http://localhost:8081"
-        langfuseMetadataProvider={() => ({
-          userId: 'provider-user-123',
-          tenantId: 'tenant-abc',
+        forwardedPropsProvider={() => ({
+          telemetryMetadata: {
+            userId: 'provider-user-123',
+            tenantId: 'tenant-abc',
+          },
         })}
         renderChat={false}
       >
@@ -110,21 +112,21 @@ describe('UseAIProvider langfuseMetadata', () => {
     // Wait for sendMessage to be available
     await waitFor(() => expect(sendMessage).not.toBeNull());
 
-    // Send message without message-level langfuseMetadata
+    // Send message without message-level forwardedProps
     await act(async () => {
       await sendMessage!('Hello');
     });
 
     const lastCall = getLastRunAgentCall();
     expect(lastCall).toBeDefined();
-    expect(lastCall!.data.forwardedProps.langfuseMetadata).toEqual({
+    expect(lastCall!.data.forwardedProps.telemetryMetadata).toEqual({
       userId: 'provider-user-123',
       tenantId: 'tenant-abc',
     });
   });
 
-  test('sends langfuseMetadata from sendMessage only', async () => {
-    let sendMessage: ((msg: string, opts?: { langfuseMetadata?: Record<string, unknown> }) => Promise<void>) | null = null;
+  test('sends forwardedProps from sendMessage only', async () => {
+    let sendMessage: ((msg: string, opts?: { forwardedProps?: Record<string, unknown> }) => Promise<void>) | null = null;
 
     render(
       <UseAIProvider serverUrl="http://localhost:8081" renderChat={false}>
@@ -143,34 +145,38 @@ describe('UseAIProvider langfuseMetadata', () => {
 
     await waitFor(() => expect(sendMessage).not.toBeNull());
 
-    // Send message with message-level langfuseMetadata only
+    // Send message with message-level forwardedProps only
     await act(async () => {
       await sendMessage!('Hello', {
-        langfuseMetadata: {
-          evaluationId: 'eval-456',
-          customKey: 'custom-value',
+        forwardedProps: {
+          telemetryMetadata: {
+            evaluationId: 'eval-456',
+            customKey: 'custom-value',
+          },
         },
       });
     });
 
     const lastCall = getLastRunAgentCall();
     expect(lastCall).toBeDefined();
-    expect(lastCall!.data.forwardedProps.langfuseMetadata).toEqual({
+    expect(lastCall!.data.forwardedProps.telemetryMetadata).toEqual({
       evaluationId: 'eval-456',
       customKey: 'custom-value',
     });
   });
 
-  test('merges langfuseMetadata with message-level taking precedence', async () => {
-    let sendMessage: ((msg: string, opts?: { langfuseMetadata?: Record<string, unknown> }) => Promise<void>) | null = null;
+  test('merges forwardedProps with message-level taking precedence', async () => {
+    let sendMessage: ((msg: string, opts?: { forwardedProps?: Record<string, unknown> }) => Promise<void>) | null = null;
 
     render(
       <UseAIProvider
         serverUrl="http://localhost:8081"
-        langfuseMetadataProvider={() => ({
-          userId: 'provider-user',
-          tenantId: 'provider-tenant',
-          sharedKey: 'provider-value',
+        forwardedPropsProvider={() => ({
+          telemetryMetadata: {
+            userId: 'provider-user',
+            tenantId: 'provider-tenant',
+          },
+          customProviderKey: 'provider-value',
         })}
         renderChat={false}
       >
@@ -189,28 +195,30 @@ describe('UseAIProvider langfuseMetadata', () => {
 
     await waitFor(() => expect(sendMessage).not.toBeNull());
 
-    // Send message with message-level langfuseMetadata that overrides some keys
+    // Send message with message-level forwardedProps that overrides some keys
     await act(async () => {
       await sendMessage!('Hello', {
-        langfuseMetadata: {
-          evaluationId: 'eval-789',
-          sharedKey: 'message-value', // This should override provider's value
+        forwardedProps: {
+          telemetryMetadata: {
+            evaluationId: 'eval-789',
+          },
+          customProviderKey: 'message-value', // This should override provider's value
         },
       });
     });
 
     const lastCall = getLastRunAgentCall();
     expect(lastCall).toBeDefined();
-    expect(lastCall!.data.forwardedProps.langfuseMetadata).toEqual({
-      userId: 'provider-user', // From provider
-      tenantId: 'provider-tenant', // From provider
-      sharedKey: 'message-value', // Overridden by message-level
-      evaluationId: 'eval-789', // From message-level
+    // message-level telemetryMetadata overrides provider's entirely (shallow merge at top level)
+    expect(lastCall!.data.forwardedProps.telemetryMetadata).toEqual({
+      evaluationId: 'eval-789',
     });
+    // message-level customProviderKey overrides provider's
+    expect(lastCall!.data.forwardedProps.customProviderKey).toBe('message-value');
   });
 
-  test('sends empty forwardedProps when neither provider nor message-level langfuseMetadata', async () => {
-    let sendMessage: ((msg: string, opts?: { langfuseMetadata?: Record<string, unknown> }) => Promise<void>) | null = null;
+  test('sends empty forwardedProps when neither provider nor message-level props', async () => {
+    let sendMessage: ((msg: string, opts?: { forwardedProps?: Record<string, unknown> }) => Promise<void>) | null = null;
 
     render(
       <UseAIProvider serverUrl="http://localhost:8081" renderChat={false}>
@@ -229,28 +237,30 @@ describe('UseAIProvider langfuseMetadata', () => {
 
     await waitFor(() => expect(sendMessage).not.toBeNull());
 
-    // Send message without any langfuseMetadata
+    // Send message without any forwardedProps
     await act(async () => {
       await sendMessage!('Hello');
     });
 
     const lastCall = getLastRunAgentCall();
     expect(lastCall).toBeDefined();
-    // forwardedProps should not contain langfuseMetadata (or be empty object)
-    expect(lastCall!.data.forwardedProps.langfuseMetadata).toBeUndefined();
+    // forwardedProps should not contain telemetryMetadata
+    expect(lastCall!.data.forwardedProps.telemetryMetadata).toBeUndefined();
   });
 
-  test('supports async langfuseMetadataProvider', async () => {
-    let sendMessage: ((msg: string, opts?: { langfuseMetadata?: Record<string, unknown> }) => Promise<void>) | null = null;
+  test('supports async forwardedPropsProvider', async () => {
+    let sendMessage: ((msg: string, opts?: { forwardedProps?: Record<string, unknown> }) => Promise<void>) | null = null;
 
     render(
       <UseAIProvider
         serverUrl="http://localhost:8081"
-        langfuseMetadataProvider={async () => {
+        forwardedPropsProvider={async () => {
           // Simulate async operation (e.g., fetching from API)
           await new Promise((resolve) => setTimeout(resolve, 10));
           return {
-            asyncUserId: 'async-user-123',
+            telemetryMetadata: {
+              asyncUserId: 'async-user-123',
+            },
           };
         }}
         renderChat={false}
@@ -276,8 +286,101 @@ describe('UseAIProvider langfuseMetadata', () => {
 
     const lastCall = getLastRunAgentCall();
     expect(lastCall).toBeDefined();
-    expect(lastCall!.data.forwardedProps.langfuseMetadata).toEqual({
+    expect(lastCall!.data.forwardedProps.telemetryMetadata).toEqual({
       asyncUserId: 'async-user-123',
+    });
+  });
+
+  test('sends mcpHeaders through forwardedPropsProvider', async () => {
+    let sendMessage: ((msg: string, opts?: { forwardedProps?: Record<string, unknown> }) => Promise<void>) | null = null;
+
+    render(
+      <UseAIProvider
+        serverUrl="http://localhost:8081"
+        forwardedPropsProvider={() => ({
+          mcpHeaders: {
+            'http://localhost:3002': {
+              headers: { 'X-API-Key': 'secret-api-key-123' },
+            },
+          },
+          telemetryMetadata: {
+            userId: 'user-456',
+          },
+        })}
+        renderChat={false}
+      >
+        <TestConsumer
+          onReady={(fn) => {
+            sendMessage = fn;
+          }}
+        />
+      </UseAIProvider>
+    );
+
+    await act(async () => {
+      mockSocket.connected = true;
+      emitSocketEvent('connect');
+    });
+
+    await waitFor(() => expect(sendMessage).not.toBeNull());
+
+    await act(async () => {
+      await sendMessage!('Hello');
+    });
+
+    const lastCall = getLastRunAgentCall();
+    expect(lastCall).toBeDefined();
+    expect(lastCall!.data.forwardedProps.mcpHeaders).toEqual({
+      'http://localhost:3002': {
+        headers: { 'X-API-Key': 'secret-api-key-123' },
+      },
+    });
+    expect(lastCall!.data.forwardedProps.telemetryMetadata).toEqual({
+      userId: 'user-456',
+    });
+  });
+
+  test('sync provider does not create unnecessary Promise', async () => {
+    let sendMessage: ((msg: string, opts?: { forwardedProps?: Record<string, unknown> }) => Promise<void>) | null = null;
+
+    // Use a sync provider
+    const syncProvider = () => ({
+      telemetryMetadata: { userId: 'sync-user' },
+    });
+
+    // Verify the provider returns a plain object (not a Promise)
+    const result = syncProvider();
+    expect(result instanceof Promise).toBe(false);
+
+    render(
+      <UseAIProvider
+        serverUrl="http://localhost:8081"
+        forwardedPropsProvider={syncProvider}
+        renderChat={false}
+      >
+        <TestConsumer
+          onReady={(fn) => {
+            sendMessage = fn;
+          }}
+        />
+      </UseAIProvider>
+    );
+
+    await act(async () => {
+      mockSocket.connected = true;
+      emitSocketEvent('connect');
+    });
+
+    await waitFor(() => expect(sendMessage).not.toBeNull());
+
+    await act(async () => {
+      await sendMessage!('Hello');
+    });
+
+    const lastCall = getLastRunAgentCall();
+    expect(lastCall).toBeDefined();
+    expect(lastCall!.data.forwardedProps.telemetryMetadata).toEqual({
+      userId: 'sync-user',
     });
   });
 });

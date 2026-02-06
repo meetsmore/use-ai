@@ -314,7 +314,7 @@ describe('UseAIClient', () => {
       }));
     });
 
-    test('sends message with langfuseMetadata in forwardedProps', async () => {
+    test('sends message with telemetryMetadata in forwardedProps', async () => {
       const client = new UseAIClient('http://localhost:8081');
       client.connect();
 
@@ -322,33 +322,31 @@ describe('UseAIClient', () => {
       emitSocketEvent('connect');
 
       await client.sendPrompt('Hello', undefined, {
-        langfuseMetadata: { userId: 'user-123', evaluationId: 'eval-456' },
+        telemetryMetadata: { userId: 'user-123', evaluationId: 'eval-456' },
       });
 
       expect(mockSocket.emit).toHaveBeenCalledWith('message', expect.objectContaining({
         type: 'run_agent',
         data: expect.objectContaining({
           forwardedProps: {
-            langfuseMetadata: { userId: 'user-123', evaluationId: 'eval-456' },
+            telemetryMetadata: { userId: 'user-123', evaluationId: 'eval-456' },
           },
         }),
       }));
     });
 
-    test('merges forwardedProps with MCP headers', async () => {
+    test('sends mcpHeaders through forwardedProps', async () => {
       const client = new UseAIClient('http://localhost:8081');
       client.connect();
 
       mockSocket.connected = true;
       emitSocketEvent('connect');
 
-      // Set MCP headers provider
-      client.setMcpHeadersProvider(() => ({
-        'https://api.example.com': { headers: { 'Authorization': 'Bearer token' } },
-      }));
-
       await client.sendPrompt('Hello', undefined, {
-        langfuseMetadata: { userId: 'user-123' },
+        mcpHeaders: {
+          'https://api.example.com': { headers: { 'Authorization': 'Bearer token' } },
+        },
+        telemetryMetadata: { userId: 'user-123' },
       });
 
       expect(mockSocket.emit).toHaveBeenCalledWith('message', expect.objectContaining({
@@ -358,7 +356,7 @@ describe('UseAIClient', () => {
             mcpHeaders: {
               'https://api.example.com': { headers: { 'Authorization': 'Bearer token' } },
             },
-            langfuseMetadata: { userId: 'user-123' },
+            telemetryMetadata: { userId: 'user-123' },
           },
         }),
       }));
@@ -375,7 +373,7 @@ describe('UseAIClient', () => {
       client.setAgent('claude-opus');
 
       await client.sendPrompt('Hello', undefined, {
-        langfuseMetadata: { userId: 'user-123' },
+        telemetryMetadata: { userId: 'user-123' },
       });
 
       expect(mockSocket.emit).toHaveBeenCalledWith('message', expect.objectContaining({
@@ -383,7 +381,7 @@ describe('UseAIClient', () => {
         data: expect.objectContaining({
           forwardedProps: {
             agent: 'claude-opus',
-            langfuseMetadata: { userId: 'user-123' },
+            telemetryMetadata: { userId: 'user-123' },
           },
         }),
       }));

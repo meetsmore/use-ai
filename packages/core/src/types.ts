@@ -238,6 +238,8 @@ export interface UseAIForwardedProps {
   mcpHeaders?: McpHeadersMap;
   /** Agent ID to use for this request (falls back to server default if not specified) */
   agent?: string;
+  /** Telemetry metadata for observability (e.g., Langfuse eval tracing) */
+  telemetryMetadata?: Record<string, unknown>;
 }
 
 /**

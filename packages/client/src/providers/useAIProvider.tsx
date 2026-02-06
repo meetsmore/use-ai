@@ -238,33 +238,41 @@ export interface UseAIProviderProps extends UseAIConfig {
    */
   chatRepository?: ChatRepository;
   /**
-   * Callback to provide HTTP headers for MCP endpoints.
-   * Called each time AI is invoked by use-ai.
-   * Returns a mapping of MCP endpoint patterns to header configurations.
-   *
-   * Patterns can be:
-   * - Constant strings: `https://api.example.com` - Exact match
-   * - Glob patterns: `https://*.meetsmore.com` - Wildcard matching using picomatch
+   * Provider function for forwarded props (telemetry metadata, MCP headers, etc.).
+   * Called before each message is sent. Can be sync or async.
+   * Props from this provider are merged with message-level forwardedProps,
+   * with message-level taking precedence.
    *
    * @example
-   * ```typescript
-   * mcpHeadersProvider={() => ({
-   *   // Exact match
-   *   'https://api.example.com': {
-   *     headers: { 'Authorization': `Bearer ${userToken}` }
-   *   },
-   *   // Wildcard subdomain
-   *   'https://*.meetsmore.com': {
-   *     headers: { 'X-API-Key': apiKey }
-   *   },
-   *   // Multiple wildcards
-   *   '*://*.example.com': {
-   *     headers: { 'X-Custom': 'value' }
-   *   }
-   * })}
+   * ```tsx
+   * <UseAIProvider
+   *   serverUrl="wss://your-server.com"
+   *   forwardedPropsProvider={() => ({
+   *     mcpHeaders: {
+   *       // Exact match
+   *       'https://api.example.com': {
+   *         headers: { 'Authorization': `Bearer ${userToken}` }
+   *       },
+   *       // Wildcard subdomain
+   *       'https://*.meetsmore.com': {
+   *         headers: { 'X-API-Key': apiKey }
+   *       },
+   *       // Multiple wildcards
+   *       '*://*.example.com': {
+   *         headers: { 'X-Custom': 'value' }
+   *       },
+   *     },
+   *     telemetryMetadata: {
+   *       userId: currentUser.id,
+   *       tenantId: tenant.id,
+   *     },
+   *   })}
+   * >
+   *   <App />
+   * </UseAIProvider>
    * ```
    */
-  mcpHeadersProvider?: () => import('@meetsmore-oss/use-ai-core').McpHeadersMap | Promise<import('@meetsmore-oss/use-ai-core').McpHeadersMap>;
+  forwardedPropsProvider?: () => Record<string, unknown> | Promise<Record<string, unknown>>;
   /**
    * Configuration for file uploads.
    * File upload is enabled by default with EmbedFileUploadBackend, 10MB max size,
@@ -349,26 +357,6 @@ export interface UseAIProviderProps extends UseAIConfig {
    * ```
    */
   onOpenChange?: (isOpen: boolean) => void;
-  /**
-   * Provider function for Langfuse metadata (for observability and eval tracing).
-   * Called before each message is sent. Can be async.
-   * Metadata from this provider is merged with message-level langfuseMetadata,
-   * with message-level taking precedence.
-   *
-   * @example
-   * ```tsx
-   * <UseAIProvider
-   *   serverUrl="wss://your-server.com"
-   *   langfuseMetadataProvider={async () => ({
-   *     userId: currentUser.id,
-   *     tenantId: tenant.id,
-   *   })}
-   * >
-   *   <App />
-   * </UseAIProvider>
-   * ```
-   */
-  langfuseMetadataProvider?: () => Record<string, unknown> | Promise<Record<string, unknown>>;
 }
 
 /**
@@ -418,7 +406,7 @@ export function UseAIProvider({
   CustomButton,
   CustomChat,
   chatRepository,
-  mcpHeadersProvider,
+  forwardedPropsProvider,
   fileUploadConfig: fileUploadConfigProp,
   commandRepository,
   renderChat = true,
@@ -426,7 +414,6 @@ export function UseAIProvider({
   strings: customStrings,
   visibleAgentIds,
   onOpenChange,
-  langfuseMetadataProvider,
 }: UseAIProviderProps) {
   // Compute effective file upload config: use default if undefined, disable if false
   const fileUploadConfig = fileUploadConfigProp === false
@@ -465,7 +452,7 @@ export function UseAIProvider({
   );
 
   // Ref for handleSendMessage to break circular dependency with useChatManagement
-  const handleSendMessageRef = useRef<((message: string, attachments?: FileAttachment[], langfuseMetadata?: Record<string, unknown>) => Promise<void>) | null>(null);
+  const handleSendMessageRef = useRef<((message: string, attachments?: FileAttachment[], forwardedProps?: Record<string, unknown>) => Promise<void>) | null>(null);
 
   // Initialize tool registry hook
   const {
@@ -493,9 +480,9 @@ export function UseAIProvider({
   });
 
   // Stable callback that uses the ref (for useChatManagement)
-  const stableSendMessage = useCallback(async (message: string, attachments?: FileAttachment[], langfuseMetadata?: Record<string, unknown>) => {
+  const stableSendMessage = useCallback(async (message: string, attachments?: FileAttachment[], forwardedProps?: Record<string, unknown>) => {
     if (handleSendMessageRef.current) {
-      await handleSendMessageRef.current(message, attachments, langfuseMetadata);
+      await handleSendMessageRef.current(message, attachments, forwardedProps);
     }
   }, []);
 
@@ -556,11 +543,6 @@ export function UseAIProvider({
   useEffect(() => {
     console.log('[UseAIProvider] Initializing client with serverUrl:', serverUrl);
     const client = new UseAIClient(serverUrl);
-
-    // Set MCP headers provider if provided
-    if (mcpHeadersProvider) {
-      client.setMcpHeadersProvider(mcpHeadersProvider);
-    }
 
     // Subscribe to connection state changes (handles initial connection, reconnection, and disconnection)
     const unsubscribeConnection = client.onConnectionStateChange((isConnected) => {
@@ -704,16 +686,6 @@ export function UseAIProvider({
     };
   }, [serverUrl]);
 
-  // Update MCP headers provider when it changes
-  useEffect(() => {
-    const client = clientRef.current;
-    if (!client) return;
-
-    if (mcpHeadersProvider) {
-      client.setMcpHeadersProvider(mcpHeadersProvider);
-    }
-  }, [mcpHeadersProvider]);
-
   const lastRegisteredToolsRef = useRef<string>('');
 
   useEffect(() => {
@@ -739,7 +711,7 @@ export function UseAIProvider({
     }
   }, [hasTools, aggregatedTools, connected]);
 
-  const handleSendMessage = useCallback(async (message: string, attachments?: FileAttachment[], customLangfuseMetadata?: Record<string, unknown>) => {
+  const handleSendMessage = useCallback(async (message: string, attachments?: FileAttachment[], messageForwardedProps?: Record<string, unknown>) => {
     if (!clientRef.current) return;
 
     // Clear any previous streaming text when starting a new message
@@ -813,25 +785,26 @@ export function UseAIProvider({
       setLoading(true);
     }
 
-    // Get provider-level langfuseMetadata (async supported)
-    const providerMetadata = langfuseMetadataProvider ? await langfuseMetadataProvider() : {};
+    // Get provider-level forwardedProps (sync or async)
+    const providerResult = forwardedPropsProvider ? forwardedPropsProvider() : {};
+    const providerProps = providerResult instanceof Promise ? await providerResult : providerResult;
 
     // Merge: provider-level + message-level (message-level takes precedence)
-    const mergedLangfuseMetadata = {
-      ...providerMetadata,
-      ...customLangfuseMetadata,
+    const mergedForwardedProps = {
+      ...providerProps,
+      ...messageForwardedProps,
     };
 
     // State is already up-to-date via updatePrompt calls from useAI hooks
-    // Only pass langfuseMetadata if there's any metadata to send
+    // Only pass forwardedProps if there's any props to send
     await clientRef.current.sendPrompt(
       message,
       multimodalContent,
-      Object.keys(mergedLangfuseMetadata).length > 0
-        ? { langfuseMetadata: mergedLangfuseMetadata }
+      Object.keys(mergedForwardedProps).length > 0
+        ? mergedForwardedProps
         : undefined
     );
-  }, [activatePendingChat, currentChatId, saveUserMessage, fileUploadConfig, getCurrentChat, langfuseMetadataProvider]);
+  }, [activatePendingChat, currentChatId, saveUserMessage, fileUploadConfig, getCurrentChat, forwardedPropsProvider]);
 
   // Update the ref so useChatManagement's sendMessage can use it
   handleSendMessageRef.current = handleSendMessage;

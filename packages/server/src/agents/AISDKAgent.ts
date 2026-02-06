@@ -390,7 +390,7 @@ export class AISDKAgent implements Agent {
                 ipAddress: session.ipAddress,
                 toolCount: tools.length,
                 // Merge custom metadata from forwardedProps (for eval tracing, etc.)
-                ...(originalInput.forwardedProps?.langfuseMetadata || {}),
+                ...(originalInput.forwardedProps?.telemetryMetadata || {}),
               },
             }
           : undefined,
