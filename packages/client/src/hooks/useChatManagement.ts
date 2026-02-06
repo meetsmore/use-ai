@@ -4,6 +4,7 @@ import type { Message } from '../components/UseAIChatPanel';
 import type { UseAIClient } from '../client';
 import type { Message as AGUIMessage } from '../types';
 import type { FileAttachment } from '../fileUpload/types';
+import type { UseAIForwardedProps } from '../types';
 
 /**
  * Options for programmatically sending a message via sendMessage().
@@ -21,7 +22,7 @@ export interface SendMessageOptions {
    * Forwarded props for observability and configuration (e.g., telemetryMetadata, mcpHeaders).
    * This is merged with provider-level forwardedProps (message-level takes precedence).
    */
-  forwardedProps?: Record<string, unknown>;
+  forwardedProps?: UseAIForwardedProps;
 }
 
 // Constants
@@ -106,7 +107,7 @@ export interface UseChatManagementOptions {
   /** Setter for messages state (owned by provider) */
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
   /** Callback to send a message (from UseAIProvider) */
-  onSendMessage?: (message: string, attachments?: FileAttachment[], forwardedProps?: Record<string, unknown>) => Promise<void>;
+  onSendMessage?: (message: string, attachments?: FileAttachment[], forwardedProps?: UseAIForwardedProps) => Promise<void>;
   /** Callback to open/close the chat panel */
   setOpen?: (open: boolean) => void;
   /** Whether the client is connected */

@@ -400,15 +400,9 @@ export interface RunWorkflowMessage {
     threadId: string;
     /**
      * AG-UI extension point for additional fields in messages.
-     * We use it to send `mcpHeaders`.
-     * @see RunAgentInput['forwardedProps']
+     * @see UseAIForwardedProps
      */
-    forwardedProps?: {
-      /**
-       * A map of current McpHeaders that should be applied to MCP tool calls (e.g. auth headers)
-       */
-      mcpHeaders?: McpHeadersMap
-    }
+    forwardedProps?: UseAIForwardedProps
   };
 }
 

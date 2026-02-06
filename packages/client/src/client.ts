@@ -16,6 +16,7 @@ import type {
   AgentInfo,
   MultimodalContent,
   FeedbackValue,
+  UseAIForwardedProps,
 } from './types';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -316,7 +317,7 @@ export class UseAIClient {
    * @param forwardedProps - Optional props to forward to the server (e.g., telemetryMetadata, mcpHeaders).
    *                         Internally merged with other forwardedProps.
    */
-  async sendPrompt(prompt: string, multimodalContent?: MultimodalContent[], forwardedProps?: Record<string, unknown>) {
+  async sendPrompt(prompt: string, multimodalContent?: MultimodalContent[], forwardedProps?: UseAIForwardedProps) {
     // Build message content - use multimodal if provided, otherwise just the text
     // AG-UI Message type expects content to be string | ContentPart[]
     // For multimodal content, we pass the array; for text-only, we pass the string

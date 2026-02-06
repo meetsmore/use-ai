@@ -1,6 +1,6 @@
 import type { UseAIServerPlugin, MessageHandler, ClientSession } from '@meetsmore-oss/use-ai-server';
 import { logger } from '@meetsmore-oss/use-ai-server';
-import type { UseAIClientMessage, RunWorkflowMessage, ToolDefinition } from '@meetsmore-oss/use-ai-core';
+import type { UseAIClientMessage, RunWorkflowMessage, ToolDefinition, UseAIForwardedProps } from '@meetsmore-oss/use-ai-core';
 import { EventType } from '@meetsmore-oss/use-ai-core';
 import type { WorkflowRunner, EventEmitter } from './types';
 
@@ -77,7 +77,8 @@ export class WorkflowsPlugin implements UseAIServerPlugin {
     const { runner: runnerName, workflowId, inputs, tools, runId, threadId, forwardedProps } = workflowMessage.data;
 
     // Extract MCP headers from forwardedProps (AG-UI extension point)
-    const mcpHeaders = forwardedProps?.mcpHeaders as import('@meetsmore-oss/use-ai-core').McpHeadersMap | undefined;
+    const typedForwardedProps = forwardedProps as UseAIForwardedProps | undefined;
+    const mcpHeaders = typedForwardedProps?.mcpHeaders;
 
     logger.info('Running workflow', {
       runner: runnerName,

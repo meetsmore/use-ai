@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
-import type { UseAIConfig, AGUIEvent, ToolCallStartEvent, ToolCallEndEvent, RunErrorEvent, RunFinishedEvent, AgentInfo, TextMessageContentEvent, ToolCallStartExtensions, ToolApprovalRequestEvent } from '../types';
+import type { UseAIConfig, AGUIEvent, ToolCallStartEvent, ToolCallEndEvent, RunErrorEvent, RunFinishedEvent, AgentInfo, TextMessageContentEvent, ToolCallStartExtensions, ToolApprovalRequestEvent, UseAIForwardedProps } from '../types';
 import { EventType, ErrorCode, TOOL_APPROVAL_REQUEST } from '../types';
 import { UseAIFloatingButton } from '../components/UseAIFloatingButton';
 import { UseAIChatPanel, type Message } from '../components/UseAIChatPanel';
@@ -273,7 +273,7 @@ export interface UseAIProviderProps extends UseAIConfig {
    * </UseAIProvider>
    * ```
    */
-  forwardedPropsProvider?: () => Record<string, unknown> | Promise<Record<string, unknown>>;
+  forwardedPropsProvider?: () => UseAIForwardedProps | Promise<UseAIForwardedProps>;
   /**
    * Configuration for file uploads.
    * File upload is enabled by default with EmbedFileUploadBackend, 10MB max size,
@@ -453,7 +453,7 @@ export function UseAIProvider({
   );
 
   // Ref for handleSendMessage to break circular dependency with useChatManagement
-  const handleSendMessageRef = useRef<((message: string, attachments?: FileAttachment[], forwardedProps?: Record<string, unknown>) => Promise<void>) | null>(null);
+  const handleSendMessageRef = useRef<((message: string, attachments?: FileAttachment[], forwardedProps?: UseAIForwardedProps) => Promise<void>) | null>(null);
 
   // Initialize tool registry hook
   const {
@@ -481,7 +481,7 @@ export function UseAIProvider({
   });
 
   // Stable callback that uses the ref (for useChatManagement)
-  const stableSendMessage = useCallback(async (message: string, attachments?: FileAttachment[], forwardedProps?: Record<string, unknown>) => {
+  const stableSendMessage = useCallback(async (message: string, attachments?: FileAttachment[], forwardedProps?: UseAIForwardedProps) => {
     if (handleSendMessageRef.current) {
       await handleSendMessageRef.current(message, attachments, forwardedProps);
     }
@@ -693,7 +693,7 @@ export function UseAIProvider({
     }
   }, [hasTools, aggregatedTools, connected]);
 
-  const handleSendMessage = useCallback(async (message: string, attachments?: FileAttachment[], messageForwardedProps?: Record<string, unknown>) => {
+  const handleSendMessage = useCallback(async (message: string, attachments?: FileAttachment[], messageForwardedProps?: UseAIForwardedProps) => {
     if (!clientRef.current) return;
 
     // Clear any previous streaming text when starting a new message

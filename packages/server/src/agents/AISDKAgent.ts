@@ -3,7 +3,7 @@ import type { JSONSchema7 } from 'json-schema';
 import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
 import type { Agent, AgentInput, EventEmitter, AgentResult, ClientSession } from './types';
-import type { ToolDefinition } from '../types';
+import type { ToolDefinition, UseAIForwardedProps } from '../types';
 import type { RemoteToolDefinition } from '../mcp';
 import { EventType, ErrorCode } from '../types';
 import { createClientToolExecutor } from '../utils/toolConverter';
@@ -383,7 +383,7 @@ export class AISDKAgent implements Agent {
                 ipAddress: session.ipAddress,
                 toolCount: tools.length,
                 // Merge custom metadata from forwardedProps (for eval tracing, etc.)
-                ...(originalInput.forwardedProps?.telemetryMetadata || {}),
+                ...((originalInput.forwardedProps as UseAIForwardedProps | undefined)?.telemetryMetadata || {}),
               },
             }
           : undefined,

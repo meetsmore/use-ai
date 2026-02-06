@@ -2,6 +2,7 @@ import React from 'react';
 import { describe, test, expect, mock, beforeEach, afterEach } from 'bun:test';
 import { render, act, waitFor } from '@testing-library/react';
 import type { Socket } from 'socket.io-client';
+import type { UseAIForwardedProps } from '../types';
 
 // Store event handlers and captured data
 let eventHandlers: Record<string, Function[]> = {};
@@ -43,7 +44,7 @@ function getLastRunAgentCall() {
   );
   return runAgentCalls[runAgentCalls.length - 1]?.data as {
     type: string;
-    data: { forwardedProps: Record<string, unknown> };
+    data: { forwardedProps: UseAIForwardedProps };
   } | undefined;
 }
 
@@ -59,7 +60,7 @@ const { UseAIProvider, useAIContext } = await import('./useAIProvider');
 function TestConsumer({
   onReady,
 }: {
-  onReady: (sendMessage: (msg: string, opts?: { forwardedProps?: Record<string, unknown> }) => Promise<void>) => void;
+  onReady: (sendMessage: (msg: string, opts?: { forwardedProps?: UseAIForwardedProps }) => Promise<void>) => void;
 }) {
   const { chat, connected } = useAIContext();
 
@@ -82,7 +83,7 @@ describe('UseAIProvider forwardedPropsProvider', () => {
   });
 
   test('sends telemetryMetadata from provider only', async () => {
-    let sendMessage: ((msg: string, opts?: { forwardedProps?: Record<string, unknown> }) => Promise<void>) | null = null;
+    let sendMessage: ((msg: string, opts?: { forwardedProps?: UseAIForwardedProps }) => Promise<void>) | null = null;
 
     render(
       <UseAIProvider
@@ -126,7 +127,7 @@ describe('UseAIProvider forwardedPropsProvider', () => {
   });
 
   test('sends forwardedProps from sendMessage only', async () => {
-    let sendMessage: ((msg: string, opts?: { forwardedProps?: Record<string, unknown> }) => Promise<void>) | null = null;
+    let sendMessage: ((msg: string, opts?: { forwardedProps?: UseAIForwardedProps }) => Promise<void>) | null = null;
 
     render(
       <UseAIProvider serverUrl="http://localhost:8081" renderChat={false}>
@@ -166,7 +167,7 @@ describe('UseAIProvider forwardedPropsProvider', () => {
   });
 
   test('merges forwardedProps with message-level taking precedence', async () => {
-    let sendMessage: ((msg: string, opts?: { forwardedProps?: Record<string, unknown> }) => Promise<void>) | null = null;
+    let sendMessage: ((msg: string, opts?: { forwardedProps?: UseAIForwardedProps }) => Promise<void>) | null = null;
 
     render(
       <UseAIProvider
@@ -218,7 +219,7 @@ describe('UseAIProvider forwardedPropsProvider', () => {
   });
 
   test('sends empty forwardedProps when neither provider nor message-level props', async () => {
-    let sendMessage: ((msg: string, opts?: { forwardedProps?: Record<string, unknown> }) => Promise<void>) | null = null;
+    let sendMessage: ((msg: string, opts?: { forwardedProps?: UseAIForwardedProps }) => Promise<void>) | null = null;
 
     render(
       <UseAIProvider serverUrl="http://localhost:8081" renderChat={false}>
@@ -248,7 +249,7 @@ describe('UseAIProvider forwardedPropsProvider', () => {
   });
 
   test('supports async forwardedPropsProvider', async () => {
-    let sendMessage: ((msg: string, opts?: { forwardedProps?: Record<string, unknown> }) => Promise<void>) | null = null;
+    let sendMessage: ((msg: string, opts?: { forwardedProps?: UseAIForwardedProps }) => Promise<void>) | null = null;
 
     render(
       <UseAIProvider
