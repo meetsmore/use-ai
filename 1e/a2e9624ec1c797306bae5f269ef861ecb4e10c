@@ -1,0 +1,36 @@
+packages/client/src/providers/useAIProvider.forwardedPropsProvider.test.tsx
+  dfb430ecc6f511b5 247
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.42",
+  "base_commit_sha": "1ea2e9624ec1c797306bae5f269ef861ecb4e10c",
+  "prompts": {
+    "8d5f659a31e2047c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e6243bbc-224d-4588-8f1f-299c694e7c66",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 1,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    },
+    "dfb430ecc6f511b5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1a49ae53-384c-4785-b50b-4985b7ece1c3",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 5,
+      "total_deletions": 2,
+      "accepted_lines": 5,
+      "overriden_lines": 0
+    }
+  }
+}
