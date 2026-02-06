@@ -169,6 +169,9 @@ export type {
   WorkflowStatus,
   UseAIClientMessage,
   RunWorkflowMessage,
+  // Tool approval types
+  ToolApprovalRequestEvent,
+  ToolApprovalResponseMessage,
 } from '@meetsmore-oss/use-ai-core';
 
-export { EventType, ErrorCode } from '@meetsmore-oss/use-ai-core';
+export { EventType, ErrorCode, TOOL_APPROVAL_REQUEST } from '@meetsmore-oss/use-ai-core';

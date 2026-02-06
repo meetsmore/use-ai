@@ -113,6 +113,8 @@ export interface UseChatManagementOptions {
   connected?: boolean;
   /** Whether the AI is currently loading/processing a response */
   loading?: boolean;
+  /** Whether there's a pending tool approval blocking the queue */
+  hasPendingApproval?: boolean;
 }
 
 export interface UseChatManagementReturn {
@@ -194,6 +196,7 @@ export function useChatManagement({
   setOpen,
   connected,
   loading,
+  hasPendingApproval,
 }: UseChatManagementOptions): UseChatManagementReturn {
   /**
    * Current active chat where AI responses are saved.
@@ -555,6 +558,12 @@ export function useChatManagement({
     loadingRef.current = loading;
   }, [loading]);
 
+  // Keep pending approval state in a ref for the queue processor
+  const hasPendingApprovalRef = useRef(hasPendingApproval);
+  useEffect(() => {
+    hasPendingApprovalRef.current = hasPendingApproval;
+  }, [hasPendingApproval]);
+
   /**
    * Processes queued messages one at a time.
    */
@@ -602,18 +611,18 @@ export function useChatManagement({
         setOpen(true);
       }
 
-      // Wait for loading to complete before processing next message
+      // Wait for loading and pending approval to complete before processing next message
       await new Promise<void>((resolve) => {
-        const checkLoading = () => {
+        const checkReady = () => {
           setTimeout(() => {
-            if (!loadingRef.current) {
+            if (!loadingRef.current && !hasPendingApprovalRef.current) {
               resolve();
             } else {
-              checkLoading();
+              checkReady();
             }
           }, 100);
         };
-        checkLoading();
+        checkReady();
       });
     }
 
