@@ -58,6 +58,9 @@ function getFileCacheKey(file: File): string {
  * combined string is hashed with SHA-256 to keep key size constant
  * regardless of how many files are in the group.
  *
+ * Order matters: [A, B] and [B, A] produce different cache keys because
+ * transformer results are positional (results[i] corresponds to files[i]).
+ *
  * @example
  * // Input:  ["report.pdf:1024:1700000000", "scan.pdf:2048:1700000001"]
  * // Hashed: "a3f1...b7c2" (64-char hex string)
