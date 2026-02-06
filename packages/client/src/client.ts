@@ -314,8 +314,7 @@ export class UseAIClient {
    * @param prompt - The user's prompt/question (text part)
    * @param multimodalContent - Optional multimodal content (text, images, files)
    * @param forwardedProps - Optional props to forward to the server (e.g., telemetryMetadata, mcpHeaders).
-   *                         Internally merged with other forwardedProps (agent).
-   * @internal This parameter is used internally by UseAIProvider. Direct usage is not recommended.
+   *                         Internally merged with other forwardedProps.
    */
   async sendPrompt(prompt: string, multimodalContent?: MultimodalContent[], forwardedProps?: Record<string, unknown>) {
     // Build message content - use multimodal if provided, otherwise just the text

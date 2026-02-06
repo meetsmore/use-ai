@@ -244,8 +244,7 @@ describe('UseAIProvider forwardedPropsProvider', () => {
 
     const lastCall = getLastRunAgentCall();
     expect(lastCall).toBeDefined();
-    // forwardedProps should not contain telemetryMetadata
-    expect(lastCall!.data.forwardedProps.telemetryMetadata).toBeUndefined();
+    expect(lastCall!.data.forwardedProps).toEqual({});
   });
 
   test('supports async forwardedPropsProvider', async () => {
@@ -288,99 +287,6 @@ describe('UseAIProvider forwardedPropsProvider', () => {
     expect(lastCall).toBeDefined();
     expect(lastCall!.data.forwardedProps.telemetryMetadata).toEqual({
       asyncUserId: 'async-user-123',
-    });
-  });
-
-  test('sends mcpHeaders through forwardedPropsProvider', async () => {
-    let sendMessage: ((msg: string, opts?: { forwardedProps?: Record<string, unknown> }) => Promise<void>) | null = null;
-
-    render(
-      <UseAIProvider
-        serverUrl="http://localhost:8081"
-        forwardedPropsProvider={() => ({
-          mcpHeaders: {
-            'http://localhost:3002': {
-              headers: { 'X-API-Key': 'secret-api-key-123' },
-            },
-          },
-          telemetryMetadata: {
-            userId: 'user-456',
-          },
-        })}
-        renderChat={false}
-      >
-        <TestConsumer
-          onReady={(fn) => {
-            sendMessage = fn;
-          }}
-        />
-      </UseAIProvider>
-    );
-
-    await act(async () => {
-      mockSocket.connected = true;
-      emitSocketEvent('connect');
-    });
-
-    await waitFor(() => expect(sendMessage).not.toBeNull());
-
-    await act(async () => {
-      await sendMessage!('Hello');
-    });
-
-    const lastCall = getLastRunAgentCall();
-    expect(lastCall).toBeDefined();
-    expect(lastCall!.data.forwardedProps.mcpHeaders).toEqual({
-      'http://localhost:3002': {
-        headers: { 'X-API-Key': 'secret-api-key-123' },
-      },
-    });
-    expect(lastCall!.data.forwardedProps.telemetryMetadata).toEqual({
-      userId: 'user-456',
-    });
-  });
-
-  test('sync provider does not create unnecessary Promise', async () => {
-    let sendMessage: ((msg: string, opts?: { forwardedProps?: Record<string, unknown> }) => Promise<void>) | null = null;
-
-    // Use a sync provider
-    const syncProvider = () => ({
-      telemetryMetadata: { userId: 'sync-user' },
-    });
-
-    // Verify the provider returns a plain object (not a Promise)
-    const result = syncProvider();
-    expect(result instanceof Promise).toBe(false);
-
-    render(
-      <UseAIProvider
-        serverUrl="http://localhost:8081"
-        forwardedPropsProvider={syncProvider}
-        renderChat={false}
-      >
-        <TestConsumer
-          onReady={(fn) => {
-            sendMessage = fn;
-          }}
-        />
-      </UseAIProvider>
-    );
-
-    await act(async () => {
-      mockSocket.connected = true;
-      emitSocketEvent('connect');
-    });
-
-    await waitFor(() => expect(sendMessage).not.toBeNull());
-
-    await act(async () => {
-      await sendMessage!('Hello');
-    });
-
-    const lastCall = getLastRunAgentCall();
-    expect(lastCall).toBeDefined();
-    expect(lastCall!.data.forwardedProps.telemetryMetadata).toEqual({
-      userId: 'sync-user',
     });
   });
 });

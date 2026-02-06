@@ -314,28 +314,7 @@ describe('UseAIClient', () => {
       }));
     });
 
-    test('sends message with telemetryMetadata in forwardedProps', async () => {
-      const client = new UseAIClient('http://localhost:8081');
-      client.connect();
-
-      mockSocket.connected = true;
-      emitSocketEvent('connect');
-
-      await client.sendPrompt('Hello', undefined, {
-        telemetryMetadata: { userId: 'user-123', evaluationId: 'eval-456' },
-      });
-
-      expect(mockSocket.emit).toHaveBeenCalledWith('message', expect.objectContaining({
-        type: 'run_agent',
-        data: expect.objectContaining({
-          forwardedProps: {
-            telemetryMetadata: { userId: 'user-123', evaluationId: 'eval-456' },
-          },
-        }),
-      }));
-    });
-
-    test('sends mcpHeaders through forwardedProps', async () => {
+    test('sends message with forwardedProps when provided', async () => {
       const client = new UseAIClient('http://localhost:8081');
       client.connect();
 
@@ -346,7 +325,8 @@ describe('UseAIClient', () => {
         mcpHeaders: {
           'https://api.example.com': { headers: { 'Authorization': 'Bearer token' } },
         },
-        telemetryMetadata: { userId: 'user-123' },
+        telemetryMetadata: { userId: 'user-123', evaluationId: 'eval-456' },
+
       });
 
       expect(mockSocket.emit).toHaveBeenCalledWith('message', expect.objectContaining({
@@ -356,7 +336,7 @@ describe('UseAIClient', () => {
             mcpHeaders: {
               'https://api.example.com': { headers: { 'Authorization': 'Bearer token' } },
             },
-            telemetryMetadata: { userId: 'user-123' },
+            telemetryMetadata: { userId: 'user-123', evaluationId: 'eval-456' },
           },
         }),
       }));
