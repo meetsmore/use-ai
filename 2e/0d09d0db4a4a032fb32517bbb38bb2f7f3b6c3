@@ -1,0 +1,33 @@
+packages/client/src/hooks/useFileUpload.tsx
+  66e28924eb2ef582 2,187,189-191,218,259-260,262
+packages/client/src/fileUpload/mimeTypeMatcher.test.ts
+  66e28924eb2ef582 3,39-40,44-45,48,53-54,57,62-63,66,71,74,79,82,87-88,91,95,100-103,107-108,111,114
+packages/client/src/fileUpload/mimeTypeMatcher.ts
+  66e28924eb2ef582 1,31-32,46,51,55,64,72,77
+packages/client/tsconfig.json
+  66e28924eb2ef582 8
+packages/client/src/fileUpload/processAttachments.ts
+  66e28924eb2ef582 140-141,144,147-149,157-158
+packages/client/src/fileUpload/processAttachments.test.ts
+  66e28924eb2ef582 638-639,643,661-685,689
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.42",
+  "base_commit_sha": "2e0d09d0db4a4a032fb32517bbb38bb2f7f3b6c3",
+  "prompts": {
+    "66e28924eb2ef582": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b8125d80-c7b3-47c2-90f5-37b010e1e45c",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "yuma.ito@meetsmore.com",
+      "messages": [],
+      "total_additions": 109,
+      "total_deletions": 98,
+      "accepted_lines": 90,
+      "overriden_lines": 0
+    }
+  }
+}
