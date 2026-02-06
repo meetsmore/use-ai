@@ -74,7 +74,8 @@ export default function MultiListPage() {
           success: true,
           message: `Deleted item ${input.itemId}`,
         };
-      }
+      },
+      { annotations: { title: 'Deleting Item', destructiveHint: true } }
     ),
   };
 

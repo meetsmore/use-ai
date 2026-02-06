@@ -53,6 +53,9 @@ export type {
   McpHeadersMap,
   AgentInfo,
   UseAIForwardedProps,
+  // Tool approval types
+  ToolApprovalRequestEvent,
+  ToolApprovalResponseMessage,
   // Multimodal content types
   TextContent,
   ImageContent,
@@ -61,4 +64,4 @@ export type {
   UserMessageContent,
 } from '@meetsmore-oss/use-ai-core';
 
-export { EventType, ErrorCode } from '@meetsmore-oss/use-ai-core';
+export { EventType, ErrorCode, TOOL_APPROVAL_REQUEST } from '@meetsmore-oss/use-ai-core';

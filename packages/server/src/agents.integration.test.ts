@@ -257,45 +257,4 @@ describe('Agent System', () => {
     stateServer.close();
   });
 
-  test('System instructs AI to ask for confirmation on destructiveHint tools', async () => {
-    // Create a custom server that verifies confirmation instructions
-    const confirmPort = 9102;
-    const confirmMockModel = createSystemPromptValidatorMockModel((messages) => {
-      const systemMessage = messages.find(
-        (m): m is { role: string; content: string } =>
-          typeof m === 'object' && m !== null && (m as { role?: string }).role === 'system'
-      );
-      const systemContent = systemMessage?.content || '';
-      expect(systemContent.toLowerCase()).toContain('confirm');
-    });
-
-    const confirmAgent = new AISDKAgent({ model: confirmMockModel });
-    const confirmServer = new UseAIServer({
-      port: confirmPort,
-      agents: { test: confirmAgent },
-      defaultAgent: 'test',
-    });
-    cleanup.trackServer(confirmServer);
-
-    const socket = await cleanup.createTestClient(confirmPort);
-
-    const tools: ToolDefinition[] = [
-      {
-        name: 'delete_account',
-        description: 'Delete user account',
-        parameters: { type: 'object', properties: {} },
-        annotations: { destructiveHint: true },
-      },
-    ];
-
-    sendRunAgent(socket, {
-      prompt: 'Test confirmation',
-      tools,
-    });
-
-    await waitForEventType(socket, EventType.RUN_FINISHED);
-
-    socket.disconnect();
-    confirmServer.close();
-  });
 });

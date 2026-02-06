@@ -35,7 +35,7 @@ A React client/framework for easily enabling AI to control your users frontend.
     - [Multiple Components of the same type](#multiple-components-of-the-same-type)
     - [Invisible (`Provider`) components](#invisible-provider-components)
     - [Suggestions](#suggestions)
-    - [`confirmationRequired`](#confirmationrequired)
+    - [Destructive Tool Approval](#destructive-tool-approval)
     - [Chat History](#chat-history)
     - [Chat Metadata](#chat-metadata)
     - [Programmatic Chat Control](#programmatic-chat-control)
@@ -485,19 +485,63 @@ function MyAppRouter() {
 
 The `UseAIProvider` chat selects 4 random suggestions from all mounted components for display in empty chat pages, users can click them to instantly send them as a message.
 
-### `confirmationRequired`
+### Destructive Tool Approval
 
-For destructive operations, use `confirmationRequired`:
+For destructive operations (delete, remove, etc.), you can require explicit user approval before the tool executes. This respects the MCP `destructiveHint` annotation to mark tools that need confirmation.
 
 ```tsx
 const deleteAccount = defineTool(
   'Delete this user\'s account permanently',
   () => { /* deletion logic */ },
-  { confirmationRequired: true }
+  {
+    annotations: {
+      destructiveHint: true
+    }
+  }
 );
 ```
 
-This will try its best to get the AI to request confirmation from the user via chat before taking action.
+When the AI attempts to call a tool marked with `destructiveHint: true`:
+
+1. The tool execution is paused before running
+2. An approval dialog appears in the chat UI showing the tool name and arguments
+3. The user can click "Allow" to proceed or "Deny" to reject the action
+4. If rejected, the AI receives a message that the user denied the action
+
+**Batch Approvals:**
+
+When the AI proposes multiple destructive tool calls at once, they are batched together in a single approval dialog:
+
+- Shows the count of pending actions (e.g., "3 actions are waiting for your approval")
+- "Allow All" / "Deny All" buttons to handle all at once
+- Expandable details section showing each tool with its arguments
+
+**UI Behavior:**
+
+- While approval is pending, the chat input is replaced by the approval dialog
+- Users cannot send new messages until they approve or deny the pending actions
+- Tool details can be expanded to see the exact arguments being passed
+
+**Example with schema:**
+
+```tsx
+const deleteTodo = defineTool(
+  'Delete a todo item from the list',
+  z.object({
+    id: z.number().describe('The ID of the todo to delete'),
+  }),
+  (input) => {
+    setTodos(prev => prev.filter(t => t.id !== input.id));
+    return { success: true, message: `Deleted todo ${input.id}` };
+  },
+  {
+    annotations: {
+      destructiveHint: true,
+      title: 'Deleting Todo'  // Optional: shown in approval dialog
+    }
+  }
+);
+```
 
 ### Chat History
 
@@ -732,19 +776,17 @@ Enable file uploads in chat:
 
 File transformers allow you to preprocess files before sending them to the AI. This is useful for extracting text from PDFs, performing OCR on images, or any other file-to-text conversion.
 
+`transform()` receives an array of files matching the MIME pattern, and returns an array of strings (one per file, same order).
+
 ```tsx
 import { UseAIProvider, FileTransformer } from '@meetsmore-oss/use-ai-client';
 
-// Define a custom transformer
 const pdfTransformer: FileTransformer = {
-  transform: async (file, context, onProgress) => {
-    // context.chat contains the current chat with metadata
-    onProgress?.(10); // Report progress (shows progress bar in UI)
-
-    const text = await extractTextFromPDF(file); // Your extraction logic
-
-    onProgress?.(100);
-    return text; // This text is sent to the AI instead of the raw file
+  transform: async (files, context, onProgress) => {
+    return Promise.all(files.map(async (file) => {
+      const text = await extractTextFromPDF(file);
+      return text;
+    }));
   }
 };
 
@@ -753,7 +795,7 @@ const pdfTransformer: FileTransformer = {
   fileUploadConfig={{
     transformers: {
       'application/pdf': pdfTransformer,      // Exact MIME type match
-      'image/*': imageOcrTransformer,         // Wildcard match for all images
+      'image/*': ocrTransformer,              // Wildcard match for all images
     }
   }}
 >
@@ -766,6 +808,19 @@ When multiple patterns match a file, the most specific one wins:
 2. Partial wildcard (`image/*`)
 3. Global wildcard (`*`)
 
+Files matching the same MIME pattern key are grouped together and passed as a single array. For example, two `image/*` files are grouped into one `transform()` call:
+
+```tsx
+<UseAIProvider
+  fileUploadConfig={{
+    transformers: {
+      'application/pdf': pdfTransformer,  // PDF files grouped separately
+      'image/*': imageTransformer,        // All image files grouped together
+    }
+  }}
+>
+```
+
 **Progress Reporting:**
 
 - If `onProgress` is called, the UI shows a progress bar
@@ -777,7 +832,7 @@ When multiple patterns match a file, the most specific one wins:
 Transformers receive a `context` object containing:
 - `chat`: The current chat object (includes metadata set via `chat.updateMetadata()`)
 
-This allows transformers to access chat metadata for context-aware processing (e.g., document type hints).
+This allows transformers to access chat metadata (e.g., document type hints).
 
 ### Theme Customization
 

@@ -208,6 +208,52 @@ export interface ToolCallStartExtensions {
   annotations?: ToolAnnotations;
 }
 
+// ============================================================================
+// Tool Approval Events (use-ai extension)
+// ============================================================================
+
+/**
+ * Event type for tool approval requests.
+ * This is a use-ai extension, not part of AG-UI protocol.
+ */
+export const TOOL_APPROVAL_REQUEST = 'TOOL_APPROVAL_REQUEST' as const;
+
+/**
+ * Event emitted when a tool requires user approval before execution.
+ * This happens when a tool has `annotations.destructiveHint: true`.
+ *
+ * The client should display a confirmation dialog and respond with
+ * a tool_approval_response message.
+ */
+export interface ToolApprovalRequestEvent {
+  type: typeof TOOL_APPROVAL_REQUEST;
+  /** Unique ID for this tool call */
+  toolCallId: string;
+  /** Name of the tool requesting approval */
+  toolCallName: string;
+  /** Arguments the tool will be called with */
+  toolCallArgs: Record<string, unknown>;
+  /** Tool annotations for UI display */
+  annotations?: ToolAnnotations;
+  /** Timestamp when this event was generated */
+  timestamp: number;
+}
+
+/**
+ * Message sent from client to server to approve or reject a tool execution.
+ */
+export interface ToolApprovalResponseMessage {
+  type: 'tool_approval_response';
+  data: {
+    /** The tool call ID being approved/rejected */
+    toolCallId: string;
+    /** Whether the tool execution is approved */
+    approved: boolean;
+    /** Optional reason for rejection (shown to AI) */
+    reason?: string;
+  };
+}
+
 /**
  * HTTP headers configuration for a single MCP endpoint.
  * Can be used for authentication, custom headers, or any HTTP header needs.
@@ -274,13 +320,13 @@ export type WorkflowStatus = 'idle' | 'running' | 'completed' | 'error';
 /**
  * Extended message type for use-ai.
  * Includes AG-UI protocol messages ('run_agent', 'tool_result', 'abort_run')
- * plus use-ai-specific extensions ('run_workflow', 'message_feedback').
+ * plus use-ai-specific extensions ('run_workflow', 'message_feedback', 'tool_approval_response').
  *
  * Note: This extends beyond AG-UI protocol to support headless workflow triggers.
  * For AG-UI compliance, use ClientMessage instead.
  */
 export interface UseAIClientMessage {
-  type: 'run_agent' | 'tool_result' | 'abort_run' | 'run_workflow' | 'message_feedback';
+  type: 'run_agent' | 'tool_result' | 'abort_run' | 'run_workflow' | 'message_feedback' | 'tool_approval_response';
   data: unknown;
 }
 

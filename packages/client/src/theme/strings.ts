@@ -108,6 +108,26 @@ export const defaultStrings = {
     /** Fallback messages when no tool title is provided (one randomly selected) */
     fallbackMessages: ['Working', 'Processing', 'Thinking'],
   },
+
+  // Tool approval dialog
+  toolApproval: {
+    /** Title shown in the approval dialog */
+    title: 'Confirmation Required',
+    /** Message shown in the approval dialog. {toolName} is replaced with tool name. */
+    message: '"{toolName}" is waiting for your approval.',
+    /** Message shown when multiple tools are awaiting approval. {count} is replaced with number. */
+    batchMessage: '{count} actions are waiting for your approval.',
+    /** Label for approve button */
+    approve: 'Allow',
+    /** Label for approve all button (batch mode) */
+    approveAll: 'Allow All',
+    /** Label for reject button */
+    reject: 'Deny',
+    /** Label for reject all button (batch mode) */
+    rejectAll: 'Deny All',
+    /** Label for showing tool arguments */
+    showDetails: 'Show details',
+  },
 };
 
 /**

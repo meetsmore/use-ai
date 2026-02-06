@@ -1,8 +1,8 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
-import type { FileAttachment, FileUploadConfig, FileProcessingState, FileTransformer, FileTransformerContext } from '../fileUpload/types';
+import type { FileAttachment, FileUploadConfig, FileProcessingState, FileTransformerContext, FileTransformerMap } from '../fileUpload/types';
 import type { Chat } from '../providers/chatRepository/types';
 import { DEFAULT_MAX_FILE_SIZE } from '../fileUpload/types';
-import { findTransformer } from '../fileUpload/mimeTypeMatcher';
+import { findTransformerPattern } from '../fileUpload/mimeTypeMatcher';
 import { getTransformedContent } from '../fileUpload/processAttachments';
 import { v4 as uuidv4 } from 'uuid';
 import { useTheme, useStrings } from '../theme';
@@ -184,8 +184,11 @@ export function useFileUpload({
   const runTransformer = useCallback(async (
     attachmentId: string,
     file: File,
-    transformer: FileTransformer
+    transformerKey: string
   ) => {
+    const transformer = transformers?.[transformerKey];
+    if (!transformer) return;
+
     // Set initial processing state
     setProcessingState(prev => new Map(prev).set(attachmentId, { status: 'processing' }));
 
@@ -194,7 +197,7 @@ export function useFileUpload({
       const chat = await getCurrentChat();
       const context: FileTransformerContext = { chat };
 
-      const transformedContent = await getTransformedContent(file, transformer, context, (progress) => {
+      const [transformedContent] = await getTransformedContent([file], transformer, context, (progress) => {
         setProcessingState(prev => new Map(prev).set(attachmentId, {
           status: 'processing',
           progress,
@@ -212,7 +215,7 @@ export function useFileUpload({
       console.error(`[useFileUpload] Transformation failed for ${file.name}:`, error);
       setProcessingState(prev => new Map(prev).set(attachmentId, { status: 'error' }));
     }
-  }, [getCurrentChat]);
+  }, [getCurrentChat, transformers]);
 
   /**
    * Validates and adds files to attachments.
@@ -253,10 +256,10 @@ export function useFileUpload({
       setAttachments(prev => [...prev, attachment]);
 
       // Check for transformer and start transformation immediately
-      const transformer = findTransformer(file.type, transformers);
-      if (transformer) {
+      const transformerKey = findTransformerPattern(file.type, transformers);
+      if (transformerKey) {
         // Run transformer in background (don't await - let it update state as it progresses)
-        runTransformer(attachmentId, file, transformer);
+        runTransformer(attachmentId, file, transformerKey);
       }
     }
   }, [maxFileSize, acceptedTypes, strings, transformers, runTransformer]);

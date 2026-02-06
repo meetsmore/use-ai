@@ -88,7 +88,7 @@ export function useCalculatorLogic() {
       'Clear the calculator display and history',
       z.object({}),
       () => clearCalculatorFn(),
-      { annotations: { title: 'Clearing Calculator' } }
+      { annotations: { title: 'Clearing Calculator', destructiveHint: true } }
     ),
   };
 

@@ -12,6 +12,7 @@ import type {
   ToolCallEndEvent,
   UseAIClientMessage,
   ToolResultMessage,
+  ToolApprovalResponseMessage,
   McpHeadersMap,
   AgentInfo,
   MultimodalContent,
@@ -386,6 +387,7 @@ export class UseAIClient {
         name: t.name,
         description: t.description,
         parameters: t.parameters,
+        annotations: t.annotations,
       })),
       state: this._state,
       context: [],
@@ -434,6 +436,26 @@ export class UseAIClient {
     this._messages.push(toolResultMsg);
 
     this.send(toolResultMessage);
+  }
+
+  /**
+   * Sends a tool approval response back to the server.
+   *
+   * @param toolCallId - The ID of the tool call being approved/rejected
+   * @param approved - Whether the tool execution is approved
+   * @param reason - Optional reason for rejection (shown to AI)
+   */
+  sendToolApprovalResponse(toolCallId: string, approved: boolean, reason?: string) {
+    const message: ToolApprovalResponseMessage = {
+      type: 'tool_approval_response',
+      data: {
+        toolCallId,
+        approved,
+        reason,
+      },
+    };
+
+    this.send(message);
   }
 
   /**
