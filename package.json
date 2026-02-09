@@ -30,11 +30,15 @@
     "test:e2e:debug": "cd apps/example && bun run test:e2e:debug",
     "test:e2e:react-16": "cd apps/example && bun run test:e2e:react-16",
     "clean": "turbo run clean && rm -rf .cache/turbo",
+    "docs": "typedoc",
+    "docs:clean": "rm -rf docs/api && bun run docs",
     "kill": "(lsof -ti:3000 2>/dev/null | xargs -r kill; lsof -ti:3002 2>/dev/null | xargs -r kill; lsof -ti:8081 2>/dev/null | xargs -r kill) && echo 'Killed processes on ports 3000, 3002, 8081' || echo 'No processes to kill'"
   },
   "devDependencies": {
     "@types/bun": "latest",
     "turbo": "^2.6.1",
+    "typedoc": "^0.28.16",
+    "typedoc-plugin-markdown": "^4.10.0",
     "typescript": "^5.3.3"
   }
 }

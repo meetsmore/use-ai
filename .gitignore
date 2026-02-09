@@ -17,6 +17,9 @@ apps/*/dist
 apps/example/playwright-report/
 apps/example/test-results/
 
+# TypeDoc generated API docs
+docs/api/
+
 # Turbo
 .turbo/
 
