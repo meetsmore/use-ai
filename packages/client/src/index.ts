@@ -3,6 +3,7 @@ export { useAIWorkflow } from './useAIWorkflow';
 export { UseAIProvider, useAIContext } from './providers/useAIProvider';
 export { UseAIClient } from './client';
 export { defineTool, executeDefinedTool, convertToolsToDefinitions } from './defineTool';
+/** @hidden */
 export { z } from 'zod';
 
 // Theme and strings
