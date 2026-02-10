@@ -12,9 +12,15 @@ root.render(
   <UseAIProvider
     serverUrl="ws://localhost:8081"
     systemPrompt="You are a helpful AI assistant for a demo application. Be concise and friendly in your responses."
-    mcpHeadersProvider={() => ({
-      'http://localhost:3002': {
-        headers: { 'X-API-Key': 'secret-api-key-123' },
+    forwardedPropsProvider={() => ({
+      mcpHeaders: {
+        'http://localhost:3002': {
+          headers: { 'X-API-Key': 'secret-api-key-123' },
+        },
+      },
+      telemetryMetadata: {
+        userId: 'dummy',
+        tenantId: 'example-tenant',
       },
     })}
   >

@@ -13,10 +13,10 @@ import type {
   UseAIClientMessage,
   ToolResultMessage,
   ToolApprovalResponseMessage,
-  McpHeadersMap,
   AgentInfo,
   MultimodalContent,
   FeedbackValue,
+  UseAIForwardedProps,
 } from './types';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -91,9 +91,6 @@ export class UseAIClient {
   private _tools: ToolDefinition[] = [];
   private _messages: Message[] = [];
   private _state: unknown = null;
-
-  // MCP headers provider
-  private mcpHeadersProvider?: () => McpHeadersMap | Promise<McpHeadersMap>;
 
   // Agent selection
   private _availableAgents: AgentInfo[] = [];
@@ -313,22 +310,14 @@ export class UseAIClient {
   }
 
   /**
-   * Sets the MCP headers provider.
-   * The provider will be called each time a message is sent to get fresh headers.
-   *
-   * @param provider - Function that returns MCP headers configuration
-   */
-  setMcpHeadersProvider(provider: () => McpHeadersMap | Promise<McpHeadersMap>) {
-    this.mcpHeadersProvider = provider;
-  }
-
-  /**
    * Sends a user prompt to the AI.
    *
    * @param prompt - The user's prompt/question (text part)
    * @param multimodalContent - Optional multimodal content (text, images, files)
+   * @param forwardedProps - Optional props to forward to the server (e.g., telemetryMetadata, mcpHeaders).
+   *                         Internally merged with other forwardedProps.
    */
-  async sendPrompt(prompt: string, multimodalContent?: MultimodalContent[]) {
+  async sendPrompt(prompt: string, multimodalContent?: MultimodalContent[], forwardedProps?: UseAIForwardedProps) {
     // Build message content - use multimodal if provided, otherwise just the text
     // AG-UI Message type expects content to be string | ContentPart[]
     // For multimodal content, we pass the array; for text-only, we pass the string
@@ -367,17 +356,6 @@ export class UseAIClient {
     };
     this._messages.push(userMessage);
 
-    // Get MCP headers if provider is set
-    let mcpHeaders: McpHeadersMap | undefined;
-    if (this.mcpHeadersProvider) {
-      try {
-        mcpHeaders = await this.mcpHeadersProvider();
-      } catch (error) {
-        console.error('[UseAIClient] Failed to get MCP headers:', error);
-        // Continue without headers rather than blocking the request
-      }
-    }
-
     // Create RunAgentInput
     const runInput: RunAgentInput = {
       threadId: this.threadId, // Use getter to ensure non-null
@@ -392,8 +370,8 @@ export class UseAIClient {
       state: this._state,
       context: [],
       forwardedProps: {
-        ...(mcpHeaders ? { mcpHeaders } : {}),
         ...(this._selectedAgent ? { agent: this._selectedAgent } : {}),
+        ...(forwardedProps || {}),
       },
     };
 

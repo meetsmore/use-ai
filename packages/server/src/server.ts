@@ -1,7 +1,7 @@
 import { Server as SocketIOServer, Socket } from 'socket.io';
 import { ModelMessage, ToolModelMessage } from 'ai';
 import { createHash } from 'crypto';
-import { EventType, type McpHeadersMap } from '@meetsmore-oss/use-ai-core';
+import { EventType, type McpHeadersMap, type UseAIForwardedProps } from '@meetsmore-oss/use-ai-core';
 import type {
   UseAIServerConfig,
   McpEndpointConfig,
@@ -369,11 +369,12 @@ export class UseAIServer {
   }
 
   private async handleRunAgent(session: ClientSession, message: RunAgentMessage) {
-    const { threadId, runId, messages, tools, state, context, forwardedProps } = message.data;
+    const { threadId, runId, messages, tools, state, context, forwardedProps: rawForwardedProps } = message.data;
 
     // Extract use-ai extensions from forwardedProps (AG-UI extension point)
-    const mcpHeaders = forwardedProps?.mcpHeaders as McpHeadersMap | undefined;
-    const requestedAgent = forwardedProps?.agent as string | undefined;
+    const forwardedProps = rawForwardedProps as UseAIForwardedProps | undefined;
+    const mcpHeaders = forwardedProps?.mcpHeaders;
+    const requestedAgent = forwardedProps?.agent;
 
     // Select agent: use requested agent if valid, otherwise fall back to default
     let selectedAgent = this.agent;

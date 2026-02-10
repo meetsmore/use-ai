@@ -295,4 +295,76 @@ describe('UseAIClient', () => {
       expect(client.isConnected()).toBe(false);
     });
   });
+
+  describe('sendPrompt()', () => {
+    test('sends message without forwardedProps when not provided', async () => {
+      const client = new UseAIClient('http://localhost:8081');
+      client.connect();
+
+      mockSocket.connected = true;
+      emitSocketEvent('connect');
+
+      await client.sendPrompt('Hello');
+
+      expect(mockSocket.emit).toHaveBeenCalledWith('message', expect.objectContaining({
+        type: 'run_agent',
+        data: expect.objectContaining({
+          forwardedProps: {},
+        }),
+      }));
+    });
+
+    test('sends message with forwardedProps when provided', async () => {
+      const client = new UseAIClient('http://localhost:8081');
+      client.connect();
+
+      mockSocket.connected = true;
+      emitSocketEvent('connect');
+
+      await client.sendPrompt('Hello', undefined, {
+        mcpHeaders: {
+          'https://api.example.com': { headers: { 'Authorization': 'Bearer token' } },
+        },
+        telemetryMetadata: { userId: 'user-123', evaluationId: 'eval-456' },
+
+      });
+
+      expect(mockSocket.emit).toHaveBeenCalledWith('message', expect.objectContaining({
+        type: 'run_agent',
+        data: expect.objectContaining({
+          forwardedProps: {
+            mcpHeaders: {
+              'https://api.example.com': { headers: { 'Authorization': 'Bearer token' } },
+            },
+            telemetryMetadata: { userId: 'user-123', evaluationId: 'eval-456' },
+          },
+        }),
+      }));
+    });
+
+    test('merges forwardedProps with selected agent', async () => {
+      const client = new UseAIClient('http://localhost:8081');
+      client.connect();
+
+      mockSocket.connected = true;
+      emitSocketEvent('connect');
+
+      // Set selected agent
+      client.setAgent('claude-opus');
+
+      await client.sendPrompt('Hello', undefined, {
+        telemetryMetadata: { userId: 'user-123' },
+      });
+
+      expect(mockSocket.emit).toHaveBeenCalledWith('message', expect.objectContaining({
+        type: 'run_agent',
+        data: expect.objectContaining({
+          forwardedProps: {
+            agent: 'claude-opus',
+            telemetryMetadata: { userId: 'user-123' },
+          },
+        }),
+      }));
+    });
+  });
 });
