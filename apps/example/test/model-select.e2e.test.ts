@@ -280,28 +280,18 @@ test.describe('Model Selection', () => {
       await aiButton.click();
       await expect(page.getByTestId('chat-input')).toBeVisible({ timeout: 5000 });
 
-      // Wait for connection and agent info
-      await page.waitForTimeout(2000);
-
-      // Verify we're connected (connection status indicator should be green)
-      // The connection dot should be visible in the header
-      const connectionDot = page.locator('[title="Online"]');
-      await expect(connectionDot).toBeVisible({ timeout: 5000 });
-
-      // If multiple agents configured, selector should be visible
-      // If single agent, selector should NOT be visible
-      // Either way, the connection should be established and agent info received
-
-      // The chat should be functional - try sending a message
+      // Verify we're connected by checking the chat input is enabled
       const chatInput = page.getByTestId('chat-input');
       const sendButton = page.getByTestId('chat-send-button');
 
-      // Input should be enabled (meaning we're connected and ready)
       await expect(chatInput).toBeEnabled({ timeout: 5000 });
       await expect(sendButton).toBeVisible();
 
-      console.log('[Test] Connection established and chat is functional');
-      console.log('[Test] Agent info was received from server (connection is working)');
+      // Agent selector should be visible when multiple agents are configured
+      const agentSelector = page.getByTestId('agent-selector');
+      await expect(agentSelector).toBeVisible({ timeout: 5000 });
+
+      console.log('[Test] Connection established and agent info received from server');
     });
   });
 });

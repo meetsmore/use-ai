@@ -12,22 +12,17 @@ import type { Page } from '@playwright/test';
  */
 export async function setupAutoApprove(page: Page): Promise<void> {
   await page.addInitScript(() => {
-    const startObserver = () => {
-      const observer = new MutationObserver(() => {
-        const btn = document.querySelector<HTMLButtonElement>(
-          '[data-testid="approve-tool-button"]'
-        );
-        if (btn) {
-          btn.click();
-        }
-      });
-      observer.observe(document.body, { childList: true, subtree: true });
-    };
-
-    if (document.body) {
-      startObserver();
-    } else {
-      document.addEventListener('DOMContentLoaded', startObserver);
-    }
+    // Poll for the approve button and click it when found.
+    // MutationObserver can fire during React's DOM commit before event
+    // handlers are wired up, causing btn.click() to be silently ignored.
+    // Polling avoids this race condition.
+    setInterval(() => {
+      const btn = document.querySelector<HTMLButtonElement>(
+        '[data-testid="approve-tool-button"]'
+      );
+      if (btn) {
+        btn.click();
+      }
+    }, 100);
   });
 }

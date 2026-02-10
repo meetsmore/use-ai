@@ -634,21 +634,8 @@ export class UseAIServer {
   }
 
   private buildSystemPrompt(session: ClientSession, state: unknown): string | undefined {
-    const parts: string[] = [];
-
-    // Add state context if available
-    if (state) {
-      parts.push('You are interacting with a web application. Here is the current state:');
-      parts.push('');
-      parts.push(JSON.stringify(state, null, 2));
-      parts.push('');
-      parts.push('Use the available tools to interact with and modify the UI based on user requests.');
-    }
-
-    // Note: Confirmation for destructive tools is now handled via AI SDK's needsApproval
-    // mechanism in AISDKAgent, not via prompt injection.
-
-    return parts.length > 0 ? parts.join('\n') : undefined;
+    if (!state) return undefined;
+    return 'You are interacting with a web application. Use the available tools to interact with and modify the UI based on user requests.';
   }
 
   private handleToolResult(session: ClientSession, message: ToolResultMessage) {

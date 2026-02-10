@@ -85,9 +85,9 @@ test.describe('Mid-run Tool Registration', () => {
   });
 
   test('should be able to navigate and use addTodo tool on Todo page in single prompt', async ({ page }) => {
-    // Start on the Calculator page
-    await page.click('text=Calculator');
-    await expect(page.locator('h1:has-text("Calculator")')).toBeVisible();
+    // Start on the Remote MCP Tools page (away from Todo, which is the default)
+    await page.click('text=Remote MCP Tools');
+    await expect(page.locator('h1:has-text("Remote MCP Tools")')).toBeVisible({ timeout: 10000 });
 
     // Open AI chat
     const aiButton = page.getByTestId('ai-button');
@@ -96,7 +96,6 @@ test.describe('Mid-run Tool Registration', () => {
     await expect(page.getByTestId('chat-input')).toBeVisible({ timeout: 5000 });
 
     // Ask AI to navigate to Todo page and add a todo item
-    // Phrase it as a direct action request that requires the tool to be called
     const chatInput = page.getByTestId('chat-input');
     await chatInput.fill(
       'Navigate to the Todo page and add "Buy milk 12345" to my todo list using the addTodo tool, then confirm it was added by telling me the ID number of the new todo.'
@@ -118,10 +117,8 @@ test.describe('Mid-run Tool Registration', () => {
     // Wait for the AI to finish processing
     await page.waitForTimeout(10000);
 
-    // The key assertion: Check if the addTodo tool was actually executed
-    // by verifying the todo item appears in the Todo list
+    // Verify addTodo tool was executed by checking a todo item exists
     const todoList = page.getByTestId('todo-list');
-
     // This assertion will FAIL if the addTodo tool wasn't available mid-run
     // because there will be no todo items in the list
     // NOTE: AI may paraphrase the text, so we just check that a todo exists

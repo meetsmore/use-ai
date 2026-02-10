@@ -1028,7 +1028,7 @@ describe('AISDKAgent', () => {
       expect(capturedMessages.values[0].content).toBe('You are a helpful assistant.');
     });
 
-    test('sends config and runtime systemPrompts as separate messages', async () => {
+    test('sends config, runtime instructions, and state as separate system messages', async () => {
       const capturedMessages = { values: [] as Array<{ role: string; content: string }> };
       const mockModel = createSystemMessageCapturingMockModel(capturedMessages);
 
@@ -1040,21 +1040,27 @@ describe('AISDKAgent', () => {
       const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
 
+      const testState = { todos: [] };
       const input = createTestInput({
-        systemPrompt: 'Current state: {"todos": []}',
+        systemPrompt: 'Use tools to modify the UI.',
+        state: testState,
       });
+      // Also set session.state so buildStateMessage picks it up
+      input.session.state = testState;
       const result = await agent.run(input, eventEmitter);
 
       expect(result.success).toBe(true);
-      // Config prompt and runtime prompt are sent as separate system messages
-      expect(capturedMessages.values.length).toBe(2);
+      // Config prompt, runtime instructions, and state are sent as 3 separate system messages
+      expect(capturedMessages.values.length).toBe(3);
       expect(capturedMessages.values[0].role).toBe('system');
       expect(capturedMessages.values[0].content).toBe('You are a helpful assistant.');
       expect(capturedMessages.values[1].role).toBe('system');
-      expect(capturedMessages.values[1].content).toBe('Current state: {"todos": []}');
+      expect(capturedMessages.values[1].content).toBe('Use tools to modify the UI.');
+      expect(capturedMessages.values[2].role).toBe('system');
+      expect(capturedMessages.values[2].content).toContain('"todos": []');
     });
 
-    test('uses only runtime systemPrompt when config is not set', async () => {
+    test('uses only runtime systemPrompt and state when config is not set', async () => {
       const capturedMessages = { values: [] as Array<{ role: string; content: string }> };
       const mockModel = createSystemMessageCapturingMockModel(capturedMessages);
 
@@ -1066,14 +1072,19 @@ describe('AISDKAgent', () => {
       const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
 
+      const testState = { page: '/home' };
       const input = createTestInput({
-        systemPrompt: 'Current state: {"todos": []}',
+        systemPrompt: 'Use tools to modify the UI.',
+        state: testState,
       });
+      input.session.state = testState;
       const result = await agent.run(input, eventEmitter);
 
       expect(result.success).toBe(true);
-      expect(capturedMessages.values.length).toBe(1);
-      expect(capturedMessages.values[0].content).toBe('Current state: {"todos": []}');
+      // Runtime instructions + state (no config prompt)
+      expect(capturedMessages.values.length).toBe(2);
+      expect(capturedMessages.values[0].content).toBe('Use tools to modify the UI.');
+      expect(capturedMessages.values[1].content).toContain('/home');
     });
 
     test('no systemPrompt when both config and runtime are undefined', async () => {
@@ -1226,6 +1237,155 @@ describe('AISDKAgent', () => {
       expect(result.success).toBe(true);
       expect(capturedMessages.values.length).toBe(1);
       expect(capturedMessages.values[0].content).toBe('Runtime prompt only');
+    });
+
+    test('state message is rebuilt from session.state between steps', async () => {
+      // Track all system messages sent in each step call
+      const capturedPerStep: Array<Array<{ role: string; content: string }>> = [];
+      const toolCallId = 'tool-call-state-test';
+      let callCount = 0;
+
+      const mockModel = new MockLanguageModelV3({
+        doStream: async ({ prompt }) => {
+          callCount++;
+          // Capture system messages for this step
+          const systemMessages = prompt
+            .filter((msg) => msg.role === 'system')
+            .map((msg) => ({ role: msg.role, content: msg.content as string }));
+          capturedPerStep.push(systemMessages);
+
+          // First call: return a tool call
+          if (callCount === 1) {
+            return {
+              stream: simulateReadableStream({
+                chunks: [
+                  { type: 'tool-input-start', id: toolCallId, toolName: 'navigate' },
+                  { type: 'tool-input-delta', id: toolCallId, delta: '{"page":"todo"}' },
+                  { type: 'tool-input-end', id: toolCallId },
+                  { type: 'tool-call', toolCallId, toolName: 'navigate', input: '{"page":"todo"}' },
+                  {
+                    type: 'finish',
+                    finishReason: 'tool-calls',
+                    usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
+                  },
+                ],
+              }),
+              response: {
+                id: 'response-1',
+                timestamp: new Date(),
+                modelId: 'mock-model',
+                headers: {},
+                messages: [
+                  {
+                    role: 'assistant',
+                    content: [
+                      { type: 'tool-call', toolCallId, toolName: 'navigate', input: { page: 'todo' } },
+                    ],
+                  },
+                ],
+              },
+            };
+          }
+
+          // Second call: return text response
+          return {
+            stream: simulateReadableStream({
+              chunks: [
+                { type: 'text-start', id: 'text-1' },
+                { type: 'text-delta', id: 'text-1', delta: 'Navigated to todo page' },
+                { type: 'text-end', id: 'text-1' },
+                {
+                  type: 'finish',
+                  finishReason: 'stop',
+                  usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
+                },
+              ],
+            }),
+            response: {
+              id: 'response-2',
+              timestamp: new Date(),
+              modelId: 'mock-model',
+              headers: {},
+              messages: [{ role: 'assistant', content: 'Navigated to todo page' }],
+            },
+          };
+        },
+      });
+
+      const agent = new AISDKAgent({ model: mockModel });
+
+      const emittedEvents: AGUIEventExtended[] = [];
+      const eventEmitter: EventEmitter = {
+        emit: (event) => emittedEvents.push(event),
+      };
+
+      const initialState = { currentPage: '/mcp-tools', todos: [] };
+      const input = createTestInput({
+        tools: [
+          {
+            name: 'navigate',
+            description: 'Navigate to a page',
+            parameters: {
+              type: 'object',
+              properties: { page: { type: 'string' } },
+              required: ['page'],
+            },
+          },
+        ],
+        state: initialState,
+        systemPrompt: 'You are interacting with a web application.',
+      });
+      input.session.state = initialState;
+
+      // Start run in background
+      const runPromise = agent.run(input, eventEmitter);
+
+      // Wait for tool call and simulate state change on tool result
+      await new Promise<void>((resolve) => {
+        const checkInterval = setInterval(() => {
+          const toolCallEnd = emittedEvents.find(e => e.type === EventType.TOOL_CALL_END);
+          if (toolCallEnd) {
+            clearInterval(checkInterval);
+
+            // Simulate navigation: update session.state (as server.handleToolResult does)
+            input.session.state = { currentPage: '/todo', todos: ['Buy groceries'] };
+
+            // Resolve the pending tool call
+            const receivedToolCallId = (toolCallEnd as { toolCallId: string }).toolCallId;
+            const resolver = input.session.pendingToolCalls.get(receivedToolCallId);
+            if (resolver) {
+              resolver(JSON.stringify({ success: true }));
+            }
+            resolve();
+          }
+        }, 10);
+
+        setTimeout(() => {
+          clearInterval(checkInterval);
+          resolve();
+        }, 5000);
+      });
+
+      await runPromise;
+
+      // Verify we had 2 steps
+      expect(capturedPerStep.length).toBe(2);
+
+      // Step 1: state message should contain initial state
+      const step1StateMsg = capturedPerStep[0].find(m => m.content.includes('currentPage'));
+      expect(step1StateMsg).toBeDefined();
+      expect(step1StateMsg!.content).toContain('/mcp-tools');
+
+      // Step 2: state message should contain updated state (rebuilt from session.state)
+      const step2StateMsg = capturedPerStep[1].find(m => m.content.includes('currentPage'));
+      expect(step2StateMsg).toBeDefined();
+      expect(step2StateMsg!.content).toContain('/todo');
+      expect(step2StateMsg!.content).toContain('Buy groceries');
+
+      // Static system messages should be identical across both steps
+      const step1StaticMsgs = capturedPerStep[0].filter(m => !m.content.includes('currentPage'));
+      const step2StaticMsgs = capturedPerStep[1].filter(m => !m.content.includes('currentPage'));
+      expect(step1StaticMsgs).toEqual(step2StaticMsgs);
     });
   });
 
