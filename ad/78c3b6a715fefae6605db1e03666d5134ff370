@@ -1,0 +1,25 @@
+packages/server/src/error-handling.integration.test.ts
+  8626eda9985f20c7 7,28,41,69,125,178,187-189,194-272
+packages/server/src/agents/AISDKAgent.test.ts
+  8626eda9985f20c7 16,1803-1866
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.42",
+  "base_commit_sha": "ad78c3b6a715fefae6605db1e03666d5134ff370",
+  "prompts": {
+    "8626eda9985f20c7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a8377fcd-ceba-4267-a262-95a49652518f",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 155,
+      "total_deletions": 12,
+      "accepted_lines": 154,
+      "overriden_lines": 0
+    }
+  }
+}

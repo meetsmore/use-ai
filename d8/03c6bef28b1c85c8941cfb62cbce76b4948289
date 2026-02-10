@@ -1,0 +1,33 @@
+packages/client/src/providers/useAIProvider.tsx
+  546cdcd4c32048e5 2,276,456,484,696
+packages/client/src/providers/useAIProvider.forwardedPropsProvider.test.tsx
+  546cdcd4c32048e5 5,47,63,86,130,170,222,252
+packages/client/src/hooks/useChatManagement.ts
+  546cdcd4c32048e5 7,25,110
+packages/client/src/client.ts
+  546cdcd4c32048e5 19,320
+packages/server/src/types.ts
+  546cdcd4c32048e5 172
+packages/core/src/types.ts
+  546cdcd4c32048e5 403,405
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.42",
+  "base_commit_sha": "d803c6bef28b1c85c8941cfb62cbce76b4948289",
+  "prompts": {
+    "546cdcd4c32048e5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d9b1c6c3-73a9-4eb4-9ae9-d776e783b965",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 21,
+      "total_deletions": 23,
+      "accepted_lines": 21,
+      "overriden_lines": 0
+    }
+  }
+}
