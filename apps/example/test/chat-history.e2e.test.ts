@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { setupAutoApprove } from './test-helpers';
 
 test.describe('Chat History Persistence', () => {
   // Set timeout for all tests in this suite to 45 seconds
@@ -17,6 +18,9 @@ test.describe('Chat History Persistence', () => {
     if (!process.env.ANTHROPIC_API_KEY) {
       test.skip();
     }
+
+    // Auto-approve destructive tool calls (delete, clear, etc.)
+    await setupAutoApprove(page);
 
     // Clear localStorage before each test to start fresh
     await page.goto('/');

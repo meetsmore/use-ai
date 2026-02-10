@@ -492,6 +492,7 @@ export function UseAIProvider({
     promptsRef,
     isInvisible,
     getWaiter,
+    waitForToolsToStabilize,
   });
 
   // Initialize chat management hook

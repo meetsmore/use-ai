@@ -30,6 +30,8 @@ export interface UseToolExecutionOptions {
   isInvisible: (componentId: string) => boolean;
   /** Function to get a waiter for a component */
   getWaiter: (componentId: string) => (() => Promise<void>) | undefined;
+  /** Function to wait for tools to stabilize after execution (e.g., after navigation) */
+  waitForToolsToStabilize: () => Promise<void>;
 }
 
 /**
@@ -64,6 +66,7 @@ export function useToolExecution({
   promptsRef,
   isInvisible,
   getWaiter,
+  waitForToolsToStabilize,
 }: UseToolExecutionOptions): UseToolExecutionResult {
   const [pendingApprovals, setPendingApprovals] = useState<PendingToolApproval[]>([]);
 
@@ -123,6 +126,13 @@ export function useToolExecution({
         console.log('[useToolExecution] Component is invisible, skipping prompt wait');
       }
 
+      // Wait for tools to stabilize after execution
+      // This is crucial for tools that cause navigation/component mount-unmount
+      // (e.g., new page components registering their tools)
+      console.log('[useToolExecution] Waiting for tools to stabilize...');
+      await waitForToolsToStabilize();
+      console.log('[useToolExecution] Tools stabilized');
+
       // Build updated state
       let updatedState: unknown = null;
       if (ownerId) {
@@ -140,7 +150,7 @@ export function useToolExecution({
         error: err instanceof Error ? err.message : 'Unknown error',
       });
     }
-  }, [clientRef, aggregatedToolsRef, toolOwnershipRef, promptsRef, isInvisible, getWaiter]);
+  }, [clientRef, aggregatedToolsRef, toolOwnershipRef, promptsRef, isInvisible, getWaiter, waitForToolsToStabilize]);
 
   // Store a tool call as pending approval
   const storePendingToolCall = useCallback((

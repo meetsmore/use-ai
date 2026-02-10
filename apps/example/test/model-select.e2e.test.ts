@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { setupAutoApprove } from './test-helpers';
 
 test.describe('Model Selection', () => {
   test.setTimeout(60000);
@@ -14,6 +15,9 @@ test.describe('Model Selection', () => {
     if (!process.env.ANTHROPIC_API_KEY) {
       test.skip();
     }
+
+    // Auto-approve destructive tool calls (delete, clear, etc.)
+    await setupAutoApprove(page);
 
     // Clear localStorage before each test
     await page.goto('/');
