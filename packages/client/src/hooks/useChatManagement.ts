@@ -4,6 +4,7 @@ import type { Message } from '../components/UseAIChatPanel';
 import type { UseAIClient } from '../client';
 import type { Message as AGUIMessage } from '../types';
 import type { FileAttachment } from '../fileUpload/types';
+import type { UseAIForwardedProps } from '../types';
 
 /**
  * Options for programmatically sending a message via sendMessage().
@@ -17,6 +18,11 @@ export interface SendMessageOptions {
   openChat?: boolean;
   /** Metadata to set on the new chat (only used when newChat: true) */
   metadata?: ChatMetadata;
+  /**
+   * Forwarded props for observability and configuration (e.g., telemetryMetadata, mcpHeaders).
+   * This is merged with provider-level forwardedProps (message-level takes precedence).
+   */
+  forwardedProps?: UseAIForwardedProps;
 }
 
 // Constants
@@ -101,7 +107,7 @@ export interface UseChatManagementOptions {
   /** Setter for messages state (owned by provider) */
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
   /** Callback to send a message (from UseAIProvider) */
-  onSendMessage?: (message: string, attachments?: FileAttachment[]) => Promise<void>;
+  onSendMessage?: (message: string, attachments?: FileAttachment[], forwardedProps?: UseAIForwardedProps) => Promise<void>;
   /** Callback to open/close the chat panel */
   setOpen?: (open: boolean) => void;
   /** Whether the client is connected */
@@ -571,7 +577,7 @@ export function useChatManagement({
 
     while (pendingMessagesRef.current.length > 0) {
       const { message, options } = pendingMessagesRef.current.shift()!;
-      const { newChat = false, attachments = [], openChat = true, metadata } = options ?? {};
+      const { newChat = false, attachments = [], openChat = true, metadata, forwardedProps } = options ?? {};
 
       // Optionally create new chat with metadata
       if (newChat) {
@@ -598,8 +604,8 @@ export function useChatManagement({
         })
       );
 
-      // Send the message
-      await onSendMessage(message, fileAttachments.length > 0 ? fileAttachments : undefined);
+      // Send the message with optional forwardedProps
+      await onSendMessage(message, fileAttachments.length > 0 ? fileAttachments : undefined, forwardedProps);
 
       // Open chat panel if requested
       if (openChat && setOpen) {

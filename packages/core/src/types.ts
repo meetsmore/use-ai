@@ -284,6 +284,8 @@ export interface UseAIForwardedProps {
   mcpHeaders?: McpHeadersMap;
   /** Agent ID to use for this request (falls back to server default if not specified) */
   agent?: string;
+  /** Telemetry metadata for observability (e.g., Langfuse eval tracing) */
+  telemetryMetadata?: Record<string, unknown>;
 }
 
 /**
@@ -398,15 +400,9 @@ export interface RunWorkflowMessage {
     threadId: string;
     /**
      * AG-UI extension point for additional fields in messages.
-     * We use it to send `mcpHeaders`.
-     * @see RunAgentInput['forwardedProps']
+     * @see UseAIForwardedProps
      */
-    forwardedProps?: {
-      /**
-       * A map of current McpHeaders that should be applied to MCP tool calls (e.g. auth headers)
-       */
-      mcpHeaders?: McpHeadersMap
-    }
+    forwardedProps?: UseAIForwardedProps
   };
 }
 
