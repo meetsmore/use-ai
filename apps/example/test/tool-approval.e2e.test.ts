@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, Page, Locator } from '@playwright/test';
 
 test.describe('Tool Approval', () => {
   // Set timeout for all tests in this suite
@@ -51,6 +51,28 @@ test.describe('Tool Approval', () => {
       approveButton: page.getByTestId('approve-tool-button'),
       rejectButton: page.getByTestId('reject-tool-button'),
     };
+  }
+
+  /**
+   * Handle up to N rounds of the approval dialog. TOOL_APPROVAL_REQUEST events
+   * arrive incrementally, so the dialog may re-appear after a click if more
+   * pending tools arrive. Only the first round waits with a timeout; subsequent
+   * rounds use instant visibility checks.
+   */
+  async function handleToolApprovals(
+    page: Page,
+    approvalDialog: Locator,
+    actionButton: Locator,
+    maxRounds: number,
+  ) {
+    await expect(approvalDialog).toBeVisible({ timeout: 30000 });
+    await actionButton.click();
+
+    for (let i = 1; i < maxRounds; i++) {
+      await page.waitForTimeout(200);
+      if (!(await approvalDialog.isVisible())) break;
+      await actionButton.click();
+    }
   }
 
   /**
@@ -138,6 +160,52 @@ test.describe('Tool Approval', () => {
     await expect(getTodoItems(page)).toHaveCount(0);
   });
 
+  test('auto-reject should not persist across separate tool call groups within a run', async ({ page }) => {
+    // Clear ALL localStorage to avoid stale state from previous tests
+    await page.evaluate(() => localStorage.clear());
+    await page.reload();
+    await expect(page.locator('h1:has-text("Todo List")')).toBeVisible();
+    await expect(getTodoItems(page)).toHaveCount(0);
+
+    const { chatInput, sendButton, approvalDialog, approveButton, rejectButton } = await openChat(page);
+
+    // === Run 1: Add a todo, then try to delete it (deny) ===
+    await sendMessage(chatInput, sendButton, 'Add a todo: call mom');
+    await waitForAssistantResponse(page);
+    await expect(getTodoWithText(page, 'call mom')).toBeVisible();
+
+    await sendMessage(chatInput, sendButton, 'Delete the call mom todo');
+    await expect(approvalDialog).toBeVisible({ timeout: 30000 });
+
+    // DENY the deletion
+    await rejectButton.click();
+    await waitForAssistantResponse(page);
+
+    // Verify todo is still present
+    await expect(getTodoWithText(page, 'call mom')).toBeVisible();
+    await expect(getTodoItems(page)).toHaveCount(1);
+
+    // === Run 2: Add another todo, then try to delete it (should still prompt) ===
+    // This verifies auto-reject state was properly cleared between runs.
+    await sendMessage(chatInput, sendButton, 'Add a todo: call dad');
+    await waitForAssistantResponse(page);
+    await expect(getTodoWithText(page, 'call dad')).toBeVisible();
+
+    await sendMessage(chatInput, sendButton, 'Delete the call dad todo');
+
+    // This would fail if auto-reject incorrectly persists across runs — the
+    // deletion would be silently rejected without ever showing the dialog.
+    await expect(approvalDialog).toBeVisible({ timeout: 30000 });
+
+    // APPROVE this deletion
+    await approveButton.click();
+    await waitForAssistantResponse(page);
+
+    // "call dad" should be deleted, "call mom" should still exist
+    await expect(getTodoWithText(page, 'call dad')).not.toBeVisible({ timeout: 10000 });
+    await expect(getTodoWithText(page, 'call mom')).toBeVisible();
+  });
+
   test('bulk tool approval - approve and deny in multi-turn conversation', async ({ page }) => {
     const { chatInput, sendButton, approvalDialog, approveButton, rejectButton } = await openChat(page);
 
@@ -174,8 +242,8 @@ test.describe('Tool Approval', () => {
       await expect(rejectButton).toHaveText('Deny');
     }
 
-    // DENY the deletion
-    await rejectButton.click();
+    // DENY the deletion (handle multiple rounds if tool requests arrive incrementally)
+    await handleToolApprovals(page, approvalDialog, rejectButton, todoCountAfterCreate);
 
     // Wait for AI to acknowledge the denial
     await waitForAssistantResponse(page);
@@ -204,8 +272,8 @@ test.describe('Tool Approval', () => {
     // Capture count before approve
     const todoCountBeforeApprove = await getTodoItems(page).count();
 
-    // APPROVE the deletion
-    await approveButton.click();
+    // APPROVE the deletion (handle multiple rounds if tool requests arrive incrementally)
+    await handleToolApprovals(page, approvalDialog, approveButton, todoCountBeforeApprove);
 
     // Verify dialog closes (approval was processed)
     await expect(approvalDialog).not.toBeVisible({ timeout: 10000 });
