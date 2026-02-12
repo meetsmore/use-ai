@@ -616,10 +616,13 @@ export class AISDKAgent implements Agent {
         }
 
         // Tool calls were made - prepare for next iteration
-        // Update messages with the response from this step (includes tool calls and results)
-        // Sanitize to remove provider-specific fields
+        // Append new messages from this step (assistant tool calls + tool results) to the
+        // existing conversation. response.messages only contains generated messages, not
+        // input messages, so we must preserve currentMessages to retain the user's original
+        // request and any prior step outputs.
         // Note: System messages will be rebuilt with updated state at the start of next iteration
         currentMessages = [
+          ...currentMessages,
           ...this.sanitizeMessages(response.messages),
         ];
 

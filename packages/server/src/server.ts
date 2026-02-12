@@ -23,6 +23,7 @@ import type { Agent, EventEmitter, AGUIEventExtended } from './agents/types';
 import type { ClientSession } from './agents/types';
 import type { UseAIServerPlugin, MessageHandler } from './plugins/types';
 import { FeedbackPlugin } from './plugins/FeedbackPlugin';
+import { isRemoteTool } from './utils/toolFilters';
 import { RemoteMcpToolsProvider, type RemoteToolDefinition } from './mcp';
 import { findMatch } from './utils/patternMatcher';
 import {
@@ -649,15 +650,22 @@ export class UseAIServer {
     // Update session tools if client sent updated tools
     // This allows mid-run tool updates (e.g., after navigation to a new page)
     if (tools && tools.length > 0) {
-      // Ensure parameters have required structure
-      session.tools = tools.map(t => ({
+      // Client only knows about client tools, so forwardedProps.tools never includes MCP tools.
+      // Preserve existing MCP (remote) tools and merge with the updated client tools.
+      const existingRemoteTools = session.tools.filter(isRemoteTool);
+
+      const updatedClientTools = tools.map(t => ({
         ...t,
         parameters: t.parameters || { type: 'object', properties: {}, required: [] },
       })) as ToolDefinition[];
 
+      session.tools = [...updatedClientTools, ...existingRemoteTools];
+
       logger.debug('Tools updated mid-run', {
         clientId: session.clientId,
         toolCount: session.tools.length,
+        clientToolCount: updatedClientTools.length,
+        mcpToolCount: existingRemoteTools.length,
         toolNames: session.tools.map(t => t.name),
       });
     }
