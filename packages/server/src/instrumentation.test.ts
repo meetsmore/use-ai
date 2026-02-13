@@ -1,9 +1,9 @@
 /**
- * Unit tests for instrumentation.ts trace ID storage functions.
+ * Unit tests for instrumentation.ts trace ID storage functions and error tracing.
  */
 
-import { describe, expect, test, beforeEach } from 'bun:test';
-import { pushTraceIdForRun, popTraceIdForRun } from './instrumentation';
+import { describe, expect, test, beforeEach, mock, spyOn } from 'bun:test';
+import { pushTraceIdForRun, popTraceIdForRun, recordErrorTrace, langfuse } from './instrumentation';
 
 describe('Trace ID Storage', () => {
   // Use unique runIds per test to avoid cross-test pollution
@@ -66,5 +66,93 @@ describe('Trace ID Storage', () => {
       // Second runId should still be available
       expect(popTraceIdForRun(runId2)).toBe(traceId2);
     });
+  });
+});
+
+describe('recordErrorTrace', () => {
+  const baseParams = {
+    runId: 'run-123',
+    errorCategory: 'agent_not_found' as const,
+    errorMessage: 'Agent "foo" not found',
+    sessionId: 'client-1',
+    threadId: 'thread-abc',
+    ipAddress: '127.0.0.1',
+  };
+
+  test('is a no-op when Langfuse is disabled (does not throw)', () => {
+    const originalEnabled = langfuse.enabled;
+    const originalClient = langfuse.client;
+    try {
+      langfuse.enabled = false;
+      langfuse.client = undefined;
+      // Should not throw
+      expect(() => recordErrorTrace(baseParams)).not.toThrow();
+    } finally {
+      langfuse.enabled = originalEnabled;
+      langfuse.client = originalClient;
+    }
+  });
+
+  test('calls langfuse.client.trace() with correct arguments when enabled', () => {
+    const originalEnabled = langfuse.enabled;
+    const originalClient = langfuse.client;
+    const mockTrace = mock(() => {});
+    try {
+      langfuse.enabled = true;
+      langfuse.client = { trace: mockTrace } as any;
+
+      recordErrorTrace({
+        ...baseParams,
+        metadata: { requestedAgent: 'foo' },
+      });
+
+      expect(mockTrace).toHaveBeenCalledTimes(1);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const calls = mockTrace.mock.calls as any[][];
+      const call = calls[0][0];
+      expect(call.id).toBe('run-123');
+      expect(call.name).toBe('use-ai-error');
+      expect(call.sessionId).toBe('client-1');
+      expect(call.input).toEqual({ threadId: 'thread-abc', errorCategory: 'agent_not_found' });
+      expect(call.output).toEqual({ error: 'Agent "foo" not found' });
+      expect(call.tags).toEqual(['error', 'agent_not_found']);
+      expect(call.metadata.errorCategory).toBe('agent_not_found');
+      expect(call.metadata.ipAddress).toBe('127.0.0.1');
+      expect(call.metadata.source).toBe('use-ai-server');
+      expect(call.metadata.requestedAgent).toBe('foo');
+    } finally {
+      langfuse.enabled = originalEnabled;
+      langfuse.client = originalClient;
+    }
+  });
+
+  test('does not propagate errors when langfuse.client.trace() throws', () => {
+    const originalEnabled = langfuse.enabled;
+    const originalClient = langfuse.client;
+    const mockTrace = mock(() => { throw new Error('Langfuse connection failed'); });
+    try {
+      langfuse.enabled = true;
+      langfuse.client = { trace: mockTrace } as any;
+
+      // Should not throw even though trace() throws
+      expect(() => recordErrorTrace(baseParams)).not.toThrow();
+      expect(mockTrace).toHaveBeenCalledTimes(1);
+    } finally {
+      langfuse.enabled = originalEnabled;
+      langfuse.client = originalClient;
+    }
+  });
+
+  test('is a no-op when enabled but client is undefined', () => {
+    const originalEnabled = langfuse.enabled;
+    const originalClient = langfuse.client;
+    try {
+      langfuse.enabled = true;
+      langfuse.client = undefined;
+      expect(() => recordErrorTrace(baseParams)).not.toThrow();
+    } finally {
+      langfuse.enabled = originalEnabled;
+      langfuse.client = originalClient;
+    }
   });
 });

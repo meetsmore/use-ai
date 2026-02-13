@@ -162,4 +162,10 @@ export interface Agent {
    * ```
    */
   getAnnotation?(): string | undefined;
+
+  /**
+   * Flushes any pending telemetry data (e.g., Langfuse spans).
+   * Called during server shutdown to ensure all telemetry is persisted.
+   */
+  flushTelemetry?(): Promise<void>;
 }
