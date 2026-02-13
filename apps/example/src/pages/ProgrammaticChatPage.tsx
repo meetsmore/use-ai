@@ -2,25 +2,10 @@ import React, { useRef, useState } from 'react';
 import { useAIContext, type SendMessageOptions } from '@meetsmore-oss/use-ai-client';
 
 export default function ProgrammaticChatPage() {
-  const { chat, connected, agents } = useAIContext();
+  const { chat, connected } = useAIContext();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isSending, setIsSending] = useState(false);
-
-  const handleSendWithInvalidAgent = async (agentName: string) => {
-    if (!connected || isSending) return;
-    setIsSending(true);
-    const previousAgent = agents.selected;
-    try {
-      agents.set(agentName);
-      await chat.sendMessage(`Testing agent_not_found error with agent: ${agentName}`);
-    } catch (error) {
-      console.error('Expected error:', error);
-    } finally {
-      agents.set(previousAgent);
-      setIsSending(false);
-    }
-  };
 
   const handleSendPreset = async (message: string, options?: SendMessageOptions) => {
     if (!connected || isSending) return;
@@ -144,27 +129,6 @@ export default function ProgrammaticChatPage() {
         </div>
       </section>
 
-      <section style={{ ...styles.section, borderLeft: '4px solid #ef4444' }}>
-        <h2 style={styles.sectionTitle}>Error Logging Test (PR #28)</h2>
-        <p style={styles.sectionDescription}>
-          Trigger server-side error scenarios to verify Langfuse error traces. Check server logs for <code style={styles.code}>recordErrorTrace</code> output.
-        </p>
-        <div style={styles.buttonGroup}>
-          <button
-            style={{ ...styles.button, ...styles.buttonDanger }}
-            onClick={() => handleSendWithInvalidAgent('nonexistent-agent')}
-            disabled={!connected || isSending}
-            data-testid="btn-agent-not-found"
-          >
-            agent_not_found
-          </button>
-        </div>
-        <p style={{ ...styles.sectionDescription, marginTop: '12px', marginBottom: 0 }}>
-          Current agent: <code style={styles.code}>{agents.selected ?? agents.default ?? 'none'}</code>
-          {' | '}Available: <code style={styles.code}>{agents.available.map(a => a.id).join(', ') || 'none'}</code>
-        </p>
-      </section>
-
       <section style={styles.section}>
         <h2 style={styles.sectionTitle}>Code Example</h2>
         <pre style={styles.codeBlock}>
@@ -281,11 +245,6 @@ const styles: Record<string, React.CSSProperties> = {
     background: '#007bff',
     color: 'white',
     borderColor: '#007bff',
-  },
-  buttonDanger: {
-    background: '#ef4444',
-    color: 'white',
-    borderColor: '#ef4444',
   },
   fileSection: {
     display: 'flex',
