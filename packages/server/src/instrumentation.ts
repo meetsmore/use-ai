@@ -44,7 +44,10 @@ export interface ErrorTraceParams {
   sessionId: string;
   threadId?: string;
   ipAddress?: string;
+  /** Error-specific metadata (e.g. requestedAgent, retryAfterSeconds). Goes to top-level trace metadata. */
   metadata?: Record<string, unknown>;
+  /** Forwarded telemetry metadata (e.g. userId, tenantId). Nested under metadata.attributes.ai.telemetry.metadata. */
+  telemetryMetadata?: Record<string, unknown>;
 }
 
 /**
@@ -66,6 +69,9 @@ export function recordErrorTrace(params: ErrorTraceParams): void {
         ipAddress: params.ipAddress,
         source: 'use-ai-server',
         ...params.metadata,
+        ...(params.telemetryMetadata && Object.keys(params.telemetryMetadata).length > 0
+          ? { attributes: { 'ai.telemetry.metadata': params.telemetryMetadata } }
+          : {}),
       },
       tags: ['error', params.errorCategory],
     });

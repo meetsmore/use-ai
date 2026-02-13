@@ -322,7 +322,7 @@ export class UseAIServer {
               sessionId: clientId,
               threadId: runAgentData?.threadId,
               ipAddress: session?.ipAddress,
-              metadata: { ...unhandledForwardedProps?.telemetryMetadata },
+              telemetryMetadata: unhandledForwardedProps?.telemetryMetadata,
             });
           }
           this.sendEvent(socket, {
@@ -413,7 +413,8 @@ export class UseAIServer {
           sessionId: session.clientId,
           threadId,
           ipAddress: session.ipAddress,
-          metadata: { requestedAgent, availableAgents, ...forwardedProps?.telemetryMetadata },
+          metadata: { requestedAgent, availableAgents },
+          telemetryMetadata: forwardedProps?.telemetryMetadata,
         });
         this.sendEvent(session.socket, {
           type: EventType.RUN_ERROR,
@@ -435,7 +436,8 @@ export class UseAIServer {
         sessionId: session.clientId,
         threadId,
         ipAddress: session.ipAddress,
-        metadata: { retryAfterSeconds, ...forwardedProps?.telemetryMetadata },
+        metadata: { retryAfterSeconds },
+        telemetryMetadata: forwardedProps?.telemetryMetadata,
       });
       this.sendEvent(session.socket, {
         type: EventType.RUN_ERROR,

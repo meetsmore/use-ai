@@ -105,6 +105,7 @@ describe('recordErrorTrace', () => {
       recordErrorTrace({
         ...baseParams,
         metadata: { requestedAgent: 'foo' },
+        telemetryMetadata: { userId: 'user-123', tenantId: 'tenant-abc' },
       });
 
       expect(mockTrace).toHaveBeenCalledTimes(1);
@@ -120,7 +121,12 @@ describe('recordErrorTrace', () => {
       expect(call.metadata.errorCategory).toBe('agent_not_found');
       expect(call.metadata.ipAddress).toBe('127.0.0.1');
       expect(call.metadata.source).toBe('use-ai-server');
+      // Error-specific metadata stays at top level
       expect(call.metadata.requestedAgent).toBe('foo');
+      // telemetryMetadata is nested under attributes.ai.telemetry.metadata
+      expect(call.metadata.attributes).toEqual({
+        'ai.telemetry.metadata': { userId: 'user-123', tenantId: 'tenant-abc' },
+      });
 
       // Verify child span was created with ERROR level
       expect(mockSpan).toHaveBeenCalledTimes(1);
