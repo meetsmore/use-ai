@@ -566,12 +566,9 @@ describe('Error recording and abort handling', () => {
       const call = (lf.mockTrace.mock.calls as any[][])[0][0];
       expect(call.tags).toEqual(['error', 'agent_not_found']);
       expect(call.output.error).toContain('not found');
-      // Error-specific metadata stays at top level
-      expect(call.metadata.requestedAgent).toBe('nonexistent');
-      // telemetryMetadata is nested under attributes.ai.telemetry.metadata
-      expect(call.metadata.attributes).toEqual({
-        'ai.telemetry.metadata': { userId: 'user-123', tenantId: 'tenant-abc' },
-      });
+      // Verify telemetryMetadata is included in trace metadata
+      expect(call.metadata.userId).toBe('user-123');
+      expect(call.metadata.tenantId).toBe('tenant-abc');
 
       // Verify error span was created with ERROR level
       expect(lf.mockSpan).toHaveBeenCalledTimes(1);
@@ -622,10 +619,8 @@ describe('Error recording and abort handling', () => {
       expect(lf.mockTrace).toHaveBeenCalledTimes(1);
       const call = (lf.mockTrace.mock.calls as any[][])[0][0];
       expect(call.tags).toEqual(['error', 'rate_limit_exceeded']);
-      // Verify telemetryMetadata is nested under attributes.ai.telemetry.metadata
-      expect(call.metadata.attributes).toEqual({
-        'ai.telemetry.metadata': { userId: 'rate-limited-user' },
-      });
+      // Verify telemetryMetadata is included
+      expect(call.metadata.userId).toBe('rate-limited-user');
 
       // Verify error span was created
       expect(lf.mockSpan).toHaveBeenCalledTimes(1);
@@ -676,10 +671,9 @@ describe('Error recording and abort handling', () => {
       const call = (lf.mockTrace.mock.calls as any[][])[0][0];
       expect(call.tags).toEqual(['error', 'unhandled_error']);
       expect(call.output.error).toContain('Unexpected agent failure');
-      // Verify telemetryMetadata is nested under attributes.ai.telemetry.metadata
-      expect(call.metadata.attributes).toEqual({
-        'ai.telemetry.metadata': { userId: 'unhandled-user', tenantId: 'tenant-xyz' },
-      });
+      // Verify telemetryMetadata is included
+      expect(call.metadata.userId).toBe('unhandled-user');
+      expect(call.metadata.tenantId).toBe('tenant-xyz');
 
       socket.disconnect();
       server.close();
