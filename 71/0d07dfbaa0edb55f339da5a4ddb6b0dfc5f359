@@ -1,0 +1,35 @@
+packages/server/src/server.ts
+  163291321ff242c3 317,325,416,438
+packages/server/test/test-utils.ts
+  163291321ff242c3 118,121,139
+packages/server/src/error-handling.integration.test.ts
+  163291321ff242c3 294-295,301,537,556-557,569-577,586,604,606,608,611-614,622-628,637,661-663,674-676
+packages/server/src/instrumentation.test.ts
+  163291321ff242c3 96,99-100,124-131,141,155-167
+apps/example/src/pages/ProgrammaticChatPage.tsx
+  163291321ff242c3 5,10-23,147-167,285-289
+packages/server/src/instrumentation.ts
+  163291321ff242c3 58,72-80
+packages/server/src/agents/AISDKAgent.ts
+  163291321ff242c3 680,688
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.3",
+  "base_commit_sha": "710d07dfbaa0edb55f339da5a4ddb6b0dfc5f359",
+  "prompts": {
+    "163291321ff242c3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "83563422-2d87-4d1e-bbe8-042eae6dd599",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 135,
+      "total_deletions": 19,
+      "accepted_lines": 130,
+      "overriden_lines": 0
+    }
+  }
+}
