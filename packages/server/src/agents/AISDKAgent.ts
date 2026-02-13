@@ -677,6 +677,7 @@ export class AISDKAgent implements Agent {
 
       // Record pre-streamText errors to Langfuse (post-streamText errors are captured by AI SDK OTEL)
       if (!streamTextStarted) {
+        const telemetryMetadata = (originalInput.forwardedProps as UseAIForwardedProps | undefined)?.telemetryMetadata;
         recordErrorTrace({
           runId,
           errorCategory: 'pre_stream_error',
@@ -684,8 +685,7 @@ export class AISDKAgent implements Agent {
           sessionId: session.clientId,
           threadId: session.threadId,
           ipAddress: session.ipAddress,
-          // TODO[masuda]: add telemetry metadata https://github.com/meetsmore/use-ai/pull/26
-          metadata: { errorCode, toolCount: tools.length, messageCount: messages.length },
+          metadata: { errorCode, toolCount: tools.length, messageCount: messages.length, ...telemetryMetadata },
         });
       }
 

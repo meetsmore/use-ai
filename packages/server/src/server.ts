@@ -314,6 +314,7 @@ export class UseAIServer {
           });
           if (message.type === 'run_agent') {
             const runAgentData = (message as RunAgentMessage).data;
+            const unhandledForwardedProps = runAgentData?.forwardedProps as UseAIForwardedProps | undefined;
             recordErrorTrace({
               runId: runAgentData?.runId || socket.id,
               errorCategory: 'unhandled_error',
@@ -321,6 +322,7 @@ export class UseAIServer {
               sessionId: clientId,
               threadId: runAgentData?.threadId,
               ipAddress: session?.ipAddress,
+              metadata: { ...unhandledForwardedProps?.telemetryMetadata },
             });
           }
           this.sendEvent(socket, {
@@ -411,7 +413,7 @@ export class UseAIServer {
           sessionId: session.clientId,
           threadId,
           ipAddress: session.ipAddress,
-          metadata: { requestedAgent, availableAgents },
+          metadata: { requestedAgent, availableAgents, ...forwardedProps?.telemetryMetadata },
         });
         this.sendEvent(session.socket, {
           type: EventType.RUN_ERROR,
@@ -433,7 +435,7 @@ export class UseAIServer {
         sessionId: session.clientId,
         threadId,
         ipAddress: session.ipAddress,
-        metadata: { retryAfterSeconds },
+        metadata: { retryAfterSeconds, ...forwardedProps?.telemetryMetadata },
       });
       this.sendEvent(session.socket, {
         type: EventType.RUN_ERROR,

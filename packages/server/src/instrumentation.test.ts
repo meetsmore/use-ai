@@ -93,10 +93,11 @@ describe('recordErrorTrace', () => {
     }
   });
 
-  test('calls langfuse.client.trace() with correct arguments when enabled', () => {
+  test('calls langfuse.client.trace() with correct arguments and creates error span', () => {
     const originalEnabled = langfuse.enabled;
     const originalClient = langfuse.client;
-    const mockTrace = mock(() => {});
+    const mockSpan = mock(() => {});
+    const mockTrace = mock(() => ({ span: mockSpan }));
     try {
       langfuse.enabled = true;
       langfuse.client = { trace: mockTrace } as any;
@@ -120,6 +121,14 @@ describe('recordErrorTrace', () => {
       expect(call.metadata.ipAddress).toBe('127.0.0.1');
       expect(call.metadata.source).toBe('use-ai-server');
       expect(call.metadata.requestedAgent).toBe('foo');
+
+      // Verify child span was created with ERROR level
+      expect(mockSpan).toHaveBeenCalledTimes(1);
+      const spanCalls = mockSpan.mock.calls as any[][];
+      const spanCall = spanCalls[0][0];
+      expect(spanCall.name).toBe('agent_not_found');
+      expect(spanCall.level).toBe('ERROR');
+      expect(spanCall.statusMessage).toBe('Agent "foo" not found');
     } finally {
       langfuse.enabled = originalEnabled;
       langfuse.client = originalClient;
@@ -129,7 +138,7 @@ describe('recordErrorTrace', () => {
   test('does not propagate errors when langfuse.client.trace() throws', () => {
     const originalEnabled = langfuse.enabled;
     const originalClient = langfuse.client;
-    const mockTrace = mock(() => { throw new Error('Langfuse connection failed'); });
+    const mockTrace = mock((): never => { throw new Error('Langfuse connection failed'); });
     try {
       langfuse.enabled = true;
       langfuse.client = { trace: mockTrace } as any;
@@ -137,6 +146,25 @@ describe('recordErrorTrace', () => {
       // Should not throw even though trace() throws
       expect(() => recordErrorTrace(baseParams)).not.toThrow();
       expect(mockTrace).toHaveBeenCalledTimes(1);
+    } finally {
+      langfuse.enabled = originalEnabled;
+      langfuse.client = originalClient;
+    }
+  });
+
+  test('does not propagate errors when trace.span() throws', () => {
+    const originalEnabled = langfuse.enabled;
+    const originalClient = langfuse.client;
+    const mockSpan = mock((): never => { throw new Error('Span creation failed'); });
+    const mockTrace = mock(() => ({ span: mockSpan }));
+    try {
+      langfuse.enabled = true;
+      langfuse.client = { trace: mockTrace } as any;
+
+      // Should not throw even though span() throws
+      expect(() => recordErrorTrace(baseParams)).not.toThrow();
+      expect(mockTrace).toHaveBeenCalledTimes(1);
+      expect(mockSpan).toHaveBeenCalledTimes(1);
     } finally {
       langfuse.enabled = originalEnabled;
       langfuse.client = originalClient;
