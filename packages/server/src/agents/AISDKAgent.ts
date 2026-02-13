@@ -362,6 +362,14 @@ export class AISDKAgent implements Agent {
         this.model
       );
 
+      // Push forwarded metadata (userId, tenantId, etc.) for the span processor
+      // to inject as custom OTEL attributes. These appear in Langfuse's
+      // metadata.attributes section without polluting top-level trace metadata.
+      const telemetryMeta = (originalInput.forwardedProps as UseAIForwardedProps | undefined)?.telemetryMetadata;
+      if (telemetryMeta && Object.keys(telemetryMeta).length > 0) {
+        pushForwardedMetadata(runId, telemetryMeta);
+      }
+
       streamTextStarted = true;
       const stream = streamText({
         model: this.model,
