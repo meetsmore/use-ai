@@ -842,6 +842,144 @@ describe('AISDKAgent', () => {
         streamText: originalStreamText,
       }));
     });
+
+    test('multi-step execution preserves all step messages in history', async () => {
+      // This test verifies that when multiple steps occur (tool calls trigger re-invocation),
+      // messages from ALL steps are preserved in conversation history, not just the last step.
+      // Regression test for: response.messages only containing the last step's messages.
+
+      const aiModule = await import('ai');
+      const originalStreamText = aiModule.streamText;
+      let callCount = 0;
+
+      mock.module('ai', () => ({
+        ...aiModule,
+        streamText: (options: unknown) => {
+          callCount++;
+
+          if (callCount === 1) {
+            // Step 0: Model makes a tool call
+            return {
+              fullStream: (async function* () {
+                yield { type: 'tool-input-start', id: 'call-1', toolName: 'test_tool' };
+                yield { type: 'tool-input-delta', id: 'call-1', delta: '{"value":"test"}' };
+                yield { type: 'tool-call', toolCallId: 'call-1', toolName: 'test_tool', input: { value: 'test' } };
+                yield { type: 'tool-result', toolCallId: 'call-1', toolName: 'test_tool', output: { success: true } };
+                yield {
+                  type: 'finish',
+                  finishReason: 'stop',
+                  usage: { inputTokens: 50, outputTokens: 20, totalTokens: 70 },
+                };
+              })(),
+              response: Promise.resolve({
+                id: 'response-step-0',
+                timestamp: new Date(),
+                modelId: 'mock-model',
+                headers: {},
+                messages: [
+                  {
+                    role: 'assistant',
+                    content: [
+                      {
+                        type: 'tool-call',
+                        toolCallId: 'call-1',
+                        toolName: 'test_tool',
+                        input: { value: 'test' },
+                      },
+                    ],
+                  },
+                  {
+                    role: 'tool',
+                    content: [
+                      {
+                        type: 'tool-result',
+                        toolCallId: 'call-1',
+                        toolName: 'test_tool',
+                        output: { success: true },
+                      },
+                    ],
+                  },
+                ],
+              }),
+            };
+          } else {
+            // Step 1: Model returns final text response
+            return {
+              fullStream: (async function* () {
+                yield { type: 'text-start', id: 'text-1' };
+                yield { type: 'text-delta', id: 'text-1', text: 'Done! Tool executed successfully.' };
+                yield { type: 'text-end', id: 'text-1' };
+                yield {
+                  type: 'finish',
+                  finishReason: 'stop',
+                  usage: { inputTokens: 80, outputTokens: 30, totalTokens: 110 },
+                };
+              })(),
+              response: Promise.resolve({
+                id: 'response-step-1',
+                timestamp: new Date(),
+                modelId: 'mock-model',
+                headers: {},
+                messages: [
+                  {
+                    role: 'assistant',
+                    content: 'Done! Tool executed successfully.',
+                  },
+                ],
+              }),
+            };
+          }
+        },
+      }));
+
+      const mockModel = createStreamingTextMockModel('unused');
+      const agent = new AISDKAgent({ model: mockModel });
+
+      const emittedEvents: AGUIEventExtended[] = [];
+      const eventEmitter: EventEmitter = {
+        emit: (event) => emittedEvents.push(event),
+      };
+
+      const testTool: ToolDefinition = {
+        name: 'test_tool',
+        description: 'A test tool',
+        parameters: { type: 'object', properties: { value: { type: 'string' } } },
+      };
+
+      const session = {
+        socket: {} as never,
+        clientId: 'client-1',
+        threadId: 'thread-1',
+        tools: [testTool] as never[],
+        state: null,
+        pendingToolCalls: new Map<string, (content: string) => void>(),
+        conversationHistory: [] as never[],
+        ipAddress: '127.0.0.1',
+      };
+
+      const input = createTestInput({ session: session as never, tools: [testTool] as never[] });
+      const result = await agent.run(input, eventEmitter);
+
+      expect(result.success).toBe(true);
+
+      // All 3 messages from BOTH steps should be in history:
+      // Step 0: assistant (tool call) + tool (result)
+      // Step 1: assistant (text)
+      expect(session.conversationHistory.length).toBe(3);
+      expect((session.conversationHistory[0] as { role: string }).role).toBe('assistant');
+      expect((session.conversationHistory[1] as { role: string }).role).toBe('tool');
+      expect((session.conversationHistory[2] as { role: string }).role).toBe('assistant');
+      expect((session.conversationHistory[2] as { content: string }).content).toBe('Done! Tool executed successfully.');
+
+      // Verify streamText was called twice (two steps)
+      expect(callCount).toBe(2);
+
+      // Restore original
+      mock.module('ai', () => ({
+        ...aiModule,
+        streamText: originalStreamText,
+      }));
+    });
   });
 
   describe('Streaming-specific tests', () => {
