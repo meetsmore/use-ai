@@ -13,6 +13,7 @@ import {
   or,
   not,
 } from '../utils/toolFilters';
+import { pushTraceIdForRun, popTraceIdForRun, recordErrorTrace } from '../instrumentation';
 
 /**
  * Helper to create a streaming mock model that emits text
@@ -2313,6 +2314,100 @@ describe('AISDKAgent', () => {
       const step1UserMessages = capturedMessagesPerStep[1].filter(m => m.role === 'user');
       expect(step1UserMessages.length).toBe(1);
       expect(extractTextContent(step1UserMessages[0].content)).toBe('Add a todo to buy milk');
+    });
+  });
+
+  describe('Trace ID cleanup on error', () => {
+    test('popTraceIdForRun is called on error to prevent memory leak', async () => {
+      const mockModel = new MockLanguageModelV3({
+        doStream: async () => {
+          throw new Error('API Error');
+        },
+      });
+
+      const agent = new AISDKAgent({ model: mockModel });
+
+      const emittedEvents: AGUIEventExtended[] = [];
+      const eventEmitter: EventEmitter = {
+        emit: (event) => emittedEvents.push(event),
+      };
+
+      const input = createTestInput();
+
+      // Pre-populate a trace ID for this run (simulating what the span processor would do)
+      pushTraceIdForRun(input.runId, 'trace-123');
+
+      const result = await agent.run(input, eventEmitter);
+
+      expect(result.success).toBe(false);
+
+      // Verify the trace ID was cleaned up by the catch block
+      // (popTraceIdForRun returns undefined when already removed)
+      expect(popTraceIdForRun(input.runId)).toBeUndefined();
+    });
+  });
+
+  describe('Pre-streamText error recording', () => {
+    test('records pre-streamText errors to Langfuse via recordErrorTrace', async () => {
+      // To trigger a pre-streamText error, we use a cacheBreakpoint function that throws.
+      // applyCacheBreakpoints runs before streamTextStarted = true, so this error
+      // hits the `if (!streamTextStarted)` path in the catch block.
+      const mockModel = new MockLanguageModelV3({
+        provider: 'anthropic',
+        modelId: 'claude-3-5-sonnet-20241022',
+        doStream: async () => {
+          throw new Error('Should not reach streamText');
+        },
+      });
+
+      // Mock the instrumentation module to spy on recordErrorTrace
+      const instrumentationModule = await import('../instrumentation');
+      const originalRecordErrorTrace = instrumentationModule.recordErrorTrace;
+
+      const recordedCalls: Array<{ runId: string; errorCategory: string; errorMessage: string }> = [];
+      mock.module('../instrumentation', () => ({
+        ...instrumentationModule,
+        recordErrorTrace: (params: { runId: string; errorCategory: string; errorMessage: string }) => {
+          recordedCalls.push(params);
+        },
+      }));
+
+      // Re-import to pick up the mock (dynamic import after mock.module)
+      const { AISDKAgent: MockedAISDKAgent } = await import('./AISDKAgent');
+
+      const agent = new MockedAISDKAgent({
+        model: mockModel,
+        // cacheBreakpoint throws before streamText is called
+        cacheBreakpoint: () => { throw new Error('Cache breakpoint error'); },
+      });
+
+      const emittedEvents: AGUIEventExtended[] = [];
+      const eventEmitter: EventEmitter = {
+        emit: (event) => emittedEvents.push(event),
+      };
+
+      const input = createTestInput();
+      const result = await agent.run(input, eventEmitter);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Cache breakpoint error');
+
+      // Verify recordErrorTrace was called with pre_stream_error category
+      expect(recordedCalls.length).toBeGreaterThanOrEqual(1);
+      const preStreamCall = recordedCalls.find(c => c.errorCategory === 'pre_stream_error');
+      expect(preStreamCall).toBeDefined();
+      expect(preStreamCall!.runId).toBe(input.runId);
+      expect(preStreamCall!.errorMessage).toBe('Cache breakpoint error');
+
+      // Verify RUN_ERROR was emitted
+      const runErrorEvent = emittedEvents.find(e => e.type === EventType.RUN_ERROR);
+      expect(runErrorEvent).toBeDefined();
+
+      // Restore original
+      mock.module('../instrumentation', () => ({
+        ...instrumentationModule,
+        recordErrorTrace: originalRecordErrorTrace,
+      }));
     });
   });
 });

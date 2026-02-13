@@ -23,8 +23,20 @@ export function createClientToolExecutor(
 ): (args: ToolArguments, options: { toolCallId: string }) => Promise<ToolResult> {
   return async (args: ToolArguments, { toolCallId }): Promise<ToolResult> => {
     // Wait for client to send result (async - can take as long as needed)
-    const result = await new Promise<string>((resolve) => {
+    const result = await new Promise<string>((resolve, reject) => {
+      // Check if already aborted (e.g., client disconnected before tool call started)
+      if (session.abortController?.signal.aborted) {
+        reject(new Error('Run aborted'));
+        return;
+      }
+
       session.pendingToolCalls.set(toolCallId, resolve);
+
+      // Listen for abort signal to reject the promise (client disconnect or explicit abort)
+      session.abortController?.signal.addEventListener('abort', () => {
+        session.pendingToolCalls.delete(toolCallId);
+        reject(new Error('Run aborted'));
+      }, { once: true });
     });
 
     return JSON.parse(result);

@@ -48,8 +48,20 @@ export function waitForApproval(
   session: ClientSession,
   toolCallId: string
 ): Promise<{ approved: boolean; reason?: string }> {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
+    // Check if already aborted (e.g., client disconnected before approval requested)
+    if (session.abortController?.signal.aborted) {
+      reject(new Error('Run aborted'));
+      return;
+    }
+
     session.pendingToolApprovals.set(toolCallId, resolve);
+
+    // Listen for abort signal to reject the promise (client disconnect or explicit abort)
+    session.abortController?.signal.addEventListener('abort', () => {
+      session.pendingToolApprovals.delete(toolCallId);
+      reject(new Error('Run aborted'));
+    }, { once: true });
   });
 }
 
