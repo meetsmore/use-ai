@@ -1204,4 +1204,4 @@ You can install [Claude Code skills](https://docs.anthropic.com/en/docs/claude-c
    npx skills add /path/to/use-ai
    ```
 
-We recommend installing skills in symlink format so they stay up to date automatically.
+Note that you need to build the docs locally in the use-ai repository first, then install from the local build.
