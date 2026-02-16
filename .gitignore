@@ -17,8 +17,8 @@ apps/*/dist
 apps/example/playwright-report/
 apps/example/test-results/
 
-# TypeDoc generated API docs
-docs/api/
+# Generated skill (API docs + SKILL.md)
+skills/
 
 # Turbo
 .turbo/

@@ -30,8 +30,8 @@
     "test:e2e:debug": "cd apps/example && bun run test:e2e:debug",
     "test:e2e:react-16": "cd apps/example && bun run test:e2e:react-16",
     "clean": "turbo run clean && rm -rf .cache/turbo",
-    "docs": "typedoc",
-    "docs:clean": "rm -rf docs/api && bun run docs",
+    "skill": "rm -rf skills/use-ai && typedoc && bun run skill:md",
+    "skill:md": "node scripts/generate-skill-md.mjs",
     "kill": "(lsof -ti:3000 2>/dev/null | xargs -r kill; lsof -ti:3002 2>/dev/null | xargs -r kill; lsof -ti:8081 2>/dev/null | xargs -r kill) && echo 'Killed processes on ports 3000, 3002, 8081' || echo 'No processes to kill'"
   },
   "devDependencies": {

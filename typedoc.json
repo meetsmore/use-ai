@@ -6,7 +6,7 @@
     "packages/plugin-workflows"
   ],
   "entryPointStrategy": "packages",
-  "out": "docs/api",
+  "out": "skills/use-ai/docs",
   "name": "use-ai",
   "excludePrivate": true,
   "excludeInternal": true,
