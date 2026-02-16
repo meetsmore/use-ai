@@ -58,6 +58,7 @@ A React client/framework for easily enabling AI to control your users frontend.
     - [Feedback](#feedback)
   - [Plugins](#plugins)
     - [`@meetsmore-oss/use-ai-plugin-workflows`](#meetsmore-use-ai-plugin-workflows)
+- [Skills](#skills)
 
 ## Overview
 
@@ -1184,3 +1185,23 @@ Because it's awkward to get API keys for workflows from Dify, you can use a mapp
 ```tsx
   const { trigger, status, text, error, connected } = useAIWorkflow('dify', 'greeting-workflow');
 ```
+
+## Skills
+
+You can install [Claude Code skills](https://docs.anthropic.com/en/docs/claude-code/skills) for use-ai into other repositories by following these steps:
+
+1. Generate the skill in this repository:
+
+   ```bash
+   bun run skill
+   ```
+
+   This creates a skill directory at `./skills/use-ai/` containing API docs and a `SKILL.md` entry point.
+
+2. Install it into your target repository via `npx skills`:
+
+   ```bash
+   npx skills add /path/to/use-ai
+   ```
+
+We recommend installing skills in symlink format so they stay up to date automatically.
