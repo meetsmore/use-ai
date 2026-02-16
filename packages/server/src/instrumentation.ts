@@ -35,6 +35,49 @@ export function popTraceIdForRun(runId: string): string | undefined {
 }
 
 /**
+ * Parameters for recording an error trace in Langfuse.
+ */
+export interface ErrorTraceParams {
+  runId: string;
+  errorCategory: 'agent_not_found' | 'rate_limit_exceeded' | 'unhandled_error' | 'pre_stream_error';
+  errorMessage: string;
+  sessionId: string;
+  threadId?: string;
+  ipAddress?: string;
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Records a pre-streamText error as a Langfuse trace.
+ * Uses the Langfuse SDK directly (same pattern as FeedbackPlugin).
+ * Fire-and-forget: errors are caught and logged, never propagated.
+ */
+export function recordErrorTrace(params: ErrorTraceParams): void {
+  if (!langfuse.enabled || !langfuse.client) return;
+  try {
+    langfuse.client.trace({
+      id: params.runId,
+      name: 'use-ai-error',
+      sessionId: params.sessionId,
+      input: { threadId: params.threadId, errorCategory: params.errorCategory },
+      output: { error: params.errorMessage },
+      metadata: {
+        errorCategory: params.errorCategory,
+        ipAddress: params.ipAddress,
+        source: 'use-ai-server',
+        ...params.metadata,
+      },
+      tags: ['error', params.errorCategory],
+    });
+  } catch (error) {
+    logger.debug('Failed to record error trace in Langfuse', {
+      error: error instanceof Error ? error.message : String(error),
+      runId: params.runId,
+    });
+  }
+}
+
+/**
  * Initializes Langfuse observability using OpenTelemetry.
  * Only activates if LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY are set.
  * Only exported for testing purposes, you should use the `langfuse` singleton.
