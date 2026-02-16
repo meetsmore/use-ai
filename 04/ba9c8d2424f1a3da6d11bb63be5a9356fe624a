@@ -1,0 +1,23 @@
+scripts/generate-skill-md.mjs
+  feaf8b65ca280b8b 44
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.3",
+  "base_commit_sha": "04ba9c8d2424f1a3da6d11bb63be5a9356fe624a",
+  "prompts": {
+    "feaf8b65ca280b8b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "76cb2670-8ae4-4698-8b35-6ada2d9d3b72",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 2,
+      "total_deletions": 2,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  }
+}
