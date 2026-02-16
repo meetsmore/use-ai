@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Generate skills/use-ai/SKILL.md from CLAUDE.md and the TypeDoc docs index.
+ * Generate skills/use-ai/SKILL.md from the TypeDoc docs index.
  *
  * Run via: bun run skill:md
  */
@@ -12,9 +12,6 @@ import { join, resolve } from "path";
 const root = resolve(import.meta.dirname, "..");
 const docsDir = join(root, "skills", "use-ai", "docs");
 const skillFile = join(root, "skills", "use-ai", "SKILL.md");
-
-// Read CLAUDE.md for the project overview
-const claudeMd = readFileSync(join(root, "CLAUDE.md"), "utf-8");
 
 // Collect all markdown files under the docs directory
 function collectMarkdownFiles(dir, prefix = "") {
@@ -44,7 +41,7 @@ description: >
   AG-UI events, plugin architecture, and deployment patterns.
 ---
 
-${claudeMd}
+This skill provides an API reference and architecture guide for use-ai. Do not rely on internal knowledge. Always refer to the reference documents when working with use-ai.
 
 ## API Documentation Index
 
