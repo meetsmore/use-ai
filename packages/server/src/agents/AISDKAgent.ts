@@ -415,6 +415,7 @@ export class AISDKAgent implements Agent {
           this.model
         );
 
+        streamTextStarted = true;
         const stream = streamText({
           model: this.model,
           messages: messagesWithCache,
