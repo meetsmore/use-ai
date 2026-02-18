@@ -291,12 +291,14 @@ describe('Error recording and abort handling', () => {
   function enableMockLangfuse() {
     const originalEnabled = langfuse.enabled;
     const originalClient = langfuse.client;
-    const mockTrace = mock(() => {});
+    const mockSpan = mock(() => {});
+    const mockTrace = mock(() => ({ span: mockSpan }));
     langfuse.enabled = true;
     // Include flushAsync and baseUrl so FeedbackPlugin (auto-initialized when env vars are set) works
     langfuse.client = { trace: mockTrace, flushAsync: async () => {}, baseUrl: 'mock' } as any;
     return {
       mockTrace,
+      mockSpan,
       restore: () => {
         langfuse.enabled = originalEnabled;
         langfuse.client = originalClient;
@@ -532,7 +534,7 @@ describe('Error recording and abort handling', () => {
     }
   });
 
-  test('Agent not found records agent_not_found trace', async () => {
+  test('Agent not found records agent_not_found trace with telemetryMetadata', async () => {
     const port = 9323;
     const lf = enableMockLangfuse();
     try {
@@ -550,7 +552,10 @@ describe('Error recording and abort handling', () => {
           tools: [],
           state: null,
           context: [],
-          forwardedProps: { agent: 'nonexistent' },
+          forwardedProps: {
+            agent: 'nonexistent',
+            telemetryMetadata: { userId: 'user-123', tenantId: 'tenant-abc' },
+          },
         },
       });
 
@@ -561,6 +566,15 @@ describe('Error recording and abort handling', () => {
       const call = (lf.mockTrace.mock.calls as any[][])[0][0];
       expect(call.tags).toEqual(['error', 'agent_not_found']);
       expect(call.output.error).toContain('not found');
+      // Verify telemetryMetadata is included in trace metadata
+      expect(call.metadata.userId).toBe('user-123');
+      expect(call.metadata.tenantId).toBe('tenant-abc');
+
+      // Verify error span was created with ERROR level
+      expect(lf.mockSpan).toHaveBeenCalledTimes(1);
+      const spanCall = (lf.mockSpan.mock.calls as any[][])[0][0];
+      expect(spanCall.name).toBe('agent_not_found');
+      expect(spanCall.level).toBe('ERROR');
 
       socket.disconnect();
       server.close();
@@ -569,7 +583,7 @@ describe('Error recording and abort handling', () => {
     }
   });
 
-  test('Rate limit exceeded records rate_limit_exceeded trace', async () => {
+  test('Rate limit exceeded records rate_limit_exceeded trace with telemetryMetadata', async () => {
     const port = 9324;
     const lf = enableMockLangfuse();
     try {
@@ -587,17 +601,31 @@ describe('Error recording and abort handling', () => {
       sendRunAgent(socket, { prompt: 'first request', tools: [] });
       await waitForEventType(socket, EventType.RUN_FINISHED, 5000);
 
-      // Reset mock after first request
+      // Reset mocks after first request
       lf.mockTrace.mockClear();
+      lf.mockSpan.mockClear();
 
-      // Second request should be rate-limited
-      sendRunAgent(socket, { prompt: 'second request', tools: [] });
+      // Second request should be rate-limited (with telemetryMetadata)
+      sendRunAgent(socket, {
+        prompt: 'second request',
+        tools: [],
+        forwardedProps: {
+          telemetryMetadata: { userId: 'rate-limited-user' },
+        },
+      });
       const errorEvent = await waitForEventType(socket, EventType.RUN_ERROR);
       expect((errorEvent as any).message).toContain('Rate limit exceeded');
 
       expect(lf.mockTrace).toHaveBeenCalledTimes(1);
       const call = (lf.mockTrace.mock.calls as any[][])[0][0];
       expect(call.tags).toEqual(['error', 'rate_limit_exceeded']);
+      // Verify telemetryMetadata is included
+      expect(call.metadata.userId).toBe('rate-limited-user');
+
+      // Verify error span was created
+      expect(lf.mockSpan).toHaveBeenCalledTimes(1);
+      const spanCall = (lf.mockSpan.mock.calls as any[][])[0][0];
+      expect(spanCall.level).toBe('ERROR');
 
       socket.disconnect();
       server.close();
@@ -606,7 +634,7 @@ describe('Error recording and abort handling', () => {
     }
   });
 
-  test('Unhandled agent error records unhandled_error trace', async () => {
+  test('Unhandled agent error records unhandled_error trace with telemetryMetadata', async () => {
     const port = 9325;
     const lf = enableMockLangfuse();
     try {
@@ -630,6 +658,9 @@ describe('Error recording and abort handling', () => {
       sendRunAgent(socket, {
         prompt: 'trigger unhandled error',
         tools: [],
+        forwardedProps: {
+          telemetryMetadata: { userId: 'unhandled-user', tenantId: 'tenant-xyz' },
+        },
       });
 
       const errorEvent = await waitForEventType(socket, EventType.RUN_ERROR);
@@ -640,6 +671,9 @@ describe('Error recording and abort handling', () => {
       const call = (lf.mockTrace.mock.calls as any[][])[0][0];
       expect(call.tags).toEqual(['error', 'unhandled_error']);
       expect(call.output.error).toContain('Unexpected agent failure');
+      // Verify telemetryMetadata is included
+      expect(call.metadata.userId).toBe('unhandled-user');
+      expect(call.metadata.tenantId).toBe('tenant-xyz');
 
       socket.disconnect();
       server.close();
