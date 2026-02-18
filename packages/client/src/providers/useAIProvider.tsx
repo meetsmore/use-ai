@@ -479,6 +479,7 @@ export function UseAIProvider({
     getWaiter,
     aggregatedSuggestions,
     promptsRef,
+    buildStateFromPrompts,
   } = usePromptState({
     systemPrompt,
     clientRef,
@@ -497,10 +498,10 @@ export function UseAIProvider({
     clientRef,
     aggregatedToolsRef,
     toolOwnershipRef,
-    promptsRef,
     isInvisible,
     getWaiter,
     waitForToolsToStabilize,
+    buildState: buildStateFromPrompts,
   });
 
   // Initialize chat management hook

@@ -24,14 +24,14 @@ export interface UseToolExecutionOptions {
   aggregatedToolsRef: MutableRefObject<ToolsDefinition>;
   /** Reference to tool ownership map (tool name -> owner component id) */
   toolOwnershipRef: MutableRefObject<Map<string, string>>;
-  /** Reference to prompts map (component id -> prompt string) */
-  promptsRef: MutableRefObject<Map<string, string>>;
   /** Function to check if a component is invisible */
   isInvisible: (componentId: string) => boolean;
   /** Function to get a waiter for a component */
   getWaiter: (componentId: string) => (() => Promise<void>) | undefined;
   /** Function to wait for tools to stabilize after execution (e.g., after navigation) */
   waitForToolsToStabilize: () => Promise<void>;
+  /** Builds the aggregated state from all registered prompts */
+  buildState: () => unknown;
 }
 
 /**
@@ -63,10 +63,10 @@ export function useToolExecution({
   clientRef,
   aggregatedToolsRef,
   toolOwnershipRef,
-  promptsRef,
   isInvisible,
   getWaiter,
   waitForToolsToStabilize,
+  buildState,
 }: UseToolExecutionOptions): UseToolExecutionResult {
   const [pendingApprovals, setPendingApprovals] = useState<PendingToolApproval[]>([]);
 
@@ -133,15 +133,9 @@ export function useToolExecution({
       await waitForToolsToStabilize();
       console.log('[useToolExecution] Tools stabilized');
 
-      // Build updated state
-      let updatedState: unknown = null;
-      if (ownerId) {
-        const prompt = promptsRef.current.get(ownerId);
-        if (prompt) {
-          updatedState = { context: prompt };
-          console.log(`[useToolExecution] Updated state from ${ownerId}`);
-        }
-      }
+      // Build aggregated state from all registered prompts
+      const updatedState = buildState();
+      console.log(`[useToolExecution] Updated state (aggregated from all hooks)`);
 
       client.sendToolResponse(toolCallId, result, updatedState);
     } catch (err) {
@@ -150,7 +144,7 @@ export function useToolExecution({
         error: err instanceof Error ? err.message : 'Unknown error',
       });
     }
-  }, [clientRef, aggregatedToolsRef, toolOwnershipRef, promptsRef, isInvisible, getWaiter, waitForToolsToStabilize]);
+  }, [clientRef, aggregatedToolsRef, toolOwnershipRef, isInvisible, getWaiter, waitForToolsToStabilize, buildState]);
 
   // Store a tool call as pending approval
   const storePendingToolCall = useCallback((
