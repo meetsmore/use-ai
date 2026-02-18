@@ -44,11 +44,14 @@ export function usePromptState({
   const waitersRef = useRef<Map<string, () => Promise<void>>>(new Map());
   const [suggestionsVersion, setSuggestionsVersion] = useState(0);
 
+  const systemPromptRef = useRef(systemPrompt);
+  systemPromptRef.current = systemPrompt;
+
   // Build state from all prompts
   const buildStateFromPrompts = useCallback(() => {
     const promptParts: string[] = [];
-    if (systemPrompt) {
-      promptParts.push(systemPrompt);
+    if (systemPromptRef.current) {
+      promptParts.push(systemPromptRef.current);
     }
     for (const [, prompt] of promptsRef.current.entries()) {
       if (prompt) {
@@ -56,7 +59,7 @@ export function usePromptState({
       }
     }
     return promptParts.length > 0 ? { context: promptParts.join('\n\n---\n\n') } : null;
-  }, [systemPrompt]);
+  }, []);
 
   // Sync system prompt to client when connected
   // This ensures the system prompt is sent even when no useAI hooks are present
