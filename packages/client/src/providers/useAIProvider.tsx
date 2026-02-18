@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
-import type { UseAIConfig, AGUIEvent, ToolCallStartEvent, ToolCallEndEvent, RunErrorEvent, RunFinishedEvent, AgentInfo, TextMessageContentEvent, ToolCallStartExtensions, ToolApprovalRequestEvent, UseAIForwardedProps } from '../types';
-import { EventType, ErrorCode, TOOL_APPROVAL_REQUEST } from '../types';
+import type { UseAIConfig, AGUIEvent, AgentInfo, UseAIForwardedProps } from '../types';
 import { UseAIFloatingButton } from '../components/UseAIFloatingButton';
 import { UseAIChatPanel, type Message } from '../components/UseAIChatPanel';
 import { UseAIFloatingChatWrapper, CloseButton } from '../components/UseAIFloatingChatWrapper';
@@ -14,15 +13,18 @@ import { processAttachments } from '../fileUpload/processAttachments';
 import { EmbedFileUploadBackend } from '../fileUpload/EmbedFileUploadBackend';
 import type { MultimodalContent } from '@meetsmore-oss/use-ai-core';
 import type { CommandRepository, SavedCommand } from '../commands/types';
-import { useChatManagement, type SendMessageOptions } from '../hooks/useChatManagement';
+import { useChatManagement } from '../hooks/useChatManagement';
 import { useAgentSelection } from '../hooks/useAgentSelection';
 import { useCommandManagement } from '../hooks/useCommandManagement';
-import { useToolRegistry } from '../hooks/useToolRegistry';
+import { useToolSystem, type RegisterToolsOptions } from '../hooks/useToolSystem';
 import { usePromptState } from '../hooks/usePromptState';
 import { useFeedback } from '../hooks/useFeedback';
-import { useToolExecution } from '../hooks/useToolExecution';
+import { useServerEvents } from '../hooks/useServerEvents';
+import { useMessageQueue, type SendMessageOptions } from '../hooks/useMessageQueue';
 import { ThemeContext, StringsContext, defaultTheme, defaultStrings } from '../theme';
 import type { UseAITheme, UseAIStrings } from '../theme';
+
+// ── Context Types ───────────────────────────────────────────────────────────
 
 /**
  * Chat management context (from useChatManagement hook).
@@ -86,15 +88,19 @@ export interface CommandContextValue {
 }
 
 /**
- * Tool registry context (from useToolRegistry hook).
+ * Tool system context (from useToolSystem hook).
  */
 export interface ToolRegistryContextValue {
   /** Registers tools for a specific component */
-  register: (id: string, tools: ToolsDefinition, options?: { invisible?: boolean }) => void;
+  register: (id: string, tools: ToolsDefinition, options?: RegisterToolsOptions) => void;
   /** Unregisters tools for a specific component */
   unregister: (id: string) => void;
   /** Signals that a component has completed registration in useLayoutEffect */
   signalReady: (id: string) => void;
+  /** Registers a waiter function for a component */
+  registerWaiter: (id: string, waiter: () => Promise<void>) => void;
+  /** Unregisters a waiter function */
+  unregisterWaiter: (id: string) => void;
 }
 
 /**
@@ -103,10 +109,6 @@ export interface ToolRegistryContextValue {
 export interface PromptsContextValue {
   /** Updates the prompt and suggestions for a specific component */
   update: (id: string, prompt?: string, suggestions?: string[]) => void;
-  /** Registers a waiter function for a component */
-  registerWaiter: (id: string, waiter: () => Promise<void>) => void;
-  /** Unregisters a waiter function */
-  unregisterWaiter: (id: string) => void;
 }
 
 /**
@@ -120,22 +122,21 @@ export interface UseAIContextValue {
   connected: boolean;
   /** The underlying WebSocket client instance */
   client: UseAIClient | null;
-  /** Tool registry (from useToolRegistry hook) */
+  /** Tool system (registry, waiters, execution) */
   tools: ToolRegistryContextValue;
   /** Prompt management */
   prompts: PromptsContextValue;
-  /** Chat management (from useChatManagement hook) */
+  /** Chat management */
   chat: ChatContextValue;
-  /** Agent selection (from useAgentSelection hook) */
+  /** Agent selection */
   agents: AgentContextValue;
-  /** Command management (from useCommandManagement hook) */
+  /** Command management */
   commands: CommandContextValue;
 }
 
 /**
  * React context for UseAI provider state.
- * @internal This is exported only for testing purposes and should not be used directly.
- * Use the {@link useAIContext} hook instead.
+ * @internal Exported only for testing purposes. Use {@link useAIContext} instead.
  */
 export const __UseAIContext = createContext<UseAIContextValue | null>(null);
 
@@ -157,11 +158,11 @@ const noOpContextValue: UseAIContextValue = {
     register: () => {},
     unregister: () => {},
     signalReady: () => {},
+    registerWaiter: () => {},
+    unregisterWaiter: () => {},
   },
   prompts: {
     update: () => {},
-    registerWaiter: () => {},
-    unregisterWaiter: () => {},
   },
   chat: {
     currentId: null,
@@ -188,6 +189,8 @@ const noOpContextValue: UseAIContextValue = {
     delete: async () => {},
   },
 };
+
+// ── Component Props ─────────────────────────────────────────────────────────
 
 /**
  * Props for custom floating button component.
@@ -375,6 +378,8 @@ const DEFAULT_FILE_UPLOAD_CONFIG: FileUploadConfig = {
   acceptedTypes: ['image/*', 'application/pdf'],
 };
 
+// ── Provider Component ──────────────────────────────────────────────────────
+
 /**
  * Provider component that manages AI client connection and tool registration.
  * Must wrap all components that use the useAI hook.
@@ -419,130 +424,64 @@ export function UseAIProvider({
   visibleAgentIds,
   onOpenChange,
 }: UseAIProviderProps) {
-  // Compute effective file upload config: use default if undefined, disable if false
   const fileUploadConfig = fileUploadConfigProp === false
     ? undefined
     : (fileUploadConfigProp ?? DEFAULT_FILE_UPLOAD_CONFIG);
 
-  // Merge custom theme/strings with defaults
   const theme = { ...defaultTheme, ...customTheme };
   const strings = { ...defaultStrings, ...customStrings };
 
+  // ── Core State ──────────────────────────────────────────────────────────
+
   const [connected, setConnected] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [fileProcessingState, setFileProcessingState] = useState<FileProcessingState | null>(null);
 
-  // Wrapper for setIsChatOpen that also calls onOpenChange callback
   const handleSetChatOpen = useCallback((open: boolean) => {
     setIsChatOpen(open);
     onOpenChange?.(open);
   }, [onOpenChange]);
-  const [streamingText, setStreamingText] = useState('');
-  // Track which chat the current streaming text belongs to
-  const streamingChatIdRef = useRef<string | null>(null);
-
-  // Track currently executing tool for UI status display
-  const [executingTool, setExecutingTool] = useState<{
-    toolCallId: string;
-    title: string | null;
-  } | null>(null);
-  const executingToolFallbackRef = useRef<string | null>(null);
 
   const clientRef = useRef<UseAIClient | null>(null);
   const repositoryRef = useRef<ChatRepository>(
     chatRepository || new LocalStorageChatRepository()
   );
 
-  // Ref for handleSendMessage to break circular dependency with useChatManagement
-  const handleSendMessageRef = useRef<((message: string, attachments?: FileAttachment[], forwardedProps?: UseAIForwardedProps) => Promise<void>) | null>(null);
+  // ── Hooks ───────────────────────────────────────────────────────────────
 
-  // Initialize tool registry hook
-  const {
-    registerTools,
-    unregisterTools,
-    isInvisible,
-    aggregatedTools,
-    hasTools,
-    aggregatedToolsRef,
-    toolOwnershipRef,
-    signalReady,
-    waitForToolsToStabilize,
-  } = useToolRegistry();
-
-  // Initialize prompt state hook
-  const {
-    updatePrompt,
-    registerWaiter,
-    unregisterWaiter,
-    getWaiter,
-    aggregatedSuggestions,
-    promptsRef,
-    buildStateFromPrompts,
-  } = usePromptState({
+  const promptState = usePromptState({
     systemPrompt,
     clientRef,
     connected,
   });
 
-  // Stable callback that uses the ref (for useChatManagement)
-  const stableSendMessage = useCallback(async (message: string, attachments?: FileAttachment[], forwardedProps?: UseAIForwardedProps) => {
-    if (handleSendMessageRef.current) {
-      await handleSendMessageRef.current(message, attachments, forwardedProps);
-    }
-  }, []);
-
-  // Initialize tool execution hook (before chat management so we can pass pendingApproval)
-  const toolExecution = useToolExecution({
+  const toolSystem = useToolSystem({
     clientRef,
-    aggregatedToolsRef,
-    toolOwnershipRef,
-    isInvisible,
-    getWaiter,
-    waitForToolsToStabilize,
-    buildState: buildStateFromPrompts,
+    buildState: promptState.buildStateFromPrompts,
   });
 
-  // Initialize chat management hook
   const chatManagement = useChatManagement({
     repository: repositoryRef.current,
     clientRef,
     messages,
     setMessages,
-    onSendMessage: stableSendMessage,
-    setOpen: handleSetChatOpen,
     connected,
-    loading,
-    hasPendingApproval: toolExecution.pendingApprovals.length > 0,
   });
 
-  const {
-    currentChatId,
-    pendingChatId,
-    displayedChatId,
-    createNewChat,
-    loadChat,
-    deleteChat,
-    listChats,
-    clearCurrentChat,
-    activatePendingChat,
-    saveUserMessage,
-    saveAIResponse,
-    sendMessage,
-    getCurrentChat,
-    updateMetadata,
-  } = chatManagement;
+  const serverEvents = useServerEvents({
+    toolSystem,
+    saveAIResponse: chatManagement.saveAIResponse,
+    strings,
+  });
 
-  // Initialize feedback hook
   const feedback = useFeedback({
     clientRef,
     repository: repositoryRef.current,
-    getDisplayedChatId: () => displayedChatId,
+    getDisplayedChatId: () => chatManagement.displayedChatId,
     setMessages,
   });
 
-  // Initialize agent selection hook
   const {
     availableAgents,
     defaultAgent,
@@ -550,7 +489,6 @@ export function UseAIProvider({
     setAgent,
   } = useAgentSelection({ clientRef, connected, visibleAgentIds });
 
-  // Initialize command management hook
   const {
     commands,
     refreshCommands,
@@ -559,11 +497,16 @@ export function UseAIProvider({
     deleteCommand,
   } = useCommandManagement({ repository: commandRepository });
 
+  // ── Client Lifecycle ────────────────────────────────────────────────────
+
+  // Ref to always call the latest handleServerEvent from the stable subscription
+  const handleServerEventRef = useRef(serverEvents.handleServerEvent);
+  handleServerEventRef.current = serverEvents.handleServerEvent;
+
   useEffect(() => {
     console.log('[UseAIProvider] Initializing client with serverUrl:', serverUrl);
     const client = new UseAIClient(serverUrl);
 
-    // Subscribe to connection state changes (handles initial connection, reconnection, and disconnection)
     const unsubscribeConnection = client.onConnectionStateChange((isConnected) => {
       console.log('[UseAIProvider] Connection state changed:', isConnected);
       setConnected(isConnected);
@@ -573,97 +516,7 @@ export function UseAIProvider({
     client.connect();
 
     const unsubscribe = client.onEvent('globalChat', async (event: AGUIEvent) => {
-      if (event.type === EventType.TOOL_CALL_START) {
-        // Cast to include use-ai extensions (optional, for AG-UI compatibility)
-        const e = event as ToolCallStartEvent & Partial<ToolCallStartExtensions>;
-
-        // Get title from:
-        // 1. Event annotations (use-ai server with MCP tools)
-        // 2. Local tool definition (client-side tools via defineTool)
-        // 3. `null` == will fallback to a generic message.`
-        const tool = aggregatedToolsRef.current[e.toolCallName];
-        const title = e.annotations?.title ?? tool?._options?.annotations?.title ?? null;
-
-        if (!title) {
-          const fallbacks = strings.toolExecution.fallbackMessages;
-          executingToolFallbackRef.current = fallbacks[Math.floor(Math.random() * fallbacks.length)];
-        }
-
-        setExecutingTool({ toolCallId: e.toolCallId, title });
-      } else if (event.type === EventType.TOOL_CALL_END) {
-        const toolCallEnd = event as ToolCallEndEvent;
-        const toolCallId = toolCallEnd.toolCallId;
-
-        // Clear executing tool state if this is the tool that was executing
-        setExecutingTool(prev => prev?.toolCallId === toolCallId ? null : prev);
-
-        // Get the accumulated tool call data
-        const toolCallData = client['currentToolCalls'].get(toolCallId);
-        if (!toolCallData) {
-          console.error(`[Provider] Tool call ${toolCallId} not found`);
-          return;
-        }
-
-        const name = toolCallData.name;
-        const input = JSON.parse(toolCallData.args);
-
-        // Check if this tool belongs to a useAI hook (not a workflow)
-        // If the tool doesn't exist in our aggregated tools, it's a workflow tool
-        // and will be handled by useAIWorkflow's event listener
-        const tool = aggregatedToolsRef.current[name];
-        if (!tool) {
-          console.log(`[Provider] Tool "${name}" not found in useAI tools, skipping (likely a workflow tool)`);
-          return;
-        }
-
-        // Check if tool needs approval - if so, defer execution until approved
-        // The server will send TOOL_APPROVAL_REQUEST and we'll execute after approval
-        if (tool._options?.annotations?.destructiveHint === true) {
-          console.log(`[Provider] Tool "${name}" requires approval, deferring execution`);
-          // Store pending tool call data for later execution after approval
-          toolExecution.storePendingToolCall(toolCallId, name, input, toolCallData);
-          return;
-        }
-
-        // Execute tool immediately (no approval needed)
-        await toolExecution.executeToolCall(toolCallId, name, input);
-      } else if ((event.type as string) === TOOL_APPROVAL_REQUEST) {
-        // Tool needs user approval before execution (use-ai extension event)
-        const e = event as unknown as ToolApprovalRequestEvent;
-        toolExecution.handleApprovalRequest(e);
-      } else if (event.type === EventType.TEXT_MESSAGE_CONTENT) {
-        // Update streaming text in real-time for UI display
-        const contentEvent = event as TextMessageContentEvent;
-        setStreamingText(prev => prev + contentEvent.delta);
-      } else if (event.type === EventType.TEXT_MESSAGE_END) {
-        // Content will be saved on RUN_FINISHED to include traceId
-        // Just clear streaming UI state here
-        setStreamingText('');
-        streamingChatIdRef.current = null;
-      } else if (event.type === EventType.RUN_FINISHED) {
-        const content = client.currentMessageContent;
-        if (content) {
-          // Extract traceId directly from the event (runId is the trace ID)
-          const finishedEvent = event as RunFinishedEvent;
-          const traceId = finishedEvent.runId;
-          saveAIResponse(content, undefined, traceId);
-        }
-        setLoading(false);
-      } else if (event.type === EventType.RUN_ERROR) {
-        const errorEvent = event as RunErrorEvent;
-        const errorCode = errorEvent.message as ErrorCode;
-        console.error('[Provider] Run error:', errorCode);
-
-        // Get error message from strings (customizable via strings prop)
-        const userMessage = strings.errors[errorCode] || strings.errors[ErrorCode.UNKNOWN_ERROR];
-
-        // Display error message in chat UI with error styling
-        saveAIResponse(userMessage, 'error'); // Fire-and-forget is intentional here
-        setStreamingText(''); // Clear any partial streaming text
-        streamingChatIdRef.current = null; // Clear streaming chat association
-
-        setLoading(false);
-      }
+      await handleServerEventRef.current(client, event);
     });
 
     clientRef.current = client;
@@ -675,13 +528,15 @@ export function UseAIProvider({
     };
   }, [serverUrl]);
 
+  // ── Tool Registration Sync ──────────────────────────────────────────────
+
   const lastRegisteredToolsRef = useRef<string>('');
 
   useEffect(() => {
     const client = clientRef.current;
-    if (!client || !client.isConnected() || !hasTools) return;
+    if (!client || !client.isConnected() || !toolSystem.hasTools) return;
 
-    const toolKeys = Object.keys(aggregatedTools).sort().join(',');
+    const toolKeys = Object.keys(toolSystem.aggregatedTools).sort().join(',');
     if (toolKeys === lastRegisteredToolsRef.current) {
       console.log('[Provider] Skipping re-registration, tools unchanged');
       return;
@@ -691,34 +546,30 @@ export function UseAIProvider({
     console.log('[Provider] Registering tools:', toolKeys);
 
     try {
-      const toolDefinitions = convertToolsToDefinitions(aggregatedTools);
+      const toolDefinitions = convertToolsToDefinitions(toolSystem.aggregatedTools);
       console.log(`[Provider] Registering ${toolDefinitions.length} tools`);
-      // Only register tools here - state is updated separately via updatePrompt
       client.registerTools(toolDefinitions);
     } catch (err) {
       console.error('Failed to register tools:', err);
     }
-  }, [hasTools, aggregatedTools, connected]);
+  }, [toolSystem.hasTools, toolSystem.aggregatedTools, connected]);
+
+  // ── Message Sending ─────────────────────────────────────────────────────
 
   const handleSendMessage = useCallback(async (message: string, attachments?: FileAttachment[], messageForwardedProps?: UseAIForwardedProps) => {
     if (!clientRef.current) return;
 
-    // Clear any previous streaming text when starting a new message
-    setStreamingText('');
+    serverEvents.clearStreamingText();
 
-    // Activate pending chat if exists (user is sending first message to it)
-    const activatedChatId = activatePendingChat();
-    const activeChatId = activatedChatId || currentChatId;
+    const activatedChatId = chatManagement.activatePendingChat();
+    const activeChatId = activatedChatId || chatManagement.currentChatId;
 
-    // Track which chat this streaming response belongs to
-    streamingChatIdRef.current = activeChatId;
+    serverEvents.streamingChatIdRef.current = activeChatId;
 
-    // Build content for storage and sending
     let persistedContent: PersistedMessageContent = message;
     let multimodalContent: MultimodalContent[] | undefined;
 
     if (attachments && attachments.length > 0) {
-      // Build persisted content (metadata only) for storage
       const persistedParts: PersistedContentPart[] = [];
       if (message.trim()) {
         persistedParts.push({ type: 'text', text: message });
@@ -735,19 +586,15 @@ export function UseAIProvider({
       }
       persistedContent = persistedParts;
 
-      // Save user message first so the UI shows it immediately
       if (activeChatId) {
-        await saveUserMessage(activeChatId, persistedContent);
+        await chatManagement.saveUserMessage(activeChatId, persistedContent);
       }
 
-      // Show loading state before processing (may be slow for transformers like OCR)
-      setLoading(true);
+      serverEvents.setLoading(true);
 
       try {
-        // Build multimodal content from attachments
-        // onFileProgress updates fileProcessingState only when a transformer runs
         const fileContent = await processAttachments(attachments, {
-          getCurrentChat,
+          getCurrentChat: chatManagement.getCurrentChat,
           backend: fileUploadConfig?.backend,
           transformers: fileUploadConfig?.transformers,
           onFileProgress: (_fileId, state) => {
@@ -761,31 +608,26 @@ export function UseAIProvider({
         }
         multimodalContent.push(...fileContent);
       } catch (error) {
-        setLoading(false);
+        serverEvents.setLoading(false);
         throw error;
       } finally {
         setFileProcessingState(null);
       }
     } else {
-      // No attachments — save user message
       if (activeChatId) {
-        await saveUserMessage(activeChatId, persistedContent);
+        await chatManagement.saveUserMessage(activeChatId, persistedContent);
       }
-      setLoading(true);
+      serverEvents.setLoading(true);
     }
 
-    // Get provider-level forwardedProps (sync or async)
     const providerResult = forwardedPropsProvider ? forwardedPropsProvider() : {};
     const providerProps = providerResult instanceof Promise ? await providerResult : providerResult;
 
-    // Merge: provider-level + message-level (message-level takes precedence)
     const mergedForwardedProps = {
       ...providerProps,
       ...messageForwardedProps,
     };
 
-    // State is already up-to-date via updatePrompt calls from useAI hooks
-    // Only pass forwardedProps if there's any props to send
     await clientRef.current.sendPrompt(
       message,
       multimodalContent,
@@ -793,35 +635,45 @@ export function UseAIProvider({
         ? mergedForwardedProps
         : undefined
     );
-  }, [activatePendingChat, currentChatId, saveUserMessage, fileUploadConfig, getCurrentChat, forwardedPropsProvider]);
+  }, [chatManagement, serverEvents, fileUploadConfig, forwardedPropsProvider]);
 
-  // Update the ref so useChatManagement's sendMessage can use it
-  handleSendMessageRef.current = handleSendMessage;
+  // ── Message Queue (programmatic sendMessage) ────────────────────────────
+
+  const messageQueue = useMessageQueue({
+    sendFn: handleSendMessage,
+    createNewChat: chatManagement.createNewChat,
+    setOpen: handleSetChatOpen,
+    connected,
+    loading: serverEvents.loading,
+    hasPendingApproval: toolSystem.pendingApprovals.length > 0,
+  });
+
+  // ── Context Values ──────────────────────────────────────────────────────
 
   const value: UseAIContextValue = {
     serverUrl,
     connected,
     client: clientRef.current,
     tools: {
-      register: registerTools,
-      unregister: unregisterTools,
-      signalReady,
+      register: toolSystem.registerTools,
+      unregister: toolSystem.unregisterTools,
+      signalReady: toolSystem.signalReady,
+      registerWaiter: toolSystem.registerWaiter,
+      unregisterWaiter: toolSystem.unregisterWaiter,
     },
     prompts: {
-      update: updatePrompt,
-      registerWaiter,
-      unregisterWaiter,
+      update: promptState.updatePrompt,
     },
     chat: {
-      currentId: currentChatId,
-      create: createNewChat,
-      load: loadChat,
-      delete: deleteChat,
-      list: listChats,
-      clear: clearCurrentChat,
-      sendMessage,
-      get: getCurrentChat,
-      updateMetadata,
+      currentId: chatManagement.currentChatId,
+      create: chatManagement.createNewChat,
+      load: chatManagement.loadChat,
+      delete: chatManagement.deleteChat,
+      list: chatManagement.listChats,
+      clear: chatManagement.clearCurrentChat,
+      sendMessage: messageQueue.sendMessage,
+      get: chatManagement.getCurrentChat,
+      updateMetadata: chatManagement.updateMetadata,
     },
     agents: {
       available: availableAgents,
@@ -838,32 +690,27 @@ export function UseAIProvider({
     },
   };
 
-  // Only show streaming text if it belongs to the currently displayed chat
-  // This prevents streaming from a previous chat appearing when switching chats
-  const effectiveStreamingText = streamingChatIdRef.current === displayedChatId ? streamingText : '';
+  // ── Chat UI ─────────────────────────────────────────────────────────────
 
-  // Compute executing tool display value for UI
-  const executingToolDisplay = executingTool ? {
-    displayText: executingTool.title ?? executingToolFallbackRef.current ?? strings.toolExecution.fallbackMessages[0],
-  } : null;
+  const effectiveStreamingText = serverEvents.streamingChatIdRef.current === chatManagement.displayedChatId
+    ? serverEvents.streamingText : '';
 
-  // Chat UI context value - used by UseAIChat component
   const chatUIContextValue: ChatUIContextValue = {
     connected,
-    loading,
+    loading: serverEvents.loading,
     sendMessage: handleSendMessage,
     messages,
     streamingText: effectiveStreamingText,
-    suggestions: aggregatedSuggestions,
+    suggestions: promptState.aggregatedSuggestions,
     fileUploadConfig,
     fileProcessing: fileProcessingState,
     history: {
-      currentId: displayedChatId,
-      create: createNewChat,
-      load: loadChat,
-      delete: deleteChat,
-      list: listChats,
-      get: getCurrentChat,
+      currentId: chatManagement.displayedChatId,
+      create: chatManagement.createNewChat,
+      load: chatManagement.loadChat,
+      delete: chatManagement.deleteChat,
+      list: chatManagement.listChats,
+      get: chatManagement.getCurrentChat,
     },
     agents: {
       available: availableAgents,
@@ -882,11 +729,11 @@ export function UseAIProvider({
       setOpen: handleSetChatOpen,
     },
     tools: {
-      executing: executingToolDisplay,
+      executing: serverEvents.executingTool,
       pending: {
-        tools: toolExecution.pendingApprovals,
-        approveAll: toolExecution.approveAll,
-        rejectAll: toolExecution.rejectAll,
+        tools: toolSystem.pendingApprovals,
+        approveAll: toolSystem.approveAll,
+        rejectAll: toolSystem.rejectAll,
       },
     },
     feedback: {
@@ -895,25 +742,22 @@ export function UseAIProvider({
     },
   };
 
-  // Use custom components if provided, or defaults (unless explicitly null to disable UI)
-  // When either component is explicitly null, disable the UI entirely
   const isUIDisabled = CustomButton === null || CustomChat === null;
   const ButtonComponent = isUIDisabled ? null : (CustomButton || UseAIFloatingButton);
   const hasCustomChat = CustomChat !== undefined && CustomChat !== null;
 
-  // Common props for the chat panel
   const chatPanelProps = {
     onSendMessage: handleSendMessage,
     messages,
-    loading,
+    loading: serverEvents.loading,
     connected,
     streamingText: effectiveStreamingText,
-    currentChatId: displayedChatId,
-    onNewChat: createNewChat,
-    onLoadChat: loadChat,
-    onDeleteChat: deleteChat,
-    onListChats: listChats,
-    suggestions: aggregatedSuggestions,
+    currentChatId: chatManagement.displayedChatId,
+    onNewChat: chatManagement.createNewChat,
+    onLoadChat: chatManagement.loadChat,
+    onDeleteChat: chatManagement.deleteChat,
+    onListChats: chatManagement.listChats,
+    suggestions: promptState.aggregatedSuggestions,
     availableAgents,
     defaultAgent,
     selectedAgent,
@@ -924,18 +768,16 @@ export function UseAIProvider({
     onSaveCommand: saveCommand,
     onRenameCommand: renameCommand,
     onDeleteCommand: deleteCommand,
-    executingTool: executingToolDisplay,
+    executingTool: serverEvents.executingTool,
     feedbackEnabled: feedback.enabled,
     onFeedback: feedback.submitFeedback,
-    pendingApprovals: toolExecution.pendingApprovals,
-    onApproveToolCall: toolExecution.pendingApprovals.length > 0 ? toolExecution.approveAll : undefined,
-    onRejectToolCall: toolExecution.pendingApprovals.length > 0 ? toolExecution.rejectAll : undefined,
+    pendingApprovals: toolSystem.pendingApprovals,
+    onApproveToolCall: toolSystem.pendingApprovals.length > 0 ? toolSystem.approveAll : undefined,
+    onRejectToolCall: toolSystem.pendingApprovals.length > 0 ? toolSystem.rejectAll : undefined,
   };
 
-  // Render function for default floating chat UI
   const renderDefaultChat = () => {
     if (isUIDisabled) return null;
-
     return (
       <UseAIFloatingChatWrapper isOpen={isChatOpen} onClose={() => handleSetChatOpen(false)}>
         <UseAIChatPanel
@@ -946,19 +788,17 @@ export function UseAIProvider({
     );
   };
 
-  // Render function for custom chat UI (backward compatibility)
   const renderCustomChat = () => {
     if (!CustomChat) return null;
-
     return (
       <CustomChat
         isOpen={isChatOpen}
         onClose={() => handleSetChatOpen(false)}
         onSendMessage={handleSendMessage}
         messages={messages}
-        loading={loading}
+        loading={serverEvents.loading}
         connected={connected}
-        suggestions={aggregatedSuggestions}
+        suggestions={promptState.aggregatedSuggestions}
         availableAgents={availableAgents}
         defaultAgent={defaultAgent}
         selectedAgent={selectedAgent}
@@ -967,10 +807,8 @@ export function UseAIProvider({
     );
   };
 
-  // Render built-in chat UI only when renderChat is true
   const renderBuiltInChat = () => {
     if (!renderChat) return null;
-
     return (
       <>
         {ButtonComponent && (
@@ -998,21 +836,11 @@ export function UseAIProvider({
   );
 }
 
+// ── Context Hook ────────────────────────────────────────────────────────────
+
 /**
  * Hook to access the UseAI context.
  * When used outside a UseAIProvider, returns a no-op context and logs a warning.
- * This allows components with useAI hooks to render even when UseAIProvider
- * is conditionally not rendered (e.g., feature flagged).
- *
- * @returns The UseAI context value (or no-op if provider is missing)
- *
- * @example
- * ```typescript
- * function MyComponent() {
- *   const { connected, client } = useAIContext();
- *   return <div>Connected: {connected}</div>;
- * }
- * ```
  */
 export function useAIContext(): UseAIContextValue {
   const context = useContext(__UseAIContext);
