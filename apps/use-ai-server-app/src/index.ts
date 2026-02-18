@@ -32,8 +32,10 @@ function createAgents(): { agents: Record<string, Agent>; defaultAgent: string }
   if (anthropicApiKey) {
     const model = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-20250514';
     const anthropic = createAnthropic({ apiKey: anthropicApiKey });
-    agents.claude = new AISDKAgent({ model: anthropic(model), name: 'Claude' });
-    enabledAgents.push(`claude (${model})`);
+    // Temperature can be set via env var (useful for E2E tests to reduce flakiness)
+    const temperature = process.env.AI_TEMPERATURE ? Number(process.env.AI_TEMPERATURE) : undefined;
+    agents.claude = new AISDKAgent({ model: anthropic(model), name: 'Claude', temperature });
+    enabledAgents.push(`claude (${model}${temperature !== undefined ? `, temp=${temperature}` : ''})`);
   }
 
   // Check for OpenAI API key

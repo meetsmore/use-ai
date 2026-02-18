@@ -23,6 +23,8 @@ export interface UsePromptStateReturn {
   aggregatedSuggestions: string[];
   /** Ref mapping component IDs to prompts */
   promptsRef: React.MutableRefObject<Map<string, string>>;
+  /** Builds the aggregated state from all registered prompts */
+  buildStateFromPrompts: () => { context: string } | null;
 }
 
 /**
@@ -118,5 +120,6 @@ export function usePromptState({
     getWaiter,
     aggregatedSuggestions,
     promptsRef,
+    buildStateFromPrompts,
   };
 }

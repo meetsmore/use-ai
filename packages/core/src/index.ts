@@ -6,6 +6,7 @@ export type {
   ClientMessage,
   RunAgentMessage,
   ToolResultMessage,
+  ToolResultForwardedProps,
   AbortRunMessage,
   // AG-UI types
   Tool,

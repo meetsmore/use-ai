@@ -51,9 +51,9 @@ export default function TodoList() {
           </button>
         </div>
 
-        <ul style={styles.todoList}>
+        <ul style={styles.todoList} data-testid="todo-list">
           {todos.map(todo => (
-            <li key={todo.id} style={styles.todoItem}>
+            <li key={todo.id} style={styles.todoItem} data-testid="todo-item">
               <label style={styles.todoLabel}>
                 <input
                   type="checkbox"

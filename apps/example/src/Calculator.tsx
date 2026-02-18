@@ -32,7 +32,7 @@ export default function Calculator() {
           Enter calculations below or ask the AI to perform calculations for you
         </p>
 
-        <div style={styles.display}>
+        <div style={styles.display} data-testid="calculator-display">
           {result !== null ? result : '0'}
         </div>
 

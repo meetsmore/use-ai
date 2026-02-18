@@ -7,27 +7,23 @@ export default function ProgrammaticChatPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isSending, setIsSending] = useState(false);
 
-  const handleSendPreset = async (message: string, options?: SendMessageOptions) => {
-    if (!connected || isSending) return;
-    setIsSending(true);
-    try {
-      await chat.sendMessage(message, options);
-    } catch (error) {
+  const handleSendPreset = (message: string, options?: SendMessageOptions) => {
+    if (!connected) return;
+    chat.sendMessage(message, options).catch((error) => {
       console.error('Failed to send message:', error);
-    } finally {
-      setIsSending(false);
-    }
+    });
   };
 
   const handleSendWithFile = async () => {
     if (!selectedFile || !connected || isSending) return;
+    const file = selectedFile;
+    setSelectedFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
     setIsSending(true);
     try {
-      await chat.sendMessage('Please analyze this file', { attachments: [selectedFile] });
-      setSelectedFile(null);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
+      await chat.sendMessage('Please analyze this file', { attachments: [file] });
     } catch (error) {
       console.error('Failed to send message with file:', error);
     } finally {
@@ -60,7 +56,7 @@ export default function ProgrammaticChatPage() {
           <button
             style={styles.button}
             onClick={() => handleSendPreset('What can you help me with?')}
-            disabled={!connected || isSending}
+            disabled={!connected}
             data-testid="btn-ask-capabilities"
           >
             Ask capabilities
@@ -68,7 +64,7 @@ export default function ProgrammaticChatPage() {
           <button
             style={styles.button}
             onClick={() => handleSendPreset('Tell me a joke')}
-            disabled={!connected || isSending}
+            disabled={!connected}
             data-testid="btn-tell-joke"
           >
             Tell a joke
@@ -76,7 +72,7 @@ export default function ProgrammaticChatPage() {
           <button
             style={styles.button}
             onClick={() => handleSendPreset('Hello! Starting a fresh conversation.', { newChat: true })}
-            disabled={!connected || isSending}
+            disabled={!connected}
             data-testid="btn-new-chat-greeting"
           >
             New chat + greeting
@@ -87,7 +83,7 @@ export default function ProgrammaticChatPage() {
               newChat: true,
               metadata: { documentType: 'invoice', priority: 'high' }
             })}
-            disabled={!connected || isSending}
+            disabled={!connected}
             data-testid="btn-new-chat-with-metadata"
           >
             New chat with metadata

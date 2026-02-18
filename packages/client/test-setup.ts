@@ -48,6 +48,19 @@ const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>', {
 // Mock scrollIntoView which is not implemented in jsdom
 (dom.window.Element.prototype as any).scrollIntoView = () => {};
 
+// Polyfill requestAnimationFrame/cancelAnimationFrame if not properly available
+// jsdom's pretendToBeVisual provides these but they may not fire properly in tests
+if (!global.requestAnimationFrame) {
+  (global as any).requestAnimationFrame = (callback: FrameRequestCallback): number => {
+    return setTimeout(() => callback(Date.now()), 16) as unknown as number;
+  };
+}
+if (!global.cancelAnimationFrame) {
+  (global as any).cancelAnimationFrame = (id: number): void => {
+    clearTimeout(id);
+  };
+}
+
 // Extend Bun's expect with jest-dom matchers
 expect.extend(matchers);
 

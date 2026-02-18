@@ -24,6 +24,7 @@ import type { Agent, EventEmitter, AGUIEventExtended } from './agents/types';
 import type { ClientSession } from './agents/types';
 import type { UseAIServerPlugin, MessageHandler } from './plugins/types';
 import { FeedbackPlugin } from './plugins/FeedbackPlugin';
+import { isRemoteTool } from './utils/toolFilters';
 import { RemoteMcpToolsProvider, type RemoteToolDefinition } from './mcp';
 import { findMatch } from './utils/patternMatcher';
 import {
@@ -673,25 +674,49 @@ export class UseAIServer {
   }
 
   private buildSystemPrompt(session: ClientSession, state: unknown): string | undefined {
-    const parts: string[] = [];
-
-    // Add state context if available
-    if (state) {
-      parts.push('You are interacting with a web application. Here is the current state:');
-      parts.push('');
-      parts.push(JSON.stringify(state, null, 2));
-      parts.push('');
-      parts.push('Use the available tools to interact with and modify the UI based on user requests.');
-    }
-
-    // Note: Confirmation for destructive tools is now handled via AI SDK's needsApproval
-    // mechanism in AISDKAgent, not via prompt injection.
-
-    return parts.length > 0 ? parts.join('\n') : undefined;
+    if (!state) return undefined;
+    return 'You are interacting with a web application. Use the available tools to interact with and modify the UI based on user requests.';
   }
 
   private handleToolResult(session: ClientSession, message: ToolResultMessage) {
-    const { toolCallId, content } = message.data;
+    const { toolCallId, content, forwardedProps } = message.data;
+
+    // Extract use-ai extensions from forwardedProps
+    const tools = forwardedProps?.tools;
+    const state = forwardedProps?.state;
+
+    // Update session tools if client sent updated tools
+    // This allows mid-run tool updates (e.g., after navigation to a new page)
+    if (tools && tools.length > 0) {
+      // Client only knows about client tools, so forwardedProps.tools never includes MCP tools.
+      // Preserve existing MCP (remote) tools and merge with the updated client tools.
+      const existingRemoteTools = session.tools.filter(isRemoteTool);
+
+      const updatedClientTools = tools.map(t => ({
+        ...t,
+        parameters: t.parameters || { type: 'object', properties: {}, required: [] },
+      })) as ToolDefinition[];
+
+      session.tools = [...updatedClientTools, ...existingRemoteTools];
+
+      logger.debug('Tools updated mid-run', {
+        clientId: session.clientId,
+        toolCount: session.tools.length,
+        clientToolCount: updatedClientTools.length,
+        mcpToolCount: existingRemoteTools.length,
+        toolNames: session.tools.map(t => t.name),
+      });
+    }
+
+    // Update session state if client sent updated state
+    // This allows mid-run state updates (e.g., after navigation to a new page)
+    if (state !== undefined) {
+      session.state = state;
+      logger.debug('State updated mid-run', {
+        clientId: session.clientId,
+      });
+    }
+
     const resolver = session.pendingToolCalls.get(toolCallId);
 
     if (resolver) {
