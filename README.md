@@ -1188,20 +1188,12 @@ Because it's awkward to get API keys for workflows from Dify, you can use a mapp
 
 ## Skills
 
-You can install [Claude Code skills](https://docs.anthropic.com/en/docs/claude-code/skills) for use-ai into other repositories by following these steps:
+You can install [Claude Code skills](https://docs.anthropic.com/en/docs/claude-code/skills) for use-ai into other repositories with a single command:
 
-1. Generate the skill in this repository:
+```bash
+curl -fsSL https://raw.githubusercontent.com/meetsmore/use-ai/main/scripts/install-skill.sh | bash
+```
 
-   ```bash
-   bun run skill
-   ```
+This script clones the repository, builds the API docs locally, and installs the skill via `npx skills add`. It requires `git`, `bun`, and `npx` to be installed.
 
-   This creates a skill directory at `./skills/use-ai/` containing API docs and a `SKILL.md` entry point.
-
-2. Install it into your target repository via `npx skills`:
-
-   ```bash
-   npx skills add /path/to/use-ai
-   ```
-
-Note that you need to build the docs locally in the use-ai repository first, then install from the local build.
+You will be prompted to choose between project-local or global installation.
