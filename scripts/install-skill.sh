@@ -17,10 +17,15 @@ for cmd in git bun npx; do
   fi
 done
 
-BRANCH="${USE_AI_BRANCH:-main}"
+VERSION="${USE_AI_VERSION:-}"
+if [ -n "$VERSION" ]; then
+  REF="v$VERSION"
+else
+  REF="${USE_AI_BRANCH:-main}"
+fi
 
-echo "Cloning use-ai (branch: $BRANCH)..."
-git clone --depth 1 --branch "$BRANCH" "$REPO_URL" "$WORK_DIR/use-ai"
+echo "Cloning use-ai (ref: $REF)..."
+git clone --depth 1 --branch "$REF" "$REPO_URL" "$WORK_DIR/use-ai"
 
 echo "Installing dependencies..."
 cd "$WORK_DIR/use-ai"
