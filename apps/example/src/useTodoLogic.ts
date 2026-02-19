@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { defineTool } from '@meetsmore-oss/use-ai-client';
 import { z } from 'zod';
 
@@ -8,10 +8,36 @@ export interface Todo {
   completed: boolean;
 }
 
+const STORAGE_KEY = 'use-ai-example:todos';
+const NEXT_ID_KEY = 'use-ai-example:todos-next-id';
+
+function loadTodos(): Todo[] {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch {
+    return [];
+  }
+}
+
+function loadNextId(): number {
+  try {
+    const stored = localStorage.getItem(NEXT_ID_KEY);
+    return stored ? parseInt(stored, 10) : 1;
+  } catch {
+    return 1;
+  }
+}
+
 export function useTodoLogic() {
-  const [todos, setTodos] = useState<Todo[]>([]);
-  const nextIdRef = useRef(1);
+  const [todos, setTodos] = useState<Todo[]>(loadTodos);
+  const nextIdRef = useRef(loadNextId());
   const todosRef = useRef<Todo[]>([]);
+
+  // Persist todos to localStorage whenever they change
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(todos));
+  }, [todos]);
 
   // Keep ref in sync with state for synchronous access in tool callbacks
   todosRef.current = todos;
@@ -26,6 +52,9 @@ export function useTodoLogic() {
       text: text.trim(),
       completed: false,
     };
+
+    // Persist the next ID
+    localStorage.setItem(NEXT_ID_KEY, String(nextIdRef.current));
 
     setTodos(prev => [...prev, newTodo]);
 

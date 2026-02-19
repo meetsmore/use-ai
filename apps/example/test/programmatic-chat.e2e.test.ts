@@ -214,8 +214,9 @@ test.describe('Programmatic Chat', () => {
       // Wait just a moment for the message to be sent
       await page.waitForTimeout(100);
 
-      // Immediately send second message (should be queued)
-      await page.getByTestId('btn-tell-joke').click();
+      // Send second message (should be queued).
+      // Use dispatchEvent to avoid the chat panel backdrop intercepting the click.
+      await page.getByTestId('btn-tell-joke').dispatchEvent('click');
 
       // Chat panel should open
       await expect(page.getByTestId('chat-input')).toBeVisible({ timeout: 5000 });
@@ -267,6 +268,13 @@ test.describe('Programmatic Chat', () => {
 
   test.describe('Opening Custom Chat UIs', () => {
     test('sendMessage with openChat=true should trigger onOpenChange and open sidebar', async ({ page }) => {
+    // Navigate to Embedded Chat page (collapsible sidebar lives there)
+    await page.click('text=Embedded Chat');
+    await expect(page.getByTestId('collapsible-sidebar')).toBeAttached();
+
+    // Wait for connection on the Embedded Chat page's own UseAIProvider
+    await expect(page.getByTestId('status-connected')).toBeVisible({ timeout: 10000 });
+
     const sidebar = page.getByTestId('collapsible-sidebar');
     const sendButton = page.getByTestId('send-and-open-button');
 

@@ -1,8 +1,9 @@
 import { test, expect } from '@playwright/test';
+import { setupAutoApprove } from './test-helpers';
 
 test.describe('AI responds to latest message only', () => {
-  // Set timeout for all tests in this suite to 45 seconds
-  test.setTimeout(45000);
+  // Two AI round-trips + 12+ sequential destructive tool calls with approval overhead
+  test.setTimeout(120000);
 
   test.beforeAll(() => {
     // Skip all tests if ANTHROPIC_API_KEY is not set
@@ -17,6 +18,9 @@ test.describe('AI responds to latest message only', () => {
     if (!process.env.ANTHROPIC_API_KEY) {
       test.skip();
     }
+
+    // Auto-approve destructive tool calls (delete, clear, etc.)
+    await setupAutoApprove(page);
 
     // Navigate to the todo page
     await page.goto('/');
@@ -95,7 +99,7 @@ test.describe('AI responds to latest message only', () => {
 
       // It should NOT be asking questions like "could you clarify" or "would you like me to"
       expect(lastMessage?.toLowerCase()).not.toMatch(/clarify|could you|would you like me to|which specific/);
-    }).toPass({ timeout: 30000, intervals: [2000] });
+    }).toPass({ timeout: 90000, intervals: [2000] });
 
     // Close chat and verify items were deleted
     await closeButton.click();

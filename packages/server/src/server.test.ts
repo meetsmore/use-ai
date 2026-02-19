@@ -1,6 +1,7 @@
-import { describe, expect, test, afterAll } from 'bun:test';
+import { describe, expect, test, afterAll, mock } from 'bun:test';
 import { EventType, ErrorCode } from './types';
-import type { Tool } from './types';
+import type { Tool, ToolDefinition } from './types';
+import type { RemoteToolDefinition } from './mcp';
 import {
   waitForEventType,
   collectEventsUntil,
@@ -560,5 +561,141 @@ describe.each(RUNTIMES)('Rate Limiting [%s runtime]', (runtime) => {
 
     ws1.disconnect();
     ws2.disconnect();
+  });
+});
+
+describe('handleToolResult - MCP tool preservation', () => {
+  test('updating client tools mid-run should preserve MCP (remote) tools', () => {
+    // Bug: handleToolResult replaced session.tools with only client tools from
+    // forwardedProps, dropping MCP tools. Fix: merge client tools with existing MCP tools.
+
+    const mockModel = createSequentialMockModel([{ text: 'OK' }]);
+    const agent = new AISDKAgent({ model: mockModel });
+    const server = new UseAIServer({
+      port: 19001,
+      agents: { test: agent },
+      defaultAgent: 'test',
+    });
+    cleanup.trackServer(server);
+
+    const mcpTool: RemoteToolDefinition = {
+      name: 'mcp_search',
+      description: 'MCP search tool',
+      parameters: { type: 'object', properties: {}, required: [] },
+      _remote: {
+        provider: { executeTool: mock(() => Promise.resolve({ success: true })) } as unknown as RemoteToolDefinition['_remote']['provider'],
+        originalName: 'search',
+      },
+    };
+
+    const clientToolA: ToolDefinition = {
+      name: 'navigate',
+      description: 'Navigate',
+      parameters: { type: 'object', properties: { page: { type: 'string' } }, required: ['page'] },
+    };
+
+    const clientToolB: ToolDefinition = {
+      name: 'add_todo',
+      description: 'Add todo',
+      parameters: { type: 'object', properties: { text: { type: 'string' } }, required: ['text'] },
+    };
+
+    // Create a mock session with both client and MCP tools
+    const session = {
+      clientId: 'test-client',
+      tools: [clientToolA, mcpTool] as ToolDefinition[],
+      pendingToolCalls: new Map<string, (content: string) => void>(),
+    };
+
+    // Add a pending resolver so handleToolResult can resolve it
+    let resolvedContent: string | undefined;
+    session.pendingToolCalls.set('tool-call-1', (content: string) => {
+      resolvedContent = content;
+    });
+
+    // Simulate handleToolResult with client sending updated tools (without MCP tools)
+    const message = {
+      type: 'tool_result' as const,
+      data: {
+        messageId: 'msg-1',
+        toolCallId: 'tool-call-1',
+        content: JSON.stringify({ success: true }),
+        role: 'tool' as const,
+        forwardedProps: {
+          tools: [clientToolA, clientToolB], // Client sends only client tools
+        },
+      },
+    };
+
+    // Call handleToolResult via the private method
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (server as any).handleToolResult(session, message);
+
+    // Verify tool result was resolved
+    expect(resolvedContent).toBe(JSON.stringify({ success: true }));
+
+    // Verify MCP tools are preserved alongside updated client tools
+    expect(session.tools.length).toBe(3);
+    const toolNames = session.tools.map(t => t.name).sort();
+    expect(toolNames).toEqual(['add_todo', 'mcp_search', 'navigate']);
+
+    // Verify the MCP tool still has its _remote property
+    const mcpToolInSession = session.tools.find(t => t.name === 'mcp_search');
+    expect(mcpToolInSession).toBeDefined();
+    expect((mcpToolInSession as RemoteToolDefinition)._remote).toBeDefined();
+    expect((mcpToolInSession as RemoteToolDefinition)._remote.originalName).toBe('search');
+  });
+
+  test('handleToolResult without forwardedProps.tools should not modify session.tools', () => {
+    const mockModel = createSequentialMockModel([{ text: 'OK' }]);
+    const agent = new AISDKAgent({ model: mockModel });
+    const server = new UseAIServer({
+      port: 19002,
+      agents: { test: agent },
+      defaultAgent: 'test',
+    });
+    cleanup.trackServer(server);
+
+    const mcpTool: RemoteToolDefinition = {
+      name: 'mcp_search',
+      description: 'MCP search tool',
+      parameters: { type: 'object', properties: {}, required: [] },
+      _remote: {
+        provider: { executeTool: mock(() => Promise.resolve({ success: true })) } as unknown as RemoteToolDefinition['_remote']['provider'],
+        originalName: 'search',
+      },
+    };
+
+    const clientTool: ToolDefinition = {
+      name: 'navigate',
+      description: 'Navigate',
+      parameters: { type: 'object', properties: { page: { type: 'string' } }, required: ['page'] },
+    };
+
+    const session = {
+      clientId: 'test-client',
+      tools: [clientTool, mcpTool] as ToolDefinition[],
+      pendingToolCalls: new Map<string, (content: string) => void>(),
+    };
+
+    session.pendingToolCalls.set('tool-call-2', () => {});
+
+    // No forwardedProps.tools
+    const message = {
+      type: 'tool_result' as const,
+      data: {
+        messageId: 'msg-2',
+        toolCallId: 'tool-call-2',
+        content: JSON.stringify({ success: true }),
+        role: 'tool' as const,
+      },
+    };
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (server as any).handleToolResult(session, message);
+
+    // Tools should be unchanged
+    expect(session.tools.length).toBe(2);
+    expect(session.tools.map(t => t.name).sort()).toEqual(['mcp_search', 'navigate']);
   });
 });

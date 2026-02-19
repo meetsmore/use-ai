@@ -128,7 +128,7 @@ test.describe('Remote MCP Tools', () => {
     const sendButton = page.getByTestId('chat-send-button');
 
     // Ask AI to perform multiple operations
-    await chatInput.fill('First add 10 and 15, then multiply the result by 2. Use the appropriate tools.');
+    await chatInput.fill('Use the add tool to compute 10 + 15, then use the multiply tool to multiply that exact result by 2. Do not change the numbers.');
     await sendButton.click();
 
     // Wait for AI response

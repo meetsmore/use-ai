@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { setupAutoApprove } from './test-helpers';
 
 test.describe('Todo List Edge Cases', () => {
   // Set timeout for all tests in this suite to 30 seconds
@@ -17,6 +18,9 @@ test.describe('Todo List Edge Cases', () => {
     if (!process.env.ANTHROPIC_API_KEY) {
       test.skip();
     }
+
+    // Auto-approve destructive tool calls (delete, clear, etc.)
+    await setupAutoApprove(page);
 
     // Navigate to the todo page
     await page.goto('/');

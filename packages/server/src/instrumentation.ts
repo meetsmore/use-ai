@@ -55,7 +55,7 @@ export interface ErrorTraceParams {
 export function recordErrorTrace(params: ErrorTraceParams): void {
   if (!langfuse.enabled || !langfuse.client) return;
   try {
-    langfuse.client.trace({
+    const trace = langfuse.client.trace({
       id: params.runId,
       name: 'use-ai-error',
       sessionId: params.sessionId,
@@ -68,6 +68,16 @@ export function recordErrorTrace(params: ErrorTraceParams): void {
         ...params.metadata,
       },
       tags: ['error', params.errorCategory],
+    });
+
+    // Create a child span with level: ERROR so the trace is surfaced as ERROR in Langfuse UI.
+    // Without this, the trace would remain at DEFAULT level since traces don't have a level property.
+    trace.span({
+      name: params.errorCategory,
+      level: 'ERROR',
+      statusMessage: params.errorMessage,
+      input: { threadId: params.threadId, errorCategory: params.errorCategory },
+      output: { error: params.errorMessage },
     });
   } catch (error) {
     logger.debug('Failed to record error trace in Langfuse', {

@@ -138,6 +138,7 @@ describe('useAI with enabled == false option', () => {
       tools: {
         register: registerTools,
         unregister: mock(() => {}),
+        signalReady: mock(() => {}),
       },
       prompts: {
         update: mock(() => {}),
@@ -193,6 +194,7 @@ describe('useAI with enabled == false option', () => {
       tools: {
         register: registerTools,
         unregister: mock(() => {}),
+        signalReady: mock(() => {}),
       },
       prompts: {
         update: mock(() => {}),
@@ -247,6 +249,7 @@ describe('useAI with enabled == false option', () => {
       tools: {
         register: mock(() => {}),
         unregister: mock(() => {}),
+        signalReady: mock(() => {}),
       },
       prompts: {
         update: mock(() => {}),

@@ -843,6 +843,144 @@ describe('AISDKAgent', () => {
         streamText: originalStreamText,
       }));
     });
+
+    test('multi-step execution preserves all step messages in history', async () => {
+      // This test verifies that when multiple steps occur (tool calls trigger re-invocation),
+      // messages from ALL steps are preserved in conversation history, not just the last step.
+      // Regression test for: response.messages only containing the last step's messages.
+
+      const aiModule = await import('ai');
+      const originalStreamText = aiModule.streamText;
+      let callCount = 0;
+
+      mock.module('ai', () => ({
+        ...aiModule,
+        streamText: (options: unknown) => {
+          callCount++;
+
+          if (callCount === 1) {
+            // Step 0: Model makes a tool call
+            return {
+              fullStream: (async function* () {
+                yield { type: 'tool-input-start', id: 'call-1', toolName: 'test_tool' };
+                yield { type: 'tool-input-delta', id: 'call-1', delta: '{"value":"test"}' };
+                yield { type: 'tool-call', toolCallId: 'call-1', toolName: 'test_tool', input: { value: 'test' } };
+                yield { type: 'tool-result', toolCallId: 'call-1', toolName: 'test_tool', output: { success: true } };
+                yield {
+                  type: 'finish',
+                  finishReason: 'stop',
+                  usage: { inputTokens: 50, outputTokens: 20, totalTokens: 70 },
+                };
+              })(),
+              response: Promise.resolve({
+                id: 'response-step-0',
+                timestamp: new Date(),
+                modelId: 'mock-model',
+                headers: {},
+                messages: [
+                  {
+                    role: 'assistant',
+                    content: [
+                      {
+                        type: 'tool-call',
+                        toolCallId: 'call-1',
+                        toolName: 'test_tool',
+                        input: { value: 'test' },
+                      },
+                    ],
+                  },
+                  {
+                    role: 'tool',
+                    content: [
+                      {
+                        type: 'tool-result',
+                        toolCallId: 'call-1',
+                        toolName: 'test_tool',
+                        output: { success: true },
+                      },
+                    ],
+                  },
+                ],
+              }),
+            };
+          } else {
+            // Step 1: Model returns final text response
+            return {
+              fullStream: (async function* () {
+                yield { type: 'text-start', id: 'text-1' };
+                yield { type: 'text-delta', id: 'text-1', text: 'Done! Tool executed successfully.' };
+                yield { type: 'text-end', id: 'text-1' };
+                yield {
+                  type: 'finish',
+                  finishReason: 'stop',
+                  usage: { inputTokens: 80, outputTokens: 30, totalTokens: 110 },
+                };
+              })(),
+              response: Promise.resolve({
+                id: 'response-step-1',
+                timestamp: new Date(),
+                modelId: 'mock-model',
+                headers: {},
+                messages: [
+                  {
+                    role: 'assistant',
+                    content: 'Done! Tool executed successfully.',
+                  },
+                ],
+              }),
+            };
+          }
+        },
+      }));
+
+      const mockModel = createStreamingTextMockModel('unused');
+      const agent = new AISDKAgent({ model: mockModel });
+
+      const emittedEvents: AGUIEventExtended[] = [];
+      const eventEmitter: EventEmitter = {
+        emit: (event) => emittedEvents.push(event),
+      };
+
+      const testTool: ToolDefinition = {
+        name: 'test_tool',
+        description: 'A test tool',
+        parameters: { type: 'object', properties: { value: { type: 'string' } } },
+      };
+
+      const session = {
+        socket: {} as never,
+        clientId: 'client-1',
+        threadId: 'thread-1',
+        tools: [testTool] as never[],
+        state: null,
+        pendingToolCalls: new Map<string, (content: string) => void>(),
+        conversationHistory: [] as never[],
+        ipAddress: '127.0.0.1',
+      };
+
+      const input = createTestInput({ session: session as never, tools: [testTool] as never[] });
+      const result = await agent.run(input, eventEmitter);
+
+      expect(result.success).toBe(true);
+
+      // All 3 messages from BOTH steps should be in history:
+      // Step 0: assistant (tool call) + tool (result)
+      // Step 1: assistant (text)
+      expect(session.conversationHistory.length).toBe(3);
+      expect((session.conversationHistory[0] as { role: string }).role).toBe('assistant');
+      expect((session.conversationHistory[1] as { role: string }).role).toBe('tool');
+      expect((session.conversationHistory[2] as { role: string }).role).toBe('assistant');
+      expect((session.conversationHistory[2] as { content: string }).content).toBe('Done! Tool executed successfully.');
+
+      // Verify streamText was called twice (two steps)
+      expect(callCount).toBe(2);
+
+      // Restore original
+      mock.module('ai', () => ({
+        ...aiModule,
+        streamText: originalStreamText,
+      }));
+    });
   });
 
   describe('Streaming-specific tests', () => {
@@ -1029,7 +1167,7 @@ describe('AISDKAgent', () => {
       expect(capturedMessages.values[0].content).toBe('You are a helpful assistant.');
     });
 
-    test('sends config and runtime systemPrompts as separate messages', async () => {
+    test('sends config, runtime instructions, and state as separate system messages', async () => {
       const capturedMessages = { values: [] as Array<{ role: string; content: string }> };
       const mockModel = createSystemMessageCapturingMockModel(capturedMessages);
 
@@ -1041,21 +1179,27 @@ describe('AISDKAgent', () => {
       const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
 
+      const testState = { todos: [] };
       const input = createTestInput({
-        systemPrompt: 'Current state: {"todos": []}',
+        systemPrompt: 'Use tools to modify the UI.',
+        state: testState,
       });
+      // Also set session.state so buildStateMessage picks it up
+      input.session.state = testState;
       const result = await agent.run(input, eventEmitter);
 
       expect(result.success).toBe(true);
-      // Config prompt and runtime prompt are sent as separate system messages
-      expect(capturedMessages.values.length).toBe(2);
+      // Config prompt, runtime instructions, and state are sent as 3 separate system messages
+      expect(capturedMessages.values.length).toBe(3);
       expect(capturedMessages.values[0].role).toBe('system');
       expect(capturedMessages.values[0].content).toBe('You are a helpful assistant.');
       expect(capturedMessages.values[1].role).toBe('system');
-      expect(capturedMessages.values[1].content).toBe('Current state: {"todos": []}');
+      expect(capturedMessages.values[1].content).toBe('Use tools to modify the UI.');
+      expect(capturedMessages.values[2].role).toBe('system');
+      expect(capturedMessages.values[2].content).toContain('"todos": []');
     });
 
-    test('uses only runtime systemPrompt when config is not set', async () => {
+    test('uses only runtime systemPrompt and state when config is not set', async () => {
       const capturedMessages = { values: [] as Array<{ role: string; content: string }> };
       const mockModel = createSystemMessageCapturingMockModel(capturedMessages);
 
@@ -1067,14 +1211,19 @@ describe('AISDKAgent', () => {
       const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
 
+      const testState = { page: '/home' };
       const input = createTestInput({
-        systemPrompt: 'Current state: {"todos": []}',
+        systemPrompt: 'Use tools to modify the UI.',
+        state: testState,
       });
+      input.session.state = testState;
       const result = await agent.run(input, eventEmitter);
 
       expect(result.success).toBe(true);
-      expect(capturedMessages.values.length).toBe(1);
-      expect(capturedMessages.values[0].content).toBe('Current state: {"todos": []}');
+      // Runtime instructions + state (no config prompt)
+      expect(capturedMessages.values.length).toBe(2);
+      expect(capturedMessages.values[0].content).toBe('Use tools to modify the UI.');
+      expect(capturedMessages.values[1].content).toContain('/home');
     });
 
     test('no systemPrompt when both config and runtime are undefined', async () => {
@@ -1227,6 +1376,155 @@ describe('AISDKAgent', () => {
       expect(result.success).toBe(true);
       expect(capturedMessages.values.length).toBe(1);
       expect(capturedMessages.values[0].content).toBe('Runtime prompt only');
+    });
+
+    test('state message is rebuilt from session.state between steps', async () => {
+      // Track all system messages sent in each step call
+      const capturedPerStep: Array<Array<{ role: string; content: string }>> = [];
+      const toolCallId = 'tool-call-state-test';
+      let callCount = 0;
+
+      const mockModel = new MockLanguageModelV3({
+        doStream: async ({ prompt }) => {
+          callCount++;
+          // Capture system messages for this step
+          const systemMessages = prompt
+            .filter((msg) => msg.role === 'system')
+            .map((msg) => ({ role: msg.role, content: msg.content as string }));
+          capturedPerStep.push(systemMessages);
+
+          // First call: return a tool call
+          if (callCount === 1) {
+            return {
+              stream: simulateReadableStream({
+                chunks: [
+                  { type: 'tool-input-start', id: toolCallId, toolName: 'navigate' },
+                  { type: 'tool-input-delta', id: toolCallId, delta: '{"page":"todo"}' },
+                  { type: 'tool-input-end', id: toolCallId },
+                  { type: 'tool-call', toolCallId, toolName: 'navigate', input: '{"page":"todo"}' },
+                  {
+                    type: 'finish',
+                    finishReason: 'tool-calls',
+                    usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
+                  },
+                ],
+              }),
+              response: {
+                id: 'response-1',
+                timestamp: new Date(),
+                modelId: 'mock-model',
+                headers: {},
+                messages: [
+                  {
+                    role: 'assistant',
+                    content: [
+                      { type: 'tool-call', toolCallId, toolName: 'navigate', input: { page: 'todo' } },
+                    ],
+                  },
+                ],
+              },
+            };
+          }
+
+          // Second call: return text response
+          return {
+            stream: simulateReadableStream({
+              chunks: [
+                { type: 'text-start', id: 'text-1' },
+                { type: 'text-delta', id: 'text-1', delta: 'Navigated to todo page' },
+                { type: 'text-end', id: 'text-1' },
+                {
+                  type: 'finish',
+                  finishReason: 'stop',
+                  usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
+                },
+              ],
+            }),
+            response: {
+              id: 'response-2',
+              timestamp: new Date(),
+              modelId: 'mock-model',
+              headers: {},
+              messages: [{ role: 'assistant', content: 'Navigated to todo page' }],
+            },
+          };
+        },
+      });
+
+      const agent = new AISDKAgent({ model: mockModel });
+
+      const emittedEvents: AGUIEventExtended[] = [];
+      const eventEmitter: EventEmitter = {
+        emit: (event) => emittedEvents.push(event),
+      };
+
+      const initialState = { currentPage: '/mcp-tools', todos: [] };
+      const input = createTestInput({
+        tools: [
+          {
+            name: 'navigate',
+            description: 'Navigate to a page',
+            parameters: {
+              type: 'object',
+              properties: { page: { type: 'string' } },
+              required: ['page'],
+            },
+          },
+        ],
+        state: initialState,
+        systemPrompt: 'You are interacting with a web application.',
+      });
+      input.session.state = initialState;
+
+      // Start run in background
+      const runPromise = agent.run(input, eventEmitter);
+
+      // Wait for tool call and simulate state change on tool result
+      await new Promise<void>((resolve) => {
+        const checkInterval = setInterval(() => {
+          const toolCallEnd = emittedEvents.find(e => e.type === EventType.TOOL_CALL_END);
+          if (toolCallEnd) {
+            clearInterval(checkInterval);
+
+            // Simulate navigation: update session.state (as server.handleToolResult does)
+            input.session.state = { currentPage: '/todo', todos: ['Buy groceries'] };
+
+            // Resolve the pending tool call
+            const receivedToolCallId = (toolCallEnd as { toolCallId: string }).toolCallId;
+            const resolver = input.session.pendingToolCalls.get(receivedToolCallId);
+            if (resolver) {
+              resolver(JSON.stringify({ success: true }));
+            }
+            resolve();
+          }
+        }, 10);
+
+        setTimeout(() => {
+          clearInterval(checkInterval);
+          resolve();
+        }, 5000);
+      });
+
+      await runPromise;
+
+      // Verify we had 2 steps
+      expect(capturedPerStep.length).toBe(2);
+
+      // Step 1: state message should contain initial state
+      const step1StateMsg = capturedPerStep[0].find(m => m.content.includes('currentPage'));
+      expect(step1StateMsg).toBeDefined();
+      expect(step1StateMsg!.content).toContain('/mcp-tools');
+
+      // Step 2: state message should contain updated state (rebuilt from session.state)
+      const step2StateMsg = capturedPerStep[1].find(m => m.content.includes('currentPage'));
+      expect(step2StateMsg).toBeDefined();
+      expect(step2StateMsg!.content).toContain('/todo');
+      expect(step2StateMsg!.content).toContain('Buy groceries');
+
+      // Static system messages should be identical across both steps
+      const step1StaticMsgs = capturedPerStep[0].filter(m => !m.content.includes('currentPage'));
+      const step2StaticMsgs = capturedPerStep[1].filter(m => !m.content.includes('currentPage'));
+      expect(step1StaticMsgs).toEqual(step2StaticMsgs);
     });
   });
 
@@ -1768,6 +2066,254 @@ describe('AISDKAgent', () => {
         ...aiModule,
         streamText: originalStreamText,
       }));
+    });
+  });
+
+  describe('Multi-step tool refresh bugs', () => {
+    /**
+     * Helper to extract text from AI SDK content format.
+     * AI SDK transforms user message content from string to [{ type: 'text', text: '...' }].
+     */
+    function extractTextContent(content: unknown): string {
+      if (typeof content === 'string') return content;
+      if (Array.isArray(content)) {
+        return content
+          .filter((part: { type?: string }) => part.type === 'text')
+          .map((part: { text?: string }) => part.text || '')
+          .join('');
+      }
+      return String(content);
+    }
+
+    /**
+     * Helper to wait for a pending tool call and resolve it.
+     * Polls emittedEvents for TOOL_CALL_END events that have a pending resolver in session.
+     */
+    function waitAndResolveToolCall(
+      emittedEvents: AGUIEventExtended[],
+      session: { pendingToolCalls: Map<string, (content: string) => void> },
+      result: string = JSON.stringify({ success: true }),
+      timeout: number = 10000,
+    ): Promise<void> {
+      return new Promise<void>((resolve) => {
+        const checkInterval = setInterval(() => {
+          const toolCallEnds = emittedEvents.filter(e => e.type === EventType.TOOL_CALL_END);
+          for (const toolCallEnd of toolCallEnds) {
+            const tcId = (toolCallEnd as { toolCallId: string }).toolCallId;
+            if (session.pendingToolCalls.has(tcId)) {
+              clearInterval(checkInterval);
+              const resolver = session.pendingToolCalls.get(tcId);
+              if (resolver) {
+                resolver(result);
+              }
+              resolve();
+              return;
+            }
+          }
+        }, 10);
+        setTimeout(() => { clearInterval(checkInterval); resolve(); }, timeout);
+      });
+    }
+
+    test('MCP tools should be preserved in session.tools when client sends updated tools mid-run', async () => {
+      // Bug: server.handleToolResult replaces session.tools with only client tools,
+      // dropping MCP tools. The agent reads session.tools at each step, so if MCP tools
+      // are removed from session.tools between steps, they disappear from the model.
+      //
+      // This test verifies the agent sees both client and MCP tools on step(1) when
+      // session.tools is correctly maintained (with the fix in server.handleToolResult).
+
+      const capturedToolsPerStep: string[][] = [];
+      const toolCallId = 'tool-call-mcp-bug';
+      let callCount = 0;
+
+      const mockModel = new MockLanguageModelV3({
+        doStream: async ({ tools }) => {
+          callCount++;
+          if (tools) {
+            capturedToolsPerStep.push(
+              Object.values(tools).map((t: { name?: string }) => t.name || 'unknown')
+            );
+          } else {
+            capturedToolsPerStep.push([]);
+          }
+
+          if (callCount === 1) {
+            return {
+              stream: simulateReadableStream({
+                chunks: [
+                  { type: 'tool-input-start', id: toolCallId, toolName: 'navigate' },
+                  { type: 'tool-input-delta', id: toolCallId, delta: '{"page":"settings"}' },
+                  { type: 'tool-input-end', id: toolCallId },
+                  { type: 'tool-call', toolCallId, toolName: 'navigate', input: '{"page":"settings"}' },
+                  { type: 'finish', finishReason: 'tool-calls', usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 } },
+                ],
+              }),
+              response: {
+                id: 'response-1',
+                timestamp: new Date(),
+                modelId: 'mock-model',
+                headers: {},
+                messages: [
+                  { role: 'assistant', content: [{ type: 'tool-call', toolCallId, toolName: 'navigate', input: { page: 'settings' } }] },
+                ],
+              },
+            };
+          }
+
+          return {
+            stream: simulateReadableStream({
+              chunks: [
+                { type: 'text-start', id: 'text-1' },
+                { type: 'text-delta', id: 'text-1', delta: 'Navigated' },
+                { type: 'text-end', id: 'text-1' },
+                { type: 'finish', finishReason: 'stop', usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 } },
+              ],
+            }),
+            response: {
+              id: 'response-2',
+              timestamp: new Date(),
+              modelId: 'mock-model',
+              headers: {},
+              messages: [{ role: 'assistant', content: 'Navigated' }],
+            },
+          };
+        },
+      });
+
+      const agent = new AISDKAgent({ model: mockModel });
+      const emittedEvents: AGUIEventExtended[] = [];
+      const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
+
+      const mcpTool: RemoteToolDefinition = {
+        name: 'mcp_search',
+        description: 'MCP search tool',
+        parameters: { type: 'object', properties: {}, required: [] },
+        _remote: {
+          provider: { executeTool: mock(() => Promise.resolve({ success: true })) } as unknown as RemoteToolDefinition['_remote']['provider'],
+          originalName: 'search',
+        },
+      };
+
+      const clientTool: ToolDefinition = {
+        name: 'navigate',
+        description: 'Navigate to a page',
+        parameters: { type: 'object', properties: { page: { type: 'string' } }, required: ['page'] },
+      };
+
+      const input = createTestInput({
+        tools: [clientTool, mcpTool],
+      });
+      input.session.tools = [clientTool, mcpTool] as ToolDefinition[];
+
+      const runPromise = agent.run(input, eventEmitter);
+
+      await waitAndResolveToolCall(emittedEvents, input.session);
+
+      await runPromise;
+
+      expect(capturedToolsPerStep.length).toBe(2);
+
+      // Step 0: both client and MCP tools should be present
+      expect(capturedToolsPerStep[0].sort()).toEqual(['mcp_search', 'navigate']);
+
+      // Step 1: MCP tools should still be present (session.tools was not modified)
+      expect(capturedToolsPerStep[1].sort()).toEqual(['mcp_search', 'navigate']);
+    });
+
+    test('initial user message should be preserved in step(1) after tool execution', async () => {
+      // Bug: After step(0) tool execution, currentMessages is replaced with only
+      // response.messages (generated messages), losing the initial user message.
+      // Step(1) then sends messages to the model WITHOUT the original user request.
+      //
+      // Reproduces: step(1) does not contain initial user message.
+
+      const capturedMessagesPerStep: Array<Array<{ role: string; content: unknown }>> = [];
+      const toolCallId = 'tool-call-msg-bug';
+      let callCount = 0;
+
+      const mockModel = new MockLanguageModelV3({
+        doStream: async ({ prompt }) => {
+          callCount++;
+          // Capture non-system messages for this step
+          const nonSystemMessages = prompt
+            .filter((msg: { role: string }) => msg.role !== 'system')
+            .map((msg: { role: string; content: unknown }) => ({ role: msg.role, content: msg.content }));
+          capturedMessagesPerStep.push(nonSystemMessages);
+
+          if (callCount === 1) {
+            return {
+              stream: simulateReadableStream({
+                chunks: [
+                  { type: 'tool-input-start', id: toolCallId, toolName: 'add_todo' },
+                  { type: 'tool-input-delta', id: toolCallId, delta: '{"text":"Buy milk"}' },
+                  { type: 'tool-input-end', id: toolCallId },
+                  { type: 'tool-call', toolCallId, toolName: 'add_todo', input: '{"text":"Buy milk"}' },
+                  { type: 'finish', finishReason: 'tool-calls', usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 } },
+                ],
+              }),
+              response: {
+                id: 'response-1',
+                timestamp: new Date(),
+                modelId: 'mock-model',
+                headers: {},
+                messages: [
+                  { role: 'assistant', content: [{ type: 'tool-call', toolCallId, toolName: 'add_todo', input: { text: 'Buy milk' } }] },
+                ],
+              },
+            };
+          }
+
+          return {
+            stream: simulateReadableStream({
+              chunks: [
+                { type: 'text-start', id: 'text-1' },
+                { type: 'text-delta', id: 'text-1', delta: 'Added todo: Buy milk' },
+                { type: 'text-end', id: 'text-1' },
+                { type: 'finish', finishReason: 'stop', usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 } },
+              ],
+            }),
+            response: {
+              id: 'response-2',
+              timestamp: new Date(),
+              modelId: 'mock-model',
+              headers: {},
+              messages: [{ role: 'assistant', content: 'Added todo: Buy milk' }],
+            },
+          };
+        },
+      });
+
+      const agent = new AISDKAgent({ model: mockModel });
+      const emittedEvents: AGUIEventExtended[] = [];
+      const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
+
+      const input = createTestInput({
+        tools: [{
+          name: 'add_todo',
+          description: 'Add a todo',
+          parameters: { type: 'object', properties: { text: { type: 'string' } }, required: ['text'] },
+        }],
+        messages: [{ role: 'user' as const, content: 'Add a todo to buy milk' }],
+      });
+
+      const runPromise = agent.run(input, eventEmitter);
+
+      await waitAndResolveToolCall(emittedEvents, input.session);
+
+      await runPromise;
+
+      expect(capturedMessagesPerStep.length).toBe(2);
+
+      // Step 0: should have the user message
+      const step0UserMessages = capturedMessagesPerStep[0].filter(m => m.role === 'user');
+      expect(step0UserMessages.length).toBe(1);
+      expect(extractTextContent(step0UserMessages[0].content)).toBe('Add a todo to buy milk');
+
+      // Step 1: should STILL have the user message (but bug causes it to be missing)
+      const step1UserMessages = capturedMessagesPerStep[1].filter(m => m.role === 'user');
+      expect(step1UserMessages.length).toBe(1);
+      expect(extractTextContent(step1UserMessages[0].content)).toBe('Add a todo to buy milk');
     });
   });
 

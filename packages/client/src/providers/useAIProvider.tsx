@@ -93,6 +93,8 @@ export interface ToolRegistryContextValue {
   register: (id: string, tools: ToolsDefinition, options?: { invisible?: boolean }) => void;
   /** Unregisters tools for a specific component */
   unregister: (id: string) => void;
+  /** Signals that a component has completed registration in useLayoutEffect */
+  signalReady: (id: string) => void;
 }
 
 /**
@@ -154,6 +156,7 @@ const noOpContextValue: UseAIContextValue = {
   tools: {
     register: () => {},
     unregister: () => {},
+    signalReady: () => {},
   },
   prompts: {
     update: () => {},
@@ -464,6 +467,8 @@ export function UseAIProvider({
     hasTools,
     aggregatedToolsRef,
     toolOwnershipRef,
+    signalReady,
+    waitForToolsToStabilize,
   } = useToolRegistry();
 
   // Initialize prompt state hook
@@ -474,6 +479,7 @@ export function UseAIProvider({
     getWaiter,
     aggregatedSuggestions,
     promptsRef,
+    buildStateFromPrompts,
   } = usePromptState({
     systemPrompt,
     clientRef,
@@ -492,9 +498,10 @@ export function UseAIProvider({
     clientRef,
     aggregatedToolsRef,
     toolOwnershipRef,
-    promptsRef,
     isInvisible,
     getWaiter,
+    waitForToolsToStabilize,
+    buildState: buildStateFromPrompts,
   });
 
   // Initialize chat management hook
@@ -798,6 +805,7 @@ export function UseAIProvider({
     tools: {
       register: registerTools,
       unregister: unregisterTools,
+      signalReady,
     },
     prompts: {
       update: updatePrompt,

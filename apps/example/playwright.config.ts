@@ -50,6 +50,8 @@ export default defineConfig({
         MCP_ENDPOINT_LOCALDEV_URL: 'http://localhost:3002/mcp',
         MCP_ENDPOINT_LOCALDEV_NAMESPACE: 'mcp',
         LOG_SILENT: 'true',
+        // Use temperature=0 for deterministic AI responses in E2E tests
+        AI_TEMPERATURE: '0',
       },
     },
     {

@@ -10,6 +10,8 @@ import RemoteMcpToolsPage from './pages/RemoteMcpToolsPage';
 import EmbeddedChatPage from './pages/EmbeddedChatPage';
 import ProgrammaticChatPage from './pages/ProgrammaticChatPage';
 import FileTransformersPage from './pages/FileTransformersPage';
+import { NavigationAIProvider } from './providers/NavigationAIProvider';
+import ErrorTracingTestPage from './pages/ErrorTracingTestPage';
 
 function Navigation() {
   const { navigate, currentRoute } = useRouter();
@@ -25,6 +27,7 @@ function Navigation() {
     { path: '/embedded-chat', label: 'Embedded Chat' },
     { path: '/programmatic-chat', label: 'Programmatic Chat' },
     { path: '/file-transformers', label: 'File Transformers' },
+    { path: '/error-tracing-test', label: 'Error Tracing Test' },
   ];
 
   return (
@@ -84,6 +87,9 @@ function AppContent() {
       <Route path="/file-transformers">
         <FileTransformersPage />
       </Route>
+      <Route path="/error-tracing-test">
+        <ErrorTracingTestPage />
+      </Route>
     </>
   );
 }
@@ -91,9 +97,11 @@ function AppContent() {
 export default function App() {
   return (
     <Router>
-      <div style={styles.app}>
-        <AppContent />
-      </div>
+      <NavigationAIProvider>
+        <div style={styles.app}>
+          <AppContent />
+        </div>
+      </NavigationAIProvider>
     </Router>
   );
 }
