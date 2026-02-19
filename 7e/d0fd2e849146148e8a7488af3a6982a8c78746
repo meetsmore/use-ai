@@ -1,0 +1,25 @@
+README.md
+  855026b2ec36df9a 1191,1197-1202
+scripts/install-skill.sh
+  855026b2ec36df9a 20-25,27-28
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.4",
+  "base_commit_sha": "7ed0fd2e849146148e8a7488af3a6982a8c78746",
+  "prompts": {
+    "855026b2ec36df9a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bf5892f9-d960-4c42-a39f-5013699b6b79",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 15,
+      "total_deletions": 4,
+      "accepted_lines": 15,
+      "overriden_lines": 0
+    }
+  }
+}
