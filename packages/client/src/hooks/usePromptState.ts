@@ -13,16 +13,8 @@ export interface UsePromptStateOptions {
 export interface UsePromptStateReturn {
   /** Updates the prompt and suggestions for a specific component */
   updatePrompt: (id: string, prompt?: string, suggestions?: string[]) => void;
-  /** Registers a waiter function for a component */
-  registerWaiter: (id: string, waiter: () => Promise<void>) => void;
-  /** Unregisters a waiter function */
-  unregisterWaiter: (id: string) => void;
-  /** Gets the waiter function for a component */
-  getWaiter: (id: string) => (() => Promise<void>) | undefined;
   /** All suggestions aggregated from registered components */
   aggregatedSuggestions: string[];
-  /** Ref mapping component IDs to prompts */
-  promptsRef: React.MutableRefObject<Map<string, string>>;
   /** Builds the aggregated state from all registered prompts */
   buildStateFromPrompts: () => { context: string } | null;
 }
@@ -33,7 +25,6 @@ export interface UsePromptStateReturn {
  * Handles:
  * - Storing prompts and suggestions per component
  * - Updating client state when prompts change
- * - Managing waiter functions for prompt change notifications
  * - Aggregating suggestions from all components
  */
 export function usePromptState({
@@ -43,7 +34,6 @@ export function usePromptState({
 }: UsePromptStateOptions): UsePromptStateReturn {
   const promptsRef = useRef<Map<string, string>>(new Map());
   const suggestionsRef = useRef<Map<string, string[]>>(new Map());
-  const waitersRef = useRef<Map<string, () => Promise<void>>>(new Map());
   const [suggestionsVersion, setSuggestionsVersion] = useState(0);
 
   // Build state from all prompts
@@ -61,7 +51,6 @@ export function usePromptState({
   }, [systemPrompt]);
 
   // Sync system prompt to client when connected
-  // This ensures the system prompt is sent even when no useAI hooks are present
   useEffect(() => {
     if (connected && clientRef.current && systemPrompt) {
       clientRef.current.updateState(buildStateFromPrompts());
@@ -92,18 +81,6 @@ export function usePromptState({
     }
   }, [buildStateFromPrompts, clientRef, connected]);
 
-  const registerWaiter = useCallback((id: string, waiter: () => Promise<void>) => {
-    waitersRef.current.set(id, waiter);
-  }, []);
-
-  const unregisterWaiter = useCallback((id: string) => {
-    waitersRef.current.delete(id);
-  }, []);
-
-  const getWaiter = useCallback((id: string) => {
-    return waitersRef.current.get(id);
-  }, []);
-
   const aggregatedSuggestions = useMemo(() => {
     const allSuggestions: string[] = [];
     suggestionsRef.current.forEach((suggestions) => {
@@ -115,11 +92,7 @@ export function usePromptState({
 
   return {
     updatePrompt,
-    registerWaiter,
-    unregisterWaiter,
-    getWaiter,
     aggregatedSuggestions,
-    promptsRef,
     buildStateFromPrompts,
   };
 }

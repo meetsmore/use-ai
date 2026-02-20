@@ -139,11 +139,11 @@ describe('useAI with enabled == false option', () => {
         register: registerTools,
         unregister: mock(() => {}),
         signalReady: mock(() => {}),
+        registerWaiter: mock(() => {}),
+        unregisterWaiter: mock(() => {}),
       },
       prompts: {
         update: mock(() => {}),
-        registerWaiter: mock(() => {}),
-        unregisterWaiter: mock(() => {}),
       },
       chat: {
         currentId: null,
@@ -195,11 +195,11 @@ describe('useAI with enabled == false option', () => {
         register: registerTools,
         unregister: mock(() => {}),
         signalReady: mock(() => {}),
+        registerWaiter: mock(() => {}),
+        unregisterWaiter: mock(() => {}),
       },
       prompts: {
         update: mock(() => {}),
-        registerWaiter: mock(() => {}),
-        unregisterWaiter: mock(() => {}),
       },
       chat: {
         currentId: null,
@@ -250,11 +250,11 @@ describe('useAI with enabled == false option', () => {
         register: mock(() => {}),
         unregister: mock(() => {}),
         signalReady: mock(() => {}),
+        registerWaiter: mock(() => {}),
+        unregisterWaiter: mock(() => {}),
       },
       prompts: {
         update: mock(() => {}),
-        registerWaiter: mock(() => {}),
-        unregisterWaiter: mock(() => {}),
       },
       chat: {
         currentId: null,

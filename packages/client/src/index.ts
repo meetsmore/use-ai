@@ -41,7 +41,7 @@ export type {
   ChatPanelProps,
   UseAIProviderProps,
 } from './providers/useAIProvider';
-export type { SendMessageOptions } from './hooks/useChatManagement';
+export type { SendMessageOptions } from './hooks/useMessageQueue';
 export type { DefinedTool, ToolsDefinition, ToolOptions, ToolAnnotations } from './defineTool';
 
 // Chat persistence
@@ -121,12 +121,14 @@ export type {
   UseCommandManagementReturn,
 } from './hooks/useCommandManagement';
 
-// Tool registry
-export { useToolRegistry } from './hooks/useToolRegistry';
+// Tool system (registry + execution + waiters)
+export { useToolSystem } from './hooks/useToolSystem';
 export type {
   RegisterToolsOptions,
-  UseToolRegistryReturn,
-} from './hooks/useToolRegistry';
+  PendingToolApproval,
+  UseToolSystemOptions,
+  UseToolSystemReturn,
+} from './hooks/useToolSystem';
 
 // Prompt state
 export { usePromptState } from './hooks/usePromptState';
@@ -134,6 +136,21 @@ export type {
   UsePromptStateOptions,
   UsePromptStateReturn,
 } from './hooks/usePromptState';
+
+// Server events
+export { useServerEvents } from './hooks/useServerEvents';
+export type {
+  UseServerEventsOptions,
+  UseServerEventsReturn,
+  ExecutingToolDisplay,
+} from './hooks/useServerEvents';
+
+// Message queue
+export { useMessageQueue } from './hooks/useMessageQueue';
+export type {
+  UseMessageQueueOptions,
+  UseMessageQueueReturn,
+} from './hooks/useMessageQueue';
 
 // Feedback
 export { useFeedback } from './hooks/useFeedback';

@@ -75,8 +75,8 @@ export interface UseAIResult {
 export function useAI(options: UseAIOptions = {}): UseAIResult {
   const { enabled = true } = options;
   const { connected, tools, client, prompts } = useAIContext();
-  const { register: registerTools, unregister: unregisterTools, signalReady } = tools;
-  const { update: updatePrompt, registerWaiter, unregisterWaiter } = prompts;
+  const { register: registerTools, unregister: unregisterTools, signalReady, registerWaiter, unregisterWaiter } = tools;
+  const { update: updatePrompt } = prompts;
   const [response, setResponse] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
