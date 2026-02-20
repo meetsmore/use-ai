@@ -142,21 +142,26 @@ export function useChatManagement({
 }: UseChatManagementOptions): UseChatManagementReturn {
   /**
    * Current active chat where AI responses are saved.
+   * This is the "source of truth" for where new AI messages get persisted.
    */
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
 
   /**
    * Chat loaded for viewing but not yet active for AI responses.
    * Becomes currentChatId when user sends their first message.
+   * This prevents race conditions when AI is still responding to the previous chat.
    */
   const [pendingChatId, setPendingChatId] = useState<string | null>(null);
 
   /**
    * Snapshot refs to capture latest chat IDs in event handler closures.
+   * Event handlers are created once during mount and don't see updated state values.
+   * These refs are kept in sync with state via useEffect to provide access to current values.
    */
   const currentChatIdSnapshot = useRef<string | null>(null);
   const pendingChatIdSnapshot = useRef<string | null>(null);
 
+  // Keep snapshot refs in sync with latest chat IDs
   useEffect(() => {
     currentChatIdSnapshot.current = currentChatId;
   }, [currentChatId]);
@@ -165,6 +170,7 @@ export function useChatManagement({
     pendingChatIdSnapshot.current = pendingChatId;
   }, [pendingChatId]);
 
+  /** Loads messages from storage for a given chat ID. */
   const loadChatMessages = useCallback(async (chatId: string): Promise<Message[]> => {
     try {
       const chat = await repository.loadChat(chatId);
@@ -182,11 +188,13 @@ export function useChatManagement({
     }
   }, [repository]);
 
+  /** Reloads messages from storage and updates state. */
   const reloadMessages = useCallback(async (chatId: string) => {
     const loadedMessages = await loadChatMessages(chatId);
     setMessages(loadedMessages);
   }, [loadChatMessages, setMessages]);
 
+  /** Creates a new chat. */
   const createNewChat = useCallback(async (options?: CreateChatOptions): Promise<string> => {
     console.log('[ChatManagement] createNewChat called - currentChatId:', currentChatId, 'pendingChatId:', pendingChatId, 'messages.length:', messages.length);
 
@@ -205,9 +213,11 @@ export function useChatManagement({
     console.log('[ChatManagement] Creating new chat...');
     const chatId = await repository.createChat(options);
 
+    // Set as pending - don't switch currentChatId until user sends a message
     setPendingChatId(chatId);
     setMessages([]);
 
+    // Set threadId to new chatId to ensure clean conversation state
     if (clientRef.current) {
       clientRef.current.setThreadId(chatId);
       console.log('[ChatManagement] Set threadId to new chatId:', chatId);
@@ -217,10 +227,13 @@ export function useChatManagement({
     return chatId;
   }, [currentChatId, pendingChatId, messages, repository, clientRef, setMessages]);
 
+  /** Loads an existing chat by ID. */
   const loadChat = useCallback(async (chatId: string): Promise<void> => {
+    // Set as pending chat - don't activate until user sends a message
     setPendingChatId(chatId);
     await reloadMessages(chatId);
 
+    // Set threadId so the server recognizes this as a different conversation
     if (clientRef.current) {
       clientRef.current.setThreadId(chatId);
       console.log('[ChatManagement] Set threadId to chatId:', chatId);
@@ -229,6 +242,7 @@ export function useChatManagement({
     console.log('[ChatManagement] Loaded pending chat:', chatId, '(will activate on first message)');
   }, [reloadMessages, clientRef]);
 
+  /** Deletes a chat by ID. */
   const deleteChat = useCallback(async (chatId: string): Promise<void> => {
     await repository.deleteChat(chatId);
 
@@ -245,10 +259,12 @@ export function useChatManagement({
     console.log('[ChatManagement] Deleted chat:', chatId);
   }, [currentChatId, pendingChatId, repository, setMessages]);
 
+  /** Lists all available chats. */
   const listChats = useCallback(async (): Promise<Array<Omit<Chat, 'messages'>>> => {
     return await repository.listChats();
   }, [repository]);
 
+  /** Clears the current chat messages. */
   const clearCurrentChat = useCallback(async (): Promise<void> => {
     setMessages([]);
 
@@ -262,6 +278,10 @@ export function useChatManagement({
     }
   }, [currentChatId, repository, setMessages]);
 
+  /**
+   * Gets the current chat object (including metadata).
+   * Metadata is frozen to prevent accidental mutation.
+   */
   const getCurrentChat = useCallback(async (): Promise<Chat | null> => {
     const chatId = pendingChatId || currentChatId;
     if (!chatId) return null;
@@ -272,6 +292,7 @@ export function useChatManagement({
     return chat;
   }, [pendingChatId, currentChatId, repository]);
 
+  /** Updates metadata for the current chat. */
   const updateMetadata = useCallback(async (metadata: ChatMetadata, overwrite = false): Promise<void> => {
     const chatId = pendingChatId || currentChatId;
     if (!chatId) {
@@ -280,11 +301,16 @@ export function useChatManagement({
     await repository.updateMetadata(chatId, metadata, overwrite);
   }, [pendingChatId, currentChatId, repository]);
 
+  /**
+   * Activates the pending chat (called when user sends first message).
+   * Returns the activated chat ID, or null if no pending chat.
+   */
   const activatePendingChat = useCallback((): string | null => {
     if (!pendingChatId) return null;
 
     console.log('[ChatManagement] Activating pending chat:', pendingChatId);
 
+    // Load existing messages into client if they exist
     if (clientRef.current && messages.length > 0) {
       clientRef.current.loadMessages(transformMessagesToClientFormat(messages));
       console.log('[ChatManagement] Loaded', messages.length, 'existing messages into client');
@@ -296,6 +322,7 @@ export function useChatManagement({
     return pendingChatId;
   }, [pendingChatId, messages, clientRef]);
 
+  /** Saves a user message to storage. */
   const saveUserMessage = useCallback(async (
     chatId: string,
     content: PersistedMessageContent
@@ -316,6 +343,7 @@ export function useChatManagement({
         createdAt: new Date(),
       });
 
+      // Auto-generate title from text content
       if (!chat.title) {
         const text = getTextFromContent(content);
         if (text) {
@@ -326,6 +354,7 @@ export function useChatManagement({
       await repository.saveChat(chat);
       console.log('[ChatManagement] Saved user message to storage');
 
+      // Reload messages to show the new message
       await reloadMessages(chatId);
       return true;
     } catch (error) {
@@ -334,6 +363,7 @@ export function useChatManagement({
     }
   }, [repository, reloadMessages]);
 
+  /** Saves an AI response to storage and updates UI. */
   const saveAIResponse = useCallback(async (
     content: string,
     displayMode?: 'default' | 'error',
@@ -366,6 +396,7 @@ export function useChatManagement({
         traceId,
       });
 
+      // Auto-generate title from first user message if not set
       if (!chat.title) {
         const firstUserMessage = chat.messages.find(msg => msg.role === 'user');
         if (firstUserMessage) {
@@ -379,6 +410,7 @@ export function useChatManagement({
       await repository.saveChat(chat);
       console.log('[ChatManagement] Saved AI response to storage for chatId:', currentChatIdValue);
 
+      // Reload UI if user is viewing this chat
       if (displayedChatId === currentChatIdValue) {
         await reloadMessages(currentChatIdValue);
       }
@@ -390,6 +422,7 @@ export function useChatManagement({
   // Initialize: load most recent chat or create new one on mount
   const initializedRef = useRef(false);
   useEffect(() => {
+    // Only initialize if we don't have any chat (neither current nor pending)
     if (currentChatId === null && pendingChatId === null && !initializedRef.current) {
       initializedRef.current = true;
 
@@ -398,6 +431,7 @@ export function useChatManagement({
           const chats = await repository.listChats({ limit: 1 });
 
           if (chats.length > 0) {
+            // Load the most recent chat and activate it immediately (no AI response in progress at startup)
             const mostRecentChatId = chats[0].id;
             console.log('[ChatManagement] Loading most recent chat on mount:', mostRecentChatId);
             const loadedMessages = await loadChatMessages(mostRecentChatId);
@@ -405,6 +439,7 @@ export function useChatManagement({
             setCurrentChatId(mostRecentChatId);
             setMessages(loadedMessages);
 
+            // Load into client for conversation history and set threadId
             if (clientRef.current) {
               clientRef.current.setThreadId(mostRecentChatId);
               clientRef.current.loadMessages(transformMessagesToClientFormat(loadedMessages));
@@ -413,17 +448,19 @@ export function useChatManagement({
 
             console.log('[ChatManagement] Loaded and activated chat on mount:', mostRecentChatId);
           } else {
+            // No chats exist, create a new one (will be pending until first message)
             console.log('[ChatManagement] No existing chats, creating new one');
             await createNewChat();
           }
         } catch (err) {
           console.error('[ChatManagement] Failed to initialize chat:', err);
-          initializedRef.current = false;
+          initializedRef.current = false; // Reset on error so it can retry
         }
       })();
     }
   }, [currentChatId, pendingChatId, createNewChat, repository, loadChatMessages, clientRef, setMessages]);
 
+  // The displayed chat ID is the pending chat (if any) or the current active chat
   const displayedChatId = pendingChatId || currentChatId;
 
   return {
