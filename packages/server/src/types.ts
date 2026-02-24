@@ -81,6 +81,23 @@ export interface UseAIServerConfig<TAgents extends Record<string, import('./agen
   /** Optional array of plugins to extend server functionality */
   plugins?: import('./plugins/types').UseAIServerPlugin[];
   /**
+   * Optional server-side tools available to all agents.
+   * These tools execute directly in the server process (no HTTP or WebSocket round-trip).
+   * Use defineServerTool() to create tool configs.
+   *
+   * @example
+   * ```typescript
+   * tools: {
+   *   getWeather: defineServerTool(
+   *     'Get current weather',
+   *     z.object({ city: z.string() }),
+   *     async ({ city }) => fetchWeather(city)
+   *   ),
+   * }
+   * ```
+   */
+  tools?: Record<string, import('./tools/types').ServerToolConfig>;
+  /**
    * Optional array of MCP endpoints to fetch tools from.
    * Tools from these endpoints will be automatically available to all agents and workflows.
    */

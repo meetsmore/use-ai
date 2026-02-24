@@ -52,6 +52,7 @@ export default defineConfig({
         LOG_SILENT: 'true',
         // Use temperature=0 for deterministic AI responses in E2E tests
         AI_TEMPERATURE: '0',
+        ENABLE_EXAMPLE_SERVER_TOOLS: 'true',
       },
     },
     {

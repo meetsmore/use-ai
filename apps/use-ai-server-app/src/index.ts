@@ -1,10 +1,11 @@
 #!/usr/bin/env bun
-import { UseAIServer, AISDKAgent, logger } from '@meetsmore-oss/use-ai-server';
-import type { Agent, McpEndpointConfig } from '@meetsmore-oss/use-ai-server';
+import { UseAIServer, AISDKAgent, logger, defineServerTool } from '@meetsmore-oss/use-ai-server';
+import type { Agent, McpEndpointConfig, ServerToolConfig } from '@meetsmore-oss/use-ai-server';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { createOpenAI } from '@ai-sdk/openai';
 import { WorkflowsPlugin, DifyWorkflowRunner } from '@meetsmore-oss/use-ai-plugin-workflows';
 import type { WorkflowRunner } from '@meetsmore-oss/use-ai-plugin-workflows';
+import { z } from 'zod';
 
 const port = Number(process.env.PORT) || 8081;
 const rateLimitMaxRequests = Number(process.env.RATE_LIMIT_MAX_REQUESTS) || 0;
@@ -159,6 +160,41 @@ function createMcpEndpoints(): McpEndpointConfig[] {
   return endpoints;
 }
 
+/**
+ * Create example server tools for testing/demo purposes.
+ * Only enabled when ENABLE_EXAMPLE_SERVER_TOOLS is set.
+ */
+function createServerTools(): Record<string, ServerToolConfig> | undefined {
+  if (!process.env.ENABLE_EXAMPLE_SERVER_TOOLS) {
+    return undefined;
+  }
+
+  const tools: Record<string, ServerToolConfig> = {
+    getServerTime: defineServerTool(
+      'Get the current server time as an ISO 8601 timestamp',
+      async () => new Date().toISOString(),
+      { annotations: { readOnlyHint: true } }
+    ),
+    addNumbers: defineServerTool(
+      'Add two numbers together and return the result',
+      z.object({
+        a: z.number().describe('First number'),
+        b: z.number().describe('Second number'),
+      }),
+      async ({ a, b }) => ({ result: a + b }),
+      { annotations: { readOnlyHint: true } }
+    ),
+  };
+
+  if (logFormat === 'pretty') {
+    console.log(`✓ Example server tools enabled: ${Object.keys(tools).join(', ')}`);
+  } else {
+    logger.info('Example server tools enabled', { tools: Object.keys(tools) });
+  }
+
+  return tools;
+}
+
 logger.info('Starting UseAI server', { logFormat });
 
 (async () => {
@@ -167,6 +203,7 @@ logger.info('Starting UseAI server', { logFormat });
     const { agents, defaultAgent } = createAgents();
     const workflowRunners = createWorkflowRunners();
     const mcpEndpoints = createMcpEndpoints();
+    const serverTools = createServerTools();
 
     // Build plugins array
     const plugins = [];
@@ -182,6 +219,7 @@ logger.info('Starting UseAI server', { logFormat });
       rateLimitWindowMs,
       plugins: plugins.length > 0 ? plugins : undefined,
       mcpEndpoints: mcpEndpoints.length > 0 ? mcpEndpoints : undefined,
+      tools: serverTools,
       maxHttpBufferSize,
       cors: corsOrigin
         ? {

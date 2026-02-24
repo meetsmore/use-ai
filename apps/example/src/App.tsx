@@ -7,6 +7,7 @@ import MultiListPage from './pages/MultiListPage';
 import InvisibleTestPage from './pages/InvisibleTestPage';
 import WorkflowDemoPage from './pages/WorkflowDemoPage';
 import RemoteMcpToolsPage from './pages/RemoteMcpToolsPage';
+import ServerToolsPage from './pages/ServerToolsPage';
 import EmbeddedChatPage from './pages/EmbeddedChatPage';
 import ProgrammaticChatPage from './pages/ProgrammaticChatPage';
 import FileTransformersPage from './pages/FileTransformersPage';
@@ -24,6 +25,7 @@ function Navigation() {
     { path: '/invisible-test', label: 'Invisible Test' },
     { path: '/workflow-demo', label: 'Workflow Demo' },
     { path: '/remote-mcp-tools', label: 'Remote MCP Tools' },
+    { path: '/server-tools', label: 'Server Tools' },
     { path: '/embedded-chat', label: 'Embedded Chat' },
     { path: '/programmatic-chat', label: 'Programmatic Chat' },
     { path: '/file-transformers', label: 'File Transformers' },
@@ -77,6 +79,9 @@ function AppContent() {
       </Route>
       <Route path="/remote-mcp-tools">
         <RemoteMcpToolsPage />
+      </Route>
+      <Route path="/server-tools">
+        <ServerToolsPage />
       </Route>
       <Route path="/embedded-chat">
         <EmbeddedChatPage />
