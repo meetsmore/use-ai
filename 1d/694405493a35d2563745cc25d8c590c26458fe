@@ -1,0 +1,61 @@
+packages/client/src/components/UseAIChat.tsx
+  c99c73f3b3da5460 4,22
+packages/client/src/providers/chatRepository/types.ts
+  96d2a7ee5dd39d3e 49-63,75-81
+packages/server/src/message-conversion.test.ts
+  96d2a7ee5dd39d3e 1-348
+packages/client/src/providers/chatRepository/toolCallPersistence.test.ts
+  c99c73f3b3da5460 3-4,36-37
+  96d2a7ee5dd39d3e 1-2,5-35,38-257,259-263,265-271,275-280,282-287,290-295,297-308,310-319
+packages/client/src/hooks/useFeedback.ts
+  c99c73f3b3da5460 4,14
+packages/server/src/server.ts
+  96d2a7ee5dd39d3e 593-627,630,633-634,636,638-639,641
+packages/client/src/providers/useAIProvider.tsx
+  c99c73f3b3da5460 9,220,438
+packages/client/src/client.ts
+  c99c73f3b3da5460 236,240-243,385
+packages/client/src/utils/messageContent.ts
+  c99c73f3b3da5460 1-15
+packages/client/src/hooks/useServerEvents.ts
+  96d2a7ee5dd39d3e 17,68,120-122,149-154,211,213-214
+  c99c73f3b3da5460 14,18-62,212
+packages/client/src/components/UseAIChatPanel.tsx
+  c99c73f3b3da5460 2-3,21,23,207-215,419-420,422,611,745,818,843,917,919,925,969
+packages/client/src/hooks/useChatManagement.ts
+  96d2a7ee5dd39d3e 2,29-31,33-34,36-58,97-100,102,357-358,377-380
+  c99c73f3b3da5460 3,6,68,70,162,166-167,300,310,325,330-331,344-345,351,383,390-391,407,409-413,418
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.5",
+  "base_commit_sha": "1d694405493a35d2563745cc25d8c590c26458fe",
+  "prompts": {
+    "96d2a7ee5dd39d3e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "babfa8b9-56b6-43ae-a89c-fb0d44b0accc",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 1292,
+      "total_deletions": 395,
+      "accepted_lines": 773,
+      "overriden_lines": 4
+    },
+    "c99c73f3b3da5460": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b02cdd4f-dc50-4a3d-a4e6-dc802e85d13a",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 163,
+      "total_deletions": 317,
+      "accepted_lines": 132,
+      "overriden_lines": 0
+    }
+  }
+}
