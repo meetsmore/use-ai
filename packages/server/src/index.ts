@@ -13,6 +13,9 @@ export { FeedbackPlugin } from './plugins';
 // Export logger for plugins
 export { logger } from './logger';
 
+// Export telemetry for custom agents
+export { startRunSpan, flushTelemetry, type RunSpan } from './telemetry';
+
 // Export utilities for plugins and custom agents
 export {
   createClientToolExecutor,

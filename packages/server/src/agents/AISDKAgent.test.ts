@@ -13,7 +13,7 @@ import {
   or,
   not,
 } from '../utils/toolFilters';
-import { pushTraceIdForRun, popTraceIdForRun, recordErrorTrace } from '../instrumentation';
+import { pushTraceIdForRun, popTraceIdForRun } from '../instrumentation';
 
 /**
  * Helper to create a streaming mock model that emits text
@@ -2348,7 +2348,7 @@ describe('AISDKAgent', () => {
   });
 
   describe('Pre-streamText error recording', () => {
-    test('records pre-streamText errors to Langfuse via recordErrorTrace', async () => {
+    test('records pre-streamText errors via span.recordError', async () => {
       // To trigger a pre-streamText error, we use a cacheBreakpoint function that throws.
       // applyCacheBreakpoints runs before streamTextStarted = true, so this error
       // hits the `if (!streamTextStarted)` path in the catch block.
@@ -2360,16 +2360,24 @@ describe('AISDKAgent', () => {
         },
       });
 
-      // Mock the instrumentation module to spy on recordErrorTrace
-      const instrumentationModule = await import('../instrumentation');
-      const originalRecordErrorTrace = instrumentationModule.recordErrorTrace;
+      // Mock the telemetry module to spy on span.recordError
+      const telemetryModule = await import('../telemetry');
 
       const recordedCalls: Array<{ runId: string; errorCategory: string; errorMessage: string }> = [];
-      mock.module('../instrumentation', () => ({
-        ...instrumentationModule,
-        recordErrorTrace: (params: { runId: string; errorCategory: string; errorMessage: string }) => {
-          recordedCalls.push(params);
-        },
+      mock.module('../telemetry', () => ({
+        ...telemetryModule,
+        startRunSpan: () => ({
+          active: false,
+          wrap: <T>(fn: () => T): T => fn(),
+          setInput: () => {},
+          setOutput: () => {},
+          end: () => {},
+          endWithError: () => {},
+          popTraceId: () => undefined,
+          recordError: (params: { runId: string; errorCategory: string; errorMessage: string }) => {
+            recordedCalls.push(params);
+          },
+        }),
       }));
 
       // Re-import to pick up the mock (dynamic import after mock.module)
@@ -2392,7 +2400,7 @@ describe('AISDKAgent', () => {
       expect(result.success).toBe(false);
       expect(result.error).toBe('Cache breakpoint error');
 
-      // Verify recordErrorTrace was called with pre_stream_error category
+      // Verify span.recordError was called with pre_stream_error category
       expect(recordedCalls.length).toBeGreaterThanOrEqual(1);
       const preStreamCall = recordedCalls.find(c => c.errorCategory === 'pre_stream_error');
       expect(preStreamCall).toBeDefined();
@@ -2404,10 +2412,7 @@ describe('AISDKAgent', () => {
       expect(runErrorEvent).toBeDefined();
 
       // Restore original
-      mock.module('../instrumentation', () => ({
-        ...instrumentationModule,
-        recordErrorTrace: originalRecordErrorTrace,
-      }));
+      mock.module('../telemetry', () => telemetryModule);
     });
   });
 });
