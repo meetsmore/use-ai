@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAI } from '@meetsmore-oss/use-ai-client';
+import { CollapsibleCode } from '../components/CollapsibleCode';
 
 export default function RemoteMcpToolsPage() {
   const [result, setResult] = useState<string>('');
@@ -59,8 +60,7 @@ You can help the user test these tools by calling them with various inputs.`,
           The header is automatically provided by the <code style={styles.code}>UseAIProvider</code>{' '}
           which is configured in <code style={styles.code}>src/index.tsx</code>.
         </p>
-        <div style={styles.codeBlock}>
-          <pre style={styles.pre}>
+        <CollapsibleCode>
 {`forwardedPropsProvider={() => ({
   mcpHeaders: {
     'http://localhost:3002': {
@@ -68,8 +68,7 @@ You can help the user test these tools by calling them with various inputs.`,
     },
   },
 })}`}
-          </pre>
-        </div>
+        </CollapsibleCode>
         <p style={styles.text}>
           Without this header, the tool would return an "Unauthorized" error.
         </p>
@@ -106,8 +105,7 @@ You can help the user test these tools by calling them with various inputs.`,
           and can include hints like <code style={styles.code}>readOnlyHint</code>,{' '}
           <code style={styles.code}>destructiveHint</code>, etc.
         </p>
-        <div style={styles.codeBlock}>
-          <pre style={styles.pre}>
+        <CollapsibleCode>
 {`@Tool({
   name: 'add',
   description: 'Add two numbers',
@@ -117,8 +115,7 @@ You can help the user test these tools by calling them with various inputs.`,
     readOnlyHint: true,
   },
 })`}
-          </pre>
-        </div>
+        </CollapsibleCode>
       </div>
 
       <div style={styles.statusCard}>

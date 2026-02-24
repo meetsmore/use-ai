@@ -738,6 +738,24 @@ root.render(
 );
 ```
 
+**`onOpenChange` Callback:**
+
+Use the `onOpenChange` prop to synchronize the chat panel's open/close state with external UI (e.g., a sidebar). This is called when `sendMessage({ openChat: true })` is used programmatically.
+
+```tsx
+const [sidebarOpen, setSidebarOpen] = useState(false);
+
+<UseAIProvider
+  serverUrl="ws://localhost:8081"
+  renderChat={false}
+  onOpenChange={(isOpen) => setSidebarOpen(isOpen)}
+>
+  <Sidebar isOpen={sidebarOpen}>
+    <UseAIChat />
+  </Sidebar>
+</UseAIProvider>
+```
+
 ### Slash Commands
 
 Save and reuse common prompts with slash commands:
@@ -836,28 +854,50 @@ This allows transformers to access chat metadata (e.g., document type hints).
 
 ### Theme Customization
 
-Customize the chat UI appearance:
+Customize the chat UI appearance with the `theme` prop (all fields are optional — only override what you need):
 
 ```tsx
 <UseAIProvider
   serverUrl="ws://localhost:8081"
   theme={{
-    colors: { primary: '#007bff', background: '#ffffff' },
-    borderRadius: '8px',
+    primaryColor: '#667eea',
+    primaryGradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    backgroundColor: 'white',
+    textColor: '#1f2937',
+    secondaryTextColor: '#6b7280',
+    borderColor: '#e5e7eb',
+    onlineColor: '#10b981',
+    errorBackground: '#fee2e2',
+    errorTextColor: '#dc2626',
+    dangerColor: '#ef4444',
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
   }}
 >
 ```
 
 ### Internationalization
 
-Localize UI strings:
+Localize all user-facing strings with the `strings` prop (partial objects accepted — only override what you need):
 
 ```tsx
 <UseAIProvider
   serverUrl="ws://localhost:8081"
   strings={{
-    sendButton: 'Envoyer',
-    placeholder: 'Tapez votre message...',
+    header: {
+      aiAssistant: 'AIアシスタント',
+      newChat: '新しいチャット',
+      online: 'オンライン',
+      offline: 'オフライン',
+    },
+    input: {
+      placeholder: 'メッセージを入力...',
+      thinking: '考え中',
+    },
+    toolApproval: {
+      title: '確認が必要です',
+      approve: '許可',
+      reject: '拒否',
+    },
   }}
 >
 ```
@@ -966,7 +1006,7 @@ To configure these in `@meetsmore-oss/use-ai-server`, you can use the environmen
 # MCP_ENDPOINT_ANOTHERMCP_URL=http://localhost:3003
 ```
 
-If your MCP tools need auth (e.g. you want to do things on behalf of the user, in the backend), you can use the `@meetsmore-oss/use-ai-client` `mcpHeadersProvider` prop to do that:
+If your MCP tools need auth (e.g. you want to do things on behalf of the user, in the backend), you can use the `@meetsmore-oss/use-ai-client` `forwardedPropsProvider` prop to do that:
 
 ```tsx
 import { UseAIProvider } from '@meetsmore-oss/use-ai-client';
@@ -974,9 +1014,14 @@ import { UseAIProvider } from '@meetsmore-oss/use-ai-client';
 root.render(
   <UseAIProvider
     serverUrl="ws://localhost:8081"
-    mcpHeadersProvider={() => ({
-      'http://localhost:3002/*': {        // when any URL matching this pattern is called by the server for MCPs....
-        headers: { 'X-API-Key': 'secret-api-key-123' },   // add these headers to the request.
+    forwardedPropsProvider={() => ({
+      mcpHeaders: {
+        'http://localhost:3002/*': {        // when any URL matching this pattern is called by the server for MCPs....
+          headers: { 'X-API-Key': 'secret-api-key-123' },   // add these headers to the request.
+        },
+      },
+      telemetryMetadata: {                  // optional: metadata forwarded to observability (e.g., Langfuse)
+        userId: 'user-123',
       },
     })}
   >
@@ -994,6 +1039,59 @@ The flow works like this:
 3. [server] The server prompts the LLM.
 4. [LLM] The LLM decides to call a tool.
 5. [server] The server checks if the call will use a remote MCP, if it will, it adds the headers matching the URL pattern.
+
+### Server-Side Tools
+
+Server-side tools execute directly in the server process using `defineServerTool()`. Unlike client tools (which round-trip via Socket.IO) or MCP tools (which call remote HTTP endpoints), server tools are simple function calls with no network overhead.
+
+```typescript
+import { UseAIServer, defineServerTool } from '@meetsmore-oss/use-ai-server';
+import { z } from 'zod';
+
+const server = new UseAIServer({
+  agents: { /* ... */ },
+  defaultAgent: 'claude',
+  tools: {
+    // Without parameters
+    getServerTime: defineServerTool(
+      'Get the current server time',
+      async () => new Date().toISOString(),
+      { annotations: { readOnlyHint: true } }
+    ),
+    // With Zod schema
+    addNumbers: defineServerTool(
+      'Add two numbers together',
+      z.object({ a: z.number(), b: z.number() }),
+      async ({ a, b }) => ({ result: a + b }),
+      { annotations: { readOnlyHint: true } }
+    ),
+  },
+});
+```
+
+**Execution Context:**
+
+Server tool execute functions receive a `ServerToolContext` as the second argument, providing access to the current session, app state, run ID, and tool call ID:
+
+```typescript
+defineServerTool(
+  'Get user-specific data',
+  z.object({ key: z.string() }),
+  async ({ key }, context) => {
+    // context.session   - current client session
+    // context.state     - latest app state from client
+    // context.runId     - current agent run ID
+    // context.toolCallId - this tool call's ID
+    return db.get(key);
+  }
+);
+```
+
+| Type       | Defined In       | Executed In      | Use Case                       |
+|------------|------------------|------------------|--------------------------------|
+| **Server** | Server config    | Server process   | DB queries, internal APIs      |
+| **Client** | React components | Browser          | UI state, DOM manipulation     |
+| **MCP**    | Remote endpoint  | External service | Third-party integrations       |
 
 ### Rate Limiting
 

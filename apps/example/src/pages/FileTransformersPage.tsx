@@ -1,5 +1,7 @@
 import React from 'react';
 import { UseAIProvider, UseAIChat, type FileTransformer } from '@meetsmore-oss/use-ai-client';
+import { CollapsibleCode } from '../components/CollapsibleCode';
+import { docStyles } from '../styles/docStyles';
 
 /**
  * PDF Transformer - Simulates processing with progress updates.
@@ -96,12 +98,16 @@ export default function FileTransformersPage() {
       }}
     >
       <div style={styles.page}>
-        <h2 style={styles.title}>File Transformers Demo</h2>
+        <h2 style={styles.title}>File Transformers</h2>
 
-        <p style={styles.description}>
-          This page demonstrates the file transformer feature. Transformers process uploaded files
-          before sending them to the AI, converting them into text representations.
-        </p>
+        <div style={{ ...docStyles.infoCard, marginBottom: '24px' }}>
+          <h3 style={docStyles.subtitle}>About</h3>
+          <p style={docStyles.text}>
+            File transformers process uploaded files before sending them to the AI, converting
+            binary content (PDFs, images) into text representations. Transformers can report
+            progress (circular indicator) or run without progress updates (infinite spinner).
+          </p>
+        </div>
 
         <div style={styles.instructions}>
           <h3 style={styles.sectionTitle}>How to Test</h3>
@@ -147,7 +153,8 @@ export default function FileTransformersPage() {
 
         <div style={styles.codeSection}>
           <h3 style={styles.sectionTitle}>Code Example</h3>
-          <pre style={styles.code}>{`// Configure transformers in UseAIProvider
+          <CollapsibleCode>
+{`// Configure transformers in UseAIProvider
 <UseAIProvider
   serverUrl="ws://localhost:8081"
   fileUploadConfig={{
@@ -176,7 +183,8 @@ export default function FileTransformersPage() {
   }}
 >
   <App />
-</UseAIProvider>`}</pre>
+</UseAIProvider>`}
+          </CollapsibleCode>
         </div>
 
         {/* Chat panel */}
