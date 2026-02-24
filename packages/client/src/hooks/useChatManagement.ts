@@ -1,8 +1,9 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import type { ChatRepository, Chat, ChatMetadata, CreateChatOptions, PersistedMessageContent } from '../providers/chatRepository/types';
-import type { Message } from '../components/UseAIChatPanel';
+import type { ChatRepository, Chat, ChatMetadata, CreateChatOptions, PersistedMessageContent, PersistedMessage, PersistedToolCall } from '../providers/chatRepository/types';
+import { generateMessageId } from '../providers/chatRepository/types';
 import type { UseAIClient } from '../client';
 import type { Message as AGUIMessage } from '../types';
+import { getTextFromContent } from '../utils/messageContent';
 
 // Constants
 const CHAT_TITLE_MAX_LENGTH = 50;
@@ -25,54 +26,36 @@ function generateChatTitle(message: string): string {
 }
 
 /**
- * Extracts text content from persisted message content.
+ * Transforms persisted messages to AG-UI message format for loading into client.
+ * Preserves toolCalls on assistant messages and toolCallId on tool messages
+ * so the server can reconstruct valid API messages.
  */
-function getTextFromContent(content: PersistedMessageContent): string {
-  if (typeof content === 'string') {
-    return content;
-  }
-  return content
-    .filter((part): part is { type: 'text'; text: string } => part.type === 'text')
-    .map(part => part.text)
-    .join('\n');
-}
-
-/**
- * Transforms storage messages to UI message format.
- */
-function transformMessagesToUI(
-  storageMessages: Array<{
-    id: string;
-    role: string;
-    content: PersistedMessageContent;
-    createdAt: Date;
-    displayMode?: 'default' | 'error';
-    traceId?: string;
-    feedback?: 'upvote' | 'downvote' | null;
-  }>
-): Message[] {
-  return storageMessages.map((msg) => ({
-    id: msg.id,
-    role: msg.role as 'user' | 'assistant',
-    content: msg.content,
-    timestamp: msg.createdAt,
-    displayMode: msg.displayMode,
-    traceId: msg.traceId,
-    feedback: msg.feedback,
-  }));
-}
-
-/**
- * Transforms UI messages to AG-UI message format for loading into client.
- */
-function transformMessagesToClientFormat(uiMessages: Message[]): AGUIMessage[] {
-  return uiMessages.map((msg) => {
+function transformMessagesToClientFormat(persistedMessages: PersistedMessage[]): AGUIMessage[] {
+  return persistedMessages.map((msg): AGUIMessage => {
     const textContent = getTextFromContent(msg.content);
-    return {
-      id: msg.id,
-      role: msg.role,
-      content: textContent,
-    };
+
+    switch (msg.role) {
+      case 'tool':
+        return {
+          id: msg.id,
+          role: 'tool',
+          content: textContent,
+          toolCallId: msg.toolCallId || '',
+        };
+      case 'assistant':
+        return {
+          id: msg.id,
+          role: 'assistant',
+          content: textContent,
+          ...(msg.toolCalls && msg.toolCalls.length > 0 ? { toolCalls: msg.toolCalls } : {}),
+        };
+      case 'user':
+        return {
+          id: msg.id,
+          role: 'user',
+          content: textContent,
+        };
+    }
   });
 }
 
@@ -82,9 +65,9 @@ export interface UseChatManagementOptions {
   /** Reference to the UseAIClient (can be null during initialization) */
   clientRef: React.MutableRefObject<UseAIClient | null>;
   /** Current messages state (owned by provider) */
-  messages: Message[];
+  messages: PersistedMessage[];
   /** Setter for messages state (owned by provider) */
-  setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
+  setMessages: React.Dispatch<React.SetStateAction<PersistedMessage[]>>;
   /** Whether the client is connected */
   connected?: boolean;
 }
@@ -110,8 +93,13 @@ export interface UseChatManagementReturn {
   activatePendingChat: () => string | null;
   /** Saves a user message to storage and reloads messages */
   saveUserMessage: (chatId: string, content: PersistedMessageContent) => Promise<boolean>;
-  /** Saves an AI response to storage and optionally reloads messages */
-  saveAIResponse: (content: string, displayMode?: 'default' | 'error', traceId?: string) => Promise<void>;
+  /**
+   * Saves an AI response to storage and optionally reloads messages.
+   * When turnMessages are provided, intermediate assistant+tool messages from
+   * the turn are persisted before the final assistant message, preserving the
+   * complete tool call context for conversation history.
+   */
+  saveAIResponse: (content: string, displayMode?: 'default' | 'error', traceId?: string, turnMessages?: PersistedMessage[]) => Promise<void>;
   /** Reloads messages from storage for the given chat ID */
   reloadMessages: (chatId: string) => Promise<void>;
   /** Get the current chat object. Metadata is frozen to prevent accidental mutation. */
@@ -171,13 +159,12 @@ export function useChatManagement({
   }, [pendingChatId]);
 
   /** Loads messages from storage for a given chat ID. */
-  const loadChatMessages = useCallback(async (chatId: string): Promise<Message[]> => {
+  const loadChatMessages = useCallback(async (chatId: string): Promise<PersistedMessage[]> => {
     try {
       const chat = await repository.loadChat(chatId);
       if (chat) {
-        const loadedMessages = transformMessagesToUI(chat.messages);
-        console.log('[ChatManagement] Loaded', loadedMessages.length, 'messages from storage for chat:', chatId);
-        return loadedMessages;
+        console.log('[ChatManagement] Loaded', chat.messages.length, 'messages from storage for chat:', chatId);
+        return chat.messages;
       } else {
         console.log('[ChatManagement] Chat not found in storage:', chatId);
         return [];
@@ -310,7 +297,7 @@ export function useChatManagement({
 
     console.log('[ChatManagement] Activating pending chat:', pendingChatId);
 
-    // Load existing messages into client if they exist
+    // Load existing messages into client for conversation history
     if (clientRef.current && messages.length > 0) {
       clientRef.current.loadMessages(transformMessagesToClientFormat(messages));
       console.log('[ChatManagement] Loaded', messages.length, 'existing messages into client');
@@ -320,7 +307,7 @@ export function useChatManagement({
     setPendingChatId(null);
 
     return pendingChatId;
-  }, [pendingChatId, messages, clientRef]);
+  }, [pendingChatId, clientRef, messages]);
 
   /** Saves a user message to storage. */
   const saveUserMessage = useCallback(async (
@@ -335,13 +322,13 @@ export function useChatManagement({
         return false;
       }
 
-      const { generateMessageId } = await import('../providers/chatRepository/types');
-      chat.messages.push({
+      const newMessage: PersistedMessage = {
         id: generateMessageId(),
         role: 'user',
         content,
         createdAt: new Date(),
-      });
+      };
+      chat.messages.push(newMessage);
 
       // Auto-generate title from text content
       if (!chat.title) {
@@ -354,20 +341,21 @@ export function useChatManagement({
       await repository.saveChat(chat);
       console.log('[ChatManagement] Saved user message to storage');
 
-      // Reload messages to show the new message
-      await reloadMessages(chatId);
+      // Append to local state directly (no reload round-trip)
+      setMessages(prev => [...prev, newMessage]);
       return true;
     } catch (error) {
       console.error('[ChatManagement] Failed to save user message:', error);
       return false;
     }
-  }, [repository, reloadMessages]);
+  }, [repository, setMessages]);
 
   /** Saves an AI response to storage and updates UI. */
   const saveAIResponse = useCallback(async (
     content: string,
     displayMode?: 'default' | 'error',
-    traceId?: string
+    traceId?: string,
+    turnMessages?: PersistedMessage[]
   ): Promise<void> => {
     const currentChatIdValue = currentChatIdSnapshot.current;
     const pendingChatIdValue = pendingChatIdSnapshot.current;
@@ -386,15 +374,21 @@ export function useChatManagement({
         return;
       }
 
-      const { generateMessageId } = await import('../providers/chatRepository/types');
-      chat.messages.push({
+      // Save intermediate turn messages (assistant messages with tool calls,
+      // and tool result messages) before the final assistant message.
+      if (turnMessages && turnMessages.length > 0) {
+        chat.messages.push(...turnMessages);
+      }
+
+      const finalMessage: PersistedMessage = {
         id: generateMessageId(),
         role: 'assistant',
         content,
         createdAt: new Date(),
         displayMode,
         traceId,
-      });
+      };
+      chat.messages.push(finalMessage);
 
       // Auto-generate title from first user message if not set
       if (!chat.title) {
@@ -410,14 +404,18 @@ export function useChatManagement({
       await repository.saveChat(chat);
       console.log('[ChatManagement] Saved AI response to storage for chatId:', currentChatIdValue);
 
-      // Reload UI if user is viewing this chat
+      // Append to local state directly if user is viewing this chat (no reload round-trip)
       if (displayedChatId === currentChatIdValue) {
-        await reloadMessages(currentChatIdValue);
+        const newMessages: PersistedMessage[] = [
+          ...(turnMessages ?? []),
+          finalMessage,
+        ];
+        setMessages(prev => [...prev, ...newMessages]);
       }
     } catch (error) {
       console.error('[ChatManagement] Failed to save AI response:', error);
     }
-  }, [repository, reloadMessages]);
+  }, [repository, setMessages]);
 
   // Initialize: load most recent chat or create new one on mount
   const initializedRef = useRef(false);

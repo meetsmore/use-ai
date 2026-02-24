@@ -40,34 +40,6 @@ export type ToolCallHandler = (
 ) => void;
 
 /**
- * Tool call structure for assistant messages
- */
-type MessageToolCall = {
-  id: string;
-  type: 'function';
-  function: {
-    name: string;
-    arguments: string;
-  };
-};
-
-/**
- * Assistant message with optional tool calls
- */
-type AssistantMessageWithTools = Message & {
-  role: 'assistant';
-  toolCalls?: MessageToolCall[];
-};
-
-/**
- * Tool result message
- */
-type ToolResultMessageData = Message & {
-  role: 'tool';
-  toolCallId: string;
-};
-
-/**
  * Socket.IO client for communicating with the UseAI server.
  * Uses the AG-UI protocol (https://docs.ag-ui.com/), so will be compatible with other AG-UI compliant servers.
  *
@@ -261,16 +233,15 @@ export class UseAIClient {
     else if (event.type === EventType.RUN_FINISHED) {
       // Add completed assistant message to conversation history
       if (this._currentAssistantMessage) {
-        const assistantMessage: AssistantMessageWithTools = {
+        const assistantMessage: Message = {
           id: this._currentAssistantMessage.id!,
           role: 'assistant',
           content: this._currentAssistantMessage.content || '',
+          // Add tool calls if any
+          ...(this._currentAssistantToolCalls.length > 0
+            ? { toolCalls: this._currentAssistantToolCalls }
+            : {}),
         };
-
-        // Add tool calls if any
-        if (this._currentAssistantToolCalls.length > 0) {
-          assistantMessage.toolCalls = this._currentAssistantToolCalls;
-        }
 
         this._messages.push(assistantMessage);
 
@@ -411,7 +382,7 @@ export class UseAIClient {
     };
 
     // Track tool result in conversation history
-    const toolResultMsg: ToolResultMessageData = {
+    const toolResultMsg: Message = {
       id: toolResultMessage.data.messageId,
       role: 'tool',
       content: toolResultMessage.data.content,

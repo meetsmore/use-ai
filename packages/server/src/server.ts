@@ -590,19 +590,55 @@ export class UseAIServer {
           content: convertToAISDKContent(msg.content),
         };
       } else if (msg.role === 'assistant') {
+        const textContent = getStringContent(msg.content);
+
+        // Check for AG-UI toolCalls on the message (sent by client on reconnection)
+        const toolCalls = (msg as { toolCalls?: Array<{
+          id: string;
+          type: string;
+          function: { name: string; arguments: string };
+        }> }).toolCalls;
+
+        if (toolCalls && toolCalls.length > 0) {
+          // Convert to AI SDK ModelMessage format: array of content blocks with tool-call entries
+          const content: Array<{ type: 'text'; text: string } | { type: 'tool-call'; toolCallId: string; toolName: string; input: unknown }> = [];
+          if (textContent) {
+            content.push({ type: 'text', text: textContent });
+          }
+          for (const tc of toolCalls) {
+            let input: unknown;
+            try {
+              input = JSON.parse(tc.function.arguments);
+            } catch {
+              input = tc.function.arguments;
+            }
+            content.push({
+              type: 'tool-call',
+              toolCallId: tc.id,
+              toolName: tc.function.name,
+              input,
+            });
+          }
+          return {
+            role: 'assistant' as const,
+            content,
+          };
+        }
+
         return {
           role: 'assistant' as const,
-          content: getStringContent(msg.content),
+          content: textContent,
         };
       } else if (isToolMessage(msg)) {
-        // Tool messages in AI SDK format
+        // Tool messages in AI SDK v6 ModelMessage format.
+        // The output field requires a discriminated union: { type: "json"|"text", value }
         const content = getStringContent(msg.content);
-        // Try to parse as JSON for structured output, fallback to string
-        let output: unknown;
+        let output: { type: 'json'; value: unknown } | { type: 'text'; value: string };
         try {
-          output = JSON.parse(content);
+          const parsed = JSON.parse(content);
+          output = { type: 'json', value: parsed };
         } catch {
-          output = content;
+          output = { type: 'text', value: content };
         }
         return {
           role: 'tool' as const,

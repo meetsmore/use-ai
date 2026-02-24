@@ -46,6 +46,21 @@ export type PersistedMessageContent = string | PersistedContentPart[];
  * Message format for persisted chat history.
  * Compatible with AI SDK's UIMessage format for future integration.
  */
+/**
+ * Tool call entry on an assistant message.
+ * Matches the AG-UI MessageToolCall format.
+ */
+export interface PersistedToolCall {
+  /** @example "toolu_01abc123" */
+  id: string;
+  type: 'function';
+  function: {
+    name: string;
+    /** JSON-serialized arguments */
+    arguments: string;
+  };
+}
+
 export interface PersistedMessage {
   id: string;
   role: 'user' | 'assistant' | 'tool';
@@ -57,6 +72,13 @@ export interface PersistedMessage {
   traceId?: string;
   /** User feedback on this message (only for assistant messages) */
   feedback?: FeedbackValue;
+  /** Tool calls made by the assistant in this message (only for assistant messages) */
+  toolCalls?: PersistedToolCall[];
+  /**
+   * ID of the tool call this message is a result of (only for tool messages)
+   * @example "toolu_01abc123"
+   */
+  toolCallId?: string;
 }
 
 /**

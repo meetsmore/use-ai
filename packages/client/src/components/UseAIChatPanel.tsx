@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import type { Chat, PersistedMessageContent, PersistedContentPart } from '../providers/chatRepository/types';
+import type { Chat, PersistedMessage, PersistedMessageContent, PersistedContentPart, MessageDisplayMode } from '../providers/chatRepository/types';
+import { getTextFromContent } from '../utils/messageContent';
 import type { AgentInfo, FeedbackValue, ToolAnnotations } from '../types';
 import type { FileAttachment, FileUploadConfig, FileProcessingState } from '../fileUpload/types';
 import { MarkdownContent } from './MarkdownContent';
@@ -17,29 +18,9 @@ export type UseAIChatPanelStrings = UseAIStrings;
 export type UseAIChatPanelTheme = UseAITheme;
 
 /**
- * Display mode for chat messages.
+ * @deprecated Use `PersistedMessage` directly instead.
  */
-type MessageDisplayMode = 'default' | 'error';
-
-/**
- * Represents a single message in the AI conversation.
- */
-interface Message {
-  /** Unique identifier for the message */
-  id: string;
-  /** The role of the message sender */
-  role: 'user' | 'assistant';
-  /** The message content - string or multimodal content */
-  content: PersistedMessageContent;
-  /** When the message was created */
-  timestamp: Date;
-  /** Display mode for styling the message bubble */
-  displayMode?: MessageDisplayMode;
-  /** Langfuse trace ID for feedback tracking (only for assistant messages) */
-  traceId?: string;
-  /** User feedback on this message (only for assistant messages) */
-  feedback?: FeedbackValue;
-}
+type Message = PersistedMessage;
 
 /**
  * Props for the FeedbackButton component.
@@ -126,19 +107,6 @@ function FeedbackButton({ type, isSelected, onClick, selectedColor, unselectedCo
       </svg>
     </button>
   );
-}
-
-/**
- * Helper to extract text content from message content.
- */
-function getTextContent(content: PersistedMessageContent): string {
-  if (typeof content === 'string') {
-    return content;
-  }
-  return content
-    .filter((part): part is { type: 'text'; text: string } => part.type === 'text')
-    .map(part => part.text)
-    .join('\n');
 }
 
 /**
@@ -235,6 +203,15 @@ export function UseAIChatPanel({
 }: UseAIChatPanelProps) {
   const strings = useStrings();
   const theme = useTheme();
+
+  // Filter out internal protocol messages at render time:
+  // - Tool result messages (role === 'tool')
+  // - Intermediate assistant messages that only contain tool calls (no user-visible text)
+  const displayMessages = messages.filter(m => {
+    if (m.role === 'tool') return false;
+    if (m.role === 'assistant' && m.toolCalls && m.toolCalls.length > 0 && !getTextFromContent(m.content)) return false;
+    return true;
+  });
 
   const [input, setInput] = useState('');
   const chatHistoryDropdown = useDropdownState();
@@ -439,10 +416,10 @@ export function UseAIChatPanel({
               }}>
                 {/* Get current chat title */}
                 {(() => {
-                  if (messages.length > 0) {
-                    const firstUserMsg = messages.find((m: Message) => m.role === 'user');
+                  if (displayMessages.length > 0) {
+                    const firstUserMsg = displayMessages.find((m) => m.role === 'user');
                     if (firstUserMsg) {
-                      const textContent = getTextContent(firstUserMsg.content);
+                      const textContent = getTextFromContent(firstUserMsg.content);
                       const maxLength = 30;
                       return textContent.length > maxLength
                         ? textContent.substring(0, maxLength) + '...'
@@ -631,7 +608,7 @@ export function UseAIChatPanel({
           )}
 
           {/* Delete button */}
-          {onDeleteChat && messages.length > 0 && (
+          {onDeleteChat && displayMessages.length > 0 && (
             <button
               data-testid="delete-chat-button"
               onClick={handleDeleteChat}
@@ -765,7 +742,7 @@ export function UseAIChatPanel({
           gap: '12px',
         }}
       >
-        {messages.length === 0 && (
+        {displayMessages.length === 0 && (
           <div
             style={{
               display: 'flex',
@@ -838,7 +815,7 @@ export function UseAIChatPanel({
           </div>
         )}
 
-        {messages.map((message: Message) => (
+        {displayMessages.map((message) => (
           <div
             key={message.id}
             data-testid={`chat-message-${message.role}`}
@@ -863,7 +840,7 @@ export function UseAIChatPanel({
                   data-testid="save-command-button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    const messageText = getTextContent(message.content);
+                    const messageText = getTextFromContent(message.content);
                     slashCommands.startSavingCommand(message.id, messageText);
                   }}
                   title="Save as slash command"
@@ -937,15 +914,15 @@ export function UseAIChatPanel({
                 </div>
               )}
               {message.role === 'assistant' ? (
-                <MarkdownContent content={getTextContent(message.content)} />
+                <MarkdownContent content={getTextFromContent(message.content)} />
               ) : (
-                getTextContent(message.content)
+                getTextFromContent(message.content)
               )}
               </div>
               {/* Inline save command UI - glued to chat bubble */}
               {slashCommands.renderInlineSaveUI({
                 messageId: message.id,
-                messageText: getTextContent(message.content),
+                messageText: getTextFromContent(message.content),
               })}
             </div>
             {/* Feedback buttons - only for assistant messages with traceId */}
@@ -989,7 +966,7 @@ export function UseAIChatPanel({
                 padding: '0 4px',
               }}
             >
-              {message.timestamp.toLocaleTimeString([], {
+              {message.createdAt.toLocaleTimeString([], {
                 hour: '2-digit',
                 minute: '2-digit'
               })}
