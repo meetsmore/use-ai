@@ -1,0 +1,59 @@
+apps/use-ai-server-app/src/index.ts
+  b10b0263598a66d1 2-3,8,163-197,206,222
+docs/plans/non-mcp-tools.md
+  b10b0263598a66d1 1-225
+apps/example/src/App.tsx
+  b10b0263598a66d1 10,28,83-85
+packages/server/src/agents/AISDKAgent.ts
+  b10b0263598a66d1 10-11,903-911
+apps/example/test/server-tools.e2e.test.ts
+  b10b0263598a66d1 1-105
+packages/server/src/types.ts
+  b10b0263598a66d1 84-99
+packages/server/src/server.ts
+  b10b0263598a66d1 27,29,97,108,162-178,498-499,501-502,505,711-712,714,721,728
+packages/server/src/tools/serverToolExecutor.test.ts
+  b10b0263598a66d1 1-128
+packages/server/src/index.ts
+  b10b0263598a66d1 16-19,24
+packages/server/src/utils/index.ts
+  b10b0263598a66d1 13
+packages/server/src/utils/toolFilters.test.ts
+  b10b0263598a66d1 1-90
+packages/server/src/tools/serverToolExecutor.ts
+  b10b0263598a66d1 1-49
+apps/example/src/pages/ServerToolsPage.tsx
+  b10b0263598a66d1 1-282
+apps/example/playwright.config.ts
+  b10b0263598a66d1 55
+packages/server/src/tools/index.ts
+  b10b0263598a66d1 1-8
+packages/server/src/tools/defineServerTool.ts
+  b10b0263598a66d1 1-116
+packages/server/src/tools/types.ts
+  b10b0263598a66d1 1-57
+packages/server/src/utils/toolFilters.ts
+  b10b0263598a66d1 3,25-41
+packages/server/src/tools/defineServerTool.test.ts
+  b10b0263598a66d1 1-149
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.5",
+  "base_commit_sha": "8f6eaea443758502c749b9200cc4090ad4aa55db",
+  "prompts": {
+    "b10b0263598a66d1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4b5ce7f3-1395-42f7-ba09-2960f96ccc92",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 1118,
+      "total_deletions": 17,
+      "accepted_lines": 1342,
+      "overriden_lines": 0
+    }
+  }
+}
