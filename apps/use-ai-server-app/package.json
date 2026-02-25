@@ -21,8 +21,9 @@
   "dependencies": {
     "@ai-sdk/anthropic": "3.0.0-beta.59",
     "@ai-sdk/openai": "3.0.0-beta.66",
+    "@meetsmore-oss/use-ai-plugin-workflows": "workspace:*",
     "@meetsmore-oss/use-ai-server": "workspace:*",
-    "@meetsmore-oss/use-ai-plugin-workflows": "workspace:*"
+    "zod": "3"
   },
   "devDependencies": {
     "@types/bun": "latest",

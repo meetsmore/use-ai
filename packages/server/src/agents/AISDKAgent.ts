@@ -7,7 +7,8 @@ import type { ToolDefinition, UseAIForwardedProps } from '../types';
 import type { RemoteToolDefinition } from '../mcp';
 import { EventType, ErrorCode } from '../types';
 import { createClientToolExecutor } from '../utils/toolConverter';
-import { isRemoteTool } from '../utils/toolFilters';
+import { isRemoteTool, isServerTool } from '../utils/toolFilters';
+import { createServerToolExecutor } from '../tools/serverToolExecutor';
 import type {
   TextMessageStartEvent,
   TextMessageContentEvent,
@@ -899,10 +900,15 @@ export class AISDKAgent implements Agent {
         ? { ...rawParams, type: ((rawParams as Record<string, unknown>).type || 'object') as 'object' }
         : { type: 'object' as const, properties: {} };
 
-      // Get the base executor
-      const baseExecutor = isRemoteTool(toolDef)
-        ? this.createMcpToolExecutor(toolDef, session)
-        : clientToolExecutor;
+      // Get the base executor based on tool type
+      let baseExecutor;
+      if (isRemoteTool(toolDef)) {
+        baseExecutor = this.createMcpToolExecutor(toolDef, session);
+      } else if (isServerTool(toolDef)) {
+        baseExecutor = createServerToolExecutor(toolDef, session);
+      } else {
+        baseExecutor = clientToolExecutor;
+      }
 
       // Wrap with approval handling if tool needs confirmation
       const execute = toolNeedsApproval(toolDef)
