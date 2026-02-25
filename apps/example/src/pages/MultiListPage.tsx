@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { useAI, defineTool } from '@meetsmore-oss/use-ai-client';
 import { z } from 'zod';
 import ListItem from '../components/ListItem';
+import { CollapsibleCode } from '../components/CollapsibleCode';
+import { docStyles } from '../styles/docStyles';
 
 interface Item {
   id: string;
@@ -86,26 +88,58 @@ export default function MultiListPage() {
   });
 
   return (
-    <div ref={ref} style={styles.container}>
-      <div style={styles.card}>
-        <h1 style={styles.title}>Multiple List Items Test</h1>
-        <p style={styles.subtitle}>
-          Each item below has its own useAI hook with tools. Try asking the AI to:
+    <div ref={ref} style={docStyles.container}>
+      <h1 style={docStyles.title}>Multiple Instances</h1>
+
+      <div style={docStyles.infoCard}>
+        <h2 style={docStyles.subtitle}>About</h2>
+        <p style={docStyles.text}>
+          The <code style={docStyles.code}>id</code> parameter differentiates multiple instances
+          of the same component. Each list item below has its own{' '}
+          <code style={docStyles.code}>useAI</code> hook with tools. The{' '}
+          <code style={docStyles.code}>id</code> prefixes tool names so the AI can target
+          specific items (e.g., <code style={docStyles.code}>Item-A/updateLabel</code>).
         </p>
-        <ul style={styles.instructions}>
-          <li>Change the label of Item-A</li>
-          <li>Increment the counter on all items</li>
-          <li>Change Item-B's color to blue</li>
-          <li>Get the state of all items</li>
-          <li>Reset counters for items A and C</li>
-          <li><strong>Create a new item</strong> (tests dynamic tool registration)</li>
-          <li><strong>Delete Item-C</strong> (tests tool deregistration)</li>
-        </ul>
-        <p style={styles.note}>
-          <strong>Note:</strong> This page tests what happens when multiple components
-          with similar tools are mounted. Each list item registers its own set of tools
-          with unique descriptions that include the item ID. You can also create and delete
-          items to test that tools are immediately available when components mount.
+        <p style={docStyles.text}>
+          Creating and deleting items dynamically registers and deregisters tools mid-run —
+          the AI immediately sees new tools when components mount.
+        </p>
+      </div>
+
+      <div style={docStyles.definitionCard}>
+        <h2 style={docStyles.subtitle}>Code Example</h2>
+        <CollapsibleCode>
+{`function ListItem({ id }: { id: string }) {
+  const [label, setLabel] = useState('...');
+  const [counter, setCounter] = useState(0);
+
+  const tools = {
+    updateLabel: defineTool(
+      \`Change the label of \${id}\`,
+      z.object({ label: z.string() }),
+      (input) => { setLabel(input.label); return { success: true }; }
+    ),
+    incrementCounter: defineTool(
+      \`Increment \${id}'s counter\`,
+      () => { setCounter(c => c + 1); return { success: true }; }
+    ),
+  };
+
+  useAI({
+    tools,
+    prompt: \`\${id}: label="\${label}", counter=\${counter}\`,
+    id,  // Prefixes tool names: "Item-A/updateLabel"
+  });
+
+  return (/* item UI */);
+}`}
+        </CollapsibleCode>
+      </div>
+
+      <div style={docStyles.demoCard}>
+        <h2 style={docStyles.subtitle}>Interactive Demo</h2>
+        <p style={docStyles.text}>
+          Try: "Change the label of Item-A to Hello World" or "Increment all counters" or "Create a new item"
         </p>
 
         <div style={styles.createButtonContainer}>
@@ -131,43 +165,6 @@ export default function MultiListPage() {
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  container: {
-    maxWidth: '900px',
-    margin: '0 auto',
-    padding: '20px',
-  },
-  card: {
-    background: 'white',
-    borderRadius: '8px',
-    padding: '24px',
-    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
-  },
-  title: {
-    fontSize: '28px',
-    fontWeight: 'bold',
-    marginBottom: '8px',
-    color: '#333',
-  },
-  subtitle: {
-    fontSize: '14px',
-    color: '#666',
-    marginBottom: '12px',
-  },
-  instructions: {
-    fontSize: '14px',
-    color: '#555',
-    marginBottom: '16px',
-    paddingLeft: '20px',
-  },
-  note: {
-    fontSize: '13px',
-    color: '#666',
-    padding: '12px',
-    background: '#f8f9fa',
-    borderRadius: '4px',
-    marginBottom: '24px',
-    borderLeft: '3px solid #007bff',
-  },
   createButtonContainer: {
     marginBottom: '20px',
     display: 'flex',

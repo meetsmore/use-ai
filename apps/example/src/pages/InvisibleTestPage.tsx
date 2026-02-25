@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { InvisibleAIProvider, subscribeToLogs, clearLogs } from '../providers/InvisibleAIProvider';
+import { CollapsibleCode } from '../components/CollapsibleCode';
+import { docStyles } from '../styles/docStyles';
 
 function LogDisplay() {
   const [logs, setLogs] = useState<string[]>([]);
@@ -36,24 +38,56 @@ function LogDisplay() {
 export default function InvisibleTestPage() {
   return (
     <InvisibleAIProvider>
-      <div style={styles.container}>
-        <div style={styles.card}>
-          <h1 style={styles.title}>Invisible Component Test</h1>
-          <p style={styles.subtitle}>
-            This page demonstrates an invisible AI provider component with no visual state.
-            Tools from invisible components execute immediately without waiting for re-renders.
+      <div style={docStyles.container}>
+        <h1 style={docStyles.title}>Invisible Providers</h1>
+
+        <div style={docStyles.infoCard}>
+          <h2 style={docStyles.subtitle}>About</h2>
+          <p style={docStyles.text}>
+            Components with <code style={docStyles.code}>invisible: true</code> register tools
+            without participating in render cycles. Their tools execute immediately without
+            waiting for re-renders, making them ideal for global actions (navigation, logging,
+            notifications) that don't have visual state.
           </p>
+          <p style={docStyles.text}>
+            A real-world example is the <code style={docStyles.code}>NavigationAIProvider</code>{' '}
+            that wraps this entire example app — it provides{' '}
+            <code style={docStyles.code}>navigateTo</code> and{' '}
+            <code style={docStyles.code}>getCurrentPage</code> tools on every page.
+          </p>
+        </div>
 
-          <div style={styles.infoBox}>
-            <h3 style={styles.infoTitle}>How it works:</h3>
-            <ol style={styles.infoList}>
-              <li>The InvisibleAIProvider wraps this page</li>
-              <li>It provides tools like "logMessage" to the AI</li>
-              <li>These tools execute without triggering provider re-renders</li>
-              <li>Try asking: "Log a message: [your text]"</li>
-            </ol>
-          </div>
+        <div style={docStyles.definitionCard}>
+          <h2 style={docStyles.subtitle}>Code Example</h2>
+          <CollapsibleCode>
+{`function InvisibleAIProvider({ children }: { children: ReactNode }) {
+  const tools = {
+    logMessage: defineTool(
+      'Log a message to the system log',
+      z.object({ message: z.string() }),
+      (input) => {
+        addLog(input.message);
+        return { success: true };
+      }
+    ),
+  };
 
+  useAI({
+    tools,
+    prompt: 'Invisible provider — tools only, no visual state',
+    invisible: true,  // No render cycle participation
+  });
+
+  return <>{children}</>;
+}`}
+          </CollapsibleCode>
+        </div>
+
+        <div style={docStyles.demoCard}>
+          <h2 style={docStyles.subtitle}>Interactive Demo</h2>
+          <p style={docStyles.text}>
+            Try asking: "Log a message: Hello from the AI"
+          </p>
           <LogDisplay />
         </div>
       </div>
@@ -62,50 +96,6 @@ export default function InvisibleTestPage() {
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  container: {
-    maxWidth: '800px',
-    margin: '0 auto',
-    padding: '20px',
-  },
-  card: {
-    background: 'white',
-    borderRadius: '8px',
-    padding: '24px',
-    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
-  },
-  title: {
-    fontSize: '28px',
-    fontWeight: 'bold',
-    marginBottom: '8px',
-    color: '#333',
-  },
-  subtitle: {
-    fontSize: '14px',
-    color: '#666',
-    marginBottom: '24px',
-    lineHeight: '1.5',
-  },
-  infoBox: {
-    background: '#f8f9fa',
-    border: '1px solid #dee2e6',
-    borderRadius: '6px',
-    padding: '16px',
-    marginBottom: '24px',
-  },
-  infoTitle: {
-    fontSize: '16px',
-    fontWeight: '600',
-    color: '#333',
-    marginTop: 0,
-    marginBottom: '12px',
-  },
-  infoList: {
-    margin: 0,
-    paddingLeft: '20px',
-    color: '#666',
-    fontSize: '14px',
-    lineHeight: '1.8',
-  },
   logContainer: {
     border: '1px solid #dee2e6',
     borderRadius: '6px',
