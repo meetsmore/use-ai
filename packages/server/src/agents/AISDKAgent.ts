@@ -26,7 +26,7 @@ import type {
   ToolCallStartExtensions,
 } from '../types';
 import { logger } from '../logger';
-import { langfuse, popTraceIdForRun, recordErrorTrace, type LangfuseApi } from '../instrumentation';
+import { langfuse, popTraceIdForRun, recordErrorTrace, isTracingEnabled, type LangfuseApi } from '../instrumentation';
 import { applyCacheBreakpoints, type CacheBreakpointFn } from './anthropicCache';
 import { getToolAnnotations } from '../utils';
 import { toolNeedsApproval, createApprovalWrapper, type ToolArguments, type ToolResult } from './toolApproval';
@@ -431,7 +431,7 @@ export class AISDKAgent implements Agent {
           maxOutputTokens: this.maxOutputTokens,
           temperature: this.temperature,
           abortSignal: session.abortController?.signal,
-          experimental_telemetry: this.langfuse?.enabled
+          experimental_telemetry: isTracingEnabled()
             ? {
                 isEnabled: true,
                 functionId: 'use-ai',

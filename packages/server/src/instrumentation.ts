@@ -101,6 +101,16 @@ export function recordErrorTrace(params: ErrorTraceParams): void {
 }
 
 /**
+ * Whether OpenTelemetry tracing is active (Langfuse and/or custom span processors).
+ * Used by AISDKAgent to decide whether to enable experimental_telemetry.
+ */
+let _tracingEnabled = false;
+
+export function isTracingEnabled(): boolean {
+  return _tracingEnabled;
+}
+
+/**
  * Starts OpenTelemetry tracing with Langfuse and optional custom span processors.
  * Called by UseAIServer constructor. Safe to call multiple times (no-op after first call).
  */
@@ -147,6 +157,7 @@ export function startTracing(customProcessors: SpanProcessor[] = []): void {
 
     const sdk = new NodeSDK({ spanProcessors });
     sdk.start();
+    _tracingEnabled = true;
 
     // Update flush to include all processors
     langfuse.flush = async () => {
@@ -206,4 +217,5 @@ export function _initializeLangfuse(): LangfuseApi {
  */
 export function _resetTracing(): void {
   _tracingStarted = false;
+  _tracingEnabled = false;
 }
