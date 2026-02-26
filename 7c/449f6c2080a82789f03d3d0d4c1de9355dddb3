@@ -1,0 +1,27 @@
+packages/server/src/span-processors.integration.test.ts
+  5fbafc80ba40231b 1-98
+packages/server/src/instrumentation.ts
+  5fbafc80ba40231b 104-112,160,220
+packages/server/src/agents/AISDKAgent.ts
+  5fbafc80ba40231b 29,434
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.5",
+  "base_commit_sha": "7c449f6c2080a82789f03d3d0d4c1de9355dddb3",
+  "prompts": {
+    "5fbafc80ba40231b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "01db9704-6ada-47dd-9224-262c247df9e1",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 156,
+      "total_deletions": 46,
+      "accepted_lines": 113,
+      "overriden_lines": 0
+    }
+  }
+}
