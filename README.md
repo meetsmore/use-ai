@@ -1188,7 +1188,9 @@ Because it's awkward to get API keys for workflows from Dify, you can use a mapp
 
 ## Skills
 
-You can install [agent skills](https://github.com/vercel-labs/skills) for use-ai into other repositories with a single command:
+This repository provides an [agent skill](https://agentskills.io/home) for developers building applications with use-ai. The skill includes auto-generated API documentation, allowing AI coding agents to reference it for accurate usage guidance.
+
+You can install the skill with a single command:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/meetsmore/use-ai/main/scripts/install-skill.sh | bash
