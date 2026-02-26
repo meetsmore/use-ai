@@ -10,6 +10,9 @@ export { AISDKAgent, type AISDKAgentConfig, type MessageWithCacheContext, type C
 export type { UseAIServerPlugin, MessageHandler } from './plugins';
 export { FeedbackPlugin } from './plugins';
 
+// Export span processor type for custom OTel setup
+export type { SpanProcessor } from './instrumentation';
+
 // Export logger for plugins
 export { logger } from './logger';
 

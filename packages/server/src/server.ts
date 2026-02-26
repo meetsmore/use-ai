@@ -18,7 +18,7 @@ import type {
 } from './types';
 import { RateLimiter } from './rateLimiter';
 import { logger } from './logger';
-import { recordErrorTrace } from './instrumentation';
+import { recordErrorTrace, startTracing } from './instrumentation';
 import { v4 as uuidv4 } from 'uuid';
 import type { Agent, EventEmitter, AGUIEventExtended } from './agents/types';
 import type { ClientSession } from './agents/types';
@@ -94,7 +94,7 @@ export class UseAIServer {
   private defaultAgentId: string; // ID of the default agent
   private agents: Record<string, Agent>; // Registry of all agents
   private clients: Map<string, ClientSession> = new Map();
-  private config: Required<Omit<UseAIServerConfig, 'defaultAgent' | 'agents' | 'plugins' | 'tools' | 'mcpEndpoints' | 'maxHttpBufferSize' | 'cors' | 'idleTimeout' | 'runtime'>> & {
+  private config: Required<Omit<UseAIServerConfig, 'defaultAgent' | 'agents' | 'plugins' | 'tools' | 'mcpEndpoints' | 'maxHttpBufferSize' | 'cors' | 'idleTimeout' | 'runtime' | 'spanProcessors'>> & {
     maxHttpBufferSize: number;
     cors?: CorsOptions;
     idleTimeout: number;
@@ -116,6 +116,10 @@ export class UseAIServer {
    * @throws Error if the specified agent name does not exist in the agents map
    */
   constructor(config: UseAIServerConfig) {
+    // Start OTel tracing with optional custom span processors.
+    // No-op after first call, so safe if multiple UseAIServer instances are created.
+    startTracing(config.spanProcessors);
+
     this.config = {
       port: config.port ?? 8081,
       rateLimitMaxRequests: config.rateLimitMaxRequests ?? 0,

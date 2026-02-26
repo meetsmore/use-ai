@@ -142,6 +142,24 @@ export interface UseAIServerConfig<TAgents extends Record<string, import('./agen
    * @default 'auto'
    */
   runtime?: 'auto' | 'bun' | 'node';
+  /**
+   * Optional additional OpenTelemetry span processors.
+   * These are registered alongside the built-in Langfuse and traceId capture processors.
+   *
+   * @example
+   * ```typescript
+   * import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
+   * import { SimpleSpanProcessor } from '@opentelemetry/sdk-trace-base';
+   *
+   * const exporter = new OTLPTraceExporter({ url: 'http://localhost:4318/v1/traces' });
+   * const server = new UseAIServer({
+   *   agents: { claude: claudeAgent },
+   *   defaultAgent: 'claude',
+   *   spanProcessors: [new SimpleSpanProcessor(exporter)],
+   * });
+   * ```
+   */
+  spanProcessors?: import('./instrumentation').SpanProcessor[];
 }
 
 // Re-export all types from @meetsmore-oss/use-ai-core
