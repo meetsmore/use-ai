@@ -1,0 +1,18 @@
+{
+  "entryPoints": [
+    "packages/core",
+    "packages/client",
+    "packages/server",
+    "packages/plugin-workflows"
+  ],
+  "entryPointStrategy": "packages",
+  "out": "skills/use-ai/docs",
+  "name": "use-ai",
+  "excludePrivate": true,
+  "excludeInternal": true,
+  "excludeExternals": true,
+  "exclude": ["**/node_modules/zod/**"],
+  "plugin": ["typedoc-plugin-markdown"],
+  "readme": "none",
+  "hideGenerator": true
+}

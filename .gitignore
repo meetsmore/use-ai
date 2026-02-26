@@ -17,6 +17,9 @@ apps/*/dist
 apps/example/playwright-report/
 apps/example/test-results/
 
+# Generated skill (API docs + SKILL.md)
+skills/
+
 # Turbo
 .turbo/
 

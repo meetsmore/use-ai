@@ -58,6 +58,7 @@ A React client/framework for easily enabling AI to control your users frontend.
     - [Feedback](#feedback)
   - [Plugins](#plugins)
     - [`@meetsmore-oss/use-ai-plugin-workflows`](#meetsmore-use-ai-plugin-workflows)
+- [Skills](#skills)
 
 ## Overview
 
@@ -1282,3 +1283,23 @@ Because it's awkward to get API keys for workflows from Dify, you can use a mapp
 ```tsx
   const { trigger, status, text, error, connected } = useAIWorkflow('dify', 'greeting-workflow');
 ```
+
+## Skills
+
+This repository provides an [agent skill](https://agentskills.io/home) for developers building applications with use-ai. The skill includes auto-generated API documentation, allowing AI coding agents to reference it for accurate usage guidance.
+
+You can install the skill with a single command:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/meetsmore/use-ai/main/scripts/install-skill.sh | bash
+```
+
+To install a specific version:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/meetsmore/use-ai/main/scripts/install-skill.sh | USE_AI_VERSION=1.7.0 bash
+```
+
+This script clones the repository, builds the API docs locally, and installs the skill via `npx skills add`. It requires `git`, `bun`, and `npx` to be installed.
+
+You will be prompted to choose between project-local or global installation.
