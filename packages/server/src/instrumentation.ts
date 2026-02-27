@@ -25,7 +25,6 @@ export interface LangfuseApi {
   enabled: boolean;
   /** Langfuse SDK client for score operations */
   client?: Langfuse;
-  flush?: () => Promise<void>;
 }
 
 /**
@@ -115,6 +114,15 @@ export function isTracingEnabled(): boolean {
  * Called by UseAIServer constructor. Safe to call multiple times (no-op after first call).
  */
 let _tracingStarted = false;
+let _spanProcessors: SpanProcessor[] = [];
+
+/**
+ * Flushes all registered span processors (Langfuse + custom).
+ * Called by AISDKAgent.flushTelemetry() during server shutdown.
+ */
+export async function flushTracing(): Promise<void> {
+  await Promise.all(_spanProcessors.map(p => p.forceFlush()));
+}
 
 export function startTracing(customProcessors: SpanProcessor[] = []): void {
   if (_tracingStarted) return;
@@ -159,12 +167,8 @@ export function startTracing(customProcessors: SpanProcessor[] = []): void {
     sdk.start();
     _tracingEnabled = true;
 
-    // Update flush to include all processors
-    langfuse.flush = async () => {
-      if (langfuseSpanProcessor) await langfuseSpanProcessor.forceFlush();
-      await Promise.all(customProcessors.map(p => p.forceFlush()));
-      if (langfuse.client) await langfuse.client.flushAsync();
-    };
+    // Store references for flushTracing()
+    _spanProcessors = spanProcessors;
 
     logger.info('OpenTelemetry tracing started', {
       langfuseEnabled: langfuse.enabled,
@@ -205,9 +209,6 @@ export function _initializeLangfuse(): LangfuseApi {
   return {
     enabled: true,
     client,
-    flush: async () => {
-      await client.flushAsync();
-    },
   };
 }
 
@@ -218,4 +219,5 @@ export function _initializeLangfuse(): LangfuseApi {
 export function _resetTracing(): void {
   _tracingStarted = false;
   _tracingEnabled = false;
+  _spanProcessors = [];
 }

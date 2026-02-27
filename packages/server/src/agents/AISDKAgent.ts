@@ -26,7 +26,7 @@ import type {
   ToolCallStartExtensions,
 } from '../types';
 import { logger } from '../logger';
-import { langfuse, popTraceIdForRun, recordErrorTrace, isTracingEnabled, type LangfuseApi } from '../instrumentation';
+import { langfuse, popTraceIdForRun, recordErrorTrace, isTracingEnabled, flushTracing, type LangfuseApi } from '../instrumentation';
 import { applyCacheBreakpoints, type CacheBreakpointFn } from './anthropicCache';
 import { getToolAnnotations } from '../utils';
 import { toolNeedsApproval, createApprovalWrapper, type ToolArguments, type ToolResult } from './toolApproval';
@@ -291,13 +291,11 @@ export class AISDKAgent implements Agent {
   }
 
   /**
-   * Flushes pending Langfuse telemetry data.
+   * Flushes pending telemetry data (all registered span processors).
    * Useful for tests to ensure data is sent before querying.
    */
   async flushTelemetry(): Promise<void> {
-    if (this.langfuse.flush) {
-      await this.langfuse.flush();
-    }
+    await flushTracing();
   }
 
   async run(input: AgentInput, events: EventEmitter): Promise<AgentResult> {
