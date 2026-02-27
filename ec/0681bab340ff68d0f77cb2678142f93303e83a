@@ -1,0 +1,38 @@
+packages/server/src/instrumentation.ts
+  a90f24caa8152953 117-125,170-171,222
+packages/server/src/agents/AISDKAgent.ts
+  a90f24caa8152953 29,294,298
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.5",
+  "base_commit_sha": "ec0681bab340ff68d0f77cb2678142f93303e83a",
+  "prompts": {
+    "5fbafc80ba40231b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "01db9704-6ada-47dd-9224-262c247df9e1",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    },
+    "a90f24caa8152953": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "370c2f00-cbac-4362-8e73-d75eee6da792",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 24,
+      "total_deletions": 26,
+      "accepted_lines": 15,
+      "overriden_lines": 0
+    }
+  }
+}
