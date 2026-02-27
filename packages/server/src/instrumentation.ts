@@ -10,7 +10,7 @@ const traceIdByRunId = new Map<string, string>();
  * so users don't need to import the OTel package to implement custom processors.
  */
 export interface SpanProcessor {
-  onStart(span: { spanContext(): { traceId: string }; attributes?: Record<string, unknown> }): void;
+  onStart(span: { spanContext(): { traceId: string }; attributes?: Record<string, unknown>; setAttribute(key: string, value: unknown): void }): void;
   onEnd(span: unknown): void;
   shutdown(): Promise<void>;
   forceFlush(): Promise<void>;
@@ -135,7 +135,7 @@ export function startTracing(customProcessors: SpanProcessor[] = []): void {
 
     // Capture trace IDs from AI SDK spans for feedback linking
     const traceIdCaptureProcessor = {
-      onStart(span: { spanContext(): { traceId: string }; attributes?: Record<string, unknown> }) {
+      onStart(span: { spanContext(): { traceId: string }; attributes?: Record<string, unknown>; setAttribute(key: string, value: unknown): void }) {
         const runId = span.attributes?.['ai.telemetry.metadata.runId'] as string | undefined;
         if (runId) {
           pushTraceIdForRun(runId, span.spanContext().traceId);
