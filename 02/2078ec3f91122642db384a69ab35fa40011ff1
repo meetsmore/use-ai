@@ -1,0 +1,35 @@
+packages/client/src/client.test.ts
+  381e84f2714af141 370-443
+packages/client/src/hooks/useChatManagement.ts
+  381e84f2714af141 461-488
+packages/server/src/agents/AISDKAgent.test.ts
+  381e84f2714af141 544-545,635-641,644,744-754,832-838,965-972
+packages/client/src/client.ts
+  381e84f2714af141 83-84,187,237-238,240-243,247-248,250-251,253-268,273,407-408,415,437-449,668
+packages/server/src/agents/AISDKAgent.ts
+  381e84f2714af141 613,697
+packages/server/src/server.ts
+  381e84f2714af141 669
+packages/client/src/hooks/useServerEvents.ts
+  381e84f2714af141 27-29,33,37,45,55
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.7",
+  "base_commit_sha": "022078ec3f91122642db384a69ab35fa40011ff1",
+  "prompts": {
+    "381e84f2714af141": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "675707bb-1d21-409e-9582-737ad374ebc4",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 233,
+      "total_deletions": 142,
+      "accepted_lines": 196,
+      "overriden_lines": 0
+    }
+  }
+}
