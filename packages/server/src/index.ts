@@ -13,10 +13,15 @@ export { FeedbackPlugin } from './plugins';
 // Export logger for plugins
 export { logger } from './logger';
 
+// Export server tool definition helper and types
+export { defineServerTool } from './tools';
+export type { ServerToolConfig, ServerToolContext, ServerToolDefinition } from './tools';
+
 // Export utilities for plugins and custom agents
 export {
   createClientToolExecutor,
   isRemoteTool,
+  isServerTool,
   getToolAnnotations,
   createGlobFilter,
   and,

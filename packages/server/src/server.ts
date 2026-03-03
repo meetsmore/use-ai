@@ -24,8 +24,9 @@ import type { Agent, EventEmitter, AGUIEventExtended } from './agents/types';
 import type { ClientSession } from './agents/types';
 import type { UseAIServerPlugin, MessageHandler } from './plugins/types';
 import { FeedbackPlugin } from './plugins/FeedbackPlugin';
-import { isRemoteTool } from './utils/toolFilters';
+import { isRemoteTool, isServerTool } from './utils/toolFilters';
 import { RemoteMcpToolsProvider, type RemoteToolDefinition } from './mcp';
+import type { ServerToolDefinition } from './tools/types';
 import { findMatch } from './utils/patternMatcher';
 import {
   createRuntimeAdapter,
@@ -93,7 +94,7 @@ export class UseAIServer {
   private defaultAgentId: string; // ID of the default agent
   private agents: Record<string, Agent>; // Registry of all agents
   private clients: Map<string, ClientSession> = new Map();
-  private config: Required<Omit<UseAIServerConfig, 'defaultAgent' | 'agents' | 'plugins' | 'mcpEndpoints' | 'maxHttpBufferSize' | 'cors' | 'idleTimeout' | 'runtime'>> & {
+  private config: Required<Omit<UseAIServerConfig, 'defaultAgent' | 'agents' | 'plugins' | 'tools' | 'mcpEndpoints' | 'maxHttpBufferSize' | 'cors' | 'idleTimeout' | 'runtime'>> & {
     maxHttpBufferSize: number;
     cors?: CorsOptions;
     idleTimeout: number;
@@ -104,6 +105,7 @@ export class UseAIServer {
   private plugins: UseAIServerPlugin[] = [];
   private messageHandlers: Map<string, MessageHandler> = new Map();
   private mcpEndpoints: RemoteMcpToolsProvider[] = [];
+  private serverTools: ServerToolDefinition[] = [];
   // Tracks client IP addresses for both WebSocket and polling transports
   private clientIpTracker: ClientIpTracker;
 
@@ -154,6 +156,23 @@ export class UseAIServer {
       logger.info('[MCP] Created remote MCP instances', {
         count: this.mcpEndpoints.length,
         endpoints: this.mcpEndpoints.map(e => e.getUrl()),
+      });
+    }
+
+    // Convert server tools config to ServerToolDefinition[]
+    if (config.tools) {
+      this.serverTools = Object.entries(config.tools).map(([name, toolConfig]) => ({
+        name,
+        description: toolConfig.description,
+        parameters: toolConfig.parameters,
+        annotations: toolConfig.annotations,
+        _server: {
+          execute: toolConfig.execute,
+        },
+      }));
+      logger.info('[Server Tools] Registered server tools', {
+        count: this.serverTools.length,
+        names: this.serverTools.map(t => t.name),
       });
     }
 
@@ -467,13 +486,14 @@ export class UseAIServer {
       mcpTools = await this.getMcpToolsForSession(session, mcpHeaders);
     }
 
-    // Merge: client tools + MCP tools
-    session.tools = [...clientTools, ...mcpTools];
+    // Merge: client tools + MCP tools + server tools
+    session.tools = [...clientTools, ...mcpTools, ...this.serverTools];
 
-    if (mcpTools.length > 0) {
-      logger.debug('[MCP] Merged tools', {
+    if (mcpTools.length > 0 || this.serverTools.length > 0) {
+      logger.debug('Merged tools', {
         clientTools: clientTools.length,
         mcpTools: mcpTools.length,
+        serverTools: this.serverTools.length,
         total: session.tools.length,
       });
     }
@@ -695,22 +715,24 @@ export class UseAIServer {
     // Update session tools if client sent updated tools
     // This allows mid-run tool updates (e.g., after navigation to a new page)
     if (tools && tools.length > 0) {
-      // Client only knows about client tools, so forwardedProps.tools never includes MCP tools.
-      // Preserve existing MCP (remote) tools and merge with the updated client tools.
+      // Client only knows about client tools, so forwardedProps.tools never includes
+      // MCP (remote) tools or server tools. Preserve both when merging.
       const existingRemoteTools = session.tools.filter(isRemoteTool);
+      const existingServerTools = session.tools.filter(isServerTool);
 
       const updatedClientTools = tools.map(t => ({
         ...t,
         parameters: t.parameters || { type: 'object', properties: {}, required: [] },
       })) as ToolDefinition[];
 
-      session.tools = [...updatedClientTools, ...existingRemoteTools];
+      session.tools = [...updatedClientTools, ...existingRemoteTools, ...existingServerTools];
 
       logger.debug('Tools updated mid-run', {
         clientId: session.clientId,
         toolCount: session.tools.length,
         clientToolCount: updatedClientTools.length,
         mcpToolCount: existingRemoteTools.length,
+        serverToolCount: existingServerTools.length,
         toolNames: session.tools.map(t => t.name),
       });
     }

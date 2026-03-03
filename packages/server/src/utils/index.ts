@@ -10,6 +10,7 @@ export {
 
 export {
   isRemoteTool,
+  isServerTool,
   createGlobFilter,
   and,
   or,

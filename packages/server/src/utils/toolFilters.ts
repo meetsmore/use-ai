@@ -1,5 +1,6 @@
 import type { ToolDefinition } from '../types';
 import type { RemoteToolDefinition } from '../mcp';
+import type { ServerToolDefinition } from '../tools/types';
 import { matchesPattern } from './patternMatcher';
 
 /**
@@ -18,6 +19,24 @@ import { matchesPattern } from './patternMatcher';
  */
 export function isRemoteTool(tool: ToolDefinition): tool is RemoteToolDefinition {
   return (tool as RemoteToolDefinition)._remote !== undefined;
+}
+
+/**
+ * Type guard to check if a tool is a server-side tool.
+ *
+ * @param tool - Tool definition to check
+ * @returns True if tool has server execution metadata, false otherwise
+ *
+ * @example
+ * ```typescript
+ * if (isServerTool(tool)) {
+ *   // tool is ServerToolDefinition with _server property
+ *   await tool._server.execute(args, context);
+ * }
+ * ```
+ */
+export function isServerTool(tool: ToolDefinition): tool is ServerToolDefinition {
+  return (tool as ServerToolDefinition)._server !== undefined;
 }
 
 /**
