@@ -80,6 +80,8 @@ export class UseAIClient {
   // Assistant message assembly (for tracking full conversation history)
   private _currentAssistantMessage: { id: string; role: 'assistant'; content: string } | null = null;
   private _currentAssistantToolCalls: Array<{ id: string; type: 'function'; function: { name: string; arguments: string } }> = [];
+  // Tool results collected during a turn, pushed to _messages in correct order at RUN_FINISHED
+  private _pendingToolResults: Message[] = [];
 
   // Tool call assembly
   private currentToolCalls: Map<string, {
@@ -182,6 +184,7 @@ export class UseAIClient {
         content: '',
       };
       this._currentAssistantToolCalls = [];
+      this._pendingToolResults = [];
     }
 
     // Handle text message streaming
@@ -231,23 +234,43 @@ export class UseAIClient {
 
     // Handle run completion - finalize assistant message
     else if (event.type === EventType.RUN_FINISHED) {
-      // Add completed assistant message to conversation history
+      // Add completed messages to conversation history in correct API order:
+      // assistant(toolCalls) → tool results → assistant(text)
       if (this._currentAssistantMessage) {
-        const assistantMessage: Message = {
-          id: this._currentAssistantMessage.id!,
-          role: 'assistant',
-          content: this._currentAssistantMessage.content || '',
-          // Add tool calls if any
-          ...(this._currentAssistantToolCalls.length > 0
-            ? { toolCalls: this._currentAssistantToolCalls }
-            : {}),
-        };
+        if (this._currentAssistantToolCalls.length > 0) {
+          // Intermediate assistant message with tool calls only
+          const toolCallMessage: Message = {
+            id: uuidv4(),
+            role: 'assistant',
+            content: '',
+            toolCalls: this._currentAssistantToolCalls,
+          };
+          this._messages.push(toolCallMessage);
 
-        this._messages.push(assistantMessage);
+          // Tool result messages
+          this._messages.push(...this._pendingToolResults);
+
+          // Final assistant message with text only
+          const textMessage: Message = {
+            id: this._currentAssistantMessage.id!,
+            role: 'assistant',
+            content: this._currentAssistantMessage.content || '',
+          };
+          this._messages.push(textMessage);
+        } else {
+          // No tool calls - just a text response
+          const assistantMessage: Message = {
+            id: this._currentAssistantMessage.id!,
+            role: 'assistant',
+            content: this._currentAssistantMessage.content || '',
+          };
+          this._messages.push(assistantMessage);
+        }
 
         // Reset for next message
         this._currentAssistantMessage = null;
         this._currentAssistantToolCalls = [];
+        this._pendingToolResults = [];
       }
     }
 
@@ -381,14 +404,15 @@ export class UseAIClient {
       },
     };
 
-    // Track tool result in conversation history
+    // Collect tool result for deferred push at RUN_FINISHED (ensures correct
+    // API ordering: assistant(toolCalls) → tool results → assistant(text))
     const toolResultMsg: Message = {
       id: toolResultMessage.data.messageId,
       role: 'tool',
       content: toolResultMessage.data.content,
       toolCallId,
     };
-    this._messages.push(toolResultMsg);
+    this._pendingToolResults.push(toolResultMsg);
 
     this.send(toolResultMessage);
   }
@@ -409,6 +433,19 @@ export class UseAIClient {
         reason,
       },
     };
+
+    // When a tool is rejected, the server handles it internally and never sends
+    // a tool_result event back to the client. Track a synthetic tool result so
+    // the conversation history has the required tool_use → tool_result pairing.
+    // (Approved tools get their result tracked via sendToolResponse after execution.)
+    if (!approved) {
+      this._pendingToolResults.push({
+        id: uuidv4(),
+        role: 'tool',
+        content: JSON.stringify({ rejected: true, reason: reason || 'User rejected tool execution' }),
+        toolCallId,
+      });
+    }
 
     this.send(message);
   }
@@ -628,6 +665,7 @@ export class UseAIClient {
     this.currentToolCalls.clear();
     this._currentAssistantMessage = null;
     this._currentAssistantToolCalls = [];
+    this._pendingToolResults = [];
   }
 
   send(message: UseAIClientMessage) {

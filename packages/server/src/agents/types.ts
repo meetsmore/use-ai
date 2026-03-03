@@ -21,8 +21,6 @@ export interface ClientSession {
   tools: ToolDefinition[];
   /** Current application state (AG-UI format) */
   state: unknown;
-  /** Full conversation history in AI SDK ModelMessage format (for AI API calls) */
-  conversationHistory: ModelMessage[];
   /** Map of pending tool calls awaiting results from the client. Key: toolCallId, Value: resolver function */
   pendingToolCalls: Map<string, (content: string) => void>;
   /** MCP headers configuration for the current request (temporary, cleared after request) */

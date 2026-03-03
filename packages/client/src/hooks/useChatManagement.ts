@@ -458,6 +458,34 @@ export function useChatManagement({
     }
   }, [currentChatId, pendingChatId, createNewChat, repository, loadChatMessages, clientRef, setMessages]);
 
+  // Reload messages from storage on reconnection.
+  // After a server restart, the client's in-memory _messages may have tool
+  // results ordered before their parent assistant messages (because tool results
+  // are pushed during execution while assistant messages are pushed at
+  // RUN_FINISHED). Storage has the correct ordering from extractTurnMessages.
+  const connectionPhaseRef = useRef<'initial' | 'connected' | 'disconnected'>('initial');
+
+  useEffect(() => {
+    if (connected) {
+      const isReconnect = connectionPhaseRef.current === 'disconnected';
+      connectionPhaseRef.current = 'connected';
+
+      if (isReconnect && currentChatId && clientRef.current) {
+        (async () => {
+          const loadedMessages = await loadChatMessages(currentChatId);
+          if (loadedMessages.length > 0) {
+            clientRef.current?.loadMessages(transformMessagesToClientFormat(loadedMessages));
+            console.log('[ChatManagement] Reloaded', loadedMessages.length, 'messages from storage on reconnect');
+          }
+        })();
+      }
+    } else {
+      if (connectionPhaseRef.current === 'connected') {
+        connectionPhaseRef.current = 'disconnected';
+      }
+    }
+  }, [connected, currentChatId, loadChatMessages, clientRef]);
+
   // The displayed chat ID is the pending chat (if any) or the current active chat
   const displayedChatId = pendingChatId || currentChatId;
 

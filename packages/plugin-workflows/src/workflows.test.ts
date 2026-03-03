@@ -37,7 +37,6 @@ function createMockSession(sessionId: string = 'test-session'): ClientSession {
     state: null,
     pendingToolCalls: new Map(),
     pendingToolApprovals: new Map(),
-    conversationHistory: [],
     ipAddress: '127.0.0.1',
   };
 }
@@ -193,9 +192,6 @@ describe('WorkflowsPlugin', () => {
       });
 
       const session = createMockSession();
-      session.conversationHistory = [
-        { role: 'user', content: 'Previous message' },
-      ] as any;
 
       const message: RunWorkflowMessage = {
         type: 'run_workflow',

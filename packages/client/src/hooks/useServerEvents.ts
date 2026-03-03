@@ -24,31 +24,25 @@ import type { PersistedMessage } from '../providers/chatRepository/types';
  * The final text-only assistant message is excluded here because it is
  * saved separately by `saveAIResponse`.
  *
- * Returns messages in correct API ordering: assistant messages with toolCalls
- * first, then tool result messages. This is necessary because in `client._messages`,
- * tool results are pushed during execution (via `sendToolResponse`) while the
- * assistant message is only pushed at `RUN_FINISHED`, resulting in reversed
- * chronological order.
+ * Messages in `client._messages` are already in correct API order
+ * (assistant(toolCalls) → tool results → assistant(text)) since the client
+ * defers pushing tool results until RUN_FINISHED.
  */
 function extractTurnMessages(messages: Message[], startIndex: number): PersistedMessage[] {
   const turnSlice = messages.slice(startIndex);
-
-  const assistantMessages: PersistedMessage[] = [];
-  const toolMessages: PersistedMessage[] = [];
+  const result: PersistedMessage[] = [];
 
   for (const msg of turnSlice) {
     if (msg.role === 'assistant' && 'toolCalls' in msg && msg.toolCalls) {
-      assistantMessages.push({
+      result.push({
         id: msg.id,
         role: 'assistant',
-        // Text content intentionally cleared — the final text response is saved
-        // separately by saveAIResponse as its own message.
         content: '',
         createdAt: new Date(),
         toolCalls: msg.toolCalls as PersistedMessage['toolCalls'],
       });
     } else if (msg.role === 'tool') {
-      toolMessages.push({
+      result.push({
         id: msg.id,
         role: 'tool',
         content: typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content),
@@ -58,7 +52,7 @@ function extractTurnMessages(messages: Message[], startIndex: number): Persisted
     }
   }
 
-  return [...assistantMessages, ...toolMessages];
+  return result;
 }
 
 export interface UseServerEventsOptions {

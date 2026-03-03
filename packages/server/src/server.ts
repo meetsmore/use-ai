@@ -282,7 +282,6 @@ export class UseAIServer {
         threadId,
         tools: [],
         state: null,
-        conversationHistory: [],
         pendingToolCalls: new Map(),
         pendingToolApprovals: new Map(),
       };
@@ -447,14 +446,6 @@ export class UseAIServer {
     }
 
     // Update session
-    // If threadId changed, clear conversation history (new chat started)
-    if (session.threadId && session.threadId !== threadId) {
-      logger.info('ThreadId changed, clearing conversation history', {
-        oldThreadId: session.threadId,
-        newThreadId: threadId,
-      });
-      session.conversationHistory = [];
-    }
     session.threadId = threadId;
     session.currentRunId = runId;
 
@@ -659,26 +650,6 @@ export class UseAIServer {
       };
     });
 
-    // Conversation history management:
-    // - The client sends ALL messages it knows about (user + assistant messages from past turns)
-    // - The server maintains the authoritative history including tool results
-    // - We only append NEW user messages to avoid duplicates
-    if (session.conversationHistory.length === 0) {
-      // First run: initialize conversation history with incoming messages
-      session.conversationHistory = incomingMessages;
-    } else {
-      // Subsequent runs: only append NEW user messages that aren't already in the history
-      // Count how many user messages we already have
-      const existingUserMessageCount = session.conversationHistory.filter(msg => msg.role === 'user').length;
-      const incomingUserMessages = incomingMessages.filter(msg => msg.role === 'user');
-
-      // Only append user messages beyond what we already have
-      const newUserMessages = incomingUserMessages.slice(existingUserMessageCount);
-
-      // Append only new user messages to preserve the full conversation context
-      session.conversationHistory.push(...newUserMessages);
-    }
-
     // Build system prompt
     const systemPrompt = this.buildSystemPrompt(session, state);
 
@@ -695,7 +666,7 @@ export class UseAIServer {
         {
           session,
           runId,
-          messages: session.conversationHistory,
+          messages: incomingMessages,
           tools: session.tools,
           state,
           systemPrompt,
