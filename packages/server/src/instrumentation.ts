@@ -156,7 +156,7 @@ export function startTracing(customProcessors: SpanProcessor[] = []): void {
         publicKey: process.env.LANGFUSE_PUBLIC_KEY!,
         secretKey: process.env.LANGFUSE_SECRET_KEY!,
         baseUrl: process.env.LANGFUSE_BASE_URL || 'https://cloud.langfuse.com',
-        release: process.env.LANGFUSE_RELEASE || 'use-ai-test',
+        release: process.env.LANGFUSE_RELEASE || 'use-ai',
       }) as SpanProcessor;
       spanProcessors.push(langfuseSpanProcessor);
     }
@@ -197,7 +197,7 @@ export function _initializeLangfuse(): LangfuseApi {
   }
 
   const baseUrl = process.env.LANGFUSE_BASE_URL || 'https://cloud.langfuse.com';
-  const release = process.env.LANGFUSE_RELEASE || 'use-ai-test';
+  const release = process.env.LANGFUSE_RELEASE || 'use-ai';
 
   const client = new Langfuse({
     publicKey: process.env.LANGFUSE_PUBLIC_KEY!,
