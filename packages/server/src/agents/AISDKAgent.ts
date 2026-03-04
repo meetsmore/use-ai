@@ -905,7 +905,7 @@ export class AISDKAgent implements Agent {
       if (isRemoteTool(toolDef)) {
         baseExecutor = this.createMcpToolExecutor(toolDef, session);
       } else if (isServerTool(toolDef)) {
-        baseExecutor = createServerToolExecutor(toolDef, session);
+        baseExecutor = createServerToolExecutor(toolDef, session, events);
       } else {
         baseExecutor = clientToolExecutor;
       }

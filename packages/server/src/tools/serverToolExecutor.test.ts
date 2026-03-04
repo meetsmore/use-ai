@@ -1,7 +1,16 @@
 import { describe, expect, test } from 'bun:test';
 import { createServerToolExecutor } from './serverToolExecutor';
 import type { ServerToolDefinition, ServerToolContext } from './types';
-import type { ClientSession } from '../agents/types';
+import type { ClientSession, EventEmitter } from '../agents/types';
+
+/**
+ * Helper to create a mock EventEmitter for testing
+ */
+function createMockEvents(): EventEmitter {
+  return {
+    emit: () => {},
+  } as unknown as EventEmitter;
+}
 
 /**
  * Helper to create a minimal session for testing
@@ -46,7 +55,7 @@ describe('createServerToolExecutor', () => {
     });
 
     const session = createTestSession({ state: { page: 'home' } });
-    const executor = createServerToolExecutor(tool, session);
+    const executor = createServerToolExecutor(tool, session, createMockEvents());
     const result = await executor({ city: 'Tokyo' }, { toolCallId: 'tc-1' });
 
     expect(result).toEqual({ result: 'ok' });
@@ -63,7 +72,7 @@ describe('createServerToolExecutor', () => {
     });
 
     const session = createTestSession();
-    const executor = createServerToolExecutor(tool, session);
+    const executor = createServerToolExecutor(tool, session, createMockEvents());
 
     await expect(
       executor({}, { toolCallId: 'tc-1' })
@@ -76,7 +85,7 @@ describe('createServerToolExecutor', () => {
     });
 
     const session = createTestSession();
-    const executor = createServerToolExecutor(tool, session);
+    const executor = createServerToolExecutor(tool, session, createMockEvents());
     const result = await executor({ value: 21 }, { toolCallId: 'tc-1' });
 
     expect(result).toEqual({ doubled: 42 });
@@ -91,7 +100,7 @@ describe('createServerToolExecutor', () => {
     });
 
     const session = createTestSession({ currentRunId: undefined });
-    const executor = createServerToolExecutor(tool, session);
+    const executor = createServerToolExecutor(tool, session, createMockEvents());
     await executor({}, { toolCallId: 'tc-1' });
 
     expect(capturedContext!.runId).toBe('');
@@ -106,7 +115,7 @@ describe('createServerToolExecutor', () => {
     });
 
     const session = createTestSession({ state: { count: 0 } });
-    const executor = createServerToolExecutor(tool, session);
+    const executor = createServerToolExecutor(tool, session, createMockEvents());
 
     // Update state after creating executor but before calling it
     session.state = { count: 42 };
@@ -120,9 +129,90 @@ describe('createServerToolExecutor', () => {
     const tool = createTestServerTool(async () => 'result');
 
     const session = createTestSession();
-    const executor = createServerToolExecutor(tool, session);
+    const executor = createServerToolExecutor(tool, session, createMockEvents());
     await executor({}, { toolCallId: 'tc-1' });
 
     expect(session.pendingToolCalls.size).toBe(0);
+  });
+
+  test('provides requestApproval in context', async () => {
+    let hasRequestApproval = false;
+
+    const tool = createTestServerTool(async (_args, context) => {
+      hasRequestApproval = typeof context.requestApproval === 'function';
+      return 'ok';
+    });
+
+    const session = createTestSession();
+    const executor = createServerToolExecutor(tool, session, createMockEvents());
+    await executor({}, { toolCallId: 'tc-1' });
+
+    expect(hasRequestApproval).toBe(true);
+  });
+
+  test('requestApproval emits TOOL_APPROVAL_REQUEST event', async () => {
+    const emittedEvents: unknown[] = [];
+    const mockEvents = {
+      emit: (event: unknown) => { emittedEvents.push(event); },
+    } as unknown as EventEmitter;
+
+    const tool = createTestServerTool(async (_args, context) => {
+      // Start requestApproval but don't await — we'll resolve it via session
+      const approvalPromise = context.requestApproval({
+        message: 'Confirm production deploy?',
+        metadata: { env: 'production' },
+      });
+
+      // Simulate client approving after a tick
+      setTimeout(() => {
+        // Find the approvalId from the emitted event
+        const event = emittedEvents[0] as { toolCallId: string };
+        const resolver = session.pendingToolApprovals.get(event.toolCallId);
+        resolver?.({ approved: true });
+      }, 10);
+
+      return approvalPromise;
+    });
+
+    const session = createTestSession();
+    const executor = createServerToolExecutor(tool, session, mockEvents);
+    const result = await executor({}, { toolCallId: 'tc-1' });
+
+    expect(result).toEqual({ approved: true });
+    expect(emittedEvents.length).toBe(1);
+
+    const event = emittedEvents[0] as Record<string, unknown>;
+    expect(event.type).toBe('TOOL_APPROVAL_REQUEST');
+    expect(event.toolCallName).toBe('test_tool');
+    expect(event.message).toBe('Confirm production deploy?');
+    expect(event.metadata).toEqual({ env: 'production' });
+    expect((event.toolCallId as string).startsWith('tc-1-approval-')).toBe(true);
+  });
+
+  test('requestApproval resolves with rejection when user rejects', async () => {
+    const emittedEvents: unknown[] = [];
+    const mockEvents = {
+      emit: (event: unknown) => { emittedEvents.push(event); },
+    } as unknown as EventEmitter;
+
+    const tool = createTestServerTool(async (_args, context) => {
+      const approvalPromise = context.requestApproval({
+        message: 'Delete all data?',
+      });
+
+      setTimeout(() => {
+        const event = emittedEvents[0] as { toolCallId: string };
+        const resolver = session.pendingToolApprovals.get(event.toolCallId);
+        resolver?.({ approved: false, reason: 'Too dangerous' });
+      }, 10);
+
+      return approvalPromise;
+    });
+
+    const session = createTestSession();
+    const executor = createServerToolExecutor(tool, session, mockEvents);
+    const result = await executor({}, { toolCallId: 'tc-2' });
+
+    expect(result).toEqual({ approved: false, reason: 'Too dangerous' });
   });
 });

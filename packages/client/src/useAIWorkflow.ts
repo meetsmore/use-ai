@@ -188,7 +188,11 @@ export function useAIWorkflow(runner: string, workflowId: string): UseAIWorkflow
 
         try {
           // Execute the tool
-          const result = await executeDefinedTool(currentWorkflow.tools, toolName, toolArgs);
+          // Workflows are headless — no UI for runtime approval, so provide a no-op context
+          const noopCtx = {
+            requestApproval: async () => ({ approved: true }),
+          };
+          const result = await executeDefinedTool(currentWorkflow.tools, toolName, toolArgs, noopCtx);
 
           // Track tool call
           currentWorkflow.toolCalls.push({

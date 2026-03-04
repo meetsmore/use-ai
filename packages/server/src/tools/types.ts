@@ -14,6 +14,17 @@ export interface ServerToolContext {
   runId: string;
   /** Unique identifier for this specific tool call */
   toolCallId: string;
+  /**
+   * Request user approval during tool execution.
+   * Use this for conditional approval based on runtime values.
+   *
+   * @param input - Approval request details
+   * @returns Promise resolving with approval decision
+   */
+  requestApproval(input: {
+    message: string;
+    metadata?: Record<string, unknown>;
+  }): Promise<{ approved: boolean; reason?: string }>;
 }
 
 /**

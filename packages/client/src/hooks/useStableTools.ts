@@ -88,21 +88,21 @@ function createStableToolWrapper(
   latestToolsRef: React.MutableRefObject<ToolsDefinition>
 ): DefinedTool<z.ZodType> {
   // Create a stable handler that proxies to the latest version
-  const stableHandler = (input: unknown) => {
+  const stableHandler = (input: unknown, ctx: import('../defineTool').ToolExecutionContext) => {
     const currentTool = latestToolsRef.current[name];
     if (!currentTool) {
       throw new Error(`Tool "${name}" no longer exists`);
     }
-    return currentTool.fn(input);
+    return currentTool.fn(input, ctx);
   };
 
   // Create the stable _execute function
-  const stableExecute = async (input: unknown) => {
+  const stableExecute = async (input: unknown, ctx: import('../defineTool').ToolExecutionContext) => {
     const currentTool = latestToolsRef.current[name];
     if (!currentTool) {
       throw new Error(`Tool "${name}" no longer exists`);
     }
-    return await currentTool._execute(input);
+    return await currentTool._execute(input, ctx);
   };
 
   return {

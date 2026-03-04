@@ -5,6 +5,42 @@ import type { ToolDefinition, ToolAnnotations } from '@meetsmore-oss/use-ai-core
 export type { ToolAnnotations };
 
 /**
+ * Context provided to tool execution functions.
+ * Allows tools to dynamically request user approval at runtime.
+ */
+export interface ToolExecutionContext {
+  /**
+   * Request user approval during tool execution.
+   * Use this for conditional approval based on runtime values
+   * (e.g., API endpoint, input values, computed risk).
+   *
+   * @param input - Approval request details
+   * @returns Promise resolving with approval decision
+   *
+   * @example
+   * ```typescript
+   * const callApi = defineTool(
+   *   'Call an external API',
+   *   z.object({ url: z.string() }),
+   *   async (input, ctx) => {
+   *     if (input.url.includes('production')) {
+   *       const { approved } = await ctx.requestApproval({
+   *         message: `This will call production API: ${input.url}`,
+   *       });
+   *       if (!approved) return { error: 'User rejected the action' };
+   *     }
+   *     return fetch(input.url);
+   *   }
+   * );
+   * ```
+   */
+  requestApproval(input: {
+    message: string;
+    metadata?: Record<string, unknown>;
+  }): Promise<{ approved: boolean; reason?: string }>;
+}
+
+/**
  * Options for configuring tool behavior.
  */
 export interface ToolOptions {
@@ -37,13 +73,13 @@ export interface DefinedTool<T extends z.ZodType> {
   /** Zod schema for validating input */
   _zodSchema: T;
   /** The function to execute when the tool is called */
-  fn: (input: z.infer<T>) => unknown | Promise<unknown>;
+  fn: (input: z.infer<T>, ctx: ToolExecutionContext) => unknown | Promise<unknown>;
   /** Configuration options for the tool */
   _options: ToolOptions;
   /** Converts this tool to a ToolDefinition for registration with the server */
   _toToolDefinition: (name: string) => ToolDefinition;
   /** Validates input and executes the tool function */
-  _execute: (input: unknown) => Promise<unknown>;
+  _execute: (input: unknown, ctx: ToolExecutionContext) => Promise<unknown>;
 }
 
 /**
@@ -65,7 +101,7 @@ export interface DefinedTool<T extends z.ZodType> {
  */
 export function defineTool<TReturn>(
   description: string,
-  fn: () => TReturn | Promise<TReturn>,
+  fn: (ctx: ToolExecutionContext) => TReturn | Promise<TReturn>,
   options?: ToolOptions
 ): DefinedTool<z.ZodObject<{}>>;
 
@@ -97,7 +133,7 @@ export function defineTool<TReturn>(
 export function defineTool<TSchema extends z.ZodType>(
   description: string,
   schema: TSchema,
-  fn: (input: z.infer<TSchema>) => unknown | Promise<unknown>,
+  fn: (input: z.infer<TSchema>, ctx: ToolExecutionContext) => unknown | Promise<unknown>,
   options?: ToolOptions
 ): DefinedTool<TSchema>;
 
@@ -107,21 +143,23 @@ export function defineTool<TSchema extends z.ZodType>(
  */
 export function defineTool<T extends z.ZodType>(
   description: string,
-  schemaOrFn: T | (() => unknown),
-  fnOrOptions?: ((input: z.infer<T>) => unknown | Promise<unknown>) | ToolOptions,
+  schemaOrFn: T | ((ctx: ToolExecutionContext) => unknown),
+  fnOrOptions?: ((input: z.infer<T>, ctx: ToolExecutionContext) => unknown | Promise<unknown>) | ToolOptions,
   options?: ToolOptions
 ): DefinedTool<T> {
   const isNoParamFunction = typeof schemaOrFn === 'function';
   const schema = (isNoParamFunction ? z.object({}) : schemaOrFn) as T;
 
-  let actualFn: (input: z.infer<T>) => unknown | Promise<unknown>;
+  let actualFn: (input: z.infer<T>, ctx: ToolExecutionContext) => unknown | Promise<unknown>;
   let actualOptions: ToolOptions;
 
   if (isNoParamFunction) {
-    actualFn = schemaOrFn as () => unknown | Promise<unknown>;
+    // Wrap no-param function: user writes (ctx?) => ..., we adapt to (input, ctx) => ...
+    const noParamFn = schemaOrFn as (ctx: ToolExecutionContext) => unknown | Promise<unknown>;
+    actualFn = (_input: z.infer<T>, ctx: ToolExecutionContext) => noParamFn(ctx);
     actualOptions = (fnOrOptions as ToolOptions) || {};
   } else {
-    actualFn = fnOrOptions as (input: z.infer<T>) => unknown | Promise<unknown>;
+    actualFn = fnOrOptions as (input: z.infer<T>, ctx: ToolExecutionContext) => unknown | Promise<unknown>;
     actualOptions = options || {};
   }
 
@@ -167,9 +205,9 @@ export function defineTool<T extends z.ZodType>(
       return toolDef;
     },
 
-    async _execute(input: unknown) {
+    async _execute(input: unknown, ctx: ToolExecutionContext) {
       const validated = this._zodSchema.parse(input);
-      return await actualFn(validated);
+      return await actualFn(validated, ctx);
     },
   };
 }
@@ -204,11 +242,12 @@ export function convertToolsToDefinitions(tools: ToolsDefinition): ToolDefinitio
 export async function executeDefinedTool(
   tools: ToolsDefinition,
   toolName: string,
-  input: unknown
+  input: unknown,
+  ctx: ToolExecutionContext
 ): Promise<unknown> {
   const tool = tools[toolName];
   if (!tool) {
     throw new Error(`Tool "${toolName}" not found`);
   }
-  return await tool._execute(input);
+  return await tool._execute(input, ctx);
 }
