@@ -19,6 +19,9 @@ import CustomUIPage from './pages/CustomUIPage';
 import ThemeI18nPage from './pages/ThemeI18nPage';
 import SuggestionsPage from './pages/SuggestionsPage';
 import DestructiveApprovalPage from './pages/DestructiveApprovalPage';
+import RuntimeApprovalPage from './pages/RuntimeApprovalPage';
+import ServerRuntimeApprovalPage from './pages/ServerRuntimeApprovalPage';
+import McpRuntimeApprovalPage from './pages/McpRuntimeApprovalPage';
 import MultimodalPage from './pages/MultimodalPage';
 import MultiAgentPage from './pages/MultiAgentPage';
 import { NavigationAIProvider } from './providers/NavigationAIProvider';
@@ -63,6 +66,9 @@ const NAV_CATEGORIES: NavCategory[] = [
       { path: '/theme-i18n', label: 'Theme & i18n' },
       { path: '/suggestions', label: 'Suggestions' },
       { path: '/destructive-approval', label: 'Destructive Approval' },
+      { path: '/runtime-approval', label: 'Runtime Approval (Client)' },
+      { path: '/server-runtime-approval', label: 'Runtime Approval (Server)' },
+      { path: '/mcp-runtime-approval', label: 'Runtime Approval (MCP)' },
     ],
   },
   {
@@ -164,6 +170,9 @@ function AppContent() {
         <Route path="/theme-i18n"><ThemeI18nPage /></Route>
         <Route path="/suggestions"><SuggestionsPage /></Route>
         <Route path="/destructive-approval"><DestructiveApprovalPage /></Route>
+        <Route path="/runtime-approval"><RuntimeApprovalPage /></Route>
+        <Route path="/server-runtime-approval"><ServerRuntimeApprovalPage /></Route>
+        <Route path="/mcp-runtime-approval"><McpRuntimeApprovalPage /></Route>
         <Route path="/invisible-test"><InvisibleTestPage /></Route>
         <Route path="/file-transformers"><FileTransformersPage /></Route>
         <Route path="/multimodal"><MultimodalPage /></Route>

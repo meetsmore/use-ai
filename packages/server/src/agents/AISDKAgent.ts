@@ -5,6 +5,7 @@ import { z } from 'zod';
 import type { Agent, AgentInput, EventEmitter, AgentResult, ClientSession } from './types';
 import type { ToolDefinition, UseAIForwardedProps } from '../types';
 import type { RemoteToolDefinition } from '../mcp';
+import { isMcpConfirmationResponse, handleMcpConfirmation } from '../mcp/mcpConfirmation';
 import { EventType, ErrorCode } from '../types';
 import { createClientToolExecutor } from '../utils/toolConverter';
 import { isRemoteTool, isServerTool } from '../utils/toolFilters';
@@ -857,7 +858,8 @@ export class AISDKAgent implements Agent {
    */
   private createMcpToolExecutor(
     remoteTool: RemoteToolDefinition,
-    session: ClientSession
+    session: ClientSession,
+    events: EventEmitter
   ): (args: ToolArguments, options: { toolCallId: string }) => Promise<ToolResult> {
     return async (args: ToolArguments, { toolCallId }) => {
       logger.info('[MCP] Executing remote tool', {
@@ -871,6 +873,20 @@ export class AISDKAgent implements Agent {
           args,
           session.currentMcpHeaders  // Pass MCP headers from current request
         );
+
+        // Intercept MCP confirmation responses (phase 1 → approval → phase 2)
+        if (isMcpConfirmationResponse(result)) {
+          return handleMcpConfirmation(
+            result,
+            toolCallId,
+            remoteTool.name,
+            remoteTool._remote.provider,
+            session,
+            events,
+            session.currentMcpHeaders
+          );
+        }
+
         return result;
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : String(error);
@@ -903,7 +919,7 @@ export class AISDKAgent implements Agent {
       // Get the base executor based on tool type
       let baseExecutor;
       if (isRemoteTool(toolDef)) {
-        baseExecutor = this.createMcpToolExecutor(toolDef, session);
+        baseExecutor = this.createMcpToolExecutor(toolDef, session, events);
       } else if (isServerTool(toolDef)) {
         baseExecutor = createServerToolExecutor(toolDef, session, events);
       } else {

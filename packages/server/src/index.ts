@@ -17,6 +17,9 @@ export { logger } from './logger';
 export { defineServerTool } from './tools';
 export type { ServerToolConfig, ServerToolContext, ServerToolDefinition } from './tools';
 
+// Export MCP confirmation types for consumers
+export { isMcpConfirmationResponse, type McpConfirmationResponse } from './mcp';
+
 // Export utilities for plugins and custom agents
 export {
   createClientToolExecutor,
