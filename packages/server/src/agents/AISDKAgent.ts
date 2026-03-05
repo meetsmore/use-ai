@@ -704,10 +704,12 @@ export class AISDKAgent implements Agent {
       }
 
       span.setOutput(finalText);
-      span.end();
 
       // Get trace ID captured by span processor (for Langfuse feedback linking)
+      // Must be called before span.end() since end() calls popTraceIdForRun internally
       const traceId = span.popTraceId();
+
+      span.end();
 
       // Emit RUN_FINISHED with trace ID if available, otherwise original runId
       events.emit<RunFinishedEvent>({
