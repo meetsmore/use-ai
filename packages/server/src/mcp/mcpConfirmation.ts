@@ -1,13 +1,9 @@
 /**
- * MCP tool runtime interactive approval.
+ * MCP tool runtime interactive approval (`_use_ai_type: "confirmation_required"`).
  *
- * MCP tools that need user confirmation return a special JSON response with
- * `_use_ai_internal: true` and `_use_ai_type: "confirmation_required"`.
- * The server intercepts this, shows an approval dialog to the user, and if
- * approved, re-calls the same tool with original args merged with
- * `additional_columns` (phase 2).
- *
- * The `_use_ai_` prefix avoids namespace collisions with user data.
+ * When an MCP tool returns this type the server shows an approval dialog.
+ * If the user approves, the server re-calls the same tool with
+ * `{ ...originalArgs, ...additional_columns }`.
  */
 
 import type { ClientSession, EventEmitter } from '../agents/types';
@@ -17,17 +13,13 @@ import { waitForApproval } from '../agents/toolApproval';
 import type { RemoteMcpToolsProvider } from './RemoteMcpToolsProvider';
 import type { McpHeadersMap } from '@meetsmore-oss/use-ai-core';
 import { logger } from '../logger';
+import type { UseAIInternalResponse } from './useAIInternalResponse';
 
 /**
- * Response shape returned by MCP tools that require user confirmation.
- * Uses `_use_ai_` prefix to avoid collisions with user data fields.
+ * Confirmation-specific internal response.
  */
-export interface McpConfirmationResponse {
-  /** Sentinel — must be `true` */
-  _use_ai_internal: true;
-  /** Type discriminator */
+export interface McpConfirmationResponse extends UseAIInternalResponse {
   _use_ai_type: 'confirmation_required';
-  /** Payload */
   _use_ai_metadata: {
     /** Message shown in the approval dialog */
     message: string;
@@ -39,18 +31,15 @@ export interface McpConfirmationResponse {
 }
 
 /**
- * Type guard that checks whether a tool result is an MCP confirmation response.
+ * Narrow a `UseAIInternalResponse` to the confirmation variant.
  */
 export function isMcpConfirmationResponse(
-  value: unknown
+  value: UseAIInternalResponse
 ): value is McpConfirmationResponse {
-  if (value == null || typeof value !== 'object') return false;
-  const obj = value as Record<string, unknown>;
-  if (obj._use_ai_internal !== true) return false;
-  if (obj._use_ai_type !== 'confirmation_required') return false;
-  const meta = obj._use_ai_metadata;
-  if (meta == null || typeof meta !== 'object') return false;
-  return typeof (meta as Record<string, unknown>).message === 'string';
+  return (
+    value._use_ai_type === 'confirmation_required' &&
+    typeof value._use_ai_metadata.message === 'string'
+  );
 }
 
 /**

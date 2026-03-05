@@ -5,6 +5,7 @@ import { z } from 'zod';
 import type { Agent, AgentInput, EventEmitter, AgentResult, ClientSession } from './types';
 import type { ToolDefinition, UseAIForwardedProps } from '../types';
 import type { RemoteToolDefinition } from '../mcp';
+import { isUseAIInternalResponse } from '../mcp/useAIInternalResponse';
 import { isMcpConfirmationResponse, handleMcpConfirmation } from '../mcp/mcpConfirmation';
 import { EventType, ErrorCode } from '../types';
 import { createClientToolExecutor } from '../utils/toolConverter';
@@ -874,19 +875,30 @@ export class AISDKAgent implements Agent {
           session.currentMcpHeaders  // Pass MCP headers from current request
         );
 
-        // Intercept MCP confirmation responses (phase 1 → approval → phase 2)
-        if (isMcpConfirmationResponse(result)) {
-          return handleMcpConfirmation(
-            result,
-            toolCallId,
-            remoteTool.name,
-            remoteTool._remote.originalName,
-            args as Record<string, unknown>,
-            remoteTool._remote.provider,
-            session,
-            events,
-            session.currentMcpHeaders
-          );
+        // Intercept _use_ai_ internal responses from MCP tools
+        if (isUseAIInternalResponse(result)) {
+          switch (result._use_ai_type) {
+            case 'confirmation_required':
+              if (isMcpConfirmationResponse(result)) {
+                return handleMcpConfirmation(
+                  result,
+                  toolCallId,
+                  remoteTool.name,
+                  remoteTool._remote.originalName,
+                  args as Record<string, unknown>,
+                  remoteTool._remote.provider,
+                  session,
+                  events,
+                  session.currentMcpHeaders
+                );
+              }
+              break;
+            default:
+              logger.warn('[MCP] Unknown _use_ai_type, returning as-is', {
+                toolCallId,
+                type: result._use_ai_type,
+              });
+          }
         }
 
         return result;
