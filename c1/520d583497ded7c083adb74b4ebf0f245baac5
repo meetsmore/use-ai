@@ -1,0 +1,52 @@
+apps/example/src/pages/McpRuntimeApprovalPage.tsx
+  b2d384b6a5338781 22-27,77,79,92-94,96-97,130,136
+packages/server/src/mcp/mcpConfirmation.test.ts
+  b2d384b6a5338781 1,60-63,68,70-72,74-75,93,95-97,101,103-105,109,111-112,116,118-120,124,126-128,135-144,149,151-153,155-156,160,169-170,184-185,193,202-203,215,217,221,226-255,267-268,297-298,327-328,362-363
+apps/example/test/server-runtime-approval.e2e.test.ts
+  b2d384b6a5338781 1-95
+apps/example/test/client-runtime-approval.e2e.test.ts
+  b2d384b6a5338781 1-95
+packages/server/src/mcp/mcpConfirmation.ts
+  b2d384b6a5338781 5-10,23,26-32,35-37,49-53,60,69-70,76-77,81-82,85,90-91,110-113,117,122-123,131
+packages/server/src/agents/AISDKAgent.ts
+  b2d384b6a5338781 883-884
+apps/example-nest-mcp-server/src/tools.service.ts
+  b2d384b6a5338781 131-133,135-136
+apps/example/src/pages/RuntimeApprovalPage.tsx
+  b2d384b6a5338781 27
+apps/example/test/mcp-runtime-approval.e2e.test.ts
+  b2d384b6a5338781 1-96
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "c1520d583497ded7c083adb74b4ebf0f245baac5",
+  "prompts": {
+    "5fbafc80ba40231b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "01db9704-6ada-47dd-9224-262c247df9e1",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    },
+    "b2d384b6a5338781": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4c4311f3-0885-4474-88e3-ba4f1eef93ee",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 496,
+      "total_deletions": 140,
+      "accepted_lines": 448,
+      "overriden_lines": 0
+    }
+  }
+}
