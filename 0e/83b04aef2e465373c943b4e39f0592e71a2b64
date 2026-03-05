@@ -1,0 +1,46 @@
+packages/server/src/mcp/mcpConfirmation.ts
+  b2d384b6a5338781 2,4-6,16,19,21,34,37,39-42
+packages/server/src/mcp/useAIInternalResponse.test.ts
+  b2d384b6a5338781 1-71
+packages/server/src/mcp/mcpConfirmation.test.ts
+  b2d384b6a5338781 7,49-50,52-53,56-58,62,67-68,70-71,74-75,77-80,83-84,88-89,92-93,97-98,102,135,149,168,176,192,212,214,233,235,259
+packages/server/src/mcp/index.ts
+  b2d384b6a5338781 2
+packages/server/src/mcp/useAIInternalResponse.ts
+  b2d384b6a5338781 1-42
+packages/server/src/agents/AISDKAgent.ts
+  b2d384b6a5338781 8,878-881,893-901
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "0e83b04aef2e465373c943b4e39f0592e71a2b64",
+  "prompts": {
+    "5fbafc80ba40231b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "01db9704-6ada-47dd-9224-262c247df9e1",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    },
+    "b2d384b6a5338781": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4c4311f3-0885-4474-88e3-ba4f1eef93ee",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 206,
+      "total_deletions": 203,
+      "accepted_lines": 180,
+      "overriden_lines": 0
+    }
+  }
+}
