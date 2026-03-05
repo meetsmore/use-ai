@@ -26,7 +26,7 @@ import type {
   ToolCallStartExtensions,
 } from '../types';
 import { logger } from '../logger';
-import { langfuse, popTraceIdForRun, recordErrorTrace, type LangfuseApi } from '../instrumentation';
+import { langfuse, popTraceIdForRun, recordErrorTrace, isTracingEnabled, flushTracing, type LangfuseApi } from '../instrumentation';
 import { applyCacheBreakpoints, type CacheBreakpointFn } from './anthropicCache';
 import { getToolAnnotations } from '../utils';
 import { toolNeedsApproval, createApprovalWrapper, type ToolArguments, type ToolResult } from './toolApproval';
@@ -210,9 +210,17 @@ export interface AISDKAgentConfig {
    * @default undefined (uses model's default)
    */
   temperature?: number;
+
+  /**
+   * Maximum number of model step iterations per run.
+   * Each iteration performs one model invocation and may include tool calls.
+   * @default 10
+   */
+  maxSteps?: number;
 }
 
 const DEFAULT_MAX_OUTPUT_TOKENS = 4096;
+const DEFAULT_MAX_STEPS = 10;
 
 /**
  * Agent implementation for AI SDK models (Anthropic, OpenAI, Google, etc.).
@@ -268,6 +276,7 @@ export class AISDKAgent implements Agent {
   private cacheBreakpoint?: CacheBreakpointFn;
   private maxOutputTokens: number;
   private temperature?: number;
+  private maxSteps: number;
 
   constructor(config: AISDKAgentConfig) {
     this.model = config.model;
@@ -278,6 +287,7 @@ export class AISDKAgent implements Agent {
     this.cacheBreakpoint = config.cacheBreakpoint;
     this.maxOutputTokens = config.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS;
     this.temperature = config.temperature;
+    this.maxSteps = config.maxSteps ?? DEFAULT_MAX_STEPS;
     // Initialize Langfuse observability (automatically reads env vars)
     this.langfuse = langfuse;
   }
@@ -291,13 +301,11 @@ export class AISDKAgent implements Agent {
   }
 
   /**
-   * Flushes pending Langfuse telemetry data.
+   * Flushes pending telemetry data (all registered span processors).
    * Useful for tests to ensure data is sent before querying.
    */
   async flushTelemetry(): Promise<void> {
-    if (this.langfuse.flush) {
-      await this.langfuse.flush();
-    }
+    await flushTracing();
   }
 
   async run(input: AgentInput, events: EventEmitter): Promise<AgentResult> {
@@ -377,7 +385,6 @@ export class AISDKAgent implements Agent {
       let finalText = '';
       let currentStepNumber = 0;
       let hasAnyContent = false;
-      const maxSteps = 10;
 
       // Step-by-step execution loop
       // This allows tools and state to be refreshed between steps (e.g., after navigation)
@@ -388,7 +395,7 @@ export class AISDKAgent implements Agent {
       // mid-step assistant messages and tool calls would be lost in multi-step runs.
       const allResponseMessages: ModelMessage[] = [];
 
-      for (let stepIteration = 0; stepIteration < maxSteps; stepIteration++) {
+      for (let stepIteration = 0; stepIteration < this.maxSteps; stepIteration++) {
         // Get current tools from session (may have been updated by tool_result handler)
         const currentTools = session.tools;
 
@@ -431,7 +438,7 @@ export class AISDKAgent implements Agent {
           maxOutputTokens: this.maxOutputTokens,
           temperature: this.temperature,
           abortSignal: session.abortController?.signal,
-          experimental_telemetry: this.langfuse?.enabled
+          experimental_telemetry: isTracingEnabled()
             ? {
                 isEnabled: true,
                 functionId: 'use-ai',
