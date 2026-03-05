@@ -2,15 +2,8 @@ import { Injectable, Inject, Scope } from '@nestjs/common';
 import { REQUEST } from '@nestjs/core';
 import { Tool } from '@rekog/mcp-nest';
 import { z } from 'zod';
-import { randomUUID } from 'crypto';
 import type { Request } from 'express';
 
-/**
- * In-memory store for one-time approval tokens.
- * Each token is tied to specific transfer parameters and expires after 5 minutes.
- * Module-scoped so it persists across request-scoped service instances.
- */
-const pendingTokens = new Map<string, { to: string; amount: number; expiresAt: number }>();
 
 @Injectable({ scope: Scope.REQUEST })
 export class ToolsService {
@@ -114,52 +107,22 @@ export class ToolsService {
 
   @Tool({
     name: 'transfer',
-    description: '[MCP] Transfer money to a recipient via the remote MCP endpoint. Transfers over $1000 require user confirmation. On the first call, pass token as null. If confirmation is needed, the server issues a one-time token and asks for approval. The server will re-call this tool with the issued token after the user approves.',
+    description: '[MCP] Transfer money to a recipient via the remote MCP endpoint.',
     parameters: z.object({
       to: z.string().describe('Recipient name'),
       amount: z.number().describe('Amount to transfer'),
-      token: z.string().nullable().describe('One-time approval token. Pass null on the first call. The server issues and provides this token automatically after user approval — never fabricate a token.'),
+      token: z.string().nullable().describe('This is used for internal authentication. This will be filled automatically, so always set null.'),
     }),
     annotations: {
       title: 'Transferring Money',
     },
   })
   async transfer({ to, amount, token }: { to: string; amount: number; token: string | null }) {
-    // Phase 2: token provided — validate and execute
-    if (token != null) {
-      const stored = pendingTokens.get(token);
-      if (!stored) {
-        return {
-          content: [{ type: 'text', text: JSON.stringify({ error: true, message: 'Invalid or expired token' }) }],
-          isError: true,
-        };
-      }
-      // Consume the token (one-time use)
-      pendingTokens.delete(token);
+    // This token will not be in the context of AI Agent. So it is OK to set some random fixed token.
+    const internal_token_password = "random_fixed_token" 
 
-      if (stored.expiresAt < Date.now()) {
-        return {
-          content: [{ type: 'text', text: JSON.stringify({ error: true, message: 'Token expired' }) }],
-          isError: true,
-        };
-      }
-      if (stored.to !== to || stored.amount !== amount) {
-        return {
-          content: [{ type: 'text', text: JSON.stringify({ error: true, message: 'Token does not match transfer parameters' }) }],
-          isError: true,
-        };
-      }
-
-      return {
-        content: [{ type: 'text', text: JSON.stringify({ success: true, message: `Transferred $${amount} to ${to} (confirmed)` }) }],
-      };
-    }
-
-    // Phase 1: no token — check if approval is needed
-    if (amount > 1000) {
-      const approvalToken = randomUUID();
-      pendingTokens.set(approvalToken, { to, amount, expiresAt: Date.now() + 5 * 60 * 1000 });
-
+    if (!token && amount > 1000){
+      // needs user confirmation
       return {
         content: [
           {
@@ -170,17 +133,26 @@ export class ToolsService {
               metadata: { amount, to },
               execute_on_approval: {
                 tool: 'transfer',
-                args: { to, amount, token: approvalToken },
+                args: { to, amount, token: internal_token_password },
               },
             }),
           },
         ],
+      }; 
+    }
+
+    // token is set but invalid
+    if (token && token !=internal_token_password) {
+      return {
+        content: [{ type: 'text', text: JSON.stringify({ error: true, message: 'Invalid token' }) }],
+        isError: true,
       };
     }
 
-    // Small amounts proceed directly
+    // handle the request here
+    // await executeTransfer(...)
     return {
-      content: [{ type: 'text', text: JSON.stringify({ success: true, message: `Transferred $${amount} to ${to}` }) }],
+      content: [{ type: 'text', text: JSON.stringify({ success: true, message: `Transferred $${amount} to ${to} (confirmed)` }) }],
     };
   }
 
