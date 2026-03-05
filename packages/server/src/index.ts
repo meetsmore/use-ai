@@ -10,16 +10,24 @@ export { AISDKAgent, type AISDKAgentConfig, type MessageWithCacheContext, type C
 export type { UseAIServerPlugin, MessageHandler } from './plugins';
 export { FeedbackPlugin } from './plugins';
 
+// Export span processor type for custom OTel setup
+export type { SpanProcessor } from './instrumentation';
+
 // Export logger for plugins
 export { logger } from './logger';
 
 // Export telemetry for custom agents
 export { startRunSpan, flushTelemetry, type RunSpan } from './telemetry';
 
+// Export server tool definition helper and types
+export { defineServerTool } from './tools';
+export type { ServerToolConfig, ServerToolContext, ServerToolDefinition } from './tools';
+
 // Export utilities for plugins and custom agents
 export {
   createClientToolExecutor,
   isRemoteTool,
+  isServerTool,
   getToolAnnotations,
   createGlobFilter,
   and,

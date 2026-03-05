@@ -49,7 +49,6 @@ describe('Langfuse Integration', () => {
 
     expect(config.enabled).toBe(false);
     expect(config.client).toBeUndefined();
-    expect(config.flush).toBeUndefined();
   });
 
   test('should not enable Langfuse when only public key is set', () => {
@@ -76,7 +75,6 @@ describe('Langfuse Integration', () => {
 
     expect(config.enabled).toBe(true);
     expect(config.client).toBeDefined();
-    expect(config.flush).toBeInstanceOf(Function);
   });
 
   test('should use custom base URL when LANGFUSE_BASE_URL is set', () => {

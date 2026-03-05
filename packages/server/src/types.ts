@@ -81,6 +81,23 @@ export interface UseAIServerConfig<TAgents extends Record<string, import('./agen
   /** Optional array of plugins to extend server functionality */
   plugins?: import('./plugins/types').UseAIServerPlugin[];
   /**
+   * Optional server-side tools available to all agents.
+   * These tools execute directly in the server process (no HTTP or WebSocket round-trip).
+   * Use defineServerTool() to create tool configs.
+   *
+   * @example
+   * ```typescript
+   * tools: {
+   *   getWeather: defineServerTool(
+   *     'Get current weather',
+   *     z.object({ city: z.string() }),
+   *     async ({ city }) => fetchWeather(city)
+   *   ),
+   * }
+   * ```
+   */
+  tools?: Record<string, import('./tools/types').ServerToolConfig>;
+  /**
    * Optional array of MCP endpoints to fetch tools from.
    * Tools from these endpoints will be automatically available to all agents and workflows.
    */
@@ -125,6 +142,24 @@ export interface UseAIServerConfig<TAgents extends Record<string, import('./agen
    * @default 'auto'
    */
   runtime?: 'auto' | 'bun' | 'node';
+  /**
+   * Optional additional OpenTelemetry span processors.
+   * These are registered alongside the built-in Langfuse and traceId capture processors.
+   *
+   * @example
+   * ```typescript
+   * import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
+   * import { SimpleSpanProcessor } from '@opentelemetry/sdk-trace-base';
+   *
+   * const exporter = new OTLPTraceExporter({ url: 'http://localhost:4318/v1/traces' });
+   * const server = new UseAIServer({
+   *   agents: { claude: claudeAgent },
+   *   defaultAgent: 'claude',
+   *   spanProcessors: [new SimpleSpanProcessor(exporter)],
+   * });
+   * ```
+   */
+  spanProcessors?: import('./instrumentation').SpanProcessor[];
 }
 
 // Re-export all types from @meetsmore-oss/use-ai-core

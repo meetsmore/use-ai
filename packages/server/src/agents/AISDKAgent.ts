@@ -8,7 +8,8 @@ import type { ToolDefinition, UseAIForwardedProps } from '../types';
 import type { RemoteToolDefinition } from '../mcp';
 import { EventType, ErrorCode } from '../types';
 import { createClientToolExecutor } from '../utils/toolConverter';
-import { isRemoteTool } from '../utils/toolFilters';
+import { isRemoteTool, isServerTool } from '../utils/toolFilters';
+import { createServerToolExecutor } from '../tools/serverToolExecutor';
 import type {
   TextMessageStartEvent,
   TextMessageContentEvent,
@@ -209,9 +210,17 @@ export interface AISDKAgentConfig {
    * @default undefined (uses model's default)
    */
   temperature?: number;
+
+  /**
+   * Maximum number of model step iterations per run.
+   * Each iteration performs one model invocation and may include tool calls.
+   * @default 10
+   */
+  maxSteps?: number;
 }
 
 const DEFAULT_MAX_OUTPUT_TOKENS = 4096;
+const DEFAULT_MAX_STEPS = 10;
 
 /**
  * Agent implementation for AI SDK models (Anthropic, OpenAI, Google, etc.).
@@ -266,6 +275,7 @@ export class AISDKAgent implements Agent {
   private cacheBreakpoint?: CacheBreakpointFn;
   private maxOutputTokens: number;
   private temperature?: number;
+  private maxSteps: number;
 
   constructor(config: AISDKAgentConfig) {
     this.model = config.model;
@@ -276,6 +286,7 @@ export class AISDKAgent implements Agent {
     this.cacheBreakpoint = config.cacheBreakpoint;
     this.maxOutputTokens = config.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS;
     this.temperature = config.temperature;
+    this.maxSteps = config.maxSteps ?? DEFAULT_MAX_STEPS;
   }
 
   getName(): string {
@@ -287,7 +298,7 @@ export class AISDKAgent implements Agent {
   }
 
   /**
-   * Flushes pending Langfuse telemetry data.
+   * Flushes pending telemetry data (all registered span processors).
    * Useful for tests to ensure data is sent before querying.
    */
   async flushTelemetry(): Promise<void> {
@@ -380,7 +391,6 @@ export class AISDKAgent implements Agent {
       let finalText = '';
       let currentStepNumber = 0;
       let hasAnyContent = false;
-      const maxSteps = 10;
 
       // Step-by-step execution loop
       // This allows tools and state to be refreshed between steps (e.g., after navigation)
@@ -391,7 +401,7 @@ export class AISDKAgent implements Agent {
       // mid-step assistant messages and tool calls would be lost in multi-step runs.
       const allResponseMessages: ModelMessage[] = [];
 
-      for (let stepIteration = 0; stepIteration < maxSteps; stepIteration++) {
+      for (let stepIteration = 0; stepIteration < this.maxSteps; stepIteration++) {
         // Get current tools from session (may have been updated by tool_result handler)
         const currentTools = session.tools;
 
@@ -910,10 +920,15 @@ export class AISDKAgent implements Agent {
         ? { ...rawParams, type: ((rawParams as Record<string, unknown>).type || 'object') as 'object' }
         : { type: 'object' as const, properties: {} };
 
-      // Get the base executor
-      const baseExecutor = isRemoteTool(toolDef)
-        ? this.createMcpToolExecutor(toolDef, session)
-        : clientToolExecutor;
+      // Get the base executor based on tool type
+      let baseExecutor;
+      if (isRemoteTool(toolDef)) {
+        baseExecutor = this.createMcpToolExecutor(toolDef, session);
+      } else if (isServerTool(toolDef)) {
+        baseExecutor = createServerToolExecutor(toolDef, session);
+      } else {
+        baseExecutor = clientToolExecutor;
+      }
 
       // Wrap with approval handling if tool needs confirmation
       const execute = toolNeedsApproval(toolDef)

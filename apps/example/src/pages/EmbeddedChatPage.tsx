@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { UseAIProvider, UseAIChat, useAIContext } from '@meetsmore-oss/use-ai-client';
+import { CollapsibleCode } from '../components/CollapsibleCode';
+import { docStyles } from '../styles/docStyles';
 
 type LayoutType = 'sidebar' | 'collapsible' | 'split' | 'compact';
 
@@ -111,7 +113,7 @@ function CollapsibleSidebarContent({ isOpen, setIsOpen }: { isOpen: boolean; set
 
             <div style={styles.codeExample}>
               <h5 style={styles.codeExampleTitle}>Code Example</h5>
-              <pre style={styles.codeBlock}>
+              <CollapsibleCode>
 {`const [sidebarOpen, setSidebarOpen] = useState(false);
 
 <UseAIProvider
@@ -126,7 +128,7 @@ function CollapsibleSidebarContent({ isOpen, setIsOpen }: { isOpen: boolean; set
     <UseAIChat />
   </Sidebar>
 </UseAIProvider>`}
-              </pre>
+              </CollapsibleCode>
             </div>
           </div>
 
@@ -227,13 +229,19 @@ export default function EmbeddedChatPage() {
   if (layout === 'collapsible') {
     return (
       <div style={styles.page}>
-        {/* Layout selector */}
         <div style={styles.selector}>
-          <h2 style={styles.pageTitle}>Embedded Chat Demo</h2>
-          <p style={styles.pageDescription}>
-            Using <code style={styles.code}>&lt;UseAIChat&gt;</code> component with{' '}
-            <code style={styles.code}>renderChat=&#123;false&#125;</code> to place chat anywhere.
-          </p>
+          <h2 style={styles.pageTitle}>Embedded Chat</h2>
+
+          <div style={{ ...docStyles.infoCard, marginBottom: '16px' }}>
+            <h3 style={docStyles.subtitle}>About</h3>
+            <p style={docStyles.text}>
+              Set <code style={docStyles.code}>renderChat={'{'} false {'}'}</code> on{' '}
+              <code style={docStyles.code}>UseAIProvider</code> to disable the default floating chat,
+              then place <code style={docStyles.code}>&lt;UseAIChat /&gt;</code> anywhere in your layout.
+              This gives you full control over chat placement — sidebars, split views, bottom panels, etc.
+            </p>
+          </div>
+
           <div style={styles.layoutButtons}>
             {layouts.map(({ type, label, description }) => (
               <button
@@ -262,13 +270,19 @@ export default function EmbeddedChatPage() {
       renderChat={false}
     >
       <div style={styles.page}>
-        {/* Layout selector */}
         <div style={styles.selector}>
-          <h2 style={styles.pageTitle}>Embedded Chat Demo</h2>
-          <p style={styles.pageDescription}>
-            Using <code style={styles.code}>&lt;UseAIChat&gt;</code> component with{' '}
-            <code style={styles.code}>renderChat=&#123;false&#125;</code> to place chat anywhere.
-          </p>
+          <h2 style={styles.pageTitle}>Embedded Chat</h2>
+
+          <div style={{ ...docStyles.infoCard, marginBottom: '16px' }}>
+            <h3 style={docStyles.subtitle}>About</h3>
+            <p style={docStyles.text}>
+              Set <code style={docStyles.code}>renderChat={'{'} false {'}'}</code> on{' '}
+              <code style={docStyles.code}>UseAIProvider</code> to disable the default floating chat,
+              then place <code style={docStyles.code}>&lt;UseAIChat /&gt;</code> anywhere in your layout.
+              This gives you full control over chat placement — sidebars, split views, bottom panels, etc.
+            </p>
+          </div>
+
           <div style={styles.layoutButtons}>
             {layouts.map(({ type, label, description }) => (
               <button

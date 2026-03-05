@@ -1,5 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { useAIContext, type SendMessageOptions } from '@meetsmore-oss/use-ai-client';
+import { CollapsibleCode } from '../components/CollapsibleCode';
+import { docStyles } from '../styles/docStyles';
 
 export default function ProgrammaticChatPage() {
   const { chat, connected } = useAIContext();
@@ -33,11 +35,17 @@ export default function ProgrammaticChatPage() {
 
   return (
     <div style={styles.container}>
-      <h1 style={styles.title}>Programmatic Chat Demo</h1>
-      <p style={styles.description}>
-        This page demonstrates how to send messages to the chat panel programmatically using{' '}
-        <code style={styles.code}>sendMessage()</code> from <code style={styles.code}>useAIContext()</code>.
-      </p>
+      <h1 style={styles.title}>Programmatic Chat</h1>
+
+      <div style={{ ...docStyles.infoCard, marginBottom: '24px' }}>
+        <h2 style={docStyles.subtitle}>About</h2>
+        <p style={docStyles.text}>
+          Use <code style={docStyles.code}>chat.sendMessage()</code> from{' '}
+          <code style={docStyles.code}>useAIContext()</code> to send messages programmatically —
+          triggered by button clicks, form submissions, or any event. Supports file attachments,
+          new chat creation, chat metadata, and controlling whether the chat panel opens.
+        </p>
+      </div>
 
       <div style={styles.statusBadge} data-testid="connection-status">
         Status: {connected ? (
@@ -127,7 +135,7 @@ export default function ProgrammaticChatPage() {
 
       <section style={styles.section}>
         <h2 style={styles.sectionTitle}>Code Example</h2>
-        <pre style={styles.codeBlock}>
+        <CollapsibleCode>
 {`import { useAIContext } from '@meetsmore-oss/use-ai-client';
 
 function MyComponent() {
@@ -161,7 +169,7 @@ function MyComponent() {
 
   await chat.updateMetadata({ processed: true });
 }`}
-        </pre>
+        </CollapsibleCode>
       </section>
     </div>
   );
