@@ -26,39 +26,24 @@ const PYTHON_EXAMPLE = [
   '    return do_transfer(to, amount)',
 ].join('\n');
 
-const SEQUENCE_DIAGRAM = [
-  'Client          Server              MCP Endpoint',
-  '  |                 |                      |',
-  '  | run_agent       |                      |',
-  '  |---------------->|  tools/call (ph.1)   |',
-  '  |                 |--------------------->|',
-  '  |                 |  { confirmation_     |',
-  '  |                 |    required: true }  |',
-  '  |                 |<---------------------|',
-  '  | TOOL_APPROVAL   |                      |',
-  '  |   _REQUEST      |                      |',
-  '  |<----------------|                      |',
-  '  | (user approves) |                      |',
-  '  |---------------->|  tools/call (ph.2)   |',
-  '  |                 |--------------------->|',
-  '  |                 |  { success: true }   |',
-  '  |                 |<---------------------|',
-  '  |  final result   |                      |',
-  '  |<----------------|                      |',
-].join('\n');
-
 export default function McpRuntimeApprovalPage() {
   useAI({
     tools: {},
     prompt: `MCP Runtime Approval Demo Page.
 
-This page explains how MCP tools can request runtime user confirmation using the two-phase confirmation pattern.
-There is no live MCP endpoint connected — this is a documentation page.
+This page demonstrates MCP tools that use the two-phase confirmation pattern.
+The following remote MCP tools (prefixed with "mcp_") are available:
+- mcp_transfer: [MCP] Transfer money via the remote MCP endpoint. Transfers over $1,000 return a confirmation_required response which triggers the approval dialog.
+- mcp_confirm_transfer: [MCP] Phase-2 execution tool, called automatically by the server after user approval. Do NOT call this tool directly.
 
-Help the user understand the MCP confirmation flow.`,
+IMPORTANT: Always use the mcp_transfer tool (the MCP tool), NOT the serverTransfer tool (which is a different server-side tool).
+
+Help the user test the MCP confirmation flow:
+- Small transfers (e.g. $500) should proceed directly without approval.
+- Large transfers (e.g. $2000) should show an approval dialog first.`,
     suggestions: [
-      'How does MCP runtime approval work?',
-      'What is the two-phase confirmation pattern?',
+      'Transfer $500 to Alice',
+      'Transfer $5000 to Bob',
     ],
   });
 
@@ -66,23 +51,30 @@ Help the user understand the MCP confirmation flow.`,
     <div style={docStyles.container}>
       <h1 style={docStyles.title}>MCP Runtime Approval</h1>
 
+      <div style={docStyles.prerequisiteCard}>
+        <h2 style={docStyles.subtitle}>Prerequisites</h2>
+        <p style={docStyles.text}>
+          The MCP server must be running on <code style={docStyles.code}>localhost:3002</code> with
+          the <code style={docStyles.code}>transfer</code> and <code style={docStyles.code}>confirm_transfer</code> tools
+          registered.
+        </p>
+      </div>
+
       <div style={docStyles.infoCard}>
         <h2 style={docStyles.subtitle}>About</h2>
         <p style={docStyles.text}>
           MCP tools run on remote servers and cannot call{' '}
           <code style={docStyles.code}>ctx.requestApproval()</code> directly.
           Instead, they use a <strong>two-phase confirmation pattern</strong>:
-          the tool returns a special JSON response, the server intercepts it,
-          shows the approval dialog, and if approved, calls the execution tool
-          on the same MCP endpoint.
+          the tool returns a special JSON response with{' '}
+          <code style={docStyles.code}>confirmation_required: true</code>,
+          the server intercepts it, shows the approval dialog, and if approved,
+          calls the execution tool on the same MCP endpoint.
         </p>
       </div>
 
       <div style={docStyles.definitionCard}>
-        <h2 style={docStyles.subtitle}>Phase 1: Confirmation Response</h2>
-        <p style={docStyles.text}>
-          The MCP tool returns this JSON structure instead of a normal result:
-        </p>
+        <h2 style={docStyles.subtitle}>Confirmation Response Schema</h2>
         <CollapsibleCode defaultOpen>
 {`{
   "confirmation_required": true,
@@ -97,18 +89,7 @@ Help the user understand the MCP confirmation flow.`,
       </div>
 
       <div style={docStyles.definitionCard}>
-        <h2 style={docStyles.subtitle}>Phase 2: Execution</h2>
-        <p style={docStyles.text}>
-          The server detects <code style={docStyles.code}>confirmation_required: true</code>,
-          emits a <code style={docStyles.code}>TOOL_APPROVAL_REQUEST</code> event to the client,
-          and waits for user approval. If approved, it calls{' '}
-          <code style={docStyles.code}>execute_on_approval.tool</code> with the specified args
-          on the same MCP endpoint.
-        </p>
-      </div>
-
-      <div style={docStyles.definitionCard}>
-        <h2 style={docStyles.subtitle}>MCP Endpoint Example (Python)</h2>
+        <h2 style={docStyles.subtitle}>MCP Endpoint Code</h2>
         <CollapsibleCode>{PYTHON_EXAMPLE}</CollapsibleCode>
       </div>
 
@@ -153,10 +134,10 @@ Help the user understand the MCP confirmation flow.`,
       </div>
 
       <div style={docStyles.demoCard}>
-        <h2 style={docStyles.subtitle}>Sequence</h2>
-        <pre style={{ ...docStyles.text, fontFamily: 'monospace', fontSize: '12px', lineHeight: '1.6', whiteSpace: 'pre', overflowX: 'auto' }}>
-          {SEQUENCE_DIAGRAM}
-        </pre>
+        <h2 style={docStyles.subtitle}>Interactive Demo</h2>
+        <p style={docStyles.text}>
+          Try: "Transfer $500 to Alice" (no approval) vs "Transfer $5000 to Bob" (approval required).
+        </p>
       </div>
     </div>
   );

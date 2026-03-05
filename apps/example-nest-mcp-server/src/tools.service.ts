@@ -105,6 +105,88 @@ export class ToolsService {
   }
 
   @Tool({
+    name: 'transfer',
+    description: '[MCP] Transfer money to a recipient via the remote MCP endpoint. Transfers over $1000 require user confirmation via the two-phase approval flow. This is an MCP tool (not a server tool).',
+    parameters: z.object({
+      to: z.string().describe('Recipient name'),
+      amount: z.number().describe('Amount to transfer'),
+    }),
+    annotations: {
+      title: 'Transferring Money',
+    },
+  })
+  async transfer({ to, amount }: { to: string; amount: number }) {
+    if (amount > 1000) {
+      // Phase 1: Return confirmation_required response
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({
+              confirmation_required: true,
+              message: `Transfer $${amount} to "${to}". Are you sure?`,
+              metadata: { amount, to },
+              execute_on_approval: {
+                tool: 'confirm_transfer',
+                args: { to, amount, confirmed: true },
+              },
+            }),
+          },
+        ],
+      };
+    }
+    // Small amounts proceed directly
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({
+            success: true,
+            message: `Transferred $${amount} to ${to}`,
+          }),
+        },
+      ],
+    };
+  }
+
+  @Tool({
+    name: 'confirm_transfer',
+    description: '[MCP] Execute a confirmed money transfer via the remote MCP endpoint (phase 2 of the two-phase approval flow). This tool is called automatically by the server after user approval — do not call it directly.',
+    parameters: z.object({
+      to: z.string().describe('Recipient name'),
+      amount: z.number().describe('Amount to transfer'),
+      confirmed: z.boolean().describe('Must be true'),
+    }),
+    annotations: {
+      title: 'Executing Transfer',
+    },
+  })
+  async confirmTransfer({ to, amount, confirmed }: { to: string; amount: number; confirmed: boolean }) {
+    if (!confirmed) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({ error: true, message: 'Transfer not confirmed' }),
+          },
+        ],
+        isError: true,
+      };
+    }
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({
+            success: true,
+            message: `Transferred $${amount} to ${to} (confirmed)`,
+          }),
+        },
+      ],
+    };
+  }
+
+  @Tool({
     name: 'get_secure_data',
     description: 'Get secure data (requires authentication via X-API-Key header)',
     parameters: z.object({
