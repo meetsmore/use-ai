@@ -19,11 +19,12 @@ const TOKEN_EXAMPLE = [
   '        approval_token = generate_token()',
   '        pending_tokens[approval_token] = {"to": to, "amount": amount}',
   '        return {',
-  '            "confirmation_required": True,',
-  '            "message": f"Transfer ${amount} to {to}. Are you sure?",',
-  '            "execute_on_approval": {',
-  '                "tool": "transfer",  # same tool!',
-  '                "args": {"to": to, "amount": amount, "token": approval_token}',
+  '            "_use_ai_internal": True,',
+  '            "_use_ai_type": "confirmation_required",',
+  '            "_use_ai_metadata": {',
+  '                "message": f"Transfer ${amount} to {to}. Are you sure?",',
+  '                "metadata": {"amount": amount, "to": to},',
+  '                "additional_columns": {"token": approval_token}',
   '            }',
   '        }',
   '',
@@ -73,9 +74,9 @@ Help the user test the MCP confirmation flow:
           a single tool and a <code style={docStyles.code}>token</code> parameter:
         </p>
         <ol style={{ ...docStyles.text, paddingLeft: '20px', lineHeight: '1.8' }}>
-          <li>First call: <code style={docStyles.code}>token: null</code> — if amount &gt; $1,000, returns <code style={docStyles.code}>confirmation_required</code> with a server-issued one-time token</li>
+          <li>First call: <code style={docStyles.code}>token: null</code> — if amount &gt; $1,000, returns <code style={docStyles.code}>_use_ai_type: "confirmation_required"</code> with a server-issued one-time token in <code style={docStyles.code}>additional_columns</code></li>
           <li>Server shows approval dialog to the user</li>
-          <li>If approved: server re-calls the same tool with the issued token</li>
+          <li>If approved: server re-calls the same tool with original args merged with <code style={docStyles.code}>additional_columns</code></li>
           <li>Tool validates token (one-time, parameter-bound, expiring) and executes</li>
         </ol>
         <p style={docStyles.text}>
@@ -88,12 +89,12 @@ Help the user test the MCP confirmation flow:
         <h2 style={docStyles.subtitle}>Confirmation Response Schema</h2>
         <CollapsibleCode defaultOpen>
 {`{
-  "confirmation_required": true,
-  "message": "Transfer $5000 to Bob. Are you sure?",
-  "metadata": { "amount": 5000, "to": "Bob" },
-  "execute_on_approval": {
-    "tool": "transfer",
-    "args": { "to": "Bob", "amount": 5000, "token": "<server-issued UUID>" }
+  "_use_ai_internal": true,
+  "_use_ai_type": "confirmation_required",
+  "_use_ai_metadata": {
+    "message": "Transfer $5000 to Bob. Are you sure?",
+    "metadata": { "amount": 5000, "to": "Bob" },
+    "additional_columns": { "token": "<server-issued UUID>" }
   }
 }`}
         </CollapsibleCode>
@@ -126,13 +127,13 @@ Help the user test the MCP confirmation flow:
               <td style={docStyles.tdAlt}><strong>Approval trigger</strong></td>
               <td style={docStyles.tdAlt}>setPendingApprovals</td>
               <td style={docStyles.tdAlt}>ctx.requestApproval()</td>
-              <td style={docStyles.tdAlt}>confirmation_required + token</td>
+              <td style={docStyles.tdAlt}>_use_ai_type: "confirmation_required"</td>
             </tr>
             <tr>
               <td style={docStyles.td}><strong>Bypass prevention</strong></td>
               <td style={docStyles.td}>Client-side only</td>
               <td style={docStyles.td}>Server-side ctx</td>
-              <td style={docStyles.td}>One-time token validation</td>
+              <td style={docStyles.td}>One-time token in additional_columns</td>
             </tr>
             <tr>
               <td style={docStyles.tdAlt}><strong>UI</strong></td>

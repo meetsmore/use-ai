@@ -128,17 +128,17 @@ export class ToolsService {
           {
             type: 'text',
             text: JSON.stringify({
-              confirmation_required: true,
-              message: `Transfer $${amount} to "${to}". Are you sure?`,
-              metadata: { amount, to },
-              execute_on_approval: {
-                tool: 'transfer',
-                args: { to, amount, token: internal_token_password },
+              _use_ai_internal: true,
+              _use_ai_type: 'confirmation_required',
+              _use_ai_metadata: {
+                message: `Transfer $${amount} to "${to}". Are you sure?`,
+                metadata: { amount, to },
+                additional_columns: { token: internal_token_password },
               },
             }),
           },
         ],
-      }; 
+      };
     }
 
     // token is set but invalid

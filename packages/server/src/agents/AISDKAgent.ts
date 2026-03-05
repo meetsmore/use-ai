@@ -880,6 +880,8 @@ export class AISDKAgent implements Agent {
             result,
             toolCallId,
             remoteTool.name,
+            remoteTool._remote.originalName,
+            args as Record<string, unknown>,
             remoteTool._remote.provider,
             session,
             events,

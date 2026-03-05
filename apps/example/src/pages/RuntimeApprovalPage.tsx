@@ -24,7 +24,7 @@ export default function RuntimeApprovalPage() {
       { annotations: { readOnlyHint: true, title: 'Check Balance' } }
     ),
 
-    transfer: defineTool(
+    clientTransfer: defineTool(
       'Transfer money to another account. Requires user approval for large amounts (over 1000).',
       z.object({
         to: z.string().describe('Recipient account name'),
