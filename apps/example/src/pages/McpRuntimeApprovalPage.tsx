@@ -3,27 +3,32 @@ import { useAI } from '@meetsmore-oss/use-ai-client';
 import { CollapsibleCode } from '../components/CollapsibleCode';
 import { docStyles } from '../styles/docStyles';
 
-const PYTHON_EXAMPLE = [
-  '# Phase 1: check tool — returns confirmation response',
+const TOKEN_EXAMPLE = [
+  '# Single tool with token-based approval',
   '@server.tool("transfer")',
-  'async def transfer(to: str, amount: float):',
+  'async def transfer(to: str, amount: float, token: str | None):',
+  '    # Phase 2: token provided — validate and execute',
+  '    if token is not None:',
+  '        stored = pending_tokens.pop(token, None)',
+  '        if not stored or stored["to"] != to or stored["amount"] != amount:',
+  '            return {"error": True, "message": "Invalid token"}',
+  '        return {"success": True, "message": f"Transferred ${amount} to {to}"}',
+  '',
+  '    # Phase 1: no token — check if approval is needed',
   '    if amount > 1000:',
+  '        approval_token = generate_token()',
+  '        pending_tokens[approval_token] = {"to": to, "amount": amount}',
   '        return {',
   '            "confirmation_required": True,',
   '            "message": f"Transfer ${amount} to {to}. Are you sure?",',
-  '            "metadata": {"amount": amount, "to": to},',
   '            "execute_on_approval": {',
-  '                "tool": "confirm_transfer",',
-  '                "args": {"to": to, "amount": amount, "confirmed": True}',
+  '                "tool": "transfer",  # same tool!',
+  '                "args": {"to": to, "amount": amount, "token": approval_token}',
   '            }',
   '        }',
-  '    # Small amounts proceed directly',
-  '    return do_transfer(to, amount)',
   '',
-  '# Phase 2: execution tool — called by server after approval',
-  '@server.tool("confirm_transfer")',
-  'async def confirm_transfer(to: str, amount: float, confirmed: bool):',
-  '    return do_transfer(to, amount)',
+  '    # Small amounts proceed directly',
+  '    return {"success": True, "message": f"Transferred ${amount} to {to}"}',
 ].join('\n');
 
 export default function McpRuntimeApprovalPage() {
@@ -31,12 +36,12 @@ export default function McpRuntimeApprovalPage() {
     tools: {},
     prompt: `MCP Runtime Approval Demo Page.
 
-This page demonstrates MCP tools that use the two-phase confirmation pattern.
-The following remote MCP tools (prefixed with "mcp_") are available:
-- mcp_transfer: [MCP] Transfer money via the remote MCP endpoint. Transfers over $1,000 return a confirmation_required response which triggers the approval dialog.
-- mcp_confirm_transfer: [MCP] Phase-2 execution tool, called automatically by the server after user approval. Do NOT call this tool directly.
+This page demonstrates MCP tools that use the two-phase confirmation pattern with token-based security.
+The following remote MCP tool (prefixed with "mcp_") is available:
+- mcp_transfer: Transfer money via the remote MCP endpoint. Pass token as null on the first call. Transfers over $1,000 require user approval — the server issues a one-time token and re-calls the same tool after approval.
 
-IMPORTANT: Always use the mcp_transfer tool (the MCP tool), NOT the serverTransfer tool (which is a different server-side tool).
+IMPORTANT: Always use the mcp_transfer tool (the MCP tool), NOT the serverTransfer tool.
+IMPORTANT: Always pass token as null. Never fabricate or guess a token value.
 
 Help the user test the MCP confirmation flow:
 - Small transfers (e.g. $500) should proceed directly without approval.
@@ -55,8 +60,7 @@ Help the user test the MCP confirmation flow:
         <h2 style={docStyles.subtitle}>Prerequisites</h2>
         <p style={docStyles.text}>
           The MCP server must be running on <code style={docStyles.code}>localhost:3002</code> with
-          the <code style={docStyles.code}>transfer</code> and <code style={docStyles.code}>confirm_transfer</code> tools
-          registered.
+          the <code style={docStyles.code}>transfer</code> tool registered.
         </p>
       </div>
 
@@ -65,11 +69,18 @@ Help the user test the MCP confirmation flow:
         <p style={docStyles.text}>
           MCP tools run on remote servers and cannot call{' '}
           <code style={docStyles.code}>ctx.requestApproval()</code> directly.
-          Instead, they use a <strong>two-phase confirmation pattern</strong>:
-          the tool returns a special JSON response with{' '}
-          <code style={docStyles.code}>confirmation_required: true</code>,
-          the server intercepts it, shows the approval dialog, and if approved,
-          calls the execution tool on the same MCP endpoint.
+          Instead, they use a <strong>two-phase confirmation pattern</strong> with
+          a single tool and a <code style={docStyles.code}>token</code> parameter:
+        </p>
+        <ol style={{ ...docStyles.text, paddingLeft: '20px', lineHeight: '1.8' }}>
+          <li>First call: <code style={docStyles.code}>token: null</code> — if amount &gt; $1,000, returns <code style={docStyles.code}>confirmation_required</code> with a server-issued one-time token</li>
+          <li>Server shows approval dialog to the user</li>
+          <li>If approved: server re-calls the same tool with the issued token</li>
+          <li>Tool validates token (one-time, parameter-bound, expiring) and executes</li>
+        </ol>
+        <p style={docStyles.text}>
+          The AI cannot bypass approval because it never sees a valid token — tokens are
+          generated server-side and consumed on use.
         </p>
       </div>
 
@@ -81,8 +92,8 @@ Help the user test the MCP confirmation flow:
   "message": "Transfer $5000 to Bob. Are you sure?",
   "metadata": { "amount": 5000, "to": "Bob" },
   "execute_on_approval": {
-    "tool": "confirm_transfer",
-    "args": { "to": "Bob", "amount": 5000, "confirmed": true }
+    "tool": "transfer",
+    "args": { "to": "Bob", "amount": 5000, "token": "<server-issued UUID>" }
   }
 }`}
         </CollapsibleCode>
@@ -90,7 +101,7 @@ Help the user test the MCP confirmation flow:
 
       <div style={docStyles.definitionCard}>
         <h2 style={docStyles.subtitle}>MCP Endpoint Code</h2>
-        <CollapsibleCode>{PYTHON_EXAMPLE}</CollapsibleCode>
+        <CollapsibleCode>{TOKEN_EXAMPLE}</CollapsibleCode>
       </div>
 
       <div style={docStyles.comparisonCard}>
@@ -115,13 +126,13 @@ Help the user test the MCP confirmation flow:
               <td style={docStyles.tdAlt}><strong>Approval trigger</strong></td>
               <td style={docStyles.tdAlt}>setPendingApprovals</td>
               <td style={docStyles.tdAlt}>ctx.requestApproval()</td>
-              <td style={docStyles.tdAlt}>confirmation_required response</td>
+              <td style={docStyles.tdAlt}>confirmation_required + token</td>
             </tr>
             <tr>
-              <td style={docStyles.td}><strong>Wait mechanism</strong></td>
-              <td style={docStyles.td}>React state + ref</td>
-              <td style={docStyles.td}>waitForApproval()</td>
-              <td style={docStyles.td}>waitForApproval()</td>
+              <td style={docStyles.td}><strong>Bypass prevention</strong></td>
+              <td style={docStyles.td}>Client-side only</td>
+              <td style={docStyles.td}>Server-side ctx</td>
+              <td style={docStyles.td}>One-time token validation</td>
             </tr>
             <tr>
               <td style={docStyles.tdAlt}><strong>UI</strong></td>

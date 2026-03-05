@@ -2,7 +2,15 @@ import { Injectable, Inject, Scope } from '@nestjs/common';
 import { REQUEST } from '@nestjs/core';
 import { Tool } from '@rekog/mcp-nest';
 import { z } from 'zod';
+import { randomUUID } from 'crypto';
 import type { Request } from 'express';
+
+/**
+ * In-memory store for one-time approval tokens.
+ * Each token is tied to specific transfer parameters and expires after 5 minutes.
+ * Module-scoped so it persists across request-scoped service instances.
+ */
+const pendingTokens = new Map<string, { to: string; amount: number; expiresAt: number }>();
 
 @Injectable({ scope: Scope.REQUEST })
 export class ToolsService {
@@ -106,18 +114,52 @@ export class ToolsService {
 
   @Tool({
     name: 'transfer',
-    description: '[MCP] Transfer money to a recipient via the remote MCP endpoint. Transfers over $1000 require user confirmation via the two-phase approval flow. This is an MCP tool (not a server tool).',
+    description: '[MCP] Transfer money to a recipient via the remote MCP endpoint. Transfers over $1000 require user confirmation. On the first call, pass token as null. If confirmation is needed, the server issues a one-time token and asks for approval. The server will re-call this tool with the issued token after the user approves.',
     parameters: z.object({
       to: z.string().describe('Recipient name'),
       amount: z.number().describe('Amount to transfer'),
+      token: z.string().nullable().describe('One-time approval token. Pass null on the first call. The server issues and provides this token automatically after user approval — never fabricate a token.'),
     }),
     annotations: {
       title: 'Transferring Money',
     },
   })
-  async transfer({ to, amount }: { to: string; amount: number }) {
+  async transfer({ to, amount, token }: { to: string; amount: number; token: string | null }) {
+    // Phase 2: token provided — validate and execute
+    if (token != null) {
+      const stored = pendingTokens.get(token);
+      if (!stored) {
+        return {
+          content: [{ type: 'text', text: JSON.stringify({ error: true, message: 'Invalid or expired token' }) }],
+          isError: true,
+        };
+      }
+      // Consume the token (one-time use)
+      pendingTokens.delete(token);
+
+      if (stored.expiresAt < Date.now()) {
+        return {
+          content: [{ type: 'text', text: JSON.stringify({ error: true, message: 'Token expired' }) }],
+          isError: true,
+        };
+      }
+      if (stored.to !== to || stored.amount !== amount) {
+        return {
+          content: [{ type: 'text', text: JSON.stringify({ error: true, message: 'Token does not match transfer parameters' }) }],
+          isError: true,
+        };
+      }
+
+      return {
+        content: [{ type: 'text', text: JSON.stringify({ success: true, message: `Transferred $${amount} to ${to} (confirmed)` }) }],
+      };
+    }
+
+    // Phase 1: no token — check if approval is needed
     if (amount > 1000) {
-      // Phase 1: Return confirmation_required response
+      const approvalToken = randomUUID();
+      pendingTokens.set(approvalToken, { to, amount, expiresAt: Date.now() + 5 * 60 * 1000 });
+
       return {
         content: [
           {
@@ -127,62 +169,18 @@ export class ToolsService {
               message: `Transfer $${amount} to "${to}". Are you sure?`,
               metadata: { amount, to },
               execute_on_approval: {
-                tool: 'confirm_transfer',
-                args: { to, amount, confirmed: true },
+                tool: 'transfer',
+                args: { to, amount, token: approvalToken },
               },
             }),
           },
         ],
       };
     }
+
     // Small amounts proceed directly
     return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify({
-            success: true,
-            message: `Transferred $${amount} to ${to}`,
-          }),
-        },
-      ],
-    };
-  }
-
-  @Tool({
-    name: 'confirm_transfer',
-    description: '[MCP] Execute a confirmed money transfer via the remote MCP endpoint (phase 2 of the two-phase approval flow). This tool is called automatically by the server after user approval — do not call it directly.',
-    parameters: z.object({
-      to: z.string().describe('Recipient name'),
-      amount: z.number().describe('Amount to transfer'),
-      confirmed: z.boolean().describe('Must be true'),
-    }),
-    annotations: {
-      title: 'Executing Transfer',
-    },
-  })
-  async confirmTransfer({ to, amount, confirmed }: { to: string; amount: number; confirmed: boolean }) {
-    if (!confirmed) {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify({ error: true, message: 'Transfer not confirmed' }),
-          },
-        ],
-        isError: true,
-      };
-    }
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify({
-            success: true,
-            message: `Transferred $${amount} to ${to} (confirmed)`,
-          }),
-        },
-      ],
+      content: [{ type: 'text', text: JSON.stringify({ success: true, message: `Transferred $${amount} to ${to}` }) }],
     };
   }
 
