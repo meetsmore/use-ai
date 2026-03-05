@@ -1,0 +1,38 @@
+apps/example/test/tool-approval.e2e.test.ts
+  b2d384b6a5338781 21,167
+apps/example/test/server-tools.e2e.test.ts
+  b2d384b6a5338781 21,24,34
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "9d01ab3bd19245d80e1ccb7e17bd5a7623618e70",
+  "prompts": {
+    "5fbafc80ba40231b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "01db9704-6ada-47dd-9224-262c247df9e1",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    },
+    "b2d384b6a5338781": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4c4311f3-0885-4474-88e3-ba4f1eef93ee",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 6,
+      "total_deletions": 6,
+      "accepted_lines": 5,
+      "overriden_lines": 0
+    }
+  }
+}
