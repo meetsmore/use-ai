@@ -18,10 +18,10 @@ test.describe('Server-Side Tools', () => {
 
     // Navigate to the Server Tools page
     await page.goto('/');
-    await page.click('text=Server Tools');
+    await page.click('button:text-is("Server Tools")');
 
     // Wait for the page to load
-    await expect(page.locator('h1:has-text("Server Tools Demo")')).toBeVisible();
+    await expect(page.locator('h1:has-text("Server Tools")')).toBeVisible();
 
     // Open AI chat
     const aiButton = page.getByTestId('ai-button');
@@ -31,7 +31,7 @@ test.describe('Server-Side Tools', () => {
   });
 
   test('should display server tools page', async ({ page }) => {
-    await expect(page.locator('h1:has-text("Server Tools Demo")')).toBeVisible();
+    await expect(page.locator('h1:has-text("Server Tools")')).toBeVisible();
     await expect(page.locator('text=About Server Tools')).toBeVisible();
   });
 
