@@ -17,8 +17,14 @@ export { logger } from './logger';
 export { defineServerTool } from './tools';
 export type { ServerToolConfig, ServerToolContext, ServerToolDefinition } from './tools';
 
-// Export MCP confirmation types for consumers
-export { isMcpConfirmationResponse, type McpConfirmationResponse } from './mcp';
+// Export shared `_use_ai_` internal response types for consumers
+export {
+  isUseAIInternalResponse,
+  type UseAIInternalResponseBase,
+  type UseAIInternalResponse,
+  isMcpConfirmationResponse,
+  type McpConfirmationResponse,
+} from './mcp';
 
 // Export utilities for plugins and custom agents
 export {

@@ -72,7 +72,7 @@ describe('isMcpConfirmationResponse', () => {
   });
 
   test('returns false for different _use_ai_type', () => {
-    const value: UseAIInternalResponse = {
+    const value = {
       _use_ai_internal: true,
       _use_ai_type: 'future_feature',
       _use_ai_metadata: { message: 'hello' },
@@ -81,7 +81,7 @@ describe('isMcpConfirmationResponse', () => {
   });
 
   test('returns false when message is missing', () => {
-    const value: UseAIInternalResponse = {
+    const value = {
       _use_ai_internal: true,
       _use_ai_type: 'confirmation_required',
       _use_ai_metadata: {},
@@ -90,7 +90,7 @@ describe('isMcpConfirmationResponse', () => {
   });
 
   test('returns false when message is not a string', () => {
-    const value: UseAIInternalResponse = {
+    const value = {
       _use_ai_internal: true,
       _use_ai_type: 'confirmation_required',
       _use_ai_metadata: { message: 123 },

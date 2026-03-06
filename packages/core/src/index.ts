@@ -60,4 +60,19 @@ export type {
   UserMessageContent,
 } from './types';
 
-export { EventType, ErrorCode, TOOL_APPROVAL_REQUEST } from './types';
+export type {
+  UseAIInternalResponseBase,
+  UseAIInternalResponse,
+  McpConfirmationResponse,
+} from './useAIInternalResponse';
+
+export {
+  EventType,
+  ErrorCode,
+  TOOL_APPROVAL_REQUEST,
+} from './types';
+
+export {
+  isUseAIInternalResponse,
+  isMcpConfirmationResponse,
+} from './useAIInternalResponse';

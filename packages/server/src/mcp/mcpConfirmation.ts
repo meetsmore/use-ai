@@ -12,35 +12,13 @@ import { TOOL_APPROVAL_REQUEST } from '../types';
 import { waitForApproval } from '../agents/toolApproval';
 import type { RemoteMcpToolsProvider } from './RemoteMcpToolsProvider';
 import type { McpHeadersMap } from '@meetsmore-oss/use-ai-core';
+import type { McpConfirmationResponse } from '@meetsmore-oss/use-ai-core';
 import { logger } from '../logger';
-import type { UseAIInternalResponse } from './useAIInternalResponse';
 
-/**
- * Confirmation-specific internal response.
- */
-export interface McpConfirmationResponse extends UseAIInternalResponse {
-  _use_ai_type: 'confirmation_required';
-  _use_ai_metadata: {
-    /** Message shown in the approval dialog */
-    message: string;
-    /** Optional metadata passed through to the approval dialog */
-    metadata?: Record<string, unknown>;
-    /** Optional extra columns merged into original args for phase 2 */
-    additional_columns?: Record<string, unknown>;
-  };
-}
-
-/**
- * Narrow a `UseAIInternalResponse` to the confirmation variant.
- */
-export function isMcpConfirmationResponse(
-  value: UseAIInternalResponse
-): value is McpConfirmationResponse {
-  return (
-    value._use_ai_type === 'confirmation_required' &&
-    typeof value._use_ai_metadata.message === 'string'
-  );
-}
+export {
+  isMcpConfirmationResponse,
+  type McpConfirmationResponse,
+} from '@meetsmore-oss/use-ai-core';
 
 /**
  * Handles an MCP confirmation response:

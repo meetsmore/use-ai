@@ -10,12 +10,12 @@ describe('isUseAIInternalResponse', () => {
     })).toBe(true);
   });
 
-  test('returns true for unknown _use_ai_type (base does not restrict type)', () => {
+  test('returns false for unknown _use_ai_type', () => {
     expect(isUseAIInternalResponse({
       _use_ai_internal: true,
       _use_ai_type: 'future_feature',
       _use_ai_metadata: { foo: 'bar' },
-    })).toBe(true);
+    })).toBe(false);
   });
 
   test('returns false for null / undefined / primitives', () => {
