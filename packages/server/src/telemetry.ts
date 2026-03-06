@@ -1,5 +1,5 @@
 import { trace, context as otelContext, SpanStatusCode } from '@opentelemetry/api';
-import { langfuse, popTraceIdForRun, recordErrorTrace, type ErrorTraceParams } from './instrumentation';
+import { flushTracing, langfuse, popTraceIdForRun, recordErrorTrace, type ErrorTraceParams } from './instrumentation';
 
 /**
  * Backend-agnostic telemetry handle for a single agent run.
@@ -113,10 +113,9 @@ export function startRunSpan(config: StartRunSpanConfig): RunSpan {
 
 /**
  * Flushes all pending telemetry data.
- * Delegates to the Langfuse flush function when available.
+ * Flushes both OTel span processors and any direct Langfuse SDK writes.
  */
 export async function flushTelemetry(): Promise<void> {
-  if (langfuse.flush) {
-    await langfuse.flush();
-  }
+  await flushTracing();
+  await langfuse.client?.flushAsync();
 }
