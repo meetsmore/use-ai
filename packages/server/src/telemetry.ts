@@ -1,5 +1,5 @@
 import { trace, context as otelContext, SpanStatusCode } from '@opentelemetry/api';
-import { flushTracing, langfuse, popTraceIdForRun, recordErrorTrace, type ErrorTraceParams } from './instrumentation';
+import { flushTracing, isTracingEnabled, langfuse, popTraceIdForRun, recordErrorTrace, type ErrorTraceParams } from './instrumentation';
 
 /**
  * Backend-agnostic telemetry handle for a single agent run.
@@ -45,7 +45,7 @@ interface StartRunSpanConfig {
 export function startRunSpan(config: StartRunSpanConfig): RunSpan {
   const { runId, sessionId } = config;
 
-  if (!langfuse.enabled) {
+  if (!langfuse.enabled && !isTracingEnabled()) {
     return {
       active: false,
       wrap: <T>(fn: () => T): T => fn(),
