@@ -62,7 +62,6 @@ function createTestInput(tools: ServerToolDefinition[]): AgentInput {
       state: null,
       pendingToolCalls: new Map(),
       pendingToolApprovals: new Map(),
-      conversationHistory: [],
       ipAddress: '127.0.0.1',
     },
     runId,
