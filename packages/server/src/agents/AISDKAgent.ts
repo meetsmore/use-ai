@@ -1,5 +1,6 @@
 import { streamText, jsonSchema, LanguageModel, stepCountIs, type ModelMessage, type SystemModelMessage } from 'ai';
 import type { JSONSchema7 } from 'json-schema';
+import { startRunSpan, flushTelemetry as flushAllTelemetry } from '../telemetry';
 import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
 import type { Agent, AgentInput, EventEmitter, AgentResult, ClientSession } from './types';
@@ -26,7 +27,6 @@ import type {
   ToolCallStartExtensions,
 } from '../types';
 import { logger } from '../logger';
-import { langfuse, popTraceIdForRun, recordErrorTrace, isTracingEnabled, flushTracing, type LangfuseApi } from '../instrumentation';
 import { applyCacheBreakpoints, type CacheBreakpointFn } from './anthropicCache';
 import { getToolAnnotations } from '../utils';
 import { toolNeedsApproval, createApprovalWrapper, type ToolArguments, type ToolResult } from './toolApproval';
@@ -270,7 +270,6 @@ export class AISDKAgent implements Agent {
   private model: LanguageModel;
   private name: string;
   private annotation?: string;
-  private langfuse: LangfuseApi;
   private toolFilter?: (tool: ToolDefinition) => boolean;
   private systemPrompt?: string | (() => string | Promise<string>);
   private cacheBreakpoint?: CacheBreakpointFn;
@@ -288,8 +287,6 @@ export class AISDKAgent implements Agent {
     this.maxOutputTokens = config.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS;
     this.temperature = config.temperature;
     this.maxSteps = config.maxSteps ?? DEFAULT_MAX_STEPS;
-    // Initialize Langfuse observability (automatically reads env vars)
-    this.langfuse = langfuse;
   }
 
   getName(): string {
@@ -305,7 +302,7 @@ export class AISDKAgent implements Agent {
    * Useful for tests to ensure data is sent before querying.
    */
   async flushTelemetry(): Promise<void> {
-    await flushTracing();
+    await flushAllTelemetry();
   }
 
   async run(input: AgentInput, events: EventEmitter): Promise<AgentResult> {
@@ -349,6 +346,15 @@ export class AISDKAgent implements Agent {
     });
 
     let streamTextStarted = false;
+
+    // Create telemetry span to group all step iterations under one OTEL trace.
+    const span = startRunSpan({ runId, sessionId: session.clientId });
+
+    // Set span input from last user message (shown in Langfuse list view)
+    const lastUserMessage = [...messages].reverse().find(m => m.role === 'user');
+    if (lastUserMessage) {
+      span.setInput(lastUserMessage.content);
+    }
 
     try {
       logger.info('Sending to AI SDK model (streaming)', {
@@ -424,7 +430,7 @@ export class AISDKAgent implements Agent {
         );
 
         streamTextStarted = true;
-        const stream = streamText({
+        const createStream = () => streamText({
           model: this.model,
           messages: messagesWithCache,
           // Note: system prompt is included in messages array to support cache breakpoints
@@ -438,7 +444,7 @@ export class AISDKAgent implements Agent {
           maxOutputTokens: this.maxOutputTokens,
           temperature: this.temperature,
           abortSignal: session.abortController?.signal,
-          experimental_telemetry: isTracingEnabled()
+          experimental_telemetry: span.active
             ? {
                 isEnabled: true,
                 functionId: 'use-ai',
@@ -458,6 +464,8 @@ export class AISDKAgent implements Agent {
             logger.debug('Step finished', { usage, finishReason, stepIteration });
           },
         });
+        // Call streamText within parent OTEL context so AI SDK spans become children
+        const stream = span.wrap(createStream);
 
         // Track active tool calls for streaming args (per-step)
         const activeToolCalls = new Map<string, { name: string; args: string }>();
@@ -613,6 +621,7 @@ export class AISDKAgent implements Agent {
 
         // Check if stream was aborted
         if (session.abortController?.signal.aborted) {
+          span.endWithError('Run aborted by user');
           events.emit<RunErrorEvent>({
             type: EventType.RUN_ERROR,
             message: 'Run aborted by user',
@@ -665,6 +674,7 @@ export class AISDKAgent implements Agent {
 
       // Check for empty response (no text, no tool calls)
       if (!hasAnyContent) {
+        span.endWithError('Empty response from AI');
         events.emit<RunErrorEvent>({
           type: EventType.RUN_ERROR,
           message:
@@ -693,8 +703,13 @@ export class AISDKAgent implements Agent {
         logger.aiResponse([finalText]);
       }
 
+      span.setOutput(finalText);
+
       // Get trace ID captured by span processor (for Langfuse feedback linking)
-      const traceId = popTraceIdForRun(runId);
+      // Must be called before span.end() since end() calls popTraceIdForRun internally
+      const traceId = span.popTraceId();
+
+      span.end();
 
       // Emit RUN_FINISHED with trace ID if available, otherwise original runId
       events.emit<RunFinishedEvent>({
@@ -710,8 +725,8 @@ export class AISDKAgent implements Agent {
         conversationHistory: session.conversationHistory,
       };
     } catch (error) {
-      // Clean up trace ID to prevent memory leak on error paths
-      popTraceIdForRun(runId);
+      // End span and clean up trace ID to prevent memory leak on error paths
+      span.endWithError(error instanceof Error ? error.message : String(error));
 
       logger.error('Error calling AI SDK model', {
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -747,7 +762,7 @@ export class AISDKAgent implements Agent {
       // Record pre-streamText errors to Langfuse (post-streamText errors are captured by AI SDK OTEL)
       if (!streamTextStarted) {
         const telemetryMetadata = (originalInput.forwardedProps as UseAIForwardedProps | undefined)?.telemetryMetadata;
-        recordErrorTrace({
+        span.recordError({
           runId,
           errorCategory: 'pre_stream_error',
           errorMessage,

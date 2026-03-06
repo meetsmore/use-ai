@@ -16,6 +16,9 @@ export type { SpanProcessor } from './instrumentation';
 // Export logger for plugins
 export { logger } from './logger';
 
+// Export telemetry for custom agents
+export { startRunSpan, flushTelemetry, type RunSpan } from './telemetry';
+
 // Export server tool definition helper and types
 export { defineServerTool } from './tools';
 export type { ServerToolConfig, ServerToolContext, ServerToolDefinition } from './tools';
