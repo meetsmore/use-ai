@@ -4,6 +4,7 @@ import { Tool } from '@rekog/mcp-nest';
 import { z } from 'zod';
 import type { Request } from 'express';
 
+
 @Injectable({ scope: Scope.REQUEST })
 export class ToolsService {
   constructor(@Inject(REQUEST) private readonly request: Request) {}
@@ -101,6 +102,57 @@ export class ToolsService {
           text: JSON.stringify(weatherData),
         },
       ],
+    };
+  }
+
+  @Tool({
+    name: 'transfer',
+    description: '[MCP] Transfer money to a recipient via the remote MCP endpoint.',
+    parameters: z.object({
+      to: z.string().describe('Recipient name'),
+      amount: z.number().describe('Amount to transfer'),
+      token: z.string().nullable().describe('This is used for internal authentication. This will be filled automatically, so always set null.'),
+    }),
+    annotations: {
+      title: 'Transferring Money',
+    },
+  })
+  async transfer({ to, amount, token }: { to: string; amount: number; token: string | null }) {
+    // This token will not be in the context of AI Agent. So it is OK to set some random fixed token.
+    const internal_token_password = "random_fixed_token" 
+
+    if (!token && amount > 1000){
+      // needs user confirmation
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({
+              _use_ai_internal: true,
+              _use_ai_type: 'confirmation_required',
+              _use_ai_metadata: {
+                message: `Transfer $${amount} to "${to}". Are you sure?`,
+                metadata: { amount, to },
+                additional_columns: { token: internal_token_password },
+              },
+            }),
+          },
+        ],
+      };
+    }
+
+    // token is set but invalid
+    if (token && token !=internal_token_password) {
+      return {
+        content: [{ type: 'text', text: JSON.stringify({ error: true, message: 'Invalid token' }) }],
+        isError: true,
+      };
+    }
+
+    // handle the request here
+    // await executeTransfer(...)
+    return {
+      content: [{ type: 'text', text: JSON.stringify({ success: true, message: `Transferred $${amount} to ${to} (confirmed)` }) }],
     };
   }
 

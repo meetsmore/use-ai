@@ -66,11 +66,12 @@ describe('defineServerTool', () => {
         }
       );
 
-      const mockContext = {
+      const mockContext: ServerToolContext = {
         session: {} as ServerToolContext['session'],
         state: null,
         runId: 'run-1',
         toolCallId: 'tc-1',
+        requestApproval: async () => ({ approved: true }),
       };
 
       const result = await tool.execute({ value: 'hello' }, mockContext);
@@ -126,11 +127,12 @@ describe('defineServerTool', () => {
         async () => 'now'
       );
 
-      const mockContext = {
+      const mockContext: ServerToolContext = {
         session: {} as ServerToolContext['session'],
         state: null,
         runId: 'run-1',
         toolCallId: 'tc-1',
+        requestApproval: async () => ({ approved: true }),
       };
 
       const result = await tool.execute({}, mockContext);

@@ -23,6 +23,15 @@ export { startRunSpan, flushTelemetry, type RunSpan } from './telemetry';
 export { defineServerTool } from './tools';
 export type { ServerToolConfig, ServerToolContext, ServerToolDefinition } from './tools';
 
+// Export shared `_use_ai_` internal response types for consumers
+export {
+  isUseAIInternalResponse,
+  type UseAIInternalResponseBase,
+  type UseAIInternalResponse,
+  isMcpConfirmationResponse,
+  type McpConfirmationResponse,
+} from './mcp';
+
 // Export utilities for plugins and custom agents
 export {
   createClientToolExecutor,

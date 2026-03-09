@@ -43,7 +43,7 @@ export type {
   UseAIProviderProps,
 } from './providers/useAIProvider';
 export type { SendMessageOptions } from './hooks/useMessageQueue';
-export type { DefinedTool, ToolsDefinition, ToolOptions, ToolAnnotations } from './defineTool';
+export type { DefinedTool, ToolsDefinition, ToolOptions, ToolAnnotations, ToolExecutionContext } from './defineTool';
 
 // Chat persistence
 export { LocalStorageChatRepository } from './providers/chatRepository/LocalStorageChatRepository';

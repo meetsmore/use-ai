@@ -1,6 +1,12 @@
 import { describe, test, expect } from 'bun:test';
 import { z } from 'zod';
-import { defineTool } from './defineTool';
+import { defineTool, executeDefinedTool } from './defineTool';
+import type { ToolExecutionContext } from './defineTool';
+
+/** No-op context for tests that don't use requestApproval */
+const noopCtx: ToolExecutionContext = {
+  requestApproval: async () => ({ approved: true }),
+};
 
 describe('Tools can be defined with type-safe parameters using Zod schemas', () => {
   test('defines a tool with Zod schema and typed parameters', async () => {
@@ -270,6 +276,138 @@ describe('Additional tool definition functionality', () => {
       throw new Error('Tool execution failed');
     });
 
-    await expect(tool._execute({})).rejects.toThrow('Tool execution failed');
+    await expect(tool._execute({}, noopCtx)).rejects.toThrow('Tool execution failed');
+  });
+});
+
+describe('ToolExecutionContext with requestApproval', () => {
+  test('tool with schema receives ctx as second argument', async () => {
+    let receivedCtx: ToolExecutionContext | undefined;
+
+    const tool = defineTool(
+      'Tool with context',
+      z.object({ value: z.string() }),
+      (_input, ctx) => {
+        receivedCtx = ctx;
+        return 'ok';
+      }
+    );
+
+    await tool._execute({ value: 'test' }, noopCtx);
+    expect(receivedCtx).toBeDefined();
+    expect(receivedCtx!.requestApproval).toBeInstanceOf(Function);
+  });
+
+  test('parameterless tool receives ctx', async () => {
+    let receivedCtx: ToolExecutionContext | undefined;
+
+    const tool = defineTool(
+      'No-param tool with context',
+      (ctx) => {
+        receivedCtx = ctx;
+        return 'ok';
+      }
+    );
+
+    await tool._execute({}, noopCtx);
+    expect(receivedCtx).toBeDefined();
+    expect(receivedCtx!.requestApproval).toBeInstanceOf(Function);
+  });
+
+  test('tool can call requestApproval and receive approved result', async () => {
+    const approveCtx: ToolExecutionContext = {
+      requestApproval: async () => ({ approved: true }),
+    };
+
+    const tool = defineTool(
+      'Conditionally approved tool',
+      z.object({ action: z.string() }),
+      async (input, ctx) => {
+        const { approved } = await ctx.requestApproval({
+          message: `Approve ${input.action}?`,
+        });
+        return approved ? 'executed' : 'rejected';
+      }
+    );
+
+    const result = await tool._execute({ action: 'delete' }, approveCtx);
+    expect(result).toBe('executed');
+  });
+
+  test('tool can call requestApproval and receive rejected result', async () => {
+    const rejectCtx: ToolExecutionContext = {
+      requestApproval: async () => ({ approved: false, reason: 'Too risky' }),
+    };
+
+    const tool = defineTool(
+      'Rejected tool',
+      z.object({ action: z.string() }),
+      async (_input, ctx) => {
+        const { approved, reason } = await ctx.requestApproval({
+          message: 'Approve this?',
+        });
+        return approved ? 'executed' : `rejected: ${reason}`;
+      }
+    );
+
+    const result = await tool._execute({ action: 'delete' }, rejectCtx);
+    expect(result).toBe('rejected: Too risky');
+  });
+
+  test('requestApproval receives message and metadata', async () => {
+    let capturedInput: { message: string; metadata?: Record<string, unknown> } | undefined;
+
+    const ctx: ToolExecutionContext = {
+      requestApproval: async (input) => {
+        capturedInput = input;
+        return { approved: true };
+      },
+    };
+
+    const tool = defineTool(
+      'Tool with metadata',
+      z.object({ url: z.string() }),
+      async (input, ctx) => {
+        await ctx.requestApproval({
+          message: `Calling ${input.url}`,
+          metadata: { endpoint: input.url, risk: 'high' },
+        });
+        return 'done';
+      }
+    );
+
+    await tool._execute({ url: 'https://prod.example.com' }, ctx);
+    expect(capturedInput!.message).toBe('Calling https://prod.example.com');
+    expect(capturedInput!.metadata).toEqual({ endpoint: 'https://prod.example.com', risk: 'high' });
+  });
+
+  test('executeDefinedTool forwards ctx to tool', async () => {
+    let ctxReceived = false;
+
+    const tools = {
+      myTool: defineTool(
+        'Test',
+        z.object({ x: z.number() }),
+        (_input, ctx) => {
+          ctxReceived = ctx.requestApproval !== undefined;
+          return 'ok';
+        }
+      ),
+    };
+
+    await executeDefinedTool(tools, 'myTool', { x: 1 }, noopCtx);
+    expect(ctxReceived).toBe(true);
+  });
+
+  test('existing tools without ctx parameter still work (backward compatibility)', async () => {
+    // Simulate an existing tool that ignores ctx
+    const tool = defineTool(
+      'Legacy tool',
+      z.object({ n: z.number() }),
+      (input) => input.n * 2
+    );
+
+    const result = await tool._execute({ n: 21 }, noopCtx);
+    expect(result).toBe(42);
   });
 });

@@ -10,6 +10,8 @@ export interface PendingToolItem {
   toolCallName: string;
   toolCallArgs: Record<string, unknown>;
   annotations?: ToolAnnotations;
+  /** Optional message explaining why approval is needed (runtime approval) */
+  message?: string;
 }
 
 /**
@@ -56,11 +58,17 @@ export function ToolApprovalDialog({
   const displayName = annotations?.title || toolCallName;
   const isBatch = toolCount > 1;
 
+  // Check if any pending tool has a runtime approval message
+  const runtimeMessage = pendingTools.find(t => t.message)?.message;
+
   // For batch mode, show count; otherwise show the tool name
-  const message = isBatch
-    ? strings.toolApproval.batchMessage?.replace('{count}', String(toolCount))
-      ?? `${toolCount} actions are waiting for your approval`
-    : strings.toolApproval.message.replace('{toolName}', displayName);
+  // Runtime messages take priority over default generated messages
+  const message = runtimeMessage
+    ? runtimeMessage
+    : isBatch
+      ? strings.toolApproval.batchMessage?.replace('{count}', String(toolCount))
+        ?? `${toolCount} actions are waiting for your approval`
+      : strings.toolApproval.message.replace('{toolName}', displayName);
 
   // Get display name for a tool (use annotation title if available)
   const getToolDisplayName = (tool: PendingToolItem) =>

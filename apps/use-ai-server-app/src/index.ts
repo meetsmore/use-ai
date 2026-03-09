@@ -184,6 +184,30 @@ function createServerTools(): Record<string, ServerToolConfig> | undefined {
       async ({ a, b }) => ({ result: a + b }),
       { annotations: { readOnlyHint: true } }
     ),
+    serverTransfer: defineServerTool(
+      'Transfer money between accounts on the server side. Transfers over $1000 require user approval via ctx.requestApproval().',
+      z.object({
+        to: z.string().describe('Recipient account name'),
+        amount: z.number().describe('Amount to transfer'),
+      }),
+      async ({ to, amount }, ctx) => {
+        if (amount > 1000) {
+          const { approved, reason } = await ctx.requestApproval({
+            message: `[Server Tool] Transfer $${amount} to "${to}"? This exceeds the $1,000 threshold.`,
+            metadata: { amount, to, source: 'server' },
+          });
+          if (!approved) {
+            return { error: 'User rejected the transfer', reason };
+          }
+        }
+        return {
+          success: true,
+          message: `Server transferred $${amount} to ${to}`,
+          amount,
+          to,
+        };
+      }
+    ),
   };
 
   if (logFormat === 'pretty') {

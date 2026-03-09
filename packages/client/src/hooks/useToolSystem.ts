@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useMemo, type RefObject, type MutableRefObject } from 'react';
 import type { ToolAnnotations, ToolApprovalRequestEvent } from '../types';
 import type { UseAIClient } from '../client';
-import type { ToolsDefinition } from '../defineTool';
+import type { ToolsDefinition, ToolExecutionContext } from '../defineTool';
 import { executeDefinedTool } from '../defineTool';
 
 // ── Registry Types ──────────────────────────────────────────────────────────
@@ -21,6 +21,10 @@ export interface PendingToolApproval {
   toolCallName: string;
   toolCallArgs: Record<string, unknown>;
   annotations?: ToolAnnotations;
+  /** Optional message explaining why approval is needed (runtime approval) */
+  message?: string;
+  /** Optional metadata for the approval request (runtime approval) */
+  metadata?: Record<string, unknown>;
 }
 
 // ── Hook Options & Return ───────────────────────────────────────────────────
@@ -111,6 +115,9 @@ export function useToolSystem({
 
   const [pendingApprovals, setPendingApprovals] = useState<PendingToolApproval[]>([]);
   const pendingApprovalToolCallsRef = useRef<Map<string, { name: string; input: unknown; toolCallData: { name: string; args: string } }>>(new Map());
+
+  /** Resolvers for runtime approval requests (from ctx.requestApproval) */
+  const runtimeApprovalResolversRef = useRef<Map<string, (result: { approved: boolean; reason?: string }) => void>>(new Map());
 
   // ── Registry Methods ────────────────────────────────────────────────────
 
@@ -270,6 +277,8 @@ export function useToolSystem({
         toolCallName: event.toolCallName,
         toolCallArgs: event.toolCallArgs,
         annotations: event.annotations,
+        message: event.message,
+        metadata: event.metadata,
       },
     ]);
   }, []);
@@ -289,8 +298,29 @@ export function useToolSystem({
       const ownerId = toolOwnershipRef.current.get(name);
       console.log(`[useToolSystem] Tool "${name}" owned by component:`, ownerId);
 
+      // Build ToolExecutionContext with requestApproval for runtime approvals
+      const ctx: ToolExecutionContext = {
+        requestApproval: ({ message, metadata }) => {
+          return new Promise<{ approved: boolean; reason?: string }>((resolve) => {
+            const approvalId = `${toolCallId}-runtime-${Date.now()}`;
+            runtimeApprovalResolversRef.current.set(approvalId, resolve);
+
+            setPendingApprovals(prev => [
+              ...prev,
+              {
+                toolCallId: approvalId,
+                toolCallName: name,
+                toolCallArgs: (input as Record<string, unknown>) || {},
+                message,
+                metadata,
+              },
+            ]);
+          });
+        },
+      };
+
       console.log('[useToolSystem] Executing tool...');
-      const result = await executeDefinedTool(aggregatedToolsRef.current, name, input);
+      const result = await executeDefinedTool(aggregatedToolsRef.current, name, input, ctx);
 
       const isErrorResult = result && typeof result === 'object' &&
         ('error' in result || (result as Record<string, unknown>).success === false);
@@ -354,15 +384,19 @@ export function useToolSystem({
     console.log('[useToolSystem] Approving all tool calls:', pendingApprovals.length);
 
     const pendingTools = [...pendingApprovals];
-
-    for (const pending of pendingTools) {
-      clientRef.current.sendToolApprovalResponse(pending.toolCallId, true);
-    }
-
     setPendingApprovals([]);
 
-    for (const tool of pendingTools) {
-      await executePendingToolAfterApproval(tool.toolCallId);
+    for (const pending of pendingTools) {
+      // Check if this is a runtime client-side approval (from ctx.requestApproval)
+      const runtimeResolver = runtimeApprovalResolversRef.current.get(pending.toolCallId);
+      if (runtimeResolver) {
+        runtimeApprovalResolversRef.current.delete(pending.toolCallId);
+        runtimeResolver({ approved: true });
+      } else {
+        // Server-side approval (destructiveHint flow)
+        clientRef.current.sendToolApprovalResponse(pending.toolCallId, true);
+        await executePendingToolAfterApproval(pending.toolCallId);
+      }
     }
   }, [clientRef, pendingApprovals, executePendingToolAfterApproval]);
 
@@ -371,15 +405,19 @@ export function useToolSystem({
     console.log('[useToolSystem] Rejecting all tool calls:', pendingApprovals.length, reason);
 
     const pendingTools = [...pendingApprovals];
-
-    for (const pending of pendingTools) {
-      clientRef.current.sendToolApprovalResponse(pending.toolCallId, false, reason);
-    }
-
     setPendingApprovals([]);
 
-    for (const tool of pendingTools) {
-      pendingApprovalToolCallsRef.current.delete(tool.toolCallId);
+    for (const pending of pendingTools) {
+      // Check if this is a runtime client-side approval (from ctx.requestApproval)
+      const runtimeResolver = runtimeApprovalResolversRef.current.get(pending.toolCallId);
+      if (runtimeResolver) {
+        runtimeApprovalResolversRef.current.delete(pending.toolCallId);
+        runtimeResolver({ approved: false, reason });
+      } else {
+        // Server-side approval (destructiveHint flow)
+        clientRef.current.sendToolApprovalResponse(pending.toolCallId, false, reason);
+        pendingApprovalToolCallsRef.current.delete(pending.toolCallId);
+      }
     }
   }, [clientRef, pendingApprovals]);
 

@@ -261,6 +261,10 @@ export interface ToolApprovalRequestEvent {
   annotations?: ToolAnnotations;
   /** Timestamp when this event was generated */
   timestamp: number;
+  /** Optional message explaining why approval is needed (runtime approval) */
+  message?: string;
+  /** Optional metadata for the approval request (runtime approval) */
+  metadata?: Record<string, unknown>;
 }
 
 /**
