@@ -1,0 +1,23 @@
+packages/server/src/telemetry.ts
+  0fae4802351e2d7b 2,48
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "cea9cab24911caed8eb852f5dd8f23ed6d416e1c",
+  "prompts": {
+    "0fae4802351e2d7b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "beaf0a05-5551-4292-8f92-c895819b4cbb",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 2,
+      "total_deletions": 2,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    }
+  }
+}
