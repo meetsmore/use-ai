@@ -367,4 +367,78 @@ describe('UseAIClient', () => {
       }));
     });
   });
+
+  describe('message ordering after tool call turn', () => {
+    function simulateToolCallTurn(client: InstanceType<typeof UseAIClient>) {
+      // Simulate sending a user message
+      client.sendPrompt('Add a todo: buy groceries');
+
+      // Simulate server events for a tool call turn
+      emitSocketEvent('event', { type: 'RUN_STARTED', threadId: 'thread-1', runId: 'run-1' });
+      emitSocketEvent('event', { type: 'TOOL_CALL_START', toolCallId: 'toolu_123', toolCallName: 'addTodo' });
+      emitSocketEvent('event', { type: 'TOOL_CALL_ARGS', toolCallId: 'toolu_123', delta: '{"text":"buy groceries"}' });
+      emitSocketEvent('event', { type: 'TOOL_CALL_END', toolCallId: 'toolu_123' });
+
+      // Client executes tool and sends result
+      client.sendToolResponse('toolu_123', { success: true, message: 'Todo added' });
+
+      // Server sends final text response
+      emitSocketEvent('event', { type: 'TEXT_MESSAGE_START', messageId: 'msg-1' });
+      emitSocketEvent('event', { type: 'TEXT_MESSAGE_CONTENT', messageId: 'msg-1', delta: "I've added the todo!" });
+      emitSocketEvent('event', { type: 'TEXT_MESSAGE_END', messageId: 'msg-1' });
+
+      // RUN_FINISHED
+      emitSocketEvent('event', { type: 'RUN_FINISHED', threadId: 'thread-1', runId: 'run-1' });
+    }
+
+    test('messages are in correct API order: user → assistant(toolCalls) → tool → assistant(text)', () => {
+      const client = new UseAIClient('http://localhost:8081');
+      client.connect();
+      mockSocket.connected = true;
+      emitSocketEvent('connect');
+
+      simulateToolCallTurn(client);
+
+      const messages = client.messages;
+
+      // Should have 4 messages in correct API order
+      expect(messages).toHaveLength(4);
+
+      const [user, assistantToolCall, toolResult, assistantText] = messages;
+
+      expect(user.role).toBe('user');
+
+      expect(assistantToolCall.role).toBe('assistant');
+      expect((assistantToolCall as Record<string, unknown>).toolCalls).toBeDefined();
+      expect(assistantToolCall.content).toBe('');
+
+      expect(toolResult.role).toBe('tool');
+      expect((toolResult as Record<string, unknown>).toolCallId).toBe('toolu_123');
+
+      expect(assistantText.role).toBe('assistant');
+      expect(assistantText.content).toBe("I've added the todo!");
+      expect((assistantText as Record<string, unknown>).toolCalls).toBeUndefined();
+    });
+
+    test('simple text response (no tool calls) still works', () => {
+      const client = new UseAIClient('http://localhost:8081');
+      client.connect();
+      mockSocket.connected = true;
+      emitSocketEvent('connect');
+
+      client.sendPrompt('Hello');
+
+      emitSocketEvent('event', { type: 'RUN_STARTED', threadId: 'thread-1', runId: 'run-1' });
+      emitSocketEvent('event', { type: 'TEXT_MESSAGE_START', messageId: 'msg-1' });
+      emitSocketEvent('event', { type: 'TEXT_MESSAGE_CONTENT', messageId: 'msg-1', delta: 'Hi there!' });
+      emitSocketEvent('event', { type: 'TEXT_MESSAGE_END', messageId: 'msg-1' });
+      emitSocketEvent('event', { type: 'RUN_FINISHED', threadId: 'thread-1', runId: 'run-1' });
+
+      const messages = client.messages;
+      expect(messages).toHaveLength(2);
+      expect(messages[0].role).toBe('user');
+      expect(messages[1].role).toBe('assistant');
+      expect(messages[1].content).toBe('Hi there!');
+    });
+  });
 });

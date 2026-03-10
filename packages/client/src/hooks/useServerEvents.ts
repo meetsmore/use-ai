@@ -11,14 +11,55 @@ import type {
 } from '../types';
 import { EventType, ErrorCode, TOOL_APPROVAL_REQUEST } from '../types';
 import type { UseAIClient } from '../client';
+import type { Message } from '../types';
 import type { UseToolSystemReturn } from './useToolSystem';
 import type { UseAIStrings } from '../theme';
+import type { PersistedMessage } from '../providers/chatRepository/types';
+
+/**
+ * Extracts intermediate turn messages (assistant messages with tool calls and
+ * tool result messages) from the client message history, starting from
+ * `startIndex`. Converts them to `PersistedMessage[]` for storage.
+ *
+ * The final text-only assistant message is excluded here because it is
+ * saved separately by `saveAIResponse`.
+ *
+ * Messages in `client._messages` are already in correct API order
+ * (assistant(toolCalls) → tool results → assistant(text)) since the client
+ * defers pushing tool results until RUN_FINISHED.
+ */
+function extractTurnMessages(messages: Message[], startIndex: number): PersistedMessage[] {
+  const turnSlice = messages.slice(startIndex);
+  const result: PersistedMessage[] = [];
+
+  for (const msg of turnSlice) {
+    if (msg.role === 'assistant' && 'toolCalls' in msg && msg.toolCalls) {
+      result.push({
+        id: msg.id,
+        role: 'assistant',
+        content: '',
+        createdAt: new Date(),
+        toolCalls: msg.toolCalls as PersistedMessage['toolCalls'],
+      });
+    } else if (msg.role === 'tool') {
+      result.push({
+        id: msg.id,
+        role: 'tool',
+        content: typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content),
+        createdAt: new Date(),
+        toolCallId: ('toolCallId' in msg && msg.toolCallId) ? msg.toolCallId as string : undefined,
+      });
+    }
+  }
+
+  return result;
+}
 
 export interface UseServerEventsOptions {
   /** Tool system for executing tools and looking up tool metadata */
   toolSystem: UseToolSystemReturn;
   /** Saves an AI response to chat storage */
-  saveAIResponse: (content: string, displayMode?: 'default' | 'error', traceId?: string) => Promise<void>;
+  saveAIResponse: (content: string, displayMode?: 'default' | 'error', traceId?: string, turnMessages?: PersistedMessage[]) => Promise<void>;
   /** UI strings for error messages and tool execution fallbacks */
   strings: UseAIStrings;
 }
@@ -70,6 +111,9 @@ export function useServerEvents({
   const [streamingText, setStreamingText] = useState('');
   const streamingChatIdRef = useRef<string | null>(null);
 
+  // Track message count at run start to extract turn messages at run end
+  const messageCountAtRunStartRef = useRef<number>(0);
+
   // Executing tool state for UI display
   const [executingToolRaw, setExecutingTool] = useState<{
     toolCallId: string;
@@ -96,7 +140,12 @@ export function useServerEvents({
     const ts = toolSystemRef.current;
     const strs = stringsRef.current;
 
-    if (event.type === EventType.TOOL_CALL_START) {
+    if (event.type === EventType.RUN_STARTED) {
+      // Snapshot message count so we can extract turn messages at RUN_FINISHED.
+      // The user message was already pushed to client.messages by sendPrompt(),
+      // so messages added after this point are from the AI turn.
+      messageCountAtRunStartRef.current = client.messages.length;
+    } else if (event.type === EventType.TOOL_CALL_START) {
       const e = event as ToolCallStartEvent & Partial<ToolCallStartExtensions>;
 
       // Get title from event annotations, local tool definition, or null (fallback)
@@ -153,7 +202,10 @@ export function useServerEvents({
       if (content) {
         const finishedEvent = event as RunFinishedEvent;
         const traceId = finishedEvent.runId;
-        saveAIResponseRef.current(content, undefined, traceId);
+
+        const turnMessages = extractTurnMessages(client.messages, messageCountAtRunStartRef.current);
+
+        saveAIResponseRef.current(content, undefined, traceId, turnMessages);
       }
       setLoading(false);
     } else if (event.type === EventType.RUN_ERROR) {

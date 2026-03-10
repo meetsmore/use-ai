@@ -1,12 +1,12 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
 import type { UseAIConfig, AGUIEvent, AgentInfo, UseAIForwardedProps } from '../types';
 import { UseAIFloatingButton } from '../components/UseAIFloatingButton';
-import { UseAIChatPanel, type Message } from '../components/UseAIChatPanel';
+import { UseAIChatPanel } from '../components/UseAIChatPanel';
 import { UseAIFloatingChatWrapper, CloseButton } from '../components/UseAIFloatingChatWrapper';
 import { __UseAIChatContext, type ChatUIContextValue } from '../components/UseAIChat';
 import { UseAIClient } from '../client';
 import { convertToolsToDefinitions, type ToolsDefinition } from '../defineTool';
-import type { ChatRepository, Chat, ChatMetadata, CreateChatOptions, PersistedMessageContent, PersistedContentPart } from './chatRepository/types';
+import type { ChatRepository, Chat, ChatMetadata, CreateChatOptions, PersistedMessage, PersistedMessageContent, PersistedContentPart } from './chatRepository/types';
 import { LocalStorageChatRepository } from './chatRepository/LocalStorageChatRepository';
 import type { FileAttachment, FileUploadConfig, FileProcessingState } from '../fileUpload/types';
 import { processAttachments } from '../fileUpload/processAttachments';
@@ -217,7 +217,7 @@ export interface ChatPanelProps {
   /** Callback when a message is sent */
   onSendMessage: (message: string) => void;
   /** Array of messages in the conversation */
-  messages: Message[];
+  messages: PersistedMessage[];
   /** Whether the AI is currently processing */
   loading: boolean;
   /** Whether the client is connected to the server */
@@ -435,7 +435,7 @@ export function UseAIProvider({
 
   const [connected, setConnected] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<PersistedMessage[]>([]);
   const [fileProcessingState, setFileProcessingState] = useState<FileProcessingState | null>(null);
 
   const handleSetChatOpen = useCallback((open: boolean) => {

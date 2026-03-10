@@ -629,7 +629,7 @@ export class AISDKAgent implements Agent {
             message: 'Run aborted by user',
             timestamp: Date.now(),
           });
-          return { success: false, error: 'Run aborted', conversationHistory: session.conversationHistory };
+          return { success: false, error: 'Run aborted', conversationHistory: messages };
         }
 
         // Get the response for this step
@@ -695,11 +695,6 @@ export class AISDKAgent implements Agent {
         throw new Error('No response from AI SDK');
       }
 
-      // Update conversation history with messages accumulated from ALL steps.
-      // Each step's response.messages only contains that step's generated messages,
-      // so allResponseMessages has the complete set across the entire run.
-      session.conversationHistory.push(...allResponseMessages);
-
       // Log final response
       if (finalText) {
         logger.aiResponse([finalText]);
@@ -724,7 +719,7 @@ export class AISDKAgent implements Agent {
 
       return {
         success: true,
-        conversationHistory: session.conversationHistory,
+        conversationHistory: [...messages, ...allResponseMessages],
       };
     } catch (error) {
       // End span and clean up trace ID to prevent memory leak on error paths

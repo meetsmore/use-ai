@@ -305,7 +305,6 @@ export class UseAIServer {
         threadId,
         tools: [],
         state: null,
-        conversationHistory: [],
         pendingToolCalls: new Map(),
         pendingToolApprovals: new Map(),
       };
@@ -470,14 +469,6 @@ export class UseAIServer {
     }
 
     // Update session
-    // If threadId changed, clear conversation history (new chat started)
-    if (session.threadId && session.threadId !== threadId) {
-      logger.info('ThreadId changed, clearing conversation history', {
-        oldThreadId: session.threadId,
-        newThreadId: threadId,
-      });
-      session.conversationHistory = [];
-    }
     session.threadId = threadId;
     session.currentRunId = runId;
 
@@ -614,19 +605,55 @@ export class UseAIServer {
           content: convertToAISDKContent(msg.content),
         };
       } else if (msg.role === 'assistant') {
+        const textContent = getStringContent(msg.content);
+
+        // Check for AG-UI toolCalls on the message (sent by client on reconnection)
+        const toolCalls = (msg as { toolCalls?: Array<{
+          id: string;
+          type: string;
+          function: { name: string; arguments: string };
+        }> }).toolCalls;
+
+        if (toolCalls && toolCalls.length > 0) {
+          // Convert to AI SDK ModelMessage format: array of content blocks with tool-call entries
+          const content: Array<{ type: 'text'; text: string } | { type: 'tool-call'; toolCallId: string; toolName: string; input: unknown }> = [];
+          if (textContent) {
+            content.push({ type: 'text', text: textContent });
+          }
+          for (const tc of toolCalls) {
+            let input: unknown;
+            try {
+              input = JSON.parse(tc.function.arguments);
+            } catch {
+              input = tc.function.arguments;
+            }
+            content.push({
+              type: 'tool-call',
+              toolCallId: tc.id,
+              toolName: tc.function.name,
+              input,
+            });
+          }
+          return {
+            role: 'assistant' as const,
+            content,
+          };
+        }
+
         return {
           role: 'assistant' as const,
-          content: getStringContent(msg.content),
+          content: textContent,
         };
       } else if (isToolMessage(msg)) {
-        // Tool messages in AI SDK format
+        // Tool messages in AI SDK v6 ModelMessage format.
+        // The output field requires a discriminated union: { type: "json"|"text", value }
         const content = getStringContent(msg.content);
-        // Try to parse as JSON for structured output, fallback to string
-        let output: unknown;
+        let output: { type: 'json'; value: unknown } | { type: 'text'; value: string };
         try {
-          output = JSON.parse(content);
+          const parsed = JSON.parse(content);
+          output = { type: 'json', value: parsed };
         } catch {
-          output = content;
+          output = { type: 'text', value: content };
         }
         return {
           role: 'tool' as const,
@@ -647,26 +674,6 @@ export class UseAIServer {
       };
     });
 
-    // Conversation history management:
-    // - The client sends ALL messages it knows about (user + assistant messages from past turns)
-    // - The server maintains the authoritative history including tool results
-    // - We only append NEW user messages to avoid duplicates
-    if (session.conversationHistory.length === 0) {
-      // First run: initialize conversation history with incoming messages
-      session.conversationHistory = incomingMessages;
-    } else {
-      // Subsequent runs: only append NEW user messages that aren't already in the history
-      // Count how many user messages we already have
-      const existingUserMessageCount = session.conversationHistory.filter(msg => msg.role === 'user').length;
-      const incomingUserMessages = incomingMessages.filter(msg => msg.role === 'user');
-
-      // Only append user messages beyond what we already have
-      const newUserMessages = incomingUserMessages.slice(existingUserMessageCount);
-
-      // Append only new user messages to preserve the full conversation context
-      session.conversationHistory.push(...newUserMessages);
-    }
-
     // Build system prompt
     const systemPrompt = this.buildSystemPrompt(session, state);
 
@@ -683,7 +690,7 @@ export class UseAIServer {
         {
           session,
           runId,
-          messages: session.conversationHistory,
+          messages: incomingMessages,
           tools: session.tools,
           state,
           systemPrompt,

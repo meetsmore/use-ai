@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { UseAIClient } from '../client';
 import type { FeedbackValue } from '../types';
-import type { ChatRepository } from '../providers/chatRepository/types';
-import type { Message } from '../components/UseAIChatPanel';
+import type { ChatRepository, PersistedMessage } from '../providers/chatRepository/types';
 
 export interface UseFeedbackOptions {
   /** Reference to the UseAIClient */
@@ -12,7 +11,7 @@ export interface UseFeedbackOptions {
   /** Callback to get the currently displayed chat ID */
   getDisplayedChatId: () => string | null;
   /** Setter for messages state (for optimistic UI updates) */
-  setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
+  setMessages: React.Dispatch<React.SetStateAction<PersistedMessage[]>>;
 }
 
 export interface UseFeedbackReturn {

@@ -1,7 +1,7 @@
 import React, { createContext, useContext } from 'react';
 import { UseAIChatPanel } from './UseAIChatPanel';
 import { UseAIFloatingChatWrapper, CloseButton } from './UseAIFloatingChatWrapper';
-import type { Message } from './UseAIChatPanel';
+import type { PersistedMessage } from '../providers/chatRepository/types';
 import type { AgentInfo, FeedbackValue, ToolAnnotations } from '../types';
 import type { FileUploadConfig, FileAttachment, FileProcessingState } from '../fileUpload/types';
 import type { SavedCommand } from '../commands/types';
@@ -19,7 +19,7 @@ export interface ChatUIContextValue {
   /** Send a message with optional file attachments */
   sendMessage: (message: string, attachments?: FileAttachment[]) => void;
   /** Current messages in the conversation */
-  messages: Message[];
+  messages: PersistedMessage[];
   /** Currently streaming text from assistant (real-time updates) */
   streamingText: string;
   /** Aggregated suggestions from all useAI hooks */
