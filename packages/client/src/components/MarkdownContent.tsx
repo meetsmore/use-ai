@@ -1,5 +1,6 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 interface MarkdownContentProps {
   content: string;
@@ -11,6 +12,7 @@ interface MarkdownContentProps {
 export function MarkdownContent({ content }: MarkdownContentProps) {
   return (
     <ReactMarkdown
+      remarkPlugins={[remarkGfm]}
       components={{
         // Override default element rendering for better chat styling
         p: ({ children }) => <p style={{ margin: '0 0 0.5em 0' }}>{children}</p>,
