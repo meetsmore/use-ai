@@ -132,6 +132,20 @@ export function MarkdownContent({ content }: MarkdownContentProps) {
             {children}
           </td>
         ),
+        img: ({ src, alt }) => (
+          <a
+            href={src}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              color: 'inherit',
+              textDecoration: 'underline',
+              textUnderlineOffset: '2px',
+            }}
+          >
+            {alt || 'Image'}
+          </a>
+        ),
       }}
     >
       {content}
