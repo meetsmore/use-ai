@@ -17,7 +17,6 @@ function createTestSession(overrides: Partial<ClientSession> = {}): ClientSessio
     threadId: 'thread-1',
     tools: [],
     state: null,
-    conversationHistory: [],
     pendingToolCalls: new Map(),
     pendingToolApprovals: new Map(),
     abortController: new AbortController(),
