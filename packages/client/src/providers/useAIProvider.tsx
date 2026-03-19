@@ -534,7 +534,18 @@ export function UseAIProvider({
 
   useEffect(() => {
     const client = clientRef.current;
-    if (!client || !client.isConnected() || !toolSystem.hasTools) return;
+    if (!client || !client.isConnected()) return;
+
+    if (!toolSystem.hasTools) {
+      // All tools were unregistered (e.g., page navigation).
+      // Clear stale tools from the client instance.
+      if (lastRegisteredToolsRef.current !== '') {
+        lastRegisteredToolsRef.current = '';
+        client.registerTools([]);
+        console.log('[Provider] All tools unregistered, clearing client tools');
+      }
+      return;
+    }
 
     const toolKeys = Object.keys(toolSystem.aggregatedTools).sort().join(',');
     if (toolKeys === lastRegisteredToolsRef.current) {
