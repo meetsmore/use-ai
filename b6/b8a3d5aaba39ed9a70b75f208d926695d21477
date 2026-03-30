@@ -1,0 +1,55 @@
+packages/server/src/server.ts
+  4da02d6f97df4b6b 609,620-624,648-655
+packages/core/src/types.ts
+  4da02d6f97df4b6b 35-38,81-83,202-204
+packages/client/src/types.ts
+  4da02d6f97df4b6b 44-46
+packages/client/src/components/UseAIChat.tsx
+  4da02d6f97df4b6b 25-26
+packages/core/src/index.ts
+  4da02d6f97df4b6b 39-41
+packages/client/src/hooks/useServerEvents.ts
+  4da02d6f97df4b6b 11,44,64,84-85,118-121,202-212,226-230,232,234-236,248-250,265
+packages/server/src/reasoning.integration.test.ts
+  4da02d6f97df4b6b 1-113
+packages/server/src/types.ts
+  4da02d6f97df4b6b 200-202
+packages/client/src/hooks/useServerEvents.test.ts
+  4da02d6f97df4b6b 1-450
+packages/server/src/agents/AISDKAgent.ts
+  4da02d6f97df4b6b 30-32,225-238,298,310,415,468-472,539-543,545-567,1080-1086,1094,1103
+apps/use-ai-server-app/src/index.ts
+  4da02d6f97df4b6b 38-45
+apps/example/test/reasoning.e2e.test.ts
+  4da02d6f97df4b6b 1-109
+packages/client/src/components/UseAIChatPanel.tsx
+  4da02d6f97df4b6b 167-168,205,210-240,942-964,1045-1066,1098,1100
+packages/server/src/agents/AISDKAgent.test.ts
+  4da02d6f97df4b6b 2417-2548
+packages/client/src/hooks/useChatManagement.ts
+  4da02d6f97df4b6b 51,103,359-360,392
+packages/client/src/providers/chatRepository/types.ts
+  4da02d6f97df4b6b 82-83
+packages/client/src/client.ts
+  4da02d6f97df4b6b 10,86-87,191,194-201,255-256,258,261-262,277,279,281-282,661,686
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.22",
+  "base_commit_sha": "b6b8a3d5aaba39ed9a70b75f208d926695d21477",
+  "prompts": {
+    "4da02d6f97df4b6b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2fc41702-bba6-4fee-b2f0-4279bfd29d16",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 1162,
+      "total_deletions": 130,
+      "accepted_lines": 1059,
+      "overriden_lines": 0
+    }
+  }
+}
