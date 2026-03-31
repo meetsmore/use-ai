@@ -1,0 +1,41 @@
+packages/client/src/client.ts
+  5ce0c4f48568fb90 13,236-255
+packages/client/src/hooks/useServerEvents.ts
+  5ce0c4f48568fb90 177-178,181
+  a71f96ac43704552 176
+packages/server/src/agents/AISDKAgent.ts
+  5ce0c4f48568fb90 22,594-605
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.23",
+  "base_commit_sha": "e7a238f36dc2db053e9aa8a0dd2cfffbbbae1e06",
+  "prompts": {
+    "5ce0c4f48568fb90": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b0f58baf-71c4-4f54-a996-fe88137dcc56",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 44,
+      "total_deletions": 30,
+      "accepted_lines": 37,
+      "overriden_lines": 0
+    },
+    "a71f96ac43704552": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "19648ba0-18f0-4ef7-92b3-fe5d5d33a6c7",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 34,
+      "total_deletions": 38,
+      "accepted_lines": 4,
+      "overriden_lines": 0
+    }
+  }
+}
