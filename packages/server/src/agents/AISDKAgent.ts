@@ -473,6 +473,7 @@ export class AISDKAgent implements Agent {
         const activeToolCalls = new Map<string, { name: string; args: string }>();
         const completedToolCalls = new Set<string>();
         let stepHadToolCalls = false;
+        let stepFinishReason: string | undefined;
 
         // Process the stream for this step
         for await (const chunk of stream.fullStream) {
@@ -595,6 +596,11 @@ export class AISDKAgent implements Agent {
               break;
             }
 
+            case 'finish': {
+              stepFinishReason = chunk.finishReason;
+              break;
+            }
+
             case 'finish-step': {
               // Step completed - has usage info for telemetry
               events.emit<StepFinishedEvent>({
@@ -610,7 +616,7 @@ export class AISDKAgent implements Agent {
             }
 
             // Ignored chunk types:
-            // 'start', 'finish' - internal stream lifecycle
+            // 'start' - internal stream lifecycle
             // 'source' - RAG sources (future)
             // 'file' - generated files (future)
             // 'text-start', 'text-end' - we handle text-delta instead
@@ -641,8 +647,9 @@ export class AISDKAgent implements Agent {
         // When the stream is cut mid-tool-input, tool-input-start fires (adding to activeToolCalls)
         // but tool-call never fires (not added to completedToolCalls).
         // We inject error tool_results so the model can retry with shorter arguments.
+        // Guard with finishReason === 'length' to avoid false-positive recovery on other stream errors.
         const incompleteToolCallIds = [...activeToolCalls.keys()].filter(id => !completedToolCalls.has(id));
-        if (incompleteToolCallIds.length > 0) {
+        if (incompleteToolCallIds.length > 0 && stepFinishReason === 'length') {
           logger.warn('Incomplete tool calls detected (likely maxOutputTokens exceeded)', {
             stepIteration,
             incompleteToolCallIds,
@@ -692,10 +699,10 @@ export class AISDKAgent implements Agent {
             content: recoveryAssistantContent,
           } as ModelMessage;
 
-          // Add recovery messages to both accumulators
-          const recoveryMessages = [recoveryAssistantMessage, ...recoveryToolResults];
-          allResponseMessages.push(...recoveryMessages);
-          currentMessages = [...currentMessages, ...recoveryMessages];
+          // Add recovery messages to both accumulators (sanitized for consistency with other paths)
+          const sanitizedRecoveryMessages = this.sanitizeMessages([recoveryAssistantMessage, ...recoveryToolResults]);
+          allResponseMessages.push(...sanitizedRecoveryMessages);
+          currentMessages = [...currentMessages, ...sanitizedRecoveryMessages];
 
           logger.debug('Injected recovery messages for incomplete tool calls, continuing to next step', {
             stepIteration,
