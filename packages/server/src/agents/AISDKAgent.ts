@@ -658,6 +658,13 @@ export class AISDKAgent implements Agent {
             stepIteration,
             incompleteCount,
           });
+          // Preserve completed tool call results from this step before adding recovery messages.
+          // response.messages contains results for tool calls that completed successfully;
+          // without this, `continue` would drop them and the model would re-execute them.
+          const stepMessages = this.sanitizeMessages(response.messages);
+          allResponseMessages.push(...stepMessages);
+          currentMessages = [...currentMessages, ...stepMessages];
+
           const sanitizedRecoveryMessages = this.sanitizeMessages(recoveryMessages);
           allResponseMessages.push(...sanitizedRecoveryMessages);
           currentMessages = [...currentMessages, ...sanitizedRecoveryMessages];
