@@ -697,6 +697,22 @@ export class AISDKAgent implements Agent {
             maxOutputTokens: this.maxOutputTokens,
             temperature: this.temperature,
             abortSignal: session.abortController?.signal,
+            experimental_telemetry: span.active
+              ? {
+                  isEnabled: true,
+                  functionId: 'use-ai',
+                  metadata: {
+                    sessionId: session.clientId,
+                    threadId: session.threadId,
+                    runId,
+                    ipAddress: session.ipAddress,
+                    toolCount: 0,
+                    stepIteration: this.maxSteps,
+                    gracefulSummary: true,
+                    ...((originalInput.forwardedProps as UseAIForwardedProps | undefined)?.telemetryMetadata || {}),
+                  },
+                }
+              : undefined,
           })
         );
 
