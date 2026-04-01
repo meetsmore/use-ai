@@ -402,6 +402,7 @@ export class AISDKAgent implements Agent {
       // response.messages only contains the last step's messages, so without this,
       // mid-step assistant messages and tool calls would be lost in multi-step runs.
       const allResponseMessages: ModelMessage[] = [];
+      let lastStepHadToolCalls = false;
 
       for (let stepIteration = 0; stepIteration < this.maxSteps; stepIteration++) {
         // Get current tools from session (may have been updated by tool_result handler)
@@ -641,6 +642,9 @@ export class AISDKAgent implements Agent {
         const stepMessages = this.sanitizeMessages(response.messages);
         allResponseMessages.push(...stepMessages);
 
+        // Track whether the last completed step had tool calls (for post-loop graceful finish)
+        lastStepHadToolCalls = stepHadToolCalls;
+
         // If no tool calls were made in this step, we're done
         if (!stepHadToolCalls) {
           logger.debug('Step had no tool calls, finishing run', { stepIteration });
@@ -663,6 +667,67 @@ export class AISDKAgent implements Agent {
           newMessageCount: currentMessages.length,
           updatedToolCount: session.tools.length,
         });
+      }
+
+      // Graceful finish: if maxSteps was exhausted while still in a tool-call chain,
+      // make one final streamText call without tools so the model can summarize progress.
+      if (lastStepHadToolCalls) {
+        logger.debug('maxSteps reached with tool calls pending, generating graceful summary');
+
+        const stateMessage = this.buildStateMessage(session.state);
+        const summaryMessages: ModelMessage[] = [
+          ...(staticSystemMessages || []),
+          ...(stateMessage ? [stateMessage] : []),
+          ...currentMessages,
+          { role: 'user', content: 'max steps reached, summarize progress' },
+        ];
+
+        const summaryMessagesWithCache = applyCacheBreakpoints(
+          summaryMessages,
+          this.cacheBreakpoint,
+          this.model
+        );
+
+        const summaryStream = span.wrap(() =>
+          streamText({
+            model: this.model,
+            messages: summaryMessagesWithCache,
+            tools: undefined,
+            stopWhen: stepCountIs(1),
+            maxOutputTokens: this.maxOutputTokens,
+            temperature: this.temperature,
+            abortSignal: session.abortController?.signal,
+          })
+        );
+
+        for await (const chunk of summaryStream.fullStream) {
+          if (chunk.type === 'text-delta') {
+            hasAnyContent = true;
+            if (!hasEmittedTextStart) {
+              messageId = uuidv4();
+              events.emit<TextMessageStartEvent>({
+                type: EventType.TEXT_MESSAGE_START,
+                messageId,
+                role: 'assistant',
+                timestamp: Date.now(),
+              });
+              hasEmittedTextStart = true;
+            }
+            events.emit<TextMessageContentEvent>({
+              type: EventType.TEXT_MESSAGE_CONTENT,
+              messageId: messageId!,
+              delta: chunk.text,
+              timestamp: Date.now(),
+            });
+            finalText += chunk.text;
+          } else if (chunk.type === 'error') {
+            throw chunk.error;
+          }
+        }
+
+        const summaryResponse = await summaryStream.response;
+        allResponseMessages.push(...this.sanitizeMessages(summaryResponse.messages));
+        response = summaryResponse;
       }
 
       // End text message if we started one
