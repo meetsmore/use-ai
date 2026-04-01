@@ -249,8 +249,8 @@ test.describe('Chat History Persistence', () => {
     console.log('[Test] Chat history items:', chatCount);
     expect(chatCount).toBeGreaterThanOrEqual(2);
 
-    // Click on the first (most recent) chat to verify it's currently active
-    const activeIndicator = page.locator('text=Active');
+    // Verify the currently selected chat in the history list is marked active
+    const activeIndicator = chatItems.first().getByText('• Active');
     await expect(activeIndicator).toBeVisible();
 
     // Close history dropdown by clicking outside (the backdrop)

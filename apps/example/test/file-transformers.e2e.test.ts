@@ -10,6 +10,34 @@ test.describe('File Transformers', () => {
   let testPdfPath: string;
   let testImagePath: string;
 
+  const ensureTestFiles = () => {
+    const tempDir = os.tmpdir();
+
+    testPdfPath = path.join(tempDir, 'test-document.pdf');
+    if (!fs.existsSync(testPdfPath)) {
+      // Create a simple PDF-like file (for testing purposes, we use a text file with .pdf extension)
+      // The transformer doesn't actually parse PDF, it just simulates processing
+      fs.writeFileSync(testPdfPath, '%PDF-1.4\nThis is a test PDF content for E2E testing.\nIt contains sample text.');
+    }
+
+    testImagePath = path.join(tempDir, 'test-image.png');
+    if (!fs.existsSync(testImagePath)) {
+      // Create a simple PNG file (1x1 pixel transparent PNG)
+      const pngBuffer = Buffer.from([
+        0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, // PNG signature
+        0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52, // IHDR chunk
+        0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+        0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4,
+        0x89, 0x00, 0x00, 0x00, 0x0a, 0x49, 0x44, 0x41, // IDAT chunk
+        0x54, 0x78, 0x9c, 0x63, 0x00, 0x01, 0x00, 0x00,
+        0x05, 0x00, 0x01, 0x0d, 0x0a, 0x2d, 0xb4, 0x00,
+        0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, // IEND chunk
+        0x42, 0x60, 0x82
+      ]);
+      fs.writeFileSync(testImagePath, pngBuffer);
+    }
+  };
+
   test.beforeAll(async () => {
     // Skip all tests if ANTHROPIC_API_KEY is not set
     if (!process.env.ANTHROPIC_API_KEY) {
@@ -17,28 +45,7 @@ test.describe('File Transformers', () => {
       console.log('Set it with: export ANTHROPIC_API_KEY=your_api_key_here');
     }
 
-    // Create temporary test files
-    const tempDir = os.tmpdir();
-
-    // Create a simple PDF-like file (for testing purposes, we use a text file with .pdf extension)
-    // The transformer doesn't actually parse PDF, it just simulates processing
-    testPdfPath = path.join(tempDir, 'test-document.pdf');
-    fs.writeFileSync(testPdfPath, '%PDF-1.4\nThis is a test PDF content for E2E testing.\nIt contains sample text.');
-
-    // Create a simple PNG file (1x1 pixel transparent PNG)
-    testImagePath = path.join(tempDir, 'test-image.png');
-    const pngBuffer = Buffer.from([
-      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, // PNG signature
-      0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52, // IHDR chunk
-      0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
-      0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4,
-      0x89, 0x00, 0x00, 0x00, 0x0a, 0x49, 0x44, 0x41, // IDAT chunk
-      0x54, 0x78, 0x9c, 0x63, 0x00, 0x01, 0x00, 0x00,
-      0x05, 0x00, 0x01, 0x0d, 0x0a, 0x2d, 0xb4, 0x00,
-      0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, // IEND chunk
-      0x42, 0x60, 0x82
-    ]);
-    fs.writeFileSync(testImagePath, pngBuffer);
+    ensureTestFiles();
   });
 
   test.afterAll(async () => {
@@ -57,6 +64,8 @@ test.describe('File Transformers', () => {
       test.skip();
     }
 
+    ensureTestFiles();
+
     // Clear localStorage before each test
     await page.goto('/');
     await page.evaluate(() => {
@@ -65,10 +74,10 @@ test.describe('File Transformers', () => {
     await page.reload();
 
     // Navigate to the File Transformers page
-    await page.click('text=File Transformers');
+    await page.getByRole('button', { name: 'File Transformers' }).click();
 
     // Wait for the page to load
-    await expect(page.locator('h2:has-text("File Transformers Demo")')).toBeVisible();
+    await expect(page.getByRole('heading', { level: 2, name: 'File Transformers' })).toBeVisible();
   });
 
   test('should show progress indicator when uploading PDF', async ({ page }) => {

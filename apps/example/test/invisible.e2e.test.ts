@@ -23,7 +23,7 @@ test.describe('Invisible Component Tests', () => {
 
     // Navigate to any page (using Todo page)
     await page.goto('/');
-    await expect(page.locator('h1:has-text("use-ai Demo")')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('heading', { level: 1, name: 'use-ai' })).toBeVisible({ timeout: 10000 });
 
     // Open AI chat
     const aiButton = page.getByTestId('ai-button');
