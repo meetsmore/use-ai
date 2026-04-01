@@ -20,10 +20,10 @@ test.describe('Dynamic Tool Registration', () => {
 
     // Navigate to the multi-list page
     await page.goto('/');
-    await page.click('text=Multi-List');
+    await page.getByRole('button', { name: 'Multiple Instances' }).click();
 
     // Wait for the page to load
-    await expect(page.locator('h1:has-text("Multiple List Items Test")')).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Multiple Instances' })).toBeVisible();
   });
 
   test('BUG FIX: Repeated messages with same content are not deduplicated', async ({ page }) => {

@@ -27,7 +27,7 @@ export default function Calculator() {
   return (
     <div ref={ref} style={styles.container}>
       <div style={styles.card}>
-        <h1 style={styles.title}>Calculator</h1>
+        <h2 style={styles.title}>Calculator</h2>
         <p style={styles.subtitle}>
           Enter calculations below or ask the AI to perform calculations for you
         </p>

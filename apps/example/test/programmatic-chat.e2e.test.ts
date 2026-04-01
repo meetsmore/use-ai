@@ -24,8 +24,8 @@ test.describe('Programmatic Chat', () => {
     await page.reload();
 
     // Navigate to Programmatic Chat page
-    await page.click('text=Programmatic Chat');
-    await expect(page.locator('h1:has-text("Programmatic Chat Demo")')).toBeVisible();
+    await page.getByRole('button', { name: 'Programmatic Chat' }).click();
+    await expect(page.getByRole('heading', { level: 1, name: 'Programmatic Chat' })).toBeVisible();
 
     // Wait for connection
     await expect(page.getByTestId('status-connected')).toBeVisible({ timeout: 10000 });

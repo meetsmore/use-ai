@@ -75,9 +75,16 @@ test.describe('Server-Side Tools', () => {
   });
 
   test('should use server tools alongside client tools', async ({ page }) => {
+    // Close the chat drawer before navigating so its backdrop does not intercept nav clicks
+    await page.getByTestId('chat-close-button').click();
+
     // Navigate back to the Todo page where client tools are registered
-    await page.click('text=Todo');
-    await expect(page.locator('h1:has-text("Todo List")')).toBeVisible();
+    await page.getByRole('button', { name: 'Todo List' }).click();
+    await expect(page.getByRole('heading', { level: 1, name: 'Todo List' })).toBeVisible();
+
+    // Reopen chat on the Todo page so both server and client tools are available in the same chat
+    await page.getByTestId('ai-button').click();
+    await expect(page.getByTestId('chat-input')).toBeVisible({ timeout: 5000 });
 
     const chatInput = page.getByTestId('chat-input');
     const sendButton = page.getByTestId('chat-send-button');
@@ -100,6 +107,6 @@ test.describe('Server-Side Tools', () => {
     }).toPass({ timeout: 45000, intervals: [1000] });
 
     // Verify the todo was actually added to the UI
-    await expect(page.locator('text=Sum is 30')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByTestId('todo-item').filter({ hasText: 'Sum is 30' })).toBeVisible({ timeout: 5000 });
   });
 });
