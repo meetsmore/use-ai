@@ -684,7 +684,7 @@ export class AISDKAgent implements Agent {
                   type: 'text',
                   value: [
                     `Error: Your tool call for "${toolCall.name}" was truncated by the output token limit (maxOutputTokens: ${this.maxOutputTokens}).`,
-                    `The arguments were cut off at ${truncatedArgsLength} characters of JSON.`,
+                    `The arguments were cut off at ${truncatedArgsLength} characters of JSON, so this call was recorded with empty args ({}) as a placeholder — do NOT retry "${toolCall.name}" with empty args.`,
                     `Truncated args (first 200 chars): ${toolCall.args.substring(0, 200)}`,
                     `You MUST split this into multiple smaller tool calls, each with fewer items/shorter data.`,
                   ].join('\n'),
