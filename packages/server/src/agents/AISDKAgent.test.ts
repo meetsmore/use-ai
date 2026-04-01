@@ -2414,4 +2414,279 @@ describe('AISDKAgent', () => {
       mock.module('../telemetry', () => telemetryModule);
     });
   });
+
+  describe('token limit recovery', () => {
+    test('recovers when stream is truncated mid-tool-input (maxOutputTokens exceeded)', async () => {
+      const toolCallId = 'tool-call-truncated';
+      let callCount = 0;
+
+      const mockModel = new MockLanguageModelV3({
+        doStream: async () => {
+          callCount++;
+
+          if (callCount === 1) {
+            // First call: stream gets truncated mid-tool-input (no tool-call chunk)
+            return {
+              stream: simulateReadableStream({
+                chunks: [
+                  { type: 'tool-input-start', id: toolCallId, toolName: 'addRows' },
+                  { type: 'tool-input-delta', id: toolCallId, delta: '{"rows": [{"name": "Al' },
+                  // Stream ends here - no tool-input-end, no tool-call
+                  {
+                    type: 'finish',
+                    finishReason: 'length' as const,
+                    usage: { inputTokens: 100, outputTokens: 4096, totalTokens: 4196 },
+                  },
+                ],
+              }),
+              response: {
+                id: 'response-1',
+                timestamp: new Date(),
+                modelId: 'mock-model',
+                headers: {},
+                messages: [],
+              },
+            };
+          }
+
+          // Second call (after recovery): model retries with shorter args
+          if (callCount === 2) {
+            return {
+              stream: simulateReadableStream({
+                chunks: [
+                  { type: 'text-start', id: 'text-1' },
+                  { type: 'text-delta', id: 'text-1', delta: 'I\'ll add the rows in smaller batches.' },
+                  { type: 'text-end', id: 'text-1' },
+                  {
+                    type: 'finish',
+                    finishReason: 'stop' as const,
+                    usage: { inputTokens: 200, outputTokens: 50, totalTokens: 250 },
+                  },
+                ],
+              }),
+              response: {
+                id: 'response-2',
+                timestamp: new Date(),
+                modelId: 'mock-model',
+                headers: {},
+                messages: [{ role: 'assistant', content: 'I\'ll add the rows in smaller batches.' }],
+              },
+            };
+          }
+
+          throw new Error('Unexpected call count: ' + callCount);
+        },
+      });
+
+      const agent = new AISDKAgent({ model: mockModel });
+
+      const emittedEvents: AGUIEventExtended[] = [];
+      const eventEmitter: EventEmitter = {
+        emit: (event) => emittedEvents.push(event),
+      };
+
+      const input = createTestInput({
+        tools: [
+          {
+            name: 'addRows',
+            description: 'Add rows to a table',
+            parameters: {
+              type: 'object',
+              properties: {
+                rows: { type: 'array', items: { type: 'object' } },
+              },
+              required: ['rows'],
+            },
+          },
+        ],
+      });
+
+      const result = await agent.run(input, eventEmitter);
+
+      // Should succeed after recovery
+      expect(result.success).toBe(true);
+      expect(callCount).toBe(2);
+
+      // Should NOT have emitted TOOL_CALL_END for the incomplete tool call
+      // (emitting it would cause the client to parse incomplete JSON and execute the tool)
+      const toolCallEndEvents = emittedEvents.filter(e => e.type === EventType.TOOL_CALL_END);
+      expect(toolCallEndEvents.length).toBe(0);
+
+      // Should have emitted RUN_FINISHED
+      const runFinished = emittedEvents.find(e => e.type === EventType.RUN_FINISHED);
+      expect(runFinished).toBeDefined();
+    });
+
+    test('respects maxSteps limit when token limit keeps triggering', async () => {
+      let callCount = 0;
+      const maxSteps = 3;
+
+      const mockModel = new MockLanguageModelV3({
+        doStream: async () => {
+          callCount++;
+
+          // Always return truncated stream (never recovers)
+          return {
+            stream: simulateReadableStream({
+              chunks: [
+                { type: 'tool-input-start', id: `tool-call-${callCount}`, toolName: 'addRows' },
+                { type: 'tool-input-delta', id: `tool-call-${callCount}`, delta: '{"rows": [' },
+                {
+                  type: 'finish',
+                  finishReason: 'length' as const,
+                  usage: { inputTokens: 100, outputTokens: 4096, totalTokens: 4196 },
+                },
+              ],
+            }),
+            response: {
+              id: `response-${callCount}`,
+              timestamp: new Date(),
+              modelId: 'mock-model',
+              headers: {},
+              messages: [],
+            },
+          };
+        },
+      });
+
+      const agent = new AISDKAgent({ model: mockModel, maxSteps });
+
+      const emittedEvents: AGUIEventExtended[] = [];
+      const eventEmitter: EventEmitter = {
+        emit: (event) => emittedEvents.push(event),
+      };
+
+      const input = createTestInput({
+        tools: [
+          {
+            name: 'addRows',
+            description: 'Add rows to a table',
+            parameters: {
+              type: 'object',
+              properties: {
+                rows: { type: 'array', items: { type: 'object' } },
+              },
+              required: ['rows'],
+            },
+          },
+        ],
+      });
+
+      await agent.run(input, eventEmitter);
+
+      // Should have stopped at maxSteps
+      expect(callCount).toBe(maxSteps);
+    });
+
+    test('recovery includes truncated args info for each incomplete tool call', async () => {
+      let callCount = 0;
+      let receivedMessages: unknown[] = [];
+
+      const mockModel = new MockLanguageModelV3({
+        doStream: async ({ prompt }) => {
+          callCount++;
+          receivedMessages = prompt as unknown[];
+
+          if (callCount === 1) {
+            // Two tool calls started but neither completed
+            return {
+              stream: simulateReadableStream({
+                chunks: [
+                  { type: 'tool-input-start', id: 'tool-call-a', toolName: 'toolA' },
+                  { type: 'tool-input-delta', id: 'tool-call-a', delta: '{"data": "longValueA' },
+                  { type: 'tool-input-start', id: 'tool-call-b', toolName: 'toolB' },
+                  { type: 'tool-input-delta', id: 'tool-call-b', delta: '{"data": "longValueB' },
+                  {
+                    type: 'finish',
+                    finishReason: 'length' as const,
+                    usage: { inputTokens: 100, outputTokens: 4096, totalTokens: 4196 },
+                  },
+                ],
+              }),
+              response: {
+                id: 'response-1',
+                timestamp: new Date(),
+                modelId: 'mock-model',
+                headers: {},
+                messages: [],
+              },
+            };
+          }
+
+          // Recovery: text response
+          return {
+            stream: simulateReadableStream({
+              chunks: [
+                { type: 'text-start', id: 'text-1' },
+                { type: 'text-delta', id: 'text-1', delta: 'Recovered' },
+                { type: 'text-end', id: 'text-1' },
+                {
+                  type: 'finish',
+                  finishReason: 'stop' as const,
+                  usage: { inputTokens: 200, outputTokens: 10, totalTokens: 210 },
+                },
+              ],
+            }),
+            response: {
+              id: 'response-2',
+              timestamp: new Date(),
+              modelId: 'mock-model',
+              headers: {},
+              messages: [{ role: 'assistant', content: 'Recovered' }],
+            },
+          };
+        },
+      });
+
+      const agent = new AISDKAgent({ model: mockModel });
+
+      const emittedEvents: AGUIEventExtended[] = [];
+      const eventEmitter: EventEmitter = {
+        emit: (event) => emittedEvents.push(event),
+      };
+
+      const input = createTestInput({
+        tools: [
+          {
+            name: 'toolA',
+            description: 'Tool A',
+            parameters: { type: 'object', properties: { data: { type: 'string' } } },
+          },
+          {
+            name: 'toolB',
+            description: 'Tool B',
+            parameters: { type: 'object', properties: { data: { type: 'string' } } },
+          },
+        ],
+      });
+
+      const result = await agent.run(input, eventEmitter);
+      expect(result.success).toBe(true);
+      expect(callCount).toBe(2);
+
+      // No TOOL_CALL_END should have been emitted (would trigger client-side execution)
+      const toolCallEndEvents = emittedEvents.filter(e => e.type === EventType.TOOL_CALL_END);
+      expect(toolCallEndEvents.length).toBe(0);
+
+      // The 2nd model call should have received recovery messages with truncated args info
+      // Collect all tool-result content parts from tool messages
+      const toolResultParts: Array<{ output: { value: string } }> = [];
+      for (const msg of receivedMessages as Array<{ role: string; content: unknown }>) {
+        if (msg.role === 'tool' && Array.isArray(msg.content)) {
+          for (const part of msg.content) {
+            if ((part as { type: string }).type === 'tool-result') {
+              toolResultParts.push(part as { output: { value: string } });
+            }
+          }
+        }
+      }
+      expect(toolResultParts.length).toBe(2);
+
+      // Each tool result should contain the truncated args preview
+      const values = toolResultParts.map(p => p.output.value);
+      expect(values.some(v => v.includes('{"data": "longValueA'))).toBe(true);
+      expect(values.some(v => v.includes('{"data": "longValueB'))).toBe(true);
+      expect(values.every(v => v.includes('truncated'))).toBe(true);
+    });
+  });
 });

@@ -207,6 +207,9 @@ export function useServerEvents({
 
         saveAIResponseRef.current(content, undefined, traceId, turnMessages);
       }
+      // Clear executingTool in case TOOL_CALL_END was never received
+      // (e.g., stream truncated by token limit)
+      setExecutingTool(null);
       setLoading(false);
     } else if (event.type === EventType.RUN_ERROR) {
       const errorEvent = event as RunErrorEvent;
@@ -219,6 +222,8 @@ export function useServerEvents({
       setStreamingText('');
       streamingChatIdRef.current = null;
 
+      // Clear executingTool in case TOOL_CALL_END was never received
+      setExecutingTool(null);
       setLoading(false);
     }
   }, []);

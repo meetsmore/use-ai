@@ -471,6 +471,7 @@ export class AISDKAgent implements Agent {
 
         // Track active tool calls for streaming args (per-step)
         const activeToolCalls = new Map<string, { name: string; args: string }>();
+        const completedToolCalls = new Set<string>();
         let stepHadToolCalls = false;
 
         // Process the stream for this step
@@ -560,6 +561,7 @@ export class AISDKAgent implements Agent {
               // Tool call complete - emit TOOL_CALL_END
               // AI SDK will call execute() and stream pauses until it returns
               stepHadToolCalls = true;
+              completedToolCalls.add(chunk.toolCallId);
               const toolCall = activeToolCalls.get(chunk.toolCallId);
               const finalArgs = JSON.stringify(chunk.input);
 
@@ -634,6 +636,73 @@ export class AISDKAgent implements Agent {
 
         // Get the response for this step
         response = await stream.response;
+
+        // Detect incomplete tool calls caused by maxOutputTokens truncation.
+        // When the stream is cut mid-tool-input, tool-input-start fires (adding to activeToolCalls)
+        // but tool-call never fires (not added to completedToolCalls).
+        // We inject error tool_results so the model can retry with shorter arguments.
+        const incompleteToolCallIds = [...activeToolCalls.keys()].filter(id => !completedToolCalls.has(id));
+        if (incompleteToolCallIds.length > 0) {
+          logger.warn('Incomplete tool calls detected (likely maxOutputTokens exceeded)', {
+            stepIteration,
+            incompleteToolCallIds,
+          });
+
+          // Build recovery messages: assistant tool-call + error tool-result for each incomplete call.
+          // This satisfies the API's tool_use→tool_result pairing requirement.
+          // NOTE: Do NOT emit TOOL_CALL_END here — the client's TOOL_CALL_END handler
+          // parses args and executes the tool, which would fail with incomplete JSON.
+          // Client-side cleanup of executingTool is handled by RUN_FINISHED/RUN_ERROR handlers.
+          const recoveryAssistantContent: Array<{ type: 'tool-call'; toolCallId: string; toolName: string; input: Record<string, never> }> = [];
+          const recoveryToolResults: ModelMessage[] = [];
+
+          for (const toolCallId of incompleteToolCallIds) {
+            const toolCall = activeToolCalls.get(toolCallId)!;
+            const truncatedArgsLength = toolCall.args.length;
+
+            recoveryAssistantContent.push({
+              type: 'tool-call',
+              toolCallId,
+              toolName: toolCall.name,
+              input: {},
+            });
+
+            recoveryToolResults.push({
+              role: 'tool',
+              content: [{
+                type: 'tool-result',
+                toolCallId,
+                toolName: toolCall.name,
+                output: {
+                  type: 'text',
+                  value: [
+                    `Error: Your tool call for "${toolCall.name}" was truncated by the output token limit (maxOutputTokens: ${this.maxOutputTokens}).`,
+                    `The arguments were cut off at ${truncatedArgsLength} characters of JSON.`,
+                    `Truncated args (first 200 chars): ${toolCall.args.substring(0, 200)}`,
+                    `You MUST split this into multiple smaller tool calls, each with fewer items/shorter data.`,
+                  ].join('\n'),
+                },
+                isError: true,
+              }],
+            } as unknown as ModelMessage);
+          }
+
+          const recoveryAssistantMessage: ModelMessage = {
+            role: 'assistant',
+            content: recoveryAssistantContent,
+          } as ModelMessage;
+
+          // Add recovery messages to both accumulators
+          const recoveryMessages = [recoveryAssistantMessage, ...recoveryToolResults];
+          allResponseMessages.push(...recoveryMessages);
+          currentMessages = [...currentMessages, ...recoveryMessages];
+
+          logger.debug('Injected recovery messages for incomplete tool calls, continuing to next step', {
+            stepIteration,
+            incompleteCount: incompleteToolCallIds.length,
+          });
+          continue;
+        }
 
         // Collect sanitized messages from this step into the accumulator.
         // This must happen BEFORE the stepHadToolCalls check so that final-step
