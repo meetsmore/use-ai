@@ -173,12 +173,10 @@ export function useServerEvents({
       const name = toolCallData.name;
       const input = JSON.parse(toolCallData.args);
 
-      // Server-side tools (e.g., MCP tools) are not in the client registry.
-      // Their results are delivered via TOOL_CALL_RESULT events from the server,
-      // which the client handles directly in handleEvent() — no action needed here.
+      // Skip tools not in our registry (likely workflow tools)
       const tool = ts.aggregatedToolsRef.current[name];
       if (!tool) {
-        console.log(`[ServerEvents] Tool "${name}" not in client registry (server-side tool), skipping client execution`);
+        console.log(`[ServerEvents] Tool "${name}" not found in useAI tools, skipping (likely a workflow tool)`);
         return;
       }
 
