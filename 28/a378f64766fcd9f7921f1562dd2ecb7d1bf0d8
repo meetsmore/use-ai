@@ -1,0 +1,38 @@
+packages/server/src/agents/AISDKAgent.test.ts
+  a7d54838546af7bd 2691-2863
+packages/server/src/agents/AISDKAgent.ts
+  a7d54838546af7bd 661-667
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.3",
+  "base_commit_sha": "28a378f64766fcd9f7921f1562dd2ecb7d1bf0d8",
+  "prompts": {
+    "581648b779149aeb": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019d4852-6e7e-7a60-a214-a3bdc55c485d",
+        "model": "gpt-5.4"
+      },
+      "human_author": "deer-agent",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 383,
+      "overriden_lines": 0
+    },
+    "a7d54838546af7bd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "791bd963-fb7c-4f17-8089-aa4c1d703c97",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent",
+      "messages": [],
+      "total_additions": 180,
+      "total_deletions": 0,
+      "accepted_lines": 180,
+      "overriden_lines": 0
+    }
+  }
+}
