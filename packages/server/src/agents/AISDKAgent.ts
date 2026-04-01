@@ -32,6 +32,7 @@ import { logger } from '../logger';
 import { applyCacheBreakpoints, type CacheBreakpointFn } from './anthropicCache';
 import { getToolAnnotations } from '../utils';
 import { toolNeedsApproval, createApprovalWrapper, type ToolArguments, type ToolResult } from './toolApproval';
+import { buildTokenLimitRecoveryMessages } from './tokenLimitRecovery';
 
 /**
  * API error structure for error handling
@@ -643,70 +644,26 @@ export class AISDKAgent implements Agent {
         // Get the response for this step
         response = await stream.response;
 
-        // Detect incomplete tool calls caused by maxOutputTokens truncation.
-        // When the stream is cut mid-tool-input, tool-input-start fires (adding to activeToolCalls)
-        // but tool-call never fires (not added to completedToolCalls).
-        // We inject error tool_results so the model can retry with shorter arguments.
-        // Guard with finishReason === 'length' to avoid false-positive recovery on other stream errors.
-        const incompleteToolCallIds = [...activeToolCalls.keys()].filter(id => !completedToolCalls.has(id));
-        if (incompleteToolCallIds.length > 0 && stepFinishReason === 'length') {
+        // Detect and handle incomplete tool calls caused by maxOutputTokens truncation.
+        // See tokenLimitRecovery.ts for details.
+        const recoveryMessages = buildTokenLimitRecoveryMessages(
+          activeToolCalls,
+          completedToolCalls,
+          stepFinishReason,
+          this.maxOutputTokens,
+        );
+        if (recoveryMessages !== null) {
+          const incompleteCount = recoveryMessages.length - 1;
           logger.warn('Incomplete tool calls detected (likely maxOutputTokens exceeded)', {
             stepIteration,
-            incompleteToolCallIds,
+            incompleteCount,
           });
-
-          // Build recovery messages: assistant tool-call + error tool-result for each incomplete call.
-          // This satisfies the API's tool_use→tool_result pairing requirement.
-          // NOTE: Do NOT emit TOOL_CALL_END here — the client's TOOL_CALL_END handler
-          // parses args and executes the tool, which would fail with incomplete JSON.
-          // Client-side cleanup of executingTool is handled by RUN_FINISHED/RUN_ERROR handlers.
-          const recoveryAssistantContent: Array<{ type: 'tool-call'; toolCallId: string; toolName: string; input: Record<string, never> }> = [];
-          const recoveryToolResults: ModelMessage[] = [];
-
-          for (const toolCallId of incompleteToolCallIds) {
-            const toolCall = activeToolCalls.get(toolCallId)!;
-            const truncatedArgsLength = toolCall.args.length;
-
-            recoveryAssistantContent.push({
-              type: 'tool-call',
-              toolCallId,
-              toolName: toolCall.name,
-              input: {},
-            });
-
-            recoveryToolResults.push({
-              role: 'tool',
-              content: [{
-                type: 'tool-result',
-                toolCallId,
-                toolName: toolCall.name,
-                output: {
-                  type: 'text',
-                  value: [
-                    `Error: Your tool call for "${toolCall.name}" was truncated by the output token limit (maxOutputTokens: ${this.maxOutputTokens}).`,
-                    `The arguments were cut off at ${truncatedArgsLength} characters of JSON, so this call was recorded with empty args ({}) as a placeholder — do NOT retry "${toolCall.name}" with empty args.`,
-                    `Truncated args (first 200 chars): ${toolCall.args.substring(0, 200)}`,
-                    `You MUST split this into multiple smaller tool calls, each with fewer items/shorter data.`,
-                  ].join('\n'),
-                },
-                isError: true,
-              }],
-            } as unknown as ModelMessage);
-          }
-
-          const recoveryAssistantMessage: ModelMessage = {
-            role: 'assistant',
-            content: recoveryAssistantContent,
-          } as ModelMessage;
-
-          // Add recovery messages to both accumulators (sanitized for consistency with other paths)
-          const sanitizedRecoveryMessages = this.sanitizeMessages([recoveryAssistantMessage, ...recoveryToolResults]);
+          const sanitizedRecoveryMessages = this.sanitizeMessages(recoveryMessages);
           allResponseMessages.push(...sanitizedRecoveryMessages);
           currentMessages = [...currentMessages, ...sanitizedRecoveryMessages];
-
           logger.debug('Injected recovery messages for incomplete tool calls, continuing to next step', {
             stepIteration,
-            incompleteCount: incompleteToolCallIds.length,
+            incompleteCount,
           });
           continue;
         }
