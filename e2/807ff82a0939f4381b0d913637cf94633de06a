@@ -1,0 +1,25 @@
+apps/example/src/TodoList.tsx
+  c8e95de8463d548e 35
+apps/example/src/Calculator.tsx
+  c8e95de8463d548e 30
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.3",
+  "base_commit_sha": "e2807ff82a0939f4381b0d913637cf94633de06a",
+  "prompts": {
+    "c8e95de8463d548e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5952b703-58de-41fa-b252-922ec6e52b12",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    }
+  }
+}
