@@ -30,6 +30,7 @@ import type {
 } from '../types';
 import { logger } from '../logger';
 import { applyCacheBreakpoints, type CacheBreakpointFn } from './anthropicCache';
+import { generateGracefulSummaryIfNeeded } from './gracefulSummary';
 import { getToolAnnotations } from '../utils';
 import { toolNeedsApproval, createApprovalWrapper, type ToolArguments, type ToolResult } from './toolApproval';
 
@@ -671,79 +672,31 @@ export class AISDKAgent implements Agent {
 
       // Graceful finish: if maxSteps was exhausted while still in a tool-call chain,
       // make one final streamText call without tools so the model can summarize progress.
-      if (lastStepHadToolCalls) {
-        logger.debug('maxSteps reached with tool calls pending, generating graceful summary');
-
-        const stateMessage = this.buildStateMessage(session.state);
-        const summaryMessages: ModelMessage[] = [
-          ...(staticSystemMessages || []),
-          ...(stateMessage ? [stateMessage] : []),
-          ...currentMessages,
-          { role: 'user', content: 'max steps reached, summarize progress' },
-        ];
-
-        const summaryMessagesWithCache = applyCacheBreakpoints(
-          summaryMessages,
-          this.cacheBreakpoint,
-          this.model
-        );
-
-        const summaryStream = span.wrap(() =>
-          streamText({
-            model: this.model,
-            messages: summaryMessagesWithCache,
-            tools: undefined,
-            stopWhen: stepCountIs(1),
-            maxOutputTokens: this.maxOutputTokens,
-            temperature: this.temperature,
-            abortSignal: session.abortController?.signal,
-            experimental_telemetry: span.active
-              ? {
-                  isEnabled: true,
-                  functionId: 'use-ai',
-                  metadata: {
-                    sessionId: session.clientId,
-                    threadId: session.threadId,
-                    runId,
-                    ipAddress: session.ipAddress,
-                    toolCount: 0,
-                    stepIteration: this.maxSteps,
-                    gracefulSummary: true,
-                    ...((originalInput.forwardedProps as UseAIForwardedProps | undefined)?.telemetryMetadata || {}),
-                  },
-                }
-              : undefined,
-          })
-        );
-
-        for await (const chunk of summaryStream.fullStream) {
-          if (chunk.type === 'text-delta') {
-            hasAnyContent = true;
-            if (!hasEmittedTextStart) {
-              messageId = uuidv4();
-              events.emit<TextMessageStartEvent>({
-                type: EventType.TEXT_MESSAGE_START,
-                messageId,
-                role: 'assistant',
-                timestamp: Date.now(),
-              });
-              hasEmittedTextStart = true;
-            }
-            events.emit<TextMessageContentEvent>({
-              type: EventType.TEXT_MESSAGE_CONTENT,
-              messageId: messageId!,
-              delta: chunk.text,
-              timestamp: Date.now(),
-            });
-            finalText += chunk.text;
-          } else if (chunk.type === 'error') {
-            throw chunk.error;
-          }
-        }
-
-        const summaryResponse = await summaryStream.response;
-        allResponseMessages.push(...this.sanitizeMessages(summaryResponse.messages));
-        response = summaryResponse;
+      const gracefulSummary = await generateGracefulSummaryIfNeeded({
+        lastStepHadToolCalls,
+        staticSystemMessages,
+        session,
+        currentMessages,
+        span,
+        runId,
+        originalInput,
+        events,
+        hasEmittedTextStart,
+        messageId,
+        model: this.model,
+        cacheBreakpoint: this.cacheBreakpoint,
+        maxOutputTokens: this.maxOutputTokens,
+        temperature: this.temperature,
+        maxSteps: this.maxSteps,
+        sanitizeMessages: (msgs) => this.sanitizeMessages(msgs),
+      });
+      if (gracefulSummary) {
+        if (gracefulSummary.hadContent) hasAnyContent = true;
+        hasEmittedTextStart = gracefulSummary.hasEmittedTextStart;
+        messageId = gracefulSummary.messageId;
+        finalText += gracefulSummary.finalText;
+        allResponseMessages.push(...gracefulSummary.messages);
+        response = gracefulSummary.response;
       }
 
       // End text message if we started one
