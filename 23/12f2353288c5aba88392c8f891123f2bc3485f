@@ -1,0 +1,21 @@
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.3",
+  "base_commit_sha": "2312f2353288c5aba88392c8f891123f2bc3485f",
+  "prompts": {
+    "581648b779149aeb": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019d4852-6e7e-7a60-a214-a3bdc55c485d",
+        "model": "gpt-5.4"
+      },
+      "human_author": "deer-agent",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 383,
+      "overriden_lines": 0
+    }
+  }
+}
