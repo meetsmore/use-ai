@@ -37,7 +37,7 @@ function extractTurnMessages(messages: Message[], startIndex: number): Persisted
       result.push({
         id: msg.id,
         role: 'assistant',
-        content: '',
+        content: typeof msg.content === 'string' ? msg.content : '',
         createdAt: new Date(),
         toolCalls: msg.toolCalls as PersistedMessage['toolCalls'],
       });
