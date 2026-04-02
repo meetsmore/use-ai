@@ -25,3 +25,6 @@ skills/
 
 # Test logs
 .test-logs/
+
+# bun install cache file
+.bun-install-cache/

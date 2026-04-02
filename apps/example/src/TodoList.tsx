@@ -32,7 +32,7 @@ export default function TodoList() {
   return (
     <div ref={ref} style={styles.container}>
       <div style={styles.card}>
-        <h1 style={styles.title}>Todo List</h1>
+        <h2 style={styles.title}>Todo List</h2>
         <p style={styles.subtitle}>
           Click the AI button in the bottom right to manage todos with natural language
         </p>

@@ -1,15 +1,16 @@
 import { describe, expect, test, beforeEach, afterEach } from 'bun:test';
-import { langfuse, pushTraceIdForRun, popTraceIdForRun } from './instrumentation';
+import { langfuse, pushTraceIdForRun, popTraceIdForRun, _resetTracing } from './instrumentation';
 import { startRunSpan, flushTelemetry } from './telemetry';
 
 describe('telemetry', () => {
-  // Directly mutate the langfuse singleton to force disabled state for these tests.
+  // Directly mutate the langfuse singleton and reset tracing to force disabled state.
   // This avoids mock.module() which is process-global in Bun and leaks to other test files.
   let originalEnabled: boolean;
 
   beforeEach(() => {
     originalEnabled = langfuse.enabled;
     langfuse.enabled = false;
+    _resetTracing();
   });
 
   afterEach(() => {
