@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { UseAIClient } from './client';
 import { EventType } from '@meetsmore-oss/use-ai-core';
-import type { AGUIEvent } from './types';
+import type { AGUIEvent, Message } from './types';
+import { extractTurnMessages } from './hooks/useServerEvents';
 
 /**
  * Tests for per-step message assembly in the UseAIClient.
@@ -229,29 +230,6 @@ describe('Client per-step message assembly', () => {
      * Expected: The final assistant message should contain ONLY the
      * last step's text. Intermediate text lives in turnMessages only.
      */
-    function extractTurnMessages(messages: Array<Record<string, unknown>>, startIndex: number) {
-      const turnSlice = messages.slice(startIndex);
-      const result: Array<Record<string, unknown>> = [];
-      for (const msg of turnSlice) {
-        if (msg.role === 'assistant' && 'toolCalls' in msg && msg.toolCalls) {
-          result.push({
-            id: msg.id,
-            role: 'assistant',
-            content: typeof msg.content === 'string' ? msg.content : '',
-            toolCalls: msg.toolCalls,
-          });
-        } else if (msg.role === 'tool') {
-          result.push({
-            id: msg.id,
-            role: 'tool',
-            content: typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content),
-            toolCallId: msg.toolCallId,
-          });
-        }
-      }
-      return result;
-    }
-
     it('final message content does not include text from intermediate steps', () => {
       // Simulate: step 0 (text + tool) → step 1 (text only)
       simulateEvents(client, [
@@ -360,7 +338,7 @@ describe('Client per-step message assembly', () => {
 
       // Get turnMessages (intermediate assistant+tool messages)
       const turnMessages = extractTurnMessages(
-        client.messages as unknown as Array<Record<string, unknown>>,
+        client.messages as Message[],
         0 // startIndex
       );
 
@@ -386,35 +364,6 @@ describe('Client per-step message assembly', () => {
   });
 
   describe('extractTurnMessages compatibility', () => {
-    /**
-     * Replicate extractTurnMessages logic to validate that per-step messages
-     * are correctly extracted for persistence.
-     */
-    function extractTurnMessages(messages: Array<Record<string, unknown>>, startIndex: number) {
-      const turnSlice = messages.slice(startIndex);
-      const result: Array<Record<string, unknown>> = [];
-
-      for (const msg of turnSlice) {
-        if (msg.role === 'assistant' && 'toolCalls' in msg && msg.toolCalls) {
-          result.push({
-            id: msg.id,
-            role: 'assistant',
-            content: typeof msg.content === 'string' ? msg.content : '',
-            toolCalls: msg.toolCalls,
-          });
-        } else if (msg.role === 'tool') {
-          result.push({
-            id: msg.id,
-            role: 'tool',
-            content: typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content),
-            toolCallId: msg.toolCallId,
-          });
-        }
-      }
-
-      return result;
-    }
-
     it('extractTurnMessages preserves per-step text content', () => {
       simulateEvents(client, [
         { type: EventType.RUN_STARTED, threadId: 'thread-1', runId: 'run-1', timestamp: Date.now() },
@@ -439,7 +388,7 @@ describe('Client per-step message assembly', () => {
       ]);
 
       // extractTurnMessages should find the step 0 messages (excluding the final text-only assistant)
-      const turnMessages = extractTurnMessages(client.messages as unknown as Array<Record<string, unknown>>, 0);
+      const turnMessages = extractTurnMessages(client.messages as Message[], 0);
 
       // Should have 2 intermediate messages: assistant(text+toolCalls) + tool
       expect(turnMessages.length).toBe(2);

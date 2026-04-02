@@ -28,7 +28,7 @@ import type { PersistedMessage } from '../providers/chatRepository/types';
  * (assistant(toolCalls) → tool results → assistant(text)) since the client
  * defers pushing tool results until RUN_FINISHED.
  */
-function extractTurnMessages(messages: Message[], startIndex: number): PersistedMessage[] {
+export function extractTurnMessages(messages: Message[], startIndex: number): PersistedMessage[] {
   const turnSlice = messages.slice(startIndex);
   const result: PersistedMessage[] = [];
 
