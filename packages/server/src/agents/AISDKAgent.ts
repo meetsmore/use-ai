@@ -614,23 +614,7 @@ export class AISDKAgent implements Agent {
       ctx.allResponseMessages.push(...stepMessages);
       ctx.currentMessages = [...ctx.currentMessages, ...stepMessages];
 
-      // Detect and recover from incomplete tool calls caused by maxOutputTokens truncation.
-      // When the stream is cut mid-tool-input, tool-input-start fires but tool-call never fires.
-      // Recovery injects error tool_results so the model can retry with shorter arguments.
-      const incompleteToolCalls = [...stepCtx.activeToolCalls.entries()]
-        .filter(([id]) => !stepCtx.completedToolCalls.has(id))
-        .map(([id, call]) => ({ id, ...call }));
-      const recoveryMessages = buildRecoveryToolResults(
-        incompleteToolCalls, stepCtx.stepFinishReason, this.maxOutputTokens,
-      );
-      if (recoveryMessages.length > 0) {
-        const sanitized = this.sanitizeMessages(recoveryMessages);
-        ctx.allResponseMessages.push(...sanitized);
-        ctx.currentMessages = [...ctx.currentMessages, ...sanitized];
-        logger.warn('Incomplete tool calls detected (likely maxOutputTokens exceeded)', {
-          stepIteration,
-          incompleteCount: incompleteToolCalls.length,
-        });
+      if (this.handleIncompleteToolCalls(ctx, stepCtx)) {
         continue;
       }
 
@@ -646,6 +630,37 @@ export class AISDKAgent implements Agent {
         updatedToolCount: ctx.session.tools.length,
       });
     }
+  }
+
+  /**
+   * Detects incomplete tool calls caused by maxOutputTokens truncation and injects
+   * synthetic error tool_results into ctx so the model can retry with shorter arguments.
+   *
+   * When the stream is cut mid-tool-input, tool-input-start fires but tool-call never fires.
+   *
+   * Mutates ctx.allResponseMessages and ctx.currentMessages as a side effect.
+   * @returns true if recovery messages were injected (caller should continue to next step)
+   */
+  private handleIncompleteToolCalls(
+    ctx: RunContext,
+    stepCtx: StepContext,
+  ): boolean {
+    const incompleteToolCalls = [...stepCtx.activeToolCalls.entries()]
+      .filter(([id]) => !stepCtx.completedToolCalls.has(id))
+      .map(([id, call]) => ({ id, ...call }));
+    const recoveryMessages = buildRecoveryToolResults(
+      incompleteToolCalls, stepCtx.stepFinishReason, this.maxOutputTokens,
+    );
+    if (recoveryMessages.length === 0) {
+      return false;
+    }
+    const sanitized = this.sanitizeMessages(recoveryMessages);
+    ctx.allResponseMessages.push(...sanitized);
+    ctx.currentMessages = [...ctx.currentMessages, ...sanitized];
+    logger.warn('Incomplete tool calls detected (likely maxOutputTokens exceeded)', {
+      incompleteCount: incompleteToolCalls.length,
+    });
+    return true;
   }
 
   /**
