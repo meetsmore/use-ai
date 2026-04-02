@@ -1,4 +1,5 @@
 import { streamText, jsonSchema, LanguageModel, stepCountIs, type ModelMessage, type SystemModelMessage } from 'ai';
+import type { AttributeValue } from '@opentelemetry/api';
 import type { JSONSchema7 } from 'json-schema';
 import { startRunSpan, flushTelemetry as flushAllTelemetry } from '../telemetry';
 import { v4 as uuidv4 } from 'uuid';
@@ -30,7 +31,7 @@ import type {
 } from '../types';
 import { logger } from '../logger';
 import { applyCacheBreakpoints, type CacheBreakpointFn } from './anthropicCache';
-import { generateGracefulSummaryIfNeeded } from './gracefulSummary';
+
 import { getToolAnnotations } from '../utils';
 import { toolNeedsApproval, createApprovalWrapper, type ToolArguments, type ToolResult } from './toolApproval';
 
@@ -405,15 +406,12 @@ export class AISDKAgent implements Agent {
       const allResponseMessages: ModelMessage[] = [];
       let lastStepHadToolCalls = false;
 
-      for (let stepIteration = 0; stepIteration < this.maxSteps; stepIteration++) {
+      for (let stepIteration = 0; stepIteration <= this.maxSteps; stepIteration++) {
+        const isGracefulSummaryStep = stepIteration === this.maxSteps;
+        if (isGracefulSummaryStep && !lastStepHadToolCalls) break;
+
         // Get current tools from session (may have been updated by tool_result handler)
         const currentTools = session.tools;
-
-        logger.debug('Starting step iteration', {
-          stepIteration,
-          toolCount: currentTools.length,
-          toolNames: currentTools.map(t => t.name),
-        });
 
         // Build dynamic state message from current session state (refreshed each step)
         const stateMessage = this.buildStateMessage(session.state);
@@ -425,10 +423,30 @@ export class AISDKAgent implements Agent {
           ...currentMessages,
         ];
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const stepConfig = {
+          messages: messagesForStep,
+          tools: currentTools.length > 0
+            ? (this.sanitizeToolsForAPI(this.filterTools(currentTools), session, events) as any)
+            : undefined,
+          metadata: {
+            sessionId: session.clientId,
+            threadId: session.threadId,
+            runId,
+            ipAddress: session.ipAddress,
+            toolCount: currentTools.length,
+            stepIteration,
+            ...((originalInput.forwardedProps as UseAIForwardedProps | undefined)?.telemetryMetadata || {}),
+          } as Record<string, AttributeValue>,
+        };
+
+        this.applyGracefulSummaryOverrides(isGracefulSummaryStep, stepConfig);
+
+        logger.debug('Starting step iteration', { stepIteration, ...stepConfig.metadata });
 
         // Apply cache breakpoints for Anthropic prompt caching
         const messagesWithCache = applyCacheBreakpoints(
-          messagesForStep,
+          stepConfig.messages,
           this.cacheBreakpoint,
           this.model
         );
@@ -437,32 +455,14 @@ export class AISDKAgent implements Agent {
         const createStream = () => streamText({
           model: this.model,
           messages: messagesWithCache,
-          // Note: system prompt is included in messages array to support cache breakpoints
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          tools:
-            currentTools.length > 0
-              ? (this.sanitizeToolsForAPI(this.filterTools(currentTools), session, events) as any)
-              : undefined,
+          tools: stepConfig.tools,
           // Run ONE step at a time to allow tool refresh between steps
           stopWhen: stepCountIs(1),
           maxOutputTokens: this.maxOutputTokens,
           temperature: this.temperature,
           abortSignal: session.abortController?.signal,
           experimental_telemetry: span.active
-            ? {
-                isEnabled: true,
-                functionId: 'use-ai',
-                metadata: {
-                  sessionId: session.clientId,
-                  threadId: session.threadId,
-                  runId,
-                  ipAddress: session.ipAddress,
-                  toolCount: currentTools.length,
-                  stepIteration,
-                  // Merge custom metadata from forwardedProps (for eval tracing, etc.)
-                  ...((originalInput.forwardedProps as UseAIForwardedProps | undefined)?.telemetryMetadata || {}),
-                },
-              }
+            ? { isEnabled: true, functionId: 'use-ai', metadata: stepConfig.metadata }
             : undefined,
           onStepFinish: ({ usage, finishReason }) => {
             logger.debug('Step finished', { usage, finishReason, stepIteration });
@@ -643,7 +643,7 @@ export class AISDKAgent implements Agent {
         const stepMessages = this.sanitizeMessages(response.messages);
         allResponseMessages.push(...stepMessages);
 
-        // Track whether the last completed step had tool calls (for post-loop graceful finish)
+        // Track whether the last completed step had tool calls (for graceful summary)
         lastStepHadToolCalls = stepHadToolCalls;
 
         // If no tool calls were made in this step, we're done
@@ -668,35 +668,6 @@ export class AISDKAgent implements Agent {
           newMessageCount: currentMessages.length,
           updatedToolCount: session.tools.length,
         });
-      }
-
-      // Graceful finish: if maxSteps was exhausted while still in a tool-call chain,
-      // make one final streamText call without tools so the model can summarize progress.
-      const gracefulSummary = await generateGracefulSummaryIfNeeded({
-        lastStepHadToolCalls,
-        staticSystemMessages,
-        session,
-        currentMessages,
-        span,
-        runId,
-        originalInput,
-        events,
-        hasEmittedTextStart,
-        messageId,
-        model: this.model,
-        cacheBreakpoint: this.cacheBreakpoint,
-        maxOutputTokens: this.maxOutputTokens,
-        temperature: this.temperature,
-        maxSteps: this.maxSteps,
-        sanitizeMessages: (msgs) => this.sanitizeMessages(msgs),
-      });
-      if (gracefulSummary) {
-        if (gracefulSummary.hadContent) hasAnyContent = true;
-        hasEmittedTextStart = gracefulSummary.hasEmittedTextStart;
-        messageId = gracefulSummary.messageId;
-        finalText += gracefulSummary.finalText;
-        allResponseMessages.push(...gracefulSummary.messages);
-        response = gracefulSummary.response;
       }
 
       // End text message if we started one
@@ -875,6 +846,21 @@ export class AISDKAgent implements Agent {
       role: 'system',
       content: `Current application state:\n\n${JSON.stringify(state, null, 2)}`,
     };
+  }
+
+  /**
+   * When maxSteps is exhausted mid-tool-call chain, overrides step config
+   * to strip tools and inject a summary prompt so the model can summarize progress.
+   * No-ops when isGracefulSummaryStep is false.
+   */
+  private applyGracefulSummaryOverrides(
+    isGracefulSummaryStep: boolean,
+    stepConfig: { messages: ModelMessage[]; tools: unknown; metadata: Record<string, AttributeValue> }
+  ): void {
+    if (!isGracefulSummaryStep) return;
+    stepConfig.messages.push({ role: 'user', content: 'max steps reached, summarize progress' });
+    stepConfig.tools = undefined;
+    Object.assign(stepConfig.metadata, { toolCount: 0, gracefulSummary: true });
   }
 
   /**
