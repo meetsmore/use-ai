@@ -47,6 +47,84 @@ interface APIError {
   message?: string;
 }
 
+/**
+ * Classifies an API error into a specific error code.
+ */
+function classifyApiError(error: unknown): { errorCode: ErrorCode; errorMessage: string } {
+  let errorCode = ErrorCode.UNKNOWN_ERROR;
+  const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+  const isAPIError = (err: unknown): err is APIError =>
+    typeof err === 'object' && err !== null;
+
+  if (isAPIError(error)) {
+    const isOverloaded =
+      error.statusCode === 529 ||
+      error.data?.error?.type === 'overloaded_error' ||
+      (error.message && error.message.toLowerCase().includes('overload'));
+
+    if (isOverloaded) {
+      errorCode = ErrorCode.API_OVERLOADED;
+    }
+
+    if (error.statusCode === 429) {
+      errorCode = ErrorCode.RATE_LIMITED;
+    }
+  }
+
+  return { errorCode, errorMessage };
+}
+
+/**
+ * Sentinel error thrown when a run is aborted by the user.
+ * Caught by handleRunError to return a clean abort result.
+ */
+class AbortError extends Error {
+  constructor() {
+    super('Run aborted by user');
+    this.name = 'AbortError';
+  }
+}
+
+/**
+ * Mutable state for a single run() invocation.
+ * All fields are local to one call — no cross-request sharing.
+ */
+interface RunContext {
+  // From input (read-only after creation)
+  readonly session: ClientSession;
+  readonly runId: string;
+  /** Original unsanitized messages from input, used for conversationHistory returns */
+  readonly messages: ModelMessage[];
+  readonly tools: ToolDefinition[];
+  readonly state: unknown;
+  readonly originalInput: AgentInput['originalInput'];
+  readonly staticSystemMessages: SystemModelMessage[] | undefined;
+
+  // Streaming state (mutated during run)
+  streamTextStarted: boolean;
+  messageId: string | null;
+  hasEmittedTextStart: boolean;
+  finalText: string;
+  currentStepNumber: number;
+  hasAnyContent: boolean;
+  /** Sanitized messages for API calls, rebuilt each step with tool-call results appended */
+  currentMessages: ModelMessage[];
+  allResponseMessages: ModelMessage[];
+  response: Awaited<ReturnType<typeof streamText>['response']> | null;
+}
+
+/**
+ * Mutable state scoped to a single step iteration within executeStepLoop.
+ * Reset at the start of each step — never carried across steps.
+ */
+interface StepContext {
+  readonly currentTools: ToolDefinition[];
+  readonly activeToolCalls: Map<string, { name: string; args: string }>;
+  readonly completedToolCalls: Set<string>;
+  stepHadToolCalls: boolean;
+  stepFinishReason: string | undefined;
+}
 
 /**
  * Configuration for AISDKAgent.
@@ -309,6 +387,26 @@ export class AISDKAgent implements Agent {
   }
 
   async run(input: AgentInput, events: EventEmitter): Promise<AgentResult> {
+    const ctx = await this.createRunContext(input);
+
+    this.emitRunStartEvents(ctx, events);
+
+    const span = this.startTelemetrySpan(ctx);
+
+    try {
+      this.logRunStart(ctx);
+      await this.executeStepLoop(ctx, events, span);
+      return this.finalizeRun(ctx, events, span);
+    } catch (error) {
+      return this.handleRunError(error, ctx, events, span);
+    }
+  }
+
+  /**
+   * Creates the RunContext for a single run() invocation.
+   * Resolves system prompt and initializes all mutable state.
+   */
+  private async createRunContext(input: AgentInput): Promise<RunContext> {
     const { session, runId, messages, tools, state, systemPrompt: runtimeSystemPrompt, originalInput } = input;
 
     // Sync session.tools with input.tools if not already set
@@ -320,497 +418,540 @@ export class AISDKAgent implements Agent {
 
     // Resolve config system prompt (may be async, e.g., fetched from Langfuse)
     const configSystemPrompt = await this.resolveSystemPrompt();
-
-    // Build static system messages (config + instructions) — constant across steps for caching
     const staticSystemMessages = this.buildStaticSystemMessages(configSystemPrompt, runtimeSystemPrompt);
 
-    // Emit RUN_STARTED event
+    // Sanitize messages before sending to ensure no provider-specific fields leak through
+    const sanitizedInputMessages = this.sanitizeMessages(messages);
+
+    return {
+      session,
+      runId,
+      messages,
+      tools,
+      state,
+      originalInput,
+      staticSystemMessages,
+
+      streamTextStarted: false,
+      messageId: null,
+      hasEmittedTextStart: false,
+      finalText: '',
+      currentStepNumber: 0,
+      hasAnyContent: false,
+      currentMessages: [...sanitizedInputMessages],
+      allResponseMessages: [],
+      response: null,
+    };
+  }
+
+  /**
+   * Emits initial lifecycle events: RUN_STARTED, MESSAGES_SNAPSHOT, STATE_SNAPSHOT.
+   */
+  private emitRunStartEvents(ctx: RunContext, events: EventEmitter): void {
     events.emit<RunStartedEvent>({
       type: EventType.RUN_STARTED,
-      threadId: session.threadId,
-      runId,
-      input: originalInput,
+      threadId: ctx.session.threadId,
+      runId: ctx.runId,
+      input: ctx.originalInput,
       timestamp: Date.now(),
     });
 
-    // Emit MESSAGES_SNAPSHOT event
-    // Use messages from original input (AG-UI format) instead of session
     events.emit<MessagesSnapshotEvent>({
       type: EventType.MESSAGES_SNAPSHOT,
-      messages: originalInput.messages,
+      messages: ctx.originalInput.messages,
       timestamp: Date.now(),
     });
 
-    // Emit STATE_SNAPSHOT event
     events.emit<StateSnapshotEvent>({
       type: EventType.STATE_SNAPSHOT,
-      snapshot: state,
+      snapshot: ctx.state,
       timestamp: Date.now(),
     });
+  }
 
-    let streamTextStarted = false;
+  /**
+   * Creates a telemetry span and sets input from the last user message.
+   */
+  private startTelemetrySpan(ctx: RunContext): ReturnType<typeof startRunSpan> {
+    const span = startRunSpan({ runId: ctx.runId, sessionId: ctx.session.clientId });
 
-    // Create telemetry span to group all step iterations under one OTEL trace.
-    const span = startRunSpan({ runId, sessionId: session.clientId });
-
-    // Set span input from last user message (shown in Langfuse list view)
-    const lastUserMessage = [...messages].reverse().find(m => m.role === 'user');
+    const lastUserMessage = [...ctx.messages].reverse().find(m => m.role === 'user');
     if (lastUserMessage) {
       span.setInput(lastUserMessage.content);
     }
 
-    try {
-      logger.info('Sending to AI SDK model (streaming)', {
-        clientId: session.clientId,
-        messageCount: messages.length,
-        toolCount: tools.length,
+    return span;
+  }
+
+  /**
+   * Logs the start of a run with message/tool counts and previews.
+   */
+  private logRunStart(ctx: RunContext): void {
+    logger.info('Sending to AI SDK model (streaming)', {
+      clientId: ctx.session.clientId,
+      messageCount: ctx.messages.length,
+      toolCount: ctx.tools.length,
+    });
+
+    logger.apiRequest({
+      tools: ctx.tools.map((t) => t.name),
+      messageCount: ctx.messages.length,
+      messages: ctx.messages.map((msg: ModelMessage) => ({
+        role: msg.role,
+        preview:
+          typeof msg.content === 'string'
+            ? msg.content.substring(0, 80) + (msg.content.length > 80 ? '...' : '')
+            : Array.isArray(msg.content)
+            ? `${msg.content.length} content blocks`
+            : 'complex content',
+      })),
+      systemMessages: ctx.staticSystemMessages?.map(m => m.content.substring(0, 80) + (m.content.length > 80 ? '...' : '')),
+    });
+  }
+
+  /**
+   * Runs step-by-step model invocations, refreshing tools/state between steps.
+   * Each step runs ONE model invocation, then checks for updated tools/state.
+   */
+  private async executeStepLoop(
+    ctx: RunContext,
+    events: EventEmitter,
+    span: ReturnType<typeof startRunSpan>,
+  ): Promise<void> {
+    for (let stepIteration = 0; stepIteration < this.maxSteps; stepIteration++) {
+      const stepCtx: StepContext = {
+        currentTools: ctx.session.tools,
+        activeToolCalls: new Map(),
+        completedToolCalls: new Set(),
+        stepHadToolCalls: false,
+        stepFinishReason: undefined,
+      };
+
+      logger.debug('Starting step iteration', {
+        stepIteration,
+        toolCount: stepCtx.currentTools.length,
+        toolNames: stepCtx.currentTools.map(t => t.name),
       });
 
-      // Sanitize messages before sending to ensure no provider-specific fields leak through (e.g. for Anthropic: 'tool_use_id')
-      const sanitizedInputMessages = this.sanitizeMessages(messages);
+      // Build dynamic state message from current session state (refreshed each step)
+      const stateMessage = this.buildStateMessage(ctx.session.state);
 
-      // Start with just the user messages - system messages will be prepended in the loop
-      // (rebuilt with current state for each step)
-      let currentMessages: ModelMessage[] = [...sanitizedInputMessages];
+      // Assemble messages: static system messages + dynamic state + conversation
+      const messagesForStep: ModelMessage[] = [
+        ...(ctx.staticSystemMessages || []),
+        ...(stateMessage ? [stateMessage] : []),
+        ...ctx.currentMessages,
+      ];
 
-      logger.apiRequest({
-        tools: tools.map((t) => t.name),
-        messageCount: messages.length,
-        messages: messages.map((msg: ModelMessage) => ({
-          role: msg.role,
-          preview:
-            typeof msg.content === 'string'
-              ? msg.content.substring(0, 80) + (msg.content.length > 80 ? '...' : '')
-              : Array.isArray(msg.content)
-              ? `${msg.content.length} content blocks`
-              : 'complex content',
-        })),
-        systemMessages: staticSystemMessages?.map(m => m.content.substring(0, 80) + (m.content.length > 80 ? '...' : '')),
-      });
+      // Apply cache breakpoints for Anthropic prompt caching
+      const messagesWithCache = applyCacheBreakpoints(
+        messagesForStep,
+        this.cacheBreakpoint,
+        this.model
+      );
 
-      // Track streaming state across all steps
-      let messageId: string | null = null;
-      let hasEmittedTextStart = false;
-      let finalText = '';
-      let currentStepNumber = 0;
-      let hasAnyContent = false;
-
-      // Step-by-step execution loop
-      // This allows tools and state to be refreshed between steps (e.g., after navigation)
-      // Each step runs ONE model invocation, then we check for updated tools/state
-      let response: Awaited<ReturnType<typeof streamText>['response']> | null = null;
-      // Accumulate response messages from ALL steps for conversation history.
-      // response.messages only contains the last step's messages, so without this,
-      // mid-step assistant messages and tool calls would be lost in multi-step runs.
-      const allResponseMessages: ModelMessage[] = [];
-
-      for (let stepIteration = 0; stepIteration < this.maxSteps; stepIteration++) {
-        // Get current tools from session (may have been updated by tool_result handler)
-        const currentTools = session.tools;
-
-        logger.debug('Starting step iteration', {
-          stepIteration,
-          toolCount: currentTools.length,
-          toolNames: currentTools.map(t => t.name),
-        });
-
-        // Build dynamic state message from current session state (refreshed each step)
-        const stateMessage = this.buildStateMessage(session.state);
-
-        // Assemble messages: static system messages + dynamic state + conversation
-        const messagesForStep: ModelMessage[] = [
-          ...(staticSystemMessages || []),
-          ...(stateMessage ? [stateMessage] : []),
-          ...currentMessages,
-        ];
-
-
-        // Apply cache breakpoints for Anthropic prompt caching
-        const messagesWithCache = applyCacheBreakpoints(
-          messagesForStep,
-          this.cacheBreakpoint,
-          this.model
-        );
-
-        streamTextStarted = true;
-        const createStream = () => streamText({
-          model: this.model,
-          messages: messagesWithCache,
-          // Note: system prompt is included in messages array to support cache breakpoints
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          tools:
-            currentTools.length > 0
-              ? (this.sanitizeToolsForAPI(this.filterTools(currentTools), session, events) as any)
-              : undefined,
-          // Run ONE step at a time to allow tool refresh between steps
-          stopWhen: stepCountIs(1),
-          maxOutputTokens: this.maxOutputTokens,
-          temperature: this.temperature,
-          abortSignal: session.abortController?.signal,
-          experimental_telemetry: span.active
-            ? {
-                isEnabled: true,
-                functionId: 'use-ai',
-                metadata: {
-                  sessionId: session.clientId,
-                  threadId: session.threadId,
-                  runId,
-                  ipAddress: session.ipAddress,
-                  toolCount: currentTools.length,
-                  stepIteration,
-                  // Merge custom metadata from forwardedProps (for eval tracing, etc.)
-                  ...((originalInput.forwardedProps as UseAIForwardedProps | undefined)?.telemetryMetadata || {}),
-                },
-              }
+      ctx.streamTextStarted = true;
+      const createStream = () => streamText({
+        model: this.model,
+        messages: messagesWithCache,
+        // Note: system prompt is included in messages array to support cache breakpoints
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        tools:
+          stepCtx.currentTools.length > 0
+            ? (this.sanitizeToolsForAPI(this.filterTools(stepCtx.currentTools), ctx.session, events) as any)
             : undefined,
-          onStepFinish: ({ usage, finishReason }) => {
-            logger.debug('Step finished', { usage, finishReason, stepIteration });
-          },
-        });
-        // Call streamText within parent OTEL context so AI SDK spans become children
-        const stream = span.wrap(createStream);
-
-        // Track active tool calls for streaming args (per-step)
-        const activeToolCalls = new Map<string, { name: string; args: string }>();
-        const completedToolCalls = new Set<string>();
-        let stepHadToolCalls = false;
-        let stepFinishReason: string | undefined;
-
-        // Process the stream for this step
-        for await (const chunk of stream.fullStream) {
-          switch (chunk.type) {
-            case 'start-step': {
-              // New step beginning (for multi-step tool execution)
-              events.emit<StepStartedEvent>({
-                type: EventType.STEP_STARTED,
-                stepName: `step-${currentStepNumber++}`,
-                timestamp: Date.now(),
-              });
-              break;
+        // Run ONE step at a time to allow tool refresh between steps
+        stopWhen: stepCountIs(1),
+        maxOutputTokens: this.maxOutputTokens,
+        temperature: this.temperature,
+        abortSignal: ctx.session.abortController?.signal,
+        experimental_telemetry: span.active
+          ? {
+              isEnabled: true,
+              functionId: 'use-ai',
+              metadata: {
+                sessionId: ctx.session.clientId,
+                threadId: ctx.session.threadId,
+                runId: ctx.runId,
+                ipAddress: ctx.session.ipAddress,
+                toolCount: stepCtx.currentTools.length,
+                stepIteration,
+                // Merge custom metadata from forwardedProps (for eval tracing, etc.)
+                ...((ctx.originalInput.forwardedProps as UseAIForwardedProps | undefined)?.telemetryMetadata || {}),
+              },
             }
+          : undefined,
+        onStepFinish: ({ usage, finishReason }) => {
+          logger.debug('Step finished', { usage, finishReason, stepIteration });
+        },
+      });
+      // Call streamText within parent OTEL context so AI SDK spans become children
+      const stream = span.wrap(createStream);
 
-            case 'text-delta': {
-              hasAnyContent = true;
-              // Start text message on first text chunk
-              if (!hasEmittedTextStart) {
-                messageId = uuidv4();
-                events.emit<TextMessageStartEvent>({
-                  type: EventType.TEXT_MESSAGE_START,
-                  messageId,
-                  role: 'assistant',
-                  timestamp: Date.now(),
-                });
-                hasEmittedTextStart = true;
-              }
+      // Process the stream for this step
+      for await (const chunk of stream.fullStream) {
+        this.processStreamChunk(chunk, ctx, stepCtx, events);
 
-              // Emit delta (AI SDK v6 uses 'text' property)
-              events.emit<TextMessageContentEvent>({
-                type: EventType.TEXT_MESSAGE_CONTENT,
-                messageId: messageId!,
-                delta: chunk.text,
-                timestamp: Date.now(),
-              });
-              finalText += chunk.text;
-              break;
-            }
-
-            case 'reasoning-delta': {
-              // Extended thinking (Claude) - log for now, future AG-UI support
-              logger.debug('Reasoning', { text: chunk.text });
-              break;
-            }
-
-            case 'tool-input-start': {
-              hasAnyContent = true;
-              stepHadToolCalls = true;
-              // Find the tool definition to get annotations
-              const toolDef = currentTools.find(t => t.name === chunk.toolName);
-              const annotations = getToolAnnotations(toolDef);
-
-              // Emit TOOL_CALL_START with use-ai extensions (annotations only if present)
-              // AI SDK v6 uses 'id' as the toolCallId
-              const toolCallStartEvent: ToolCallStartEvent & ToolCallStartExtensions = {
-                type: EventType.TOOL_CALL_START,
-                toolCallId: chunk.id,
-                toolCallName: chunk.toolName,
-                parentMessageId: messageId ?? uuidv4(),
-                timestamp: Date.now(),
-              };
-              if (annotations) {
-                toolCallStartEvent.annotations = annotations;
-              }
-              events.emit(toolCallStartEvent);
-              activeToolCalls.set(chunk.id, { name: chunk.toolName, args: '' });
-              break;
-            }
-
-            case 'tool-input-delta': {
-              // Stream tool arguments
-              const toolCall = activeToolCalls.get(chunk.id);
-              if (toolCall) {
-                toolCall.args += chunk.delta;
-                events.emit<ToolCallArgsEvent>({
-                  type: EventType.TOOL_CALL_ARGS,
-                  toolCallId: chunk.id,
-                  delta: chunk.delta,
-                  timestamp: Date.now(),
-                });
-              }
-              break;
-            }
-
-            case 'tool-call': {
-              // Tool call complete - emit TOOL_CALL_END
-              // AI SDK will call execute() and stream pauses until it returns
-              stepHadToolCalls = true;
-              completedToolCalls.add(chunk.toolCallId);
-              const toolCall = activeToolCalls.get(chunk.toolCallId);
-              const finalArgs = JSON.stringify(chunk.input);
-
-              // If no args were streamed at all (tool-input-delta was never called),
-              // send the complete args as a single delta.
-              // This handles cases where AI SDK skips streaming for empty args.
-              // Note: We only handle the case where NO streaming happened.
-              // If partial streaming occurred, we trust that data and the client
-              // will receive valid JSON through the normal streaming path.
-              if (toolCall && toolCall.args.length === 0) {
-                events.emit<ToolCallArgsEvent>({
-                  type: EventType.TOOL_CALL_ARGS,
-                  toolCallId: chunk.toolCallId,
-                  delta: finalArgs,
-                  timestamp: Date.now(),
-                });
-                toolCall.args = finalArgs;
-              }
-
-              events.emit<ToolCallEndEvent>({
-                type: EventType.TOOL_CALL_END,
-                toolCallId: chunk.toolCallId,
-                timestamp: Date.now(),
-              });
-              break;
-            }
-
-            case 'tool-result': {
-              // Tool execution completed (by execute function)
-              logger.toolResult(chunk.toolName, JSON.stringify(chunk.output));
-
-              // Emit TOOL_CALL_RESULT so the client can store the actual result
-              // in conversation history. Without this, server-side tools (MCP, server tools)
-              // would have placeholder results, causing hallucinations on subsequent turns.
-              events.emit<ToolCallResultEvent>({
-                type: EventType.TOOL_CALL_RESULT,
-                messageId: uuidv4(),
-                toolCallId: chunk.toolCallId,
-                content: typeof chunk.output === 'string' ? chunk.output : JSON.stringify(chunk.output),
-                role: 'tool',
-                timestamp: Date.now(),
-              });
-              break;
-            }
-
-            case 'finish': {
-              stepFinishReason = chunk.finishReason;
-              break;
-            }
-
-            case 'finish-step': {
-              // Step completed - has usage info for telemetry
-              events.emit<StepFinishedEvent>({
-                type: EventType.STEP_FINISHED,
-                stepName: `step-${currentStepNumber - 1}`,
-                timestamp: Date.now(),
-              });
-              break;
-            }
-
-            case 'error': {
-              throw chunk.error;
-            }
-
-            // Ignored chunk types:
-            // 'start' - internal stream lifecycle
-            // 'source' - RAG sources (future)
-            // 'file' - generated files (future)
-            // 'text-start', 'text-end' - we handle text-delta instead
-            // 'reasoning-start', 'reasoning-end' - we handle reasoning-delta
-            // 'tool-input-end' - we emit TOOL_CALL_END on 'tool-call' instead
-            // 'tool-error', 'tool-output-denied' - error cases
-            // 'tool-approval-request' - handled in execute wrapper via createApprovalWrapper
-            // 'abort' - handled after loop
-            // 'raw' - raw provider data
-          }
-        }
-
-        // Check if stream was aborted
-        if (session.abortController?.signal.aborted) {
-          span.endWithError('Run aborted by user');
-          events.emit<RunErrorEvent>({
-            type: EventType.RUN_ERROR,
-            message: 'Run aborted by user',
-            timestamp: Date.now(),
-          });
-          return { success: false, error: 'Run aborted', conversationHistory: messages };
-        }
-
-        // Get the response for this step
-        response = await stream.response;
-
-        // Collect sanitized messages from this step into the accumulator.
-        const stepMessages = this.sanitizeMessages(response.messages);
-        allResponseMessages.push(...stepMessages);
-        currentMessages = [...currentMessages, ...stepMessages];
-
-        // Detect and recover from incomplete tool calls caused by maxOutputTokens truncation.
-        // When the stream is cut mid-tool-input, tool-input-start fires but tool-call never fires.
-        // Recovery injects error tool_results so the model can retry with shorter arguments.
-        const incompleteToolCalls = [...activeToolCalls.entries()]
-          .filter(([id]) => !completedToolCalls.has(id))
-          .map(([id, call]) => ({ id, ...call }));
-        const recoveryMessages = buildRecoveryToolResults(
-          incompleteToolCalls, stepFinishReason, this.maxOutputTokens,
-        );
-        if (recoveryMessages.length > 0) {
-          const sanitized = this.sanitizeMessages(recoveryMessages);
-          allResponseMessages.push(...sanitized);
-          currentMessages = [...currentMessages, ...sanitized];
-          logger.warn('Incomplete tool calls detected (likely maxOutputTokens exceeded)', {
-            stepIteration,
-            incompleteCount: incompleteToolCalls.length,
-          });
-          continue;
-        }
-
-        // If no tool calls were made in this step, we're done
-        if (!stepHadToolCalls) {
-          logger.debug('Step had no tool calls, finishing run', { stepIteration });
-          break;
-        }
-
-        logger.debug('Continuing to next step after tool calls', {
-          stepIteration,
-          newMessageCount: currentMessages.length,
-          updatedToolCount: session.tools.length,
-        });
       }
 
-      // End text message if we started one
-      if (hasEmittedTextStart && messageId) {
-        events.emit<TextMessageEndEvent>({
-          type: EventType.TEXT_MESSAGE_END,
-          messageId,
-          timestamp: Date.now(),
-        });
-      }
-
-      // Check for empty response (no text, no tool calls)
-      if (!hasAnyContent) {
-        span.endWithError('Empty response from AI');
+      // Check if stream was aborted
+      if (ctx.session.abortController?.signal.aborted) {
+        span.endWithError('Run aborted by user');
         events.emit<RunErrorEvent>({
           type: EventType.RUN_ERROR,
-          message:
-            'AI returned an empty response. This may be due to an ambiguous request. Please try being more specific.',
+          message: 'Run aborted by user',
           timestamp: Date.now(),
         });
-        return {
-          success: false,
-          error: 'Empty response from AI',
-          conversationHistory: messages,
+        throw new AbortError();
+      }
+
+      // Get the response for this step
+      const response = await stream.response;
+      ctx.response = response;
+
+      // Collect sanitized messages from this step into the accumulator.
+      const stepMessages = this.sanitizeMessages(response.messages);
+      ctx.allResponseMessages.push(...stepMessages);
+      ctx.currentMessages = [...ctx.currentMessages, ...stepMessages];
+
+      // Detect and recover from incomplete tool calls caused by maxOutputTokens truncation.
+      // When the stream is cut mid-tool-input, tool-input-start fires but tool-call never fires.
+      // Recovery injects error tool_results so the model can retry with shorter arguments.
+      const incompleteToolCalls = [...stepCtx.activeToolCalls.entries()]
+        .filter(([id]) => !stepCtx.completedToolCalls.has(id))
+        .map(([id, call]) => ({ id, ...call }));
+      const recoveryMessages = buildRecoveryToolResults(
+        incompleteToolCalls, stepCtx.stepFinishReason, this.maxOutputTokens,
+      );
+      if (recoveryMessages.length > 0) {
+        const sanitized = this.sanitizeMessages(recoveryMessages);
+        ctx.allResponseMessages.push(...sanitized);
+        ctx.currentMessages = [...ctx.currentMessages, ...sanitized];
+        logger.warn('Incomplete tool calls detected (likely maxOutputTokens exceeded)', {
+          stepIteration,
+          incompleteCount: incompleteToolCalls.length,
+        });
+        continue;
+      }
+
+      // If no tool calls were made in this step, we're done
+      if (!stepCtx.stepHadToolCalls) {
+        logger.debug('Step had no tool calls, finishing run', { stepIteration });
+        break;
+      }
+
+      logger.debug('Continuing to next step after tool calls', {
+        stepIteration,
+        newMessageCount: ctx.currentMessages.length,
+        updatedToolCount: ctx.session.tools.length,
+      });
+    }
+  }
+
+  /**
+   * Processes a single stream chunk, emitting the appropriate AG-UI events.
+   * Mutates stepCtx.stepHadToolCalls when a tool call is detected.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private processStreamChunk(
+    chunk: any,
+    ctx: RunContext,
+    stepCtx: StepContext,
+    events: EventEmitter,
+  ): void {
+    switch (chunk.type) {
+      case 'start-step': {
+        events.emit<StepStartedEvent>({
+          type: EventType.STEP_STARTED,
+          stepName: `step-${ctx.currentStepNumber++}`,
+          timestamp: Date.now(),
+        });
+        return;
+      }
+
+      case 'text-delta': {
+        ctx.hasAnyContent = true;
+        // Start text message on first text chunk
+        if (!ctx.hasEmittedTextStart) {
+          ctx.messageId = uuidv4();
+          events.emit<TextMessageStartEvent>({
+            type: EventType.TEXT_MESSAGE_START,
+            messageId: ctx.messageId,
+            role: 'assistant',
+            timestamp: Date.now(),
+          });
+          ctx.hasEmittedTextStart = true;
+        }
+
+        // AI SDK v6 uses 'text' property for deltas
+        events.emit<TextMessageContentEvent>({
+          type: EventType.TEXT_MESSAGE_CONTENT,
+          messageId: ctx.messageId!,
+          delta: chunk.text,
+          timestamp: Date.now(),
+        });
+        ctx.finalText += chunk.text;
+        return;
+      }
+
+      case 'reasoning-delta': {
+        // Extended thinking (Claude) - log for now, future AG-UI support
+        logger.debug('Reasoning', { text: chunk.text });
+        return;
+      }
+
+      case 'tool-input-start': {
+        ctx.hasAnyContent = true;
+        stepCtx.stepHadToolCalls = true;
+        // Find the tool definition to get annotations
+        const toolDef = stepCtx.currentTools.find(t => t.name === chunk.toolName);
+        const annotations = getToolAnnotations(toolDef);
+
+        // Emit TOOL_CALL_START with use-ai extensions (annotations only if present)
+        // AI SDK v6 uses 'id' as the toolCallId
+        const toolCallStartEvent: ToolCallStartEvent & ToolCallStartExtensions = {
+          type: EventType.TOOL_CALL_START,
+          toolCallId: chunk.id,
+          toolCallName: chunk.toolName,
+          parentMessageId: ctx.messageId ?? uuidv4(),
+          timestamp: Date.now(),
         };
+        if (annotations) {
+          toolCallStartEvent.annotations = annotations;
+        }
+        events.emit(toolCallStartEvent);
+        stepCtx.activeToolCalls.set(chunk.id, { name: chunk.toolName, args: '' });
+        return;
       }
 
-      // response should be set from the last step
-      if (!response) {
-        throw new Error('No response from AI SDK');
+      case 'tool-input-delta': {
+        const toolCall = stepCtx.activeToolCalls.get(chunk.id);
+        if (toolCall) {
+          toolCall.args += chunk.delta;
+          events.emit<ToolCallArgsEvent>({
+            type: EventType.TOOL_CALL_ARGS,
+            toolCallId: chunk.id,
+            delta: chunk.delta,
+            timestamp: Date.now(),
+          });
+        }
+        return;
       }
 
-      // Log final response
-      if (finalText) {
-        logger.aiResponse([finalText]);
+      case 'tool-call': {
+        // Tool call complete - emit TOOL_CALL_END
+        // AI SDK will call execute() and stream pauses until it returns
+        stepCtx.stepHadToolCalls = true;
+        stepCtx.completedToolCalls.add(chunk.toolCallId);
+        const toolCall = stepCtx.activeToolCalls.get(chunk.toolCallId);
+        const finalArgs = JSON.stringify(chunk.input);
+
+        // If no args were streamed at all (tool-input-delta was never called),
+        // send the complete args as a single delta.
+        // This handles cases where AI SDK skips streaming for empty args.
+        // Note: We only handle the case where NO streaming happened.
+        // If partial streaming occurred, we trust that data and the client
+        // will receive valid JSON through the normal streaming path.
+        if (toolCall && toolCall.args.length === 0) {
+          events.emit<ToolCallArgsEvent>({
+            type: EventType.TOOL_CALL_ARGS,
+            toolCallId: chunk.toolCallId,
+            delta: finalArgs,
+            timestamp: Date.now(),
+          });
+          toolCall.args = finalArgs;
+        }
+
+        events.emit<ToolCallEndEvent>({
+          type: EventType.TOOL_CALL_END,
+          toolCallId: chunk.toolCallId,
+          timestamp: Date.now(),
+        });
+        return;
       }
 
-      span.setOutput(finalText);
+      case 'tool-result': {
+        // Tool execution completed (by execute function)
+        logger.toolResult(chunk.toolName, JSON.stringify(chunk.output));
 
-      // Get trace ID captured by span processor (for Langfuse feedback linking)
-      // Must be called before span.end() since end() calls popTraceIdForRun internally
-      const traceId = span.popTraceId();
+        // Emit TOOL_CALL_RESULT so the client can store the actual result
+        // in conversation history. Without this, server-side tools (MCP, server tools)
+        // would have placeholder results, causing hallucinations on subsequent turns.
+        events.emit<ToolCallResultEvent>({
+          type: EventType.TOOL_CALL_RESULT,
+          messageId: uuidv4(),
+          toolCallId: chunk.toolCallId,
+          content: typeof chunk.output === 'string' ? chunk.output : JSON.stringify(chunk.output),
+          role: 'tool',
+          timestamp: Date.now(),
+        });
+        return;
+      }
 
-      span.end();
+      case 'finish': {
+        stepCtx.stepFinishReason = chunk.finishReason;
+        return;
+      }
 
-      // Emit RUN_FINISHED with trace ID if available, otherwise original runId
-      events.emit<RunFinishedEvent>({
-        type: EventType.RUN_FINISHED,
-        threadId: session.threadId,
-        runId: traceId || runId,
-        result: finalText,
+      case 'finish-step': {
+        events.emit<StepFinishedEvent>({
+          type: EventType.STEP_FINISHED,
+          stepName: `step-${ctx.currentStepNumber - 1}`,
+          timestamp: Date.now(),
+        });
+        return;
+      }
+
+      case 'tool-error': {
+        // Tool execution threw an error. Emit TOOL_CALL_RESULT with the error
+        // content so the client can store it in conversation history. Without
+        // this, the client saves an incomplete history (missing the tool_result
+        // for the failed tool), and after server restart the Anthropic API
+        // rejects with: "tool_use ids were found without tool_result blocks"
+        const errorContent = chunk.error instanceof Error ? chunk.error.message : String(chunk.error);
+        logger.toolResult(chunk.toolName, `ERROR: ${errorContent}`);
+
+        events.emit<ToolCallResultEvent>({
+          type: EventType.TOOL_CALL_RESULT,
+          messageId: uuidv4(),
+          toolCallId: chunk.toolCallId,
+          content: JSON.stringify({ error: errorContent }),
+          role: 'tool',
+          timestamp: Date.now(),
+        });
+        return;
+      }
+
+      case 'error': {
+        throw chunk.error;
+      }
+
+      // Ignored chunk types:
+      // 'start' - internal stream lifecycle
+      // 'source' - RAG sources (future)
+      // 'file' - generated files (future)
+      // 'text-start', 'text-end' - we handle text-delta instead
+      // 'reasoning-start', 'reasoning-end' - we handle reasoning-delta
+      // 'tool-input-end' - we emit TOOL_CALL_END on 'tool-call' instead
+      // 'tool-output-denied' - denied tool output cases
+      // 'tool-approval-request' - handled in execute wrapper via createApprovalWrapper
+      // 'abort' - handled after loop
+      // 'raw' - raw provider data
+    }
+  }
+
+  /**
+   * Finalizes a successful run: emits TEXT_MESSAGE_END, checks for empty response,
+   * emits RUN_FINISHED, and returns the AgentResult.
+   */
+  private finalizeRun(
+    ctx: RunContext,
+    events: EventEmitter,
+    span: ReturnType<typeof startRunSpan>,
+  ): AgentResult {
+    // End text message if we started one
+    if (ctx.hasEmittedTextStart && ctx.messageId) {
+      events.emit<TextMessageEndEvent>({
+        type: EventType.TEXT_MESSAGE_END,
+        messageId: ctx.messageId,
         timestamp: Date.now(),
       });
+    }
 
-      return {
-        success: true,
-        conversationHistory: [...messages, ...allResponseMessages],
-      };
-    } catch (error) {
-      // End span and clean up trace ID to prevent memory leak on error paths
-      span.endWithError(error instanceof Error ? error.message : String(error));
-
-      logger.error('Error calling AI SDK model', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-        clientId: session.clientId,
-      });
-
-      // Detect error type and send error code for client-side message handling
-      let errorCode = ErrorCode.UNKNOWN_ERROR;
-      let errorMessage = error instanceof Error ? error.message : 'Unknown error';
-
-      const isAPIError = (err: unknown): err is APIError => {
-        return typeof err === 'object' && err !== null;
-      };
-
-      if (isAPIError(error)) {
-        // Check for API overload (529 status code or overloaded_error type)
-        const isOverloaded =
-          error.statusCode === 529 ||
-          error.data?.error?.type === 'overloaded_error' ||
-          (error.message && error.message.toLowerCase().includes('overload'));
-
-        if (isOverloaded) {
-          errorCode = ErrorCode.API_OVERLOADED;
-        }
-
-        // Check for rate limiting (429 status code)
-        const isRateLimited = error.statusCode === 429;
-        if (isRateLimited) {
-          errorCode = ErrorCode.RATE_LIMITED;
-        }
-      }
-
-      // Record pre-streamText errors to Langfuse (post-streamText errors are captured by AI SDK OTEL)
-      if (!streamTextStarted) {
-        const telemetryMetadata = (originalInput.forwardedProps as UseAIForwardedProps | undefined)?.telemetryMetadata;
-        span.recordError({
-          runId,
-          errorCategory: 'pre_stream_error',
-          errorMessage,
-          sessionId: session.clientId,
-          threadId: session.threadId,
-          ipAddress: session.ipAddress,
-          metadata: { errorCode, toolCount: tools.length, messageCount: messages.length, ...telemetryMetadata },
-        });
-      }
-
+    // Check for empty response (no text, no tool calls)
+    if (!ctx.hasAnyContent) {
+      span.endWithError('Empty response from AI');
       events.emit<RunErrorEvent>({
         type: EventType.RUN_ERROR,
-        message: errorCode, // Send error code instead of user message
+        message:
+          'AI returned an empty response. This may be due to an ambiguous request. Please try being more specific.',
         timestamp: Date.now(),
       });
-
       return {
         success: false,
-        error: errorMessage,
-        conversationHistory: messages,
+        error: 'Empty response from AI',
+        conversationHistory: ctx.messages,
       };
     }
+
+    if (!ctx.response) {
+      throw new Error('No response from AI SDK');
+    }
+
+    if (ctx.finalText) {
+      logger.aiResponse([ctx.finalText]);
+    }
+
+    span.setOutput(ctx.finalText);
+
+    // Get trace ID captured by span processor (for Langfuse feedback linking)
+    // Must be called before span.end() since end() calls popTraceIdForRun internally
+    const traceId = span.popTraceId();
+    span.end();
+
+    events.emit<RunFinishedEvent>({
+      type: EventType.RUN_FINISHED,
+      threadId: ctx.session.threadId,
+      runId: traceId || ctx.runId,
+      result: ctx.finalText,
+      timestamp: Date.now(),
+    });
+
+    return {
+      success: true,
+      conversationHistory: [...ctx.messages, ...ctx.allResponseMessages],
+    };
+  }
+
+  /**
+   * Handles errors during a run: classifies the error, records telemetry,
+   * emits RUN_ERROR, and returns the AgentResult.
+   */
+  private handleRunError(
+    error: unknown,
+    ctx: RunContext,
+    events: EventEmitter,
+    span: ReturnType<typeof startRunSpan>,
+  ): AgentResult {
+    // Handle abort as a non-error early return
+    if (error instanceof AbortError) {
+      return { success: false, error: 'Run aborted', conversationHistory: ctx.messages };
+    }
+
+    span.endWithError(error instanceof Error ? error.message : String(error));
+
+    logger.error('Error calling AI SDK model', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      clientId: ctx.session.clientId,
+    });
+
+    const { errorCode, errorMessage } = classifyApiError(error);
+
+    // Record pre-streamText errors to Langfuse (post-streamText errors are captured by AI SDK OTEL)
+    if (!ctx.streamTextStarted) {
+      const telemetryMetadata = (ctx.originalInput.forwardedProps as UseAIForwardedProps | undefined)?.telemetryMetadata;
+      span.recordError({
+        runId: ctx.runId,
+        errorCategory: 'pre_stream_error',
+        errorMessage,
+        sessionId: ctx.session.clientId,
+        threadId: ctx.session.threadId,
+        ipAddress: ctx.session.ipAddress,
+        metadata: { errorCode, toolCount: ctx.tools.length, messageCount: ctx.messages.length, ...telemetryMetadata },
+      });
+    }
+
+    events.emit<RunErrorEvent>({
+      type: EventType.RUN_ERROR,
+      message: errorCode,
+      timestamp: Date.now(),
+    });
+
+    return {
+      success: false,
+      error: errorMessage,
+      conversationHistory: ctx.messages,
+    };
   }
 
   /**

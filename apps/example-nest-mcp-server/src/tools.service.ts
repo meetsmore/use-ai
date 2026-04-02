@@ -157,6 +157,21 @@ export class ToolsService {
   }
 
   @Tool({
+    name: 'always_fail',
+    description: 'A tool that always throws an error. Use this to test error handling.',
+    parameters: z.object({
+      message: z.string().describe('Any message (tool will fail regardless)'),
+    }),
+    annotations: {
+      title: 'Running Failing Tool',
+      readOnlyHint: true,
+    },
+  })
+  async alwaysFail({ message }: { message: string }): Promise<never> {
+    throw new Error(`Tool execution failed: ${message}`);
+  }
+
+  @Tool({
     name: 'get_secure_data',
     description: 'Get secure data (requires authentication via X-API-Key header)',
     parameters: z.object({

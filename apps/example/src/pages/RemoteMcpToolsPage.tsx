@@ -18,6 +18,7 @@ The following tools are available remotely from the MCP server:
 - mcp_multiply: Multiply two numbers
 - mcp_greet: Greet a person by name
 - mcp_get_weather: Get weather information for a location
+- mcp_always_fail: A tool that always throws an error (for testing error handling)
 - mcp_get_secure_data: Get secure data (requires authentication via X-API-Key header)
 
 The mcp_get_secure_data tool demonstrates authenticated MCP endpoints using the forwardedPropsProvider feature.
