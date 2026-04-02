@@ -206,10 +206,11 @@ export function UseAIChatPanel({
 
   // Filter out internal protocol messages at render time:
   // - Tool result messages (role === 'tool')
-  // - Intermediate assistant messages that only contain tool calls (no user-visible text)
+  // - Intermediate assistant messages with tool calls (their text is combined
+  //   into the final assistant message for display as a single bubble)
   const displayMessages = messages.filter(m => {
     if (m.role === 'tool') return false;
-    if (m.role === 'assistant' && m.toolCalls && m.toolCalls.length > 0 && !getTextFromContent(m.content)) return false;
+    if (m.role === 'assistant' && m.toolCalls && m.toolCalls.length > 0) return false;
     return true;
   });
 

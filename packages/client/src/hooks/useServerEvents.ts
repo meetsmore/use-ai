@@ -114,6 +114,11 @@ export function useServerEvents({
   // Track message count at run start to extract turn messages at run end
   const messageCountAtRunStartRef = useRef<number>(0);
 
+  // Accumulate text across all steps for the final saved message.
+  // Unlike streamingText (React state, for UI), this ref is accessible
+  // from the event handler without stale closure issues.
+  const runTextRef = useRef<string>('');
+
   // Executing tool state for UI display
   const [executingToolRaw, setExecutingTool] = useState<{
     toolCallId: string;
@@ -145,6 +150,13 @@ export function useServerEvents({
       // The user message was already pushed to client.messages by sendPrompt(),
       // so messages added after this point are from the AI turn.
       messageCountAtRunStartRef.current = client.messages.length;
+      runTextRef.current = '';
+    } else if (event.type === EventType.TEXT_MESSAGE_START) {
+      // Add paragraph separator between steps so combined text reads naturally
+      if (runTextRef.current.length > 0) {
+        runTextRef.current += '\n\n';
+        setStreamingText(prev => prev + '\n\n');
+      }
     } else if (event.type === EventType.TOOL_CALL_START) {
       const e = event as ToolCallStartEvent & Partial<ToolCallStartExtensions>;
 
@@ -193,12 +205,14 @@ export function useServerEvents({
       ts.handleApprovalRequest(e);
     } else if (event.type === EventType.TEXT_MESSAGE_CONTENT) {
       const contentEvent = event as TextMessageContentEvent;
+      runTextRef.current += contentEvent.delta;
       setStreamingText(prev => prev + contentEvent.delta);
     } else if (event.type === EventType.TEXT_MESSAGE_END) {
-      setStreamingText('');
-      streamingChatIdRef.current = null;
+      // Don't clear streaming text here — wait for RUN_FINISHED so text
+      // stays visible across multi-step runs (no flash between steps).
     } else if (event.type === EventType.RUN_FINISHED) {
-      const content = client.currentMessageContent;
+      // Use accumulated run text (all steps combined) for the final saved message
+      const content = runTextRef.current || client.currentMessageContent;
       if (content) {
         const finishedEvent = event as RunFinishedEvent;
         const traceId = finishedEvent.runId;
@@ -207,6 +221,8 @@ export function useServerEvents({
 
         saveAIResponseRef.current(content, undefined, traceId, turnMessages);
       }
+      setStreamingText('');
+      streamingChatIdRef.current = null;
       setLoading(false);
     } else if (event.type === EventType.RUN_ERROR) {
       const errorEvent = event as RunErrorEvent;
