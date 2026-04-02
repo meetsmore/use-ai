@@ -1,4 +1,4 @@
-import { streamText, jsonSchema, LanguageModel, stepCountIs, type ModelMessage, type SystemModelMessage } from 'ai';
+import { streamText, jsonSchema, LanguageModel, stepCountIs, type ModelMessage, type SystemModelMessage, type AssistantModelMessage, type ToolModelMessage } from 'ai';
 import type { JSONSchema7 } from 'json-schema';
 import { startRunSpan, flushTelemetry as flushAllTelemetry } from '../telemetry';
 import { v4 as uuidv4 } from 'uuid';
@@ -1274,48 +1274,30 @@ function buildRecoveryToolResults(
     return [];
   }
 
-  const recoveryAssistantContent: Array<{
-    type: 'tool-call';
-    toolCallId: string;
-    toolName: string;
-    input: Record<string, never>;
-  }> = [];
-  const recoveryToolResults: ModelMessage[] = [];
-
-  for (const toolCall of incompleteToolCalls) {
-    recoveryAssistantContent.push({
-      type: 'tool-call',
+  const recoveryAssistantMessage: AssistantModelMessage = {
+    role: 'assistant',
+    content: incompleteToolCalls.map((toolCall) => ({
+      type: 'tool-call' as const,
       toolCallId: toolCall.id,
       toolName: toolCall.name,
       input: {},
-    });
+    })),
+  };
 
-    recoveryToolResults.push({
-      role: 'tool',
-      content: [
-        {
-          type: 'tool-result',
-          toolCallId: toolCall.id,
-          toolName: toolCall.name,
-          output: {
-            type: 'text',
-            value: [
-              `Error: Your tool call for "${toolCall.name}" was truncated by the output token limit (maxOutputTokens: ${maxOutputTokens}).`,
-              `The arguments were cut off at ${toolCall.args.length} characters of JSON, so this call was recorded with empty args ({}) as a placeholder — do NOT retry "${toolCall.name}" with empty args.`,
-              `Truncated args (first 200 chars): ${toolCall.args.substring(0, 200)}`,
-              `You MUST split this into multiple smaller tool calls, each with fewer items/shorter data.`,
-            ].join('\n'),
-          },
-          isError: true,
+  const recoveryToolResults: ToolModelMessage[] = incompleteToolCalls.map((toolCall) => ({
+    role: 'tool' as const,
+    content: [
+      {
+        type: 'tool-result' as const,
+        toolCallId: toolCall.id,
+        toolName: toolCall.name,
+        output: {
+          type: 'text' as const,
+          value: `Error: Tool call "${toolCall.name}" failed because its arguments were cut off mid-stream by the output token limit (maxOutputTokens: ${maxOutputTokens}). This call was recorded with args={} as a placeholder — retry with shorter arguments. Truncated args (first 200 chars): ${toolCall.args.substring(0, 200)}`,
         },
-      ],
-    } as unknown as ModelMessage);
-  }
-
-  const recoveryAssistantMessage: ModelMessage = {
-    role: 'assistant',
-    content: recoveryAssistantContent,
-  } as ModelMessage;
+      },
+    ],
+  }));
 
   return [recoveryAssistantMessage, ...recoveryToolResults];
 }

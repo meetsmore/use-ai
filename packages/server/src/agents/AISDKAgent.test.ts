@@ -3038,7 +3038,101 @@ describe('AISDKAgent', () => {
       const values = toolResultParts.map(p => p.output.value);
       expect(values.some(v => v.includes('{"data": "longValueA'))).toBe(true);
       expect(values.some(v => v.includes('{"data": "longValueB'))).toBe(true);
-      expect(values.every(v => v.includes('truncated'))).toBe(true);
+      expect(values.every(v => v.includes('cut off mid-stream'))).toBe(true);
+    });
+
+    test('does not trigger recovery when finishReason is not length', async () => {
+      // When finishReason is 'stop' (or anything other than 'length'),
+      // incomplete tool calls should NOT inject recovery messages.
+      // The step loop may still continue (because tool-input-start sets stepHadToolCalls),
+      // but no synthetic tool_result messages should be injected.
+      let callCount = 0;
+      let lastReceivedMessages: unknown[] = [];
+
+      const mockModel = new MockLanguageModelV3({
+        doStream: async ({ prompt }) => {
+          callCount++;
+          lastReceivedMessages = prompt as unknown[];
+
+          if (callCount === 1) {
+            // First call: tool-input-start fires but no tool-call (incomplete),
+            // with finishReason 'stop' instead of 'length'
+            return {
+              stream: simulateReadableStream({
+                chunks: [
+                  { type: 'tool-input-start', id: 'tool-call-1', toolName: 'addRows' },
+                  { type: 'tool-input-delta', id: 'tool-call-1', delta: '{"rows": [' },
+                  {
+                    type: 'finish',
+                    finishReason: 'stop' as const,
+                    usage: { inputTokens: 100, outputTokens: 50, totalTokens: 150 },
+                  },
+                ],
+              }),
+              response: {
+                id: 'response-1',
+                timestamp: new Date(),
+                modelId: 'mock-model',
+                headers: {},
+                messages: [],
+              },
+            };
+          }
+
+          // Second call: model responds with text (step loop continues because stepHadToolCalls was true)
+          return {
+            stream: simulateReadableStream({
+              chunks: [
+                { type: 'text-start', id: 'text-1' },
+                { type: 'text-delta', id: 'text-1', delta: 'Done' },
+                { type: 'text-end', id: 'text-1' },
+                {
+                  type: 'finish',
+                  finishReason: 'stop' as const,
+                  usage: { inputTokens: 100, outputTokens: 10, totalTokens: 110 },
+                },
+              ],
+            }),
+            response: {
+              id: `response-${callCount}`,
+              timestamp: new Date(),
+              modelId: 'mock-model',
+              headers: {},
+              messages: [{ role: 'assistant', content: 'Done' }],
+            },
+          };
+        },
+      });
+
+      const agent = new AISDKAgent({ model: mockModel });
+
+      const emittedEvents: AGUIEventExtended[] = [];
+      const eventEmitter: EventEmitter = {
+        emit: (event) => emittedEvents.push(event),
+      };
+
+      const input = createTestInput({
+        tools: [
+          {
+            name: 'addRows',
+            description: 'Add rows to a table',
+            parameters: {
+              type: 'object',
+              properties: { rows: { type: 'array', items: { type: 'object' } } },
+              required: ['rows'],
+            },
+          },
+        ],
+      });
+
+      const result = await agent.run(input, eventEmitter);
+      expect(result.success).toBe(true);
+
+      // The second call's messages should NOT contain any recovery tool_result
+      // (no "cut off mid-stream by the output token limit" error messages)
+      const toolMessages = (lastReceivedMessages as Array<{ role: string; content: unknown[] }>)
+        .filter(m => m.role === 'tool');
+      expect(toolMessages.length).toBe(0);
     });
 
     test('preserves completed tool call results when mixed with incomplete ones in same step', async () => {
@@ -3204,14 +3298,14 @@ describe('AISDKAgent', () => {
       // The completed result should contain the actual success response, not a recovery error
       const outputStr = JSON.stringify(completedResult!.output);
       expect(outputStr).toContain('success');
-      expect(outputStr).not.toContain('truncated by the output token limit');
+      expect(outputStr).not.toContain('cut off mid-stream by the output token limit');
 
       // The incomplete tool call should have a recovery error
       const incompleteResult = toolResultMessages.find(
         (c: unknown) => (c as { toolCallId: string }).toolCallId === incompleteToolCallId,
       ) as { output: { type: string; value: string } } | undefined;
       expect(incompleteResult).toBeDefined();
-      expect(incompleteResult!.output.value).toContain('truncated by the output token limit');
+      expect(incompleteResult!.output.value).toContain('cut off mid-stream by the output token limit');
     });
   });
 });
