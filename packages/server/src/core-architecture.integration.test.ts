@@ -22,15 +22,11 @@ afterAll(() => {
 
 describe('Core Architecture', () => {
   let server: UseAIServer;
-  const testPort = 9001;
+  const testPort = 9150;
 
   beforeAll(() => {
     server = new UseAIServer(createServerConfig(testPort));
     cleanup.trackServer(server);
-  });
-
-  afterAll(() => {
-    server.close();
   });
 
   test('Server coordinates communication using WebSocket (Socket.IO)', async () => {

@@ -420,6 +420,80 @@ describe('UseAIClient', () => {
       expect((assistantText as Record<string, unknown>).toolCalls).toBeUndefined();
     });
 
+    test('TOOL_CALL_RESULT stores server-side tool result in conversation history', () => {
+      const client = new UseAIClient('http://localhost:8081');
+      client.connect();
+      mockSocket.connected = true;
+      emitSocketEvent('connect');
+
+      // Simulate sending a user message
+      client.sendPrompt('What is the weather in Tokyo?');
+
+      // Server-side tool call (MCP tool) — client does NOT call sendToolResponse
+      emitSocketEvent('event', { type: 'RUN_STARTED', threadId: 'thread-1', runId: 'run-1' });
+      emitSocketEvent('event', { type: 'TOOL_CALL_START', toolCallId: 'toolu_mcp_1', toolCallName: 'mcp_get_weather' });
+      emitSocketEvent('event', { type: 'TOOL_CALL_ARGS', toolCallId: 'toolu_mcp_1', delta: '{"location":"Tokyo"}' });
+      emitSocketEvent('event', { type: 'TOOL_CALL_END', toolCallId: 'toolu_mcp_1' });
+
+      // Server sends the actual MCP tool result via TOOL_CALL_RESULT
+      emitSocketEvent('event', {
+        type: 'TOOL_CALL_RESULT',
+        messageId: 'msg-result-1',
+        toolCallId: 'toolu_mcp_1',
+        content: '{"temperature":15,"condition":"cloudy"}',
+        role: 'tool',
+      });
+
+      // Server sends final text response
+      emitSocketEvent('event', { type: 'TEXT_MESSAGE_START', messageId: 'msg-1' });
+      emitSocketEvent('event', { type: 'TEXT_MESSAGE_CONTENT', messageId: 'msg-1', delta: 'It is 15°C and cloudy in Tokyo.' });
+      emitSocketEvent('event', { type: 'TEXT_MESSAGE_END', messageId: 'msg-1' });
+      emitSocketEvent('event', { type: 'RUN_FINISHED', threadId: 'thread-1', runId: 'run-1' });
+
+      const messages = client.messages;
+      expect(messages).toHaveLength(4); // user, assistant(toolCalls), tool, assistant(text)
+
+      const toolResult = messages[2];
+      expect(toolResult.role).toBe('tool');
+      expect(toolResult.content).toBe('{"temperature":15,"condition":"cloudy"}');
+      expect((toolResult as Record<string, unknown>).toolCallId).toBe('toolu_mcp_1');
+    });
+
+    test('TOOL_CALL_RESULT does not duplicate result for client-side tools', () => {
+      const client = new UseAIClient('http://localhost:8081');
+      client.connect();
+      mockSocket.connected = true;
+      emitSocketEvent('connect');
+
+      client.sendPrompt('Add a todo: buy groceries');
+
+      emitSocketEvent('event', { type: 'RUN_STARTED', threadId: 'thread-1', runId: 'run-1' });
+      emitSocketEvent('event', { type: 'TOOL_CALL_START', toolCallId: 'toolu_client_1', toolCallName: 'addTodo' });
+      emitSocketEvent('event', { type: 'TOOL_CALL_ARGS', toolCallId: 'toolu_client_1', delta: '{"text":"buy groceries"}' });
+      emitSocketEvent('event', { type: 'TOOL_CALL_END', toolCallId: 'toolu_client_1' });
+
+      // Client executes tool and sends result (this pushes to _pendingToolResults)
+      client.sendToolResponse('toolu_client_1', { success: true });
+
+      // Server also sends TOOL_CALL_RESULT for the same toolCallId (should be deduplicated)
+      emitSocketEvent('event', {
+        type: 'TOOL_CALL_RESULT',
+        messageId: 'msg-result-dup',
+        toolCallId: 'toolu_client_1',
+        content: '{"success":true}',
+        role: 'tool',
+      });
+
+      emitSocketEvent('event', { type: 'TEXT_MESSAGE_START', messageId: 'msg-1' });
+      emitSocketEvent('event', { type: 'TEXT_MESSAGE_CONTENT', messageId: 'msg-1', delta: 'Done!' });
+      emitSocketEvent('event', { type: 'TEXT_MESSAGE_END', messageId: 'msg-1' });
+      emitSocketEvent('event', { type: 'RUN_FINISHED', threadId: 'thread-1', runId: 'run-1' });
+
+      const messages = client.messages;
+      const toolResults = messages.filter(m => m.role === 'tool');
+      expect(toolResults).toHaveLength(1); // Only one, not duplicated
+    });
+
     test('simple text response (no tool calls) still works', () => {
       const client = new UseAIClient('http://localhost:8081');
       client.connect();

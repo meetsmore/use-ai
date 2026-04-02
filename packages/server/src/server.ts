@@ -521,9 +521,7 @@ export class UseAIServer {
     type ToolMessage = Message & {
       role: 'tool';
       tool_call_id?: string;
-      tool_name?: string;
       toolCallId?: string;
-      toolName?: string;
     };
 
     const isToolMessage = (msg: Message): msg is ToolMessage => {
@@ -598,7 +596,7 @@ export class UseAIServer {
     };
 
     // Convert AG-UI messages to AI SDK ModelMessage format
-    const incomingMessages: ModelMessage[] = messages.map(msg => {
+    const incomingMessages: ModelMessage[] = messages.map((msg, msgIndex) => {
       if (msg.role === 'user') {
         return {
           role: 'user' as const,
@@ -655,13 +653,26 @@ export class UseAIServer {
         } catch {
           output = { type: 'text', value: content };
         }
+        const toolCallId = msg.tool_call_id || msg.toolCallId || uuidv4();
+
+        // AG-UI ToolMessage has no toolName field. Resolve it by scanning back
+        // through the preceding assistant messages' toolCalls.
+        let toolName: string | undefined;
+        for (let i = msgIndex - 1; i >= 0; i--) {
+          const prevToolCalls = (messages[i] as { toolCalls?: Array<{ id: string; function: { name: string } }> }).toolCalls;
+          if (prevToolCalls) {
+            const match = prevToolCalls.find(tc => tc.id === toolCallId);
+            if (match) { toolName = match.function.name; break; }
+          }
+        }
+
         return {
           role: 'tool' as const,
           content: [
             {
               type: 'tool-result' as const,
-              toolCallId: msg.tool_call_id || msg.toolCallId || uuidv4(),
-              toolName: msg.tool_name || msg.toolName || 'unknown',
+              toolCallId,
+              toolName: toolName || 'unknown',
               output,
             },
           ],

@@ -10,6 +10,7 @@ import type {
   ToolCallStartEvent,
   ToolCallArgsEvent,
   ToolCallEndEvent,
+  ToolCallResultEvent,
   UseAIClientMessage,
   ToolResultMessage,
   ToolApprovalResponseMessage,
@@ -228,6 +229,26 @@ export class UseAIClient {
             name: toolCall.name,
             arguments: toolCall.args,
           },
+        });
+      }
+    }
+
+    // Handle server-side tool results (MCP tools, server tools).
+    // The server emits TOOL_CALL_RESULT with the actual execution output so the
+    // client can store it in conversation history instead of a placeholder.
+    // Client-side tools already have their results tracked via sendToolResponse(),
+    // so we skip those to avoid duplicate entries.
+    else if (event.type === EventType.TOOL_CALL_RESULT) {
+      const e = event as ToolCallResultEvent;
+      const alreadyTracked = this._pendingToolResults.some(
+        r => 'toolCallId' in r && r.toolCallId === e.toolCallId
+      );
+      if (!alreadyTracked) {
+        this._pendingToolResults.push({
+          id: e.messageId,
+          role: 'tool',
+          content: e.content,
+          toolCallId: e.toolCallId,
         });
       }
     }

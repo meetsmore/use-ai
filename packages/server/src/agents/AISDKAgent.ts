@@ -20,6 +20,7 @@ import type {
   ToolCallStartEvent,
   ToolCallArgsEvent,
   ToolCallEndEvent,
+  ToolCallResultEvent,
   RunStartedEvent,
   RunFinishedEvent,
   RunErrorEvent,
@@ -592,6 +593,18 @@ export class AISDKAgent implements Agent {
             case 'tool-result': {
               // Tool execution completed (by execute function)
               logger.toolResult(chunk.toolName, JSON.stringify(chunk.output));
+
+              // Emit TOOL_CALL_RESULT so the client can store the actual result
+              // in conversation history. Without this, server-side tools (MCP, server tools)
+              // would have placeholder results, causing hallucinations on subsequent turns.
+              events.emit<ToolCallResultEvent>({
+                type: EventType.TOOL_CALL_RESULT,
+                messageId: uuidv4(),
+                toolCallId: chunk.toolCallId,
+                content: typeof chunk.output === 'string' ? chunk.output : JSON.stringify(chunk.output),
+                role: 'tool',
+                timestamp: Date.now(),
+              });
               break;
             }
 

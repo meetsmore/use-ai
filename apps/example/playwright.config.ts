@@ -1,5 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
+process.loadEnvFile?.();
+
 // Ensure ANTHROPIC_API_KEY is set before running tests
 if (!process.env.ANTHROPIC_API_KEY) {
   throw new Error(

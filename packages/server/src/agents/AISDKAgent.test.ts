@@ -4,6 +4,7 @@ import type { AgentInput, EventEmitter, AGUIEventExtended } from './types';
 import { EventType, ErrorCode } from '../types';
 import type { ToolDefinition } from '../types';
 import type { RemoteToolDefinition } from '../mcp';
+import type { ServerToolDefinition } from '../tools/types';
 import { v4 as uuidv4 } from 'uuid';
 import { MockLanguageModelV3, simulateReadableStream } from 'ai/test';
 import {
@@ -2218,6 +2219,181 @@ describe('AISDKAgent', () => {
 
       // Step 1: MCP tools should still be present (session.tools was not modified)
       expect(capturedToolsPerStep[1].sort()).toEqual(['mcp_search', 'navigate']);
+    });
+
+    test('emits TOOL_CALL_RESULT event with actual output for MCP tool execution', async () => {
+      // When an MCP tool executes server-side, the agent should emit a TOOL_CALL_RESULT
+      // event so the client can store the actual result in conversation history.
+      // Without this, the client would use a placeholder, causing hallucinations.
+
+      const toolCallId = 'tool-call-mcp-result';
+      const mcpResult = { weather: 'sunny', temp: 72 };
+      let callCount = 0;
+
+      const mockModel = new MockLanguageModelV3({
+        doStream: async () => {
+          callCount++;
+
+          if (callCount === 1) {
+            // First step: model calls MCP tool
+            return {
+              stream: simulateReadableStream({
+                chunks: [
+                  { type: 'tool-input-start', id: toolCallId, toolName: 'mcp_get_weather' },
+                  { type: 'tool-input-delta', id: toolCallId, delta: '{"location":"Tokyo"}' },
+                  { type: 'tool-input-end', id: toolCallId },
+                  { type: 'tool-call', toolCallId, toolName: 'mcp_get_weather', input: '{"location":"Tokyo"}' },
+                  { type: 'finish', finishReason: 'tool-calls', usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 } },
+                ],
+              }),
+              response: {
+                id: 'response-1',
+                timestamp: new Date(),
+                modelId: 'mock-model',
+                headers: {},
+                messages: [
+                  { role: 'assistant', content: [{ type: 'tool-call', toolCallId, toolName: 'mcp_get_weather', input: { location: 'Tokyo' } }] },
+                ],
+              },
+            };
+          }
+
+          // Second step: model returns text after receiving tool result
+          return {
+            stream: simulateReadableStream({
+              chunks: [
+                { type: 'text-start', id: 'text-1' },
+                { type: 'text-delta', id: 'text-1', delta: 'It is sunny and 72°F.' },
+                { type: 'text-end', id: 'text-1' },
+                { type: 'finish', finishReason: 'stop', usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 } },
+              ],
+            }),
+            response: {
+              id: 'response-2',
+              timestamp: new Date(),
+              modelId: 'mock-model',
+              headers: {},
+              messages: [{ role: 'assistant', content: 'It is sunny and 72°F.' }],
+            },
+          };
+        },
+      });
+
+      const agent = new AISDKAgent({ model: mockModel });
+      const emittedEvents: AGUIEventExtended[] = [];
+      const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
+
+      const mcpTool: RemoteToolDefinition = {
+        name: 'mcp_get_weather',
+        description: 'Get weather for a location',
+        parameters: { type: 'object', properties: { location: { type: 'string' } }, required: ['location'] },
+        _remote: {
+          provider: {
+            executeTool: mock(() => Promise.resolve(mcpResult)),
+          } as unknown as RemoteToolDefinition['_remote']['provider'],
+          originalName: 'get_weather',
+        },
+      };
+
+      const input = createTestInput({ tools: [mcpTool] });
+      input.session.tools = [mcpTool] as ToolDefinition[];
+
+      await agent.run(input, eventEmitter);
+
+      // Verify TOOL_CALL_RESULT was emitted with actual MCP result
+      const toolCallResultEvent = emittedEvents.find(e => e.type === EventType.TOOL_CALL_RESULT);
+      expect(toolCallResultEvent).toBeDefined();
+      expect((toolCallResultEvent as { toolCallId: string }).toolCallId).toBe(toolCallId);
+
+      const content = (toolCallResultEvent as { content: string }).content;
+      expect(content).toContain('sunny');
+      expect(content).toContain('72');
+      expect(content).not.toContain('serverSideTool');
+    });
+
+    test('emits TOOL_CALL_RESULT event with actual output for server-side tool execution', async () => {
+      // Server-side tools (defined via defineServerTool) also execute on the server.
+      // They should emit TOOL_CALL_RESULT just like MCP tools so the client can
+      // store the actual result in conversation history.
+
+      const toolCallId = 'tool-call-server-result';
+      const serverResult = { rows: 5, status: 'ok' };
+      let callCount = 0;
+
+      const mockModel = new MockLanguageModelV3({
+        doStream: async () => {
+          callCount++;
+
+          if (callCount === 1) {
+            return {
+              stream: simulateReadableStream({
+                chunks: [
+                  { type: 'tool-input-start', id: toolCallId, toolName: 'count_records' },
+                  { type: 'tool-input-delta', id: toolCallId, delta: '{"table":"users"}' },
+                  { type: 'tool-input-end', id: toolCallId },
+                  { type: 'tool-call', toolCallId, toolName: 'count_records', input: '{"table":"users"}' },
+                  { type: 'finish', finishReason: 'tool-calls', usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 } },
+                ],
+              }),
+              response: {
+                id: 'response-1',
+                timestamp: new Date(),
+                modelId: 'mock-model',
+                headers: {},
+                messages: [
+                  { role: 'assistant', content: [{ type: 'tool-call', toolCallId, toolName: 'count_records', input: { table: 'users' } }] },
+                ],
+              },
+            };
+          }
+
+          return {
+            stream: simulateReadableStream({
+              chunks: [
+                { type: 'text-start', id: 'text-1' },
+                { type: 'text-delta', id: 'text-1', delta: 'There are 5 records.' },
+                { type: 'text-end', id: 'text-1' },
+                { type: 'finish', finishReason: 'stop', usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 } },
+              ],
+            }),
+            response: {
+              id: 'response-2',
+              timestamp: new Date(),
+              modelId: 'mock-model',
+              headers: {},
+              messages: [{ role: 'assistant', content: 'There are 5 records.' }],
+            },
+          };
+        },
+      });
+
+      const agent = new AISDKAgent({ model: mockModel });
+      const emittedEvents: AGUIEventExtended[] = [];
+      const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
+
+      const serverTool: ServerToolDefinition = {
+        name: 'count_records',
+        description: 'Count records in a table',
+        parameters: { type: 'object', properties: { table: { type: 'string' } }, required: ['table'] },
+        _server: {
+          execute: mock(() => Promise.resolve(serverResult)),
+        },
+      };
+
+      const input = createTestInput({ tools: [serverTool] });
+      input.session.tools = [serverTool] as ToolDefinition[];
+
+      await agent.run(input, eventEmitter);
+
+      // Verify TOOL_CALL_RESULT was emitted with actual server tool result
+      const toolCallResultEvent = emittedEvents.find(e => e.type === EventType.TOOL_CALL_RESULT);
+      expect(toolCallResultEvent).toBeDefined();
+      expect((toolCallResultEvent as { toolCallId: string }).toolCallId).toBe(toolCallId);
+
+      const content = (toolCallResultEvent as { content: string }).content;
+      expect(content).toContain('rows');
+      expect(content).toContain('5');
+      expect(content).not.toContain('serverSideTool');
     });
 
     test('initial user message should be preserved in step(1) after tool execution', async () => {

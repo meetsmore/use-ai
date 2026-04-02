@@ -233,8 +233,10 @@ describe('Bug 2: Server message conversion preserves tool calls on reconnection'
     const toolResult = toolMsg.content[0] as {
       type: string;
       toolCallId: string;
+      toolName: string;
     };
     expect(toolResult.toolCallId).toBe('toolu_123');
+    expect(toolResult.toolName).toBe('addTodo');
 
     ws.disconnect();
   });
