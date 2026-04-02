@@ -211,8 +211,11 @@ export function useServerEvents({
       // Don't clear streaming text here — wait for RUN_FINISHED so text
       // stays visible across multi-step runs (no flash between steps).
     } else if (event.type === EventType.RUN_FINISHED) {
-      // Use accumulated run text (all steps combined) for the final saved message
-      const content = runTextRef.current || client.currentMessageContent;
+      // Use the last step's text for the final saved message.
+      // Intermediate steps' text is preserved in turnMessages (via extractTurnMessages).
+      // Using accumulated text (runTextRef) here would duplicate intermediate text
+      // since it already exists in the per-step assistant messages.
+      const content = client.currentMessageContent;
       if (content) {
         const finishedEvent = event as RunFinishedEvent;
         const traceId = finishedEvent.runId;

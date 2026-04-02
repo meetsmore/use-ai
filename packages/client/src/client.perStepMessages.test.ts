@@ -213,6 +213,178 @@ describe('Client per-step message assembly', () => {
     });
   });
 
+  describe('no text duplication across steps', () => {
+    /**
+     * Bug: When saveAIResponse receives accumulated text from all steps
+     * (via runTextRef), the final saved assistant message contains text
+     * from ALL steps. But intermediate assistant messages (from
+     * extractTurnMessages) also have their per-step text. This causes
+     * the LLM to see step 0 text twice on subsequent turns.
+     *
+     * Example from the bug:
+     *   Intermediate assistant: "I'll create a shopping list..." + tool_calls
+     *   Final assistant: "I'll create a shopping list...\n\nPerfect! I've created..."
+     *   → step 0 text appears in BOTH messages
+     *
+     * Expected: The final assistant message should contain ONLY the
+     * last step's text. Intermediate text lives in turnMessages only.
+     */
+    function extractTurnMessages(messages: Array<Record<string, unknown>>, startIndex: number) {
+      const turnSlice = messages.slice(startIndex);
+      const result: Array<Record<string, unknown>> = [];
+      for (const msg of turnSlice) {
+        if (msg.role === 'assistant' && 'toolCalls' in msg && msg.toolCalls) {
+          result.push({
+            id: msg.id,
+            role: 'assistant',
+            content: typeof msg.content === 'string' ? msg.content : '',
+            toolCalls: msg.toolCalls,
+          });
+        } else if (msg.role === 'tool') {
+          result.push({
+            id: msg.id,
+            role: 'tool',
+            content: typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content),
+            toolCallId: msg.toolCallId,
+          });
+        }
+      }
+      return result;
+    }
+
+    it('final message content does not include text from intermediate steps', () => {
+      // Simulate: step 0 (text + tool) → step 1 (text only)
+      simulateEvents(client, [
+        { type: EventType.RUN_STARTED, threadId: 'thread-1', runId: 'run-1', timestamp: Date.now() },
+
+        // Step 0: "I'll create a shopping list..." + tool call
+        { type: EventType.STEP_STARTED, stepName: 'step-0', timestamp: Date.now() },
+        { type: EventType.TEXT_MESSAGE_START, messageId: 'text-0', role: 'assistant', timestamp: Date.now() },
+        { type: EventType.TEXT_MESSAGE_CONTENT, messageId: 'text-0', delta: "I'll create a shopping list.", timestamp: Date.now() },
+        { type: EventType.TEXT_MESSAGE_END, messageId: 'text-0', timestamp: Date.now() },
+        { type: EventType.TOOL_CALL_START, toolCallId: 'tc-1', toolCallName: 'addTodo', parentMessageId: 'text-0', timestamp: Date.now() },
+        { type: EventType.TOOL_CALL_ARGS, toolCallId: 'tc-1', delta: '{"text":"Chicken"}', timestamp: Date.now() },
+        { type: EventType.TOOL_CALL_END, toolCallId: 'tc-1', timestamp: Date.now() },
+        { type: EventType.TOOL_CALL_RESULT, messageId: 'tr-1', toolCallId: 'tc-1', content: '{"success":true}', role: 'tool', timestamp: Date.now() },
+        { type: EventType.STEP_FINISHED, stepName: 'step-0', timestamp: Date.now() },
+
+        // Step 1: "Perfect! I've created the list." (final)
+        { type: EventType.STEP_STARTED, stepName: 'step-1', timestamp: Date.now() },
+        { type: EventType.TEXT_MESSAGE_START, messageId: 'text-1', role: 'assistant', timestamp: Date.now() },
+        { type: EventType.TEXT_MESSAGE_CONTENT, messageId: 'text-1', delta: "Perfect! I've created the list.", timestamp: Date.now() },
+        { type: EventType.TEXT_MESSAGE_END, messageId: 'text-1', timestamp: Date.now() },
+        { type: EventType.STEP_FINISHED, stepName: 'step-1', timestamp: Date.now() },
+
+        { type: EventType.RUN_FINISHED, threadId: 'thread-1', runId: 'run-1', timestamp: Date.now() },
+      ]);
+
+      const messages = client.messages;
+
+      // Final assistant message should have ONLY step 1's text
+      const finalMessage = messages[messages.length - 1];
+      expect(finalMessage.role).toBe('assistant');
+      expect(finalMessage.content).toBe("Perfect! I've created the list.");
+
+      // It must NOT contain step 0's text
+      expect((finalMessage.content as string).includes("I'll create a shopping list")).toBe(false);
+
+      // Intermediate message should have step 0's text
+      expect(messages[0].content).toBe("I'll create a shopping list.");
+    });
+
+    it('saveAIResponse content (client.currentMessageContent) is only the last step text', () => {
+      simulateEvents(client, [
+        { type: EventType.RUN_STARTED, threadId: 'thread-1', runId: 'run-1', timestamp: Date.now() },
+
+        // Step 0
+        { type: EventType.STEP_STARTED, stepName: 'step-0', timestamp: Date.now() },
+        { type: EventType.TEXT_MESSAGE_START, messageId: 'text-0', role: 'assistant', timestamp: Date.now() },
+        { type: EventType.TEXT_MESSAGE_CONTENT, messageId: 'text-0', delta: 'Step zero text.', timestamp: Date.now() },
+        { type: EventType.TEXT_MESSAGE_END, messageId: 'text-0', timestamp: Date.now() },
+        { type: EventType.TOOL_CALL_START, toolCallId: 'tc-1', toolCallName: 'doThing', parentMessageId: 'text-0', timestamp: Date.now() },
+        { type: EventType.TOOL_CALL_ARGS, toolCallId: 'tc-1', delta: '{}', timestamp: Date.now() },
+        { type: EventType.TOOL_CALL_END, toolCallId: 'tc-1', timestamp: Date.now() },
+        { type: EventType.TOOL_CALL_RESULT, messageId: 'tr-1', toolCallId: 'tc-1', content: '{}', role: 'tool', timestamp: Date.now() },
+        { type: EventType.STEP_FINISHED, stepName: 'step-0', timestamp: Date.now() },
+
+        // Step 1
+        { type: EventType.STEP_STARTED, stepName: 'step-1', timestamp: Date.now() },
+        { type: EventType.TEXT_MESSAGE_START, messageId: 'text-1', role: 'assistant', timestamp: Date.now() },
+        { type: EventType.TEXT_MESSAGE_CONTENT, messageId: 'text-1', delta: 'Step one text.', timestamp: Date.now() },
+        { type: EventType.TEXT_MESSAGE_END, messageId: 'text-1', timestamp: Date.now() },
+        { type: EventType.TOOL_CALL_START, toolCallId: 'tc-2', toolCallName: 'doThing', parentMessageId: 'text-1', timestamp: Date.now() },
+        { type: EventType.TOOL_CALL_ARGS, toolCallId: 'tc-2', delta: '{}', timestamp: Date.now() },
+        { type: EventType.TOOL_CALL_END, toolCallId: 'tc-2', timestamp: Date.now() },
+        { type: EventType.TOOL_CALL_RESULT, messageId: 'tr-2', toolCallId: 'tc-2', content: '{}', role: 'tool', timestamp: Date.now() },
+        { type: EventType.STEP_FINISHED, stepName: 'step-1', timestamp: Date.now() },
+
+        // Step 2 (final)
+        { type: EventType.STEP_STARTED, stepName: 'step-2', timestamp: Date.now() },
+        { type: EventType.TEXT_MESSAGE_START, messageId: 'text-2', role: 'assistant', timestamp: Date.now() },
+        { type: EventType.TEXT_MESSAGE_CONTENT, messageId: 'text-2', delta: 'Final step text.', timestamp: Date.now() },
+        { type: EventType.TEXT_MESSAGE_END, messageId: 'text-2', timestamp: Date.now() },
+        { type: EventType.STEP_FINISHED, stepName: 'step-2', timestamp: Date.now() },
+      ]);
+
+      // This is what saveAIResponse should receive as content
+      const contentForSave = client.currentMessageContent;
+      expect(contentForSave).toBe('Final step text.');
+
+      // Must NOT contain previous steps' text
+      expect(contentForSave.includes('Step zero')).toBe(false);
+      expect(contentForSave.includes('Step one')).toBe(false);
+    });
+
+    it('combined turnMessages + final message have no text duplication', () => {
+      simulateEvents(client, [
+        { type: EventType.RUN_STARTED, threadId: 'thread-1', runId: 'run-1', timestamp: Date.now() },
+
+        { type: EventType.STEP_STARTED, stepName: 'step-0', timestamp: Date.now() },
+        { type: EventType.TEXT_MESSAGE_START, messageId: 'text-0', role: 'assistant', timestamp: Date.now() },
+        { type: EventType.TEXT_MESSAGE_CONTENT, messageId: 'text-0', delta: 'Alpha.', timestamp: Date.now() },
+        { type: EventType.TEXT_MESSAGE_END, messageId: 'text-0', timestamp: Date.now() },
+        { type: EventType.TOOL_CALL_START, toolCallId: 'tc-1', toolCallName: 'search', parentMessageId: 'text-0', timestamp: Date.now() },
+        { type: EventType.TOOL_CALL_ARGS, toolCallId: 'tc-1', delta: '{}', timestamp: Date.now() },
+        { type: EventType.TOOL_CALL_END, toolCallId: 'tc-1', timestamp: Date.now() },
+        { type: EventType.TOOL_CALL_RESULT, messageId: 'tr-1', toolCallId: 'tc-1', content: '{}', role: 'tool', timestamp: Date.now() },
+        { type: EventType.STEP_FINISHED, stepName: 'step-0', timestamp: Date.now() },
+
+        { type: EventType.STEP_STARTED, stepName: 'step-1', timestamp: Date.now() },
+        { type: EventType.TEXT_MESSAGE_START, messageId: 'text-1', role: 'assistant', timestamp: Date.now() },
+        { type: EventType.TEXT_MESSAGE_CONTENT, messageId: 'text-1', delta: 'Bravo.', timestamp: Date.now() },
+        { type: EventType.TEXT_MESSAGE_END, messageId: 'text-1', timestamp: Date.now() },
+        { type: EventType.STEP_FINISHED, stepName: 'step-1', timestamp: Date.now() },
+
+        { type: EventType.RUN_FINISHED, threadId: 'thread-1', runId: 'run-1', timestamp: Date.now() },
+      ]);
+
+      // Get turnMessages (intermediate assistant+tool messages)
+      const turnMessages = extractTurnMessages(
+        client.messages as unknown as Array<Record<string, unknown>>,
+        0 // startIndex
+      );
+
+      // Get final content (what saveAIResponse should receive)
+      const finalContent = client.currentMessageContent;
+
+      // Collect ALL text content across turnMessages and final message
+      const allTexts: string[] = [];
+      for (const msg of turnMessages) {
+        if (msg.role === 'assistant' && typeof msg.content === 'string' && msg.content) {
+          allTexts.push(msg.content);
+        }
+      }
+      allTexts.push(finalContent);
+
+      // No text should appear more than once
+      expect(allTexts).toEqual(['Alpha.', 'Bravo.']);
+
+      // Specifically: final content must NOT contain intermediate text
+      expect(finalContent).toBe('Bravo.');
+      expect(finalContent.includes('Alpha')).toBe(false);
+    });
+  });
+
   describe('extractTurnMessages compatibility', () => {
     /**
      * Replicate extractTurnMessages logic to validate that per-step messages
