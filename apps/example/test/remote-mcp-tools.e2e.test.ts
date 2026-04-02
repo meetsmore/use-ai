@@ -118,6 +118,64 @@ test.describe('Remote MCP Tools', () => {
     }).toPass({ timeout: 30000, intervals: [1000] });
   });
 
+  test('multi-turn MCP tool calls persist actual results in chat history', async ({ page }) => {
+    // Regression test: server-side MCP tool results must be stored in conversation
+    // history with actual content, not placeholders like {"serverSideTool": true}.
+    // Without this, Claude hallucinates on subsequent turns because it never sees
+    // the real tool output.
+
+    // Open AI chat
+    const aiButton = page.getByTestId('ai-button');
+    await aiButton.click();
+    await expect(page.getByTestId('chat-input')).toBeVisible({ timeout: 5000 });
+
+    const chatInput = page.getByTestId('chat-input');
+    const sendButton = page.getByTestId('chat-send-button');
+
+    // First MCP tool call
+    await chatInput.fill('What is 25 plus 17? Please use the add tool.');
+    await sendButton.click();
+
+    await page.waitForTimeout(2000);
+    await expect(async () => {
+      const messages = await page.getByTestId('chat-message-assistant').all();
+      expect(messages.length).toBeGreaterThan(0);
+      const lastMessage = await messages[messages.length - 1].textContent();
+      expect(lastMessage?.toLowerCase()).toMatch(/42|forty.two/);
+    }).toPass({ timeout: 30000, intervals: [1000] });
+
+    // Second MCP tool call (different turn)
+    await chatInput.fill('Now multiply 3 and 4 using the multiply tool.');
+    await sendButton.click();
+
+    await page.waitForTimeout(2000);
+    await expect(async () => {
+      const messages = await page.getByTestId('chat-message-assistant').all();
+      expect(messages.length).toBeGreaterThanOrEqual(2);
+      const lastMessage = await messages[messages.length - 1].textContent();
+      expect(lastMessage?.toLowerCase()).toMatch(/12|twelve/);
+    }).toPass({ timeout: 30000, intervals: [1000] });
+
+    // Verify localStorage: tool results should contain actual MCP output, not placeholders
+    const toolMessages = await page.evaluate(() => {
+      const index = localStorage.getItem('use-ai:chat-index');
+      if (!index) return [];
+      const ids = JSON.parse(index);
+      if (ids.length === 0) return [];
+      const chatData = localStorage.getItem(`use-ai:chat:${ids[ids.length - 1]}`);
+      if (!chatData) return [];
+      const chat = JSON.parse(chatData);
+      return (chat.messages || [])
+        .filter((m: { role: string }) => m.role === 'tool')
+        .map((m: { content: string }) => m.content);
+    });
+
+    expect(toolMessages.length).toBeGreaterThanOrEqual(2);
+    for (const content of toolMessages) {
+      expect(content).not.toContain('serverSideTool');
+    }
+  });
+
   test('should handle multiple remote tool calls in sequence', async ({ page }) => {
     // Open AI chat
     const aiButton = page.getByTestId('ai-button');
