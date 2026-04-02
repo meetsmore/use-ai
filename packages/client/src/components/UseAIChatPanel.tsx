@@ -883,15 +883,15 @@ export function UseAIChatPanel({
                 data-testid="chat-message-content"
                 className={`chat-message-content${message.role === 'assistant' ? ' markdown-content' : ''}`}
                 style={{
-                  padding: message.role === 'user' ? '10px 14px' : '4px 0',
-                  borderRadius: message.role === 'user'
-                    ? (slashCommands.isSavingCommand(message.id) ? '12px 12px 0 0' : '12px')
-                    : '0',
+                  padding: '10px 14px',
+                  borderRadius: slashCommands.isSavingCommand(message.id)
+                    ? '12px 12px 0 0'
+                    : '12px',
                   background: message.displayMode === 'error'
                     ? theme.errorBackground
                     : message.role === 'user'
                     ? theme.primaryGradient
-                    : 'transparent',
+                    : theme.assistantMessageBackground,
                   color: message.displayMode === 'error'
                     ? theme.errorTextColor
                     : message.role === 'user' ? 'white' : theme.textColor,
@@ -985,7 +985,9 @@ export function UseAIChatPanel({
             <div
               className="markdown-content"
               style={{
-                padding: '4px 0',
+                padding: '10px 14px',
+                borderRadius: '12px',
+                background: theme.assistantMessageBackground,
                 fontSize: '14px',
                 lineHeight: '1.5',
                 color: theme.textColor,
