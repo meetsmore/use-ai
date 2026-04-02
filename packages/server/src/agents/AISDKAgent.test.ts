@@ -2396,6 +2396,182 @@ describe('AISDKAgent', () => {
       expect(content).not.toContain('serverSideTool');
     });
 
+    test('emits TOOL_CALL_RESULT event with error content when MCP tool execution throws', async () => {
+      // Bug: When an MCP tool's execute function throws, AI SDK emits a 'tool-error'
+      // chunk instead of 'tool-result'. The server was ignoring 'tool-error' chunks,
+      // so no TOOL_CALL_RESULT event was sent to the client. This caused the client
+      // to save incomplete conversation history (missing the error tool_result),
+      // and after server restart, the Anthropic API rejected the messages with:
+      // "tool_use ids were found without tool_result blocks immediately after"
+
+      const toolCallId = 'tool-call-mcp-error';
+      const executionError = new Error('Invalid sortField: invoiceTotalAmount is not a valid enum value');
+      let callCount = 0;
+
+      const mockModel = new MockLanguageModelV3({
+        doStream: async () => {
+          callCount++;
+
+          if (callCount === 1) {
+            // First step: model calls MCP tool (which will fail)
+            return {
+              stream: simulateReadableStream({
+                chunks: [
+                  { type: 'tool-input-start', id: toolCallId, toolName: 'mcp_search_jobs' },
+                  { type: 'tool-input-delta', id: toolCallId, delta: '{"sortField":"invoiceTotalAmount"}' },
+                  { type: 'tool-input-end', id: toolCallId },
+                  { type: 'tool-call', toolCallId, toolName: 'mcp_search_jobs', input: '{"sortField":"invoiceTotalAmount"}' },
+                  { type: 'finish', finishReason: 'tool-calls', usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 } },
+                ],
+              }),
+              response: {
+                id: 'response-1',
+                timestamp: new Date(),
+                modelId: 'mock-model',
+                headers: {},
+                messages: [
+                  { role: 'assistant', content: [{ type: 'tool-call', toolCallId, toolName: 'mcp_search_jobs', input: { sortField: 'invoiceTotalAmount' } }] },
+                ],
+              },
+            };
+          }
+
+          // Second step: model returns text after receiving tool error
+          return {
+            stream: simulateReadableStream({
+              chunks: [
+                { type: 'text-start', id: 'text-1' },
+                { type: 'text-delta', id: 'text-1', delta: 'Sorting by that field is not supported.' },
+                { type: 'text-end', id: 'text-1' },
+                { type: 'finish', finishReason: 'stop', usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 } },
+              ],
+            }),
+            response: {
+              id: 'response-2',
+              timestamp: new Date(),
+              modelId: 'mock-model',
+              headers: {},
+              messages: [{ role: 'assistant', content: 'Sorting by that field is not supported.' }],
+            },
+          };
+        },
+      });
+
+      const agent = new AISDKAgent({ model: mockModel });
+      const emittedEvents: AGUIEventExtended[] = [];
+      const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
+
+      const mcpTool: RemoteToolDefinition = {
+        name: 'mcp_search_jobs',
+        description: 'Search for jobs',
+        parameters: { type: 'object', properties: { sortField: { type: 'string' } } },
+        _remote: {
+          provider: {
+            executeTool: mock(() => Promise.reject(executionError)),
+          } as unknown as RemoteToolDefinition['_remote']['provider'],
+          originalName: 'search_jobs',
+        },
+      };
+
+      const input = createTestInput({ tools: [mcpTool] });
+      input.session.tools = [mcpTool] as ToolDefinition[];
+
+      await agent.run(input, eventEmitter);
+
+      // Verify TOOL_CALL_RESULT was emitted even though the tool threw an error
+      const toolCallResultEvent = emittedEvents.find(e => e.type === EventType.TOOL_CALL_RESULT);
+      expect(toolCallResultEvent).toBeDefined();
+      expect((toolCallResultEvent as { toolCallId: string }).toolCallId).toBe(toolCallId);
+
+      // The error content should be included so it can be stored in conversation history
+      const content = (toolCallResultEvent as { content: string }).content;
+      expect(content).toBeDefined();
+      expect(content.length).toBeGreaterThan(0);
+    });
+
+    test('emits TOOL_CALL_RESULT event with error content when server tool execution throws', async () => {
+      // Same bug as MCP tools: server-side tool execution errors produce 'tool-error'
+      // chunks that were being ignored, preventing TOOL_CALL_RESULT emission.
+
+      const toolCallId = 'tool-call-server-error';
+      const executionError = new Error('Database connection timeout');
+      let callCount = 0;
+
+      const mockModel = new MockLanguageModelV3({
+        doStream: async () => {
+          callCount++;
+
+          if (callCount === 1) {
+            return {
+              stream: simulateReadableStream({
+                chunks: [
+                  { type: 'tool-input-start', id: toolCallId, toolName: 'query_database' },
+                  { type: 'tool-input-delta', id: toolCallId, delta: '{"query":"SELECT *"}' },
+                  { type: 'tool-input-end', id: toolCallId },
+                  { type: 'tool-call', toolCallId, toolName: 'query_database', input: '{"query":"SELECT *"}' },
+                  { type: 'finish', finishReason: 'tool-calls', usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 } },
+                ],
+              }),
+              response: {
+                id: 'response-1',
+                timestamp: new Date(),
+                modelId: 'mock-model',
+                headers: {},
+                messages: [
+                  { role: 'assistant', content: [{ type: 'tool-call', toolCallId, toolName: 'query_database', input: { query: 'SELECT *' } }] },
+                ],
+              },
+            };
+          }
+
+          return {
+            stream: simulateReadableStream({
+              chunks: [
+                { type: 'text-start', id: 'text-1' },
+                { type: 'text-delta', id: 'text-1', delta: 'The database query failed.' },
+                { type: 'text-end', id: 'text-1' },
+                { type: 'finish', finishReason: 'stop', usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 } },
+              ],
+            }),
+            response: {
+              id: 'response-2',
+              timestamp: new Date(),
+              modelId: 'mock-model',
+              headers: {},
+              messages: [{ role: 'assistant', content: 'The database query failed.' }],
+            },
+          };
+        },
+      });
+
+      const agent = new AISDKAgent({ model: mockModel });
+      const emittedEvents: AGUIEventExtended[] = [];
+      const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
+
+      const serverTool: ServerToolDefinition = {
+        name: 'query_database',
+        description: 'Query the database',
+        parameters: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'] },
+        _server: {
+          execute: mock(() => Promise.reject(executionError)),
+        },
+      };
+
+      const input = createTestInput({ tools: [serverTool] });
+      input.session.tools = [serverTool] as ToolDefinition[];
+
+      await agent.run(input, eventEmitter);
+
+      // Verify TOOL_CALL_RESULT was emitted even though the tool threw an error
+      const toolCallResultEvent = emittedEvents.find(e => e.type === EventType.TOOL_CALL_RESULT);
+      expect(toolCallResultEvent).toBeDefined();
+      expect((toolCallResultEvent as { toolCallId: string }).toolCallId).toBe(toolCallId);
+
+      const content = (toolCallResultEvent as { content: string }).content;
+      expect(content).toBeDefined();
+      expect(content.length).toBeGreaterThan(0);
+    });
+
     test('initial user message should be preserved in step(1) after tool execution', async () => {
       // Bug: After step(0) tool execution, currentMessages is replaced with only
       // response.messages (generated messages), losing the initial user message.
