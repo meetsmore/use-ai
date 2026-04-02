@@ -616,6 +616,26 @@ export class AISDKAgent implements Agent {
               break;
             }
 
+            case 'tool-error': {
+              // Tool execution threw an error. Emit TOOL_CALL_RESULT with the error
+              // content so the client can store it in conversation history. Without
+              // this, the client saves an incomplete history (missing the tool_result
+              // for the failed tool), and after server restart the Anthropic API
+              // rejects with: "tool_use ids were found without tool_result blocks"
+              const errorContent = chunk.error instanceof Error ? chunk.error.message : String(chunk.error);
+              logger.toolResult(chunk.toolName, `ERROR: ${errorContent}`);
+
+              events.emit<ToolCallResultEvent>({
+                type: EventType.TOOL_CALL_RESULT,
+                messageId: uuidv4(),
+                toolCallId: chunk.toolCallId,
+                content: JSON.stringify({ error: errorContent }),
+                role: 'tool',
+                timestamp: Date.now(),
+              });
+              break;
+            }
+
             case 'error': {
               throw chunk.error;
             }
@@ -627,7 +647,7 @@ export class AISDKAgent implements Agent {
             // 'text-start', 'text-end' - we handle text-delta instead
             // 'reasoning-start', 'reasoning-end' - we handle reasoning-delta
             // 'tool-input-end' - we emit TOOL_CALL_END on 'tool-call' instead
-            // 'tool-error', 'tool-output-denied' - error cases
+            // 'tool-output-denied' - denied tool output cases
             // 'tool-approval-request' - handled in execute wrapper via createApprovalWrapper
             // 'abort' - handled after loop
             // 'raw' - raw provider data
