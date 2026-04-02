@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { LocalStorageChatRepository } from './LocalStorageChatRepository';
 import type { PersistedMessage, PersistedToolCall } from './types';
-import { getTextFromContent } from '../../utils/messageContent';
+import { transformMessagesToClientFormat } from '../../hooks/useChatManagement';
 
 class MockStorage implements Storage {
   private data: Map<string, string> = new Map();
@@ -30,33 +30,6 @@ class MockStorage implements Storage {
   setItem(key: string, value: string): void {
     this.data.set(key, value);
   }
-}
-
-/**
- * Replicate transformMessagesToClientFormat from useChatManagement.ts
- * to test persistence round-trips.
- */
-function transformMessagesToClientFormat(
-  persistedMessages: PersistedMessage[]
-): Array<Record<string, unknown>> {
-  return persistedMessages.map((msg) => {
-    const textContent = getTextFromContent(msg.content);
-    const base: Record<string, unknown> = {
-      id: msg.id,
-      role: msg.role,
-      content: textContent,
-    };
-
-    if (msg.toolCalls && msg.toolCalls.length > 0) {
-      base.toolCalls = msg.toolCalls;
-    }
-
-    if (msg.toolCallId) {
-      base.toolCallId = msg.toolCallId;
-    }
-
-    return base;
-  });
 }
 
 /**

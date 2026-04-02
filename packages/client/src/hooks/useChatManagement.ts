@@ -30,7 +30,7 @@ function generateChatTitle(message: string): string {
  * Preserves toolCalls on assistant messages and toolCallId on tool messages
  * so the server can reconstruct valid API messages.
  */
-function transformMessagesToClientFormat(persistedMessages: PersistedMessage[]): AGUIMessage[] {
+export function transformMessagesToClientFormat(persistedMessages: PersistedMessage[]): AGUIMessage[] {
   return persistedMessages.map((msg): AGUIMessage => {
     const textContent = getTextFromContent(msg.content);
 
