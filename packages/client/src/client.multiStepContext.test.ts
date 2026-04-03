@@ -172,9 +172,19 @@ describe('Multi-step context preservation (integration)', () => {
       .filter(m => m.role === 'assistant' && typeof m.content === 'string' && m.content)
       .map(m => m.content as string);
 
-    // turnMessages should have per-step intermediate text
+    // turnMessages should have per-step intermediate text (not empty string)
+    // This validates the extractTurnMessages fix: content is preserved on
+    // assistant messages with toolCalls (was previously set to '')
     expect(turnTexts).toContain('Planning search.');
     expect(turnTexts).toContain('Retrying with archived.');
+
+    // Each intermediate assistant should also have toolCalls
+    const intermediateAssistants = turnMessages.filter(m => m.role === 'assistant');
+    for (const msg of intermediateAssistants) {
+      expect(msg.content).not.toBe('');
+      expect(msg.toolCalls).toBeDefined();
+      expect(msg.toolCalls!.length).toBeGreaterThan(0);
+    }
 
     // Final content should be ONLY the last step's text
     expect(finalContent).toBe('User not found.');

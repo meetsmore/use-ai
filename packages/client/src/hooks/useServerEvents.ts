@@ -114,10 +114,9 @@ export function useServerEvents({
   // Track message count at run start to extract turn messages at run end
   const messageCountAtRunStartRef = useRef<number>(0);
 
-  // Accumulate text across all steps for the final saved message.
-  // Unlike streamingText (React state, for UI), this ref is accessible
-  // from the event handler without stale closure issues.
-  const runTextRef = useRef<string>('');
+  // Tracks whether prior steps in this run emitted text, so we can insert
+  // a paragraph separator (\n\n) in streamingText between steps.
+  const hasTextFromPriorStepRef = useRef<boolean>(false);
 
   // Executing tool state for UI display
   const [executingToolRaw, setExecutingTool] = useState<{
@@ -150,11 +149,10 @@ export function useServerEvents({
       // The user message was already pushed to client.messages by sendPrompt(),
       // so messages added after this point are from the AI turn.
       messageCountAtRunStartRef.current = client.messages.length;
-      runTextRef.current = '';
+      hasTextFromPriorStepRef.current = false;
     } else if (event.type === EventType.TEXT_MESSAGE_START) {
       // Add paragraph separator between steps so combined text reads naturally
-      if (runTextRef.current.length > 0) {
-        runTextRef.current += '\n\n';
+      if (hasTextFromPriorStepRef.current) {
         setStreamingText(prev => prev + '\n\n');
       }
     } else if (event.type === EventType.TOOL_CALL_START) {
@@ -205,7 +203,7 @@ export function useServerEvents({
       ts.handleApprovalRequest(e);
     } else if (event.type === EventType.TEXT_MESSAGE_CONTENT) {
       const contentEvent = event as TextMessageContentEvent;
-      runTextRef.current += contentEvent.delta;
+      hasTextFromPriorStepRef.current = true;
       setStreamingText(prev => prev + contentEvent.delta);
     } else if (event.type === EventType.TEXT_MESSAGE_END) {
       // Don't clear streaming text here — wait for RUN_FINISHED so text
@@ -213,8 +211,6 @@ export function useServerEvents({
     } else if (event.type === EventType.RUN_FINISHED) {
       // Use the last step's text for the final saved message.
       // Intermediate steps' text is preserved in turnMessages (via extractTurnMessages).
-      // Using accumulated text (runTextRef) here would duplicate intermediate text
-      // since it already exists in the per-step assistant messages.
       const content = client.currentMessageContent;
       if (content) {
         const finishedEvent = event as RunFinishedEvent;
