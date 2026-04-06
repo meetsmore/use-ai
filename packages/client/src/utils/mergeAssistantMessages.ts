@@ -16,6 +16,7 @@ import { getTextFromContent } from './messageContent';
 export function mergeAssistantMessagesForDisplay(messages: PersistedMessage[]): PersistedMessage[] {
   const result: PersistedMessage[] = [];
   let pendingTexts: string[] = [];
+  let pendingIds: string[] = [];
 
   for (const msg of messages) {
     if (msg.role === 'tool') {
@@ -27,6 +28,7 @@ export function mergeAssistantMessagesForDisplay(messages: PersistedMessage[]): 
 
       if (msg.toolCalls && msg.toolCalls.length > 0) {
         // Intermediate assistant with tool calls — accumulate text, skip message
+        pendingIds.push(msg.id);
         if (text) {
           pendingTexts.push(text);
         }
@@ -38,17 +40,19 @@ export function mergeAssistantMessagesForDisplay(messages: PersistedMessage[]): 
         const combined = allTexts.join('\n\n');
         result.push({ ...msg, content: combined || '' });
         pendingTexts = [];
+        pendingIds = [];
       }
     } else {
       // User message — flush any pending text and reset for next turn
       if (pendingTexts.length > 0) {
         result.push({
-          id: `merged-${Date.now()}`,
+          id: `merged-${pendingIds.join('-')}`,
           role: 'assistant',
           content: pendingTexts.join('\n\n'),
           createdAt: new Date(),
         });
         pendingTexts = [];
+        pendingIds = [];
       }
       result.push(msg);
     }
@@ -57,7 +61,7 @@ export function mergeAssistantMessagesForDisplay(messages: PersistedMessage[]): 
   // Handle trailing pending text (e.g., streaming step that hasn't finished)
   if (pendingTexts.length > 0) {
     result.push({
-      id: `merged-${Date.now()}`,
+      id: `merged-${pendingIds.join('-')}`,
       role: 'assistant',
       content: pendingTexts.join('\n\n'),
       createdAt: new Date(),

@@ -82,6 +82,39 @@ describe('mergeAssistantMessagesForDisplay', () => {
     expect((result[1] as unknown as { traceId: string }).traceId).toBe('trace-1');
   });
 
+  it('returns empty array for empty input', () => {
+    expect(mergeAssistantMessagesForDisplay([])).toHaveLength(0);
+  });
+
+  it('flushes trailing pending text when no final assistant exists yet', () => {
+    // Simulates a streaming multi-step run where the final text-only assistant
+    // message has not arrived yet (run still in progress)
+    const result = mergeAssistantMessagesForDisplay([
+      msg({ id: '1', role: 'user', content: 'Go' }),
+      msg({ id: '2', role: 'assistant', content: 'Working...', toolCalls: [tc('tc1', 't1')] }),
+      msg({ id: '3', role: 'tool', content: '{}', toolCallId: 'tc1' }),
+    ]);
+    expect(result).toHaveLength(2);
+    expect(result[0].role).toBe('user');
+    expect(result[1].role).toBe('assistant');
+    expect(result[1].content).toBe('Working...');
+    expect(result[1].id).toBe('merged-2');
+  });
+
+  it('produces deterministic IDs from constituent message IDs', () => {
+    const input = [
+      msg({ id: '1', role: 'user', content: 'Go' }),
+      msg({ id: 'a1', role: 'assistant', content: 'S0.', toolCalls: [tc('tc1', 't')] }),
+      msg({ id: '2', role: 'tool', content: '{}', toolCallId: 'tc1' }),
+      msg({ id: 'a2', role: 'assistant', content: 'S1.', toolCalls: [tc('tc2', 't')] }),
+      msg({ id: '3', role: 'tool', content: '{}', toolCallId: 'tc2' }),
+    ];
+    const r1 = mergeAssistantMessagesForDisplay(input);
+    const r2 = mergeAssistantMessagesForDisplay(input);
+    expect(r1[1].id).toBe('merged-a1-a2');
+    expect(r1[1].id).toBe(r2[1].id);
+  });
+
   it('extracts text from ContentPart arrays', () => {
     const result = mergeAssistantMessagesForDisplay([
       msg({ id: '1', role: 'user', content: 'Go' }),

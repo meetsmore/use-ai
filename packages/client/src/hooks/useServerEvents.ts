@@ -26,7 +26,8 @@ import type { PersistedMessage } from '../providers/chatRepository/types';
  *
  * Messages in `client._messages` are already in correct API order
  * (assistant(toolCalls) → tool results → assistant(text)) since the client
- * defers pushing tool results until RUN_FINISHED.
+ * flushes per-step messages at STEP_FINISHED (or at RUN_FINISHED for
+ * backward compatibility when the server does not emit step events).
  */
 export function extractTurnMessages(messages: Message[], startIndex: number): PersistedMessage[] {
   const turnSlice = messages.slice(startIndex);
