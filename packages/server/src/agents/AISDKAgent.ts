@@ -1,4 +1,5 @@
-import { streamText, jsonSchema, LanguageModel, stepCountIs, type ModelMessage, type SystemModelMessage } from 'ai';
+import { streamText, jsonSchema, LanguageModel, stepCountIs, type ModelMessage, type SystemModelMessage, type AssistantModelMessage, type ToolModelMessage } from 'ai';
+import type { AttributeValue } from '@opentelemetry/api';
 import type { JSONSchema7 } from 'json-schema';
 import { startRunSpan, flushTelemetry as flushAllTelemetry } from '../telemetry';
 import { v4 as uuidv4 } from 'uuid';
@@ -110,6 +111,8 @@ interface RunContext {
   currentMessages: ModelMessage[];
   allResponseMessages: ModelMessage[];
   response: Awaited<ReturnType<typeof streamText>['response']> | null;
+  /** Whether the last completed step had tool calls (for graceful summary) */
+  lastStepHadToolCalls: boolean;
 }
 
 /**
@@ -119,11 +122,13 @@ interface RunContext {
 interface StepContext {
   readonly currentTools: ToolDefinition[];
   readonly activeToolCalls: Map<string, { name: string; args: string }>;
+  readonly completedToolCalls: Set<string>;
   stepHadToolCalls: boolean;
   /** Per-step text message ID — set on TEXT_MESSAGE_START, cleared on TEXT_MESSAGE_END */
   messageId: string | null;
   /** Whether TEXT_MESSAGE_START has been emitted in this step */
   hasEmittedTextStart: boolean;
+  stepFinishReason: string | undefined;
 }
 
 /**
@@ -439,6 +444,7 @@ export class AISDKAgent implements Agent {
       currentMessages: [...sanitizedInputMessages],
       allResponseMessages: [],
       response: null,
+      lastStepHadToolCalls: false,
     };
   }
 
@@ -516,20 +522,19 @@ export class AISDKAgent implements Agent {
     events: EventEmitter,
     span: ReturnType<typeof startRunSpan>,
   ): Promise<void> {
-    for (let stepIteration = 0; stepIteration < this.maxSteps; stepIteration++) {
+    for (let stepIteration = 0; stepIteration <= this.maxSteps; stepIteration++) {
+      const isGracefulSummaryStep = stepIteration === this.maxSteps;
+      if (isGracefulSummaryStep && !ctx.lastStepHadToolCalls) break;
+
       const stepCtx: StepContext = {
         currentTools: ctx.session.tools,
         activeToolCalls: new Map(),
+        completedToolCalls: new Set(),
         stepHadToolCalls: false,
         messageId: null,
         hasEmittedTextStart: false,
+        stepFinishReason: undefined,
       };
-
-      logger.debug('Starting step iteration', {
-        stepIteration,
-        toolCount: stepCtx.currentTools.length,
-        toolNames: stepCtx.currentTools.map(t => t.name),
-      });
 
       // Build dynamic state message from current session state (refreshed each step)
       const stateMessage = this.buildStateMessage(ctx.session.state);
@@ -541,9 +546,30 @@ export class AISDKAgent implements Agent {
         ...ctx.currentMessages,
       ];
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const stepConfig = {
+        messages: messagesForStep,
+        tools: stepCtx.currentTools.length > 0
+          ? (this.sanitizeToolsForAPI(this.filterTools(stepCtx.currentTools), ctx.session, events) as any)
+          : undefined,
+        metadata: {
+          sessionId: ctx.session.clientId,
+          threadId: ctx.session.threadId,
+          runId: ctx.runId,
+          ipAddress: ctx.session.ipAddress,
+          toolCount: stepCtx.currentTools.length,
+          stepIteration,
+          ...((ctx.originalInput.forwardedProps as UseAIForwardedProps | undefined)?.telemetryMetadata || {}),
+        } as Record<string, AttributeValue>,
+      };
+
+      this.applyGracefulSummaryOverrides(isGracefulSummaryStep, stepConfig);
+
+      logger.debug('Starting step iteration', { stepIteration, ...stepConfig.metadata });
+
       // Apply cache breakpoints for Anthropic prompt caching
       const messagesWithCache = applyCacheBreakpoints(
-        messagesForStep,
+        stepConfig.messages,
         this.cacheBreakpoint,
         this.model
       );
@@ -552,32 +578,14 @@ export class AISDKAgent implements Agent {
       const createStream = () => streamText({
         model: this.model,
         messages: messagesWithCache,
-        // Note: system prompt is included in messages array to support cache breakpoints
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        tools:
-          stepCtx.currentTools.length > 0
-            ? (this.sanitizeToolsForAPI(this.filterTools(stepCtx.currentTools), ctx.session, events) as any)
-            : undefined,
+        tools: stepConfig.tools,
         // Run ONE step at a time to allow tool refresh between steps
         stopWhen: stepCountIs(1),
         maxOutputTokens: this.maxOutputTokens,
         temperature: this.temperature,
         abortSignal: ctx.session.abortController?.signal,
         experimental_telemetry: span.active
-          ? {
-              isEnabled: true,
-              functionId: 'use-ai',
-              metadata: {
-                sessionId: ctx.session.clientId,
-                threadId: ctx.session.threadId,
-                runId: ctx.runId,
-                ipAddress: ctx.session.ipAddress,
-                toolCount: stepCtx.currentTools.length,
-                stepIteration,
-                // Merge custom metadata from forwardedProps (for eval tracing, etc.)
-                ...((ctx.originalInput.forwardedProps as UseAIForwardedProps | undefined)?.telemetryMetadata || {}),
-              },
-            }
+          ? { isEnabled: true, functionId: 'use-ai', metadata: stepConfig.metadata }
           : undefined,
         onStepFinish: ({ usage, finishReason }) => {
           logger.debug('Step finished', { usage, finishReason, stepIteration });
@@ -589,7 +597,6 @@ export class AISDKAgent implements Agent {
       // Process the stream for this step
       for await (const chunk of stream.fullStream) {
         this.processStreamChunk(chunk, ctx, stepCtx, events);
-
       }
 
       // Check if stream was aborted
@@ -608,10 +615,16 @@ export class AISDKAgent implements Agent {
       ctx.response = response;
 
       // Collect sanitized messages from this step into the accumulator.
-      // This must happen BEFORE the stepHadToolCalls check so that final-step
-      // messages (text responses) are also captured.
       const stepMessages = this.sanitizeMessages(response.messages);
       ctx.allResponseMessages.push(...stepMessages);
+      ctx.currentMessages = [...ctx.currentMessages, ...stepMessages];
+
+      if (this.handleIncompleteToolCalls(ctx, stepCtx)) {
+        continue;
+      }
+
+      // Track whether the last completed step had tool calls (for graceful summary)
+      ctx.lastStepHadToolCalls = stepCtx.stepHadToolCalls;
 
       // If no tool calls were made in this step, we're done
       if (!stepCtx.stepHadToolCalls) {
@@ -619,18 +632,43 @@ export class AISDKAgent implements Agent {
         break;
       }
 
-      // Tool calls were made - prepare for next iteration
-      // response.messages only contains generated messages, not input messages,
-      // so we must preserve currentMessages to retain the user's original request
-      // and any prior step outputs.
-      ctx.currentMessages = [...ctx.currentMessages, ...stepMessages];
-
       logger.debug('Continuing to next step after tool calls', {
         stepIteration,
         newMessageCount: ctx.currentMessages.length,
         updatedToolCount: ctx.session.tools.length,
       });
     }
+  }
+
+  /**
+   * Detects incomplete tool calls caused by maxOutputTokens truncation and injects
+   * synthetic error tool_results into ctx so the model can retry with shorter arguments.
+   *
+   * When the stream is cut mid-tool-input, tool-input-start fires but tool-call never fires.
+   *
+   * Mutates ctx.allResponseMessages and ctx.currentMessages as a side effect.
+   * @returns true if recovery messages were injected (caller should continue to next step)
+   */
+  private handleIncompleteToolCalls(
+    ctx: RunContext,
+    stepCtx: StepContext,
+  ): boolean {
+    const incompleteToolCalls = [...stepCtx.activeToolCalls.entries()]
+      .filter(([id]) => !stepCtx.completedToolCalls.has(id))
+      .map(([id, call]) => ({ id, ...call }));
+    const recoveryMessages = buildRecoveryToolResults(
+      incompleteToolCalls, stepCtx.stepFinishReason, this.maxOutputTokens,
+    );
+    if (recoveryMessages.length === 0) {
+      return false;
+    }
+    const sanitized = this.sanitizeMessages(recoveryMessages);
+    ctx.allResponseMessages.push(...sanitized);
+    ctx.currentMessages = [...ctx.currentMessages, ...sanitized];
+    logger.warn('Incomplete tool calls detected (likely maxOutputTokens exceeded)', {
+      incompleteCount: incompleteToolCalls.length,
+    });
+    return true;
   }
 
   /**
@@ -741,6 +779,7 @@ export class AISDKAgent implements Agent {
         // Tool call complete - emit TOOL_CALL_END
         // AI SDK will call execute() and stream pauses until it returns
         stepCtx.stepHadToolCalls = true;
+        stepCtx.completedToolCalls.add(chunk.toolCallId);
         const toolCall = stepCtx.activeToolCalls.get(chunk.toolCallId);
         const finalArgs = JSON.stringify(chunk.input);
 
@@ -783,6 +822,11 @@ export class AISDKAgent implements Agent {
           role: 'tool',
           timestamp: Date.now(),
         });
+        return;
+      }
+
+      case 'finish': {
+        stepCtx.stepFinishReason = chunk.finishReason;
         return;
       }
 
@@ -830,7 +874,7 @@ export class AISDKAgent implements Agent {
       }
 
       // Ignored chunk types:
-      // 'start', 'finish' - internal stream lifecycle
+      // 'start' - internal stream lifecycle
       // 'source' - RAG sources (future)
       // 'file' - generated files (future)
       // 'text-start', 'text-end' - we handle text-delta instead
@@ -1008,6 +1052,21 @@ export class AISDKAgent implements Agent {
       role: 'system',
       content: `Current application state:\n\n${JSON.stringify(state, null, 2)}`,
     };
+  }
+
+  /**
+   * When maxSteps is exhausted mid-tool-call chain, overrides step config
+   * to strip tools and inject a summary prompt so the model can summarize progress.
+   * No-ops when isGracefulSummaryStep is false.
+   */
+  private applyGracefulSummaryOverrides(
+    isGracefulSummaryStep: boolean,
+    stepConfig: { messages: ModelMessage[]; tools: unknown; metadata: Record<string, AttributeValue> }
+  ): void {
+    if (!isGracefulSummaryStep) return;
+    stepConfig.messages.push({ role: 'user', content: 'max steps reached, summarize progress' });
+    stepConfig.tools = undefined;
+    Object.assign(stepConfig.metadata, { toolCount: 0, gracefulSummary: true });
   }
 
   /**
@@ -1238,4 +1297,63 @@ export class AISDKAgent implements Agent {
     }
   }
 
+}
+
+interface IncompleteToolCall {
+  id: string;
+  name: string;
+  args: string;
+}
+
+/**
+ * Builds recovery messages for tool calls truncated by the output token limit.
+ *
+ * When maxOutputTokens is exceeded mid-stream, tool-input-start fires but tool-call
+ * never fires. This injects synthetic error tool_results so the model can retry
+ * with shorter arguments.
+ *
+ * Returns [assistantMessage, ...toolResultMessages] when recovery is needed,
+ * or an empty array otherwise.
+ *
+ * NOTE: We intentionally do NOT emit TOOL_CALL_END for incomplete calls.
+ * The client's TOOL_CALL_END handler parses args as JSON and executes the tool,
+ * which would fail on truncated JSON. Client-side cleanup of executingTool is
+ * handled instead by the RUN_FINISHED/RUN_ERROR handlers.
+ */
+function buildRecoveryToolResults(
+  incompleteToolCalls: IncompleteToolCall[],
+  stepFinishReason: string | undefined,
+  maxOutputTokens: number,
+): ModelMessage[] {
+  // Guard with finishReason === 'length' to avoid false-positive recovery on other stream errors.
+  if (incompleteToolCalls.length === 0 || stepFinishReason !== 'length') {
+    return [];
+  }
+
+  const recoveryAssistantMessage: AssistantModelMessage = {
+    role: 'assistant',
+    content: incompleteToolCalls.map((toolCall) => ({
+      type: 'tool-call' as const,
+      toolCallId: toolCall.id,
+      toolName: toolCall.name,
+      input: {},
+    })),
+  };
+
+  const recoveryToolResults: ToolModelMessage[] = incompleteToolCalls.map((toolCall) => ({
+    role: 'tool' as const,
+    content: [
+      {
+        type: 'tool-result' as const,
+        toolCallId: toolCall.id,
+        toolName: toolCall.name,
+        output: {
+          type: 'text' as const,
+          value: `Error: Tool call "${toolCall.name}" failed because its arguments were cut off mid-stream by the output token limit (maxOutputTokens: ${maxOutputTokens}). This call was recorded with args={} as a placeholder — retry with shorter arguments. Truncated args (first 200 chars): ${toolCall.args.substring(0, 200)}`,
+        },
+      },
+    ],
+  }));
+
+  return [recoveryAssistantMessage, ...recoveryToolResults];
 }
