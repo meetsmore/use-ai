@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'bun:test';
 import { UseAIClient } from './client';
 import { EventType } from '@meetsmore-oss/use-ai-core';
 import type { AGUIEvent, Message } from './types';
-import { extractTurnMessages } from './hooks/useServerEvents';
+import { extractTurnMessages } from './utils/messageConversion';
 
 /**
  * Integration test: multi-step agent run context preservation.

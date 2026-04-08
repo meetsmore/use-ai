@@ -11,50 +11,10 @@ import type {
 } from '../types';
 import { EventType, ErrorCode, TOOL_APPROVAL_REQUEST } from '../types';
 import type { UseAIClient } from '../client';
-import type { Message } from '../types';
 import type { UseToolSystemReturn } from './useToolSystem';
 import type { UseAIStrings } from '../theme';
 import type { PersistedMessage } from '../providers/chatRepository/types';
-
-/**
- * Extracts intermediate turn messages (assistant messages with tool calls and
- * tool result messages) from the client message history, starting from
- * `startIndex`. Converts them to `PersistedMessage[]` for storage.
- *
- * The final text-only assistant message is excluded here because it is
- * saved separately by `saveAIResponse`.
- *
- * Messages in `client._messages` are already in correct API order
- * (assistant(toolCalls) → tool results → assistant(text)) since the client
- * flushes per-step messages at STEP_FINISHED (or at RUN_FINISHED for
- * backward compatibility when the server does not emit step events).
- */
-export function extractTurnMessages(messages: Message[], startIndex: number): PersistedMessage[] {
-  const turnSlice = messages.slice(startIndex);
-  const result: PersistedMessage[] = [];
-
-  for (const msg of turnSlice) {
-    if (msg.role === 'assistant' && 'toolCalls' in msg && msg.toolCalls) {
-      result.push({
-        id: msg.id,
-        role: 'assistant',
-        content: typeof msg.content === 'string' ? msg.content : '',
-        createdAt: new Date(),
-        toolCalls: msg.toolCalls as PersistedMessage['toolCalls'],
-      });
-    } else if (msg.role === 'tool') {
-      result.push({
-        id: msg.id,
-        role: 'tool',
-        content: typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content),
-        createdAt: new Date(),
-        toolCallId: ('toolCallId' in msg && msg.toolCallId) ? msg.toolCallId as string : undefined,
-      });
-    }
-  }
-
-  return result;
-}
+import { extractTurnMessages } from '../utils/messageConversion';
 
 export interface UseServerEventsOptions {
   /** Tool system for executing tools and looking up tool metadata */
