@@ -213,7 +213,7 @@ export function useServerEvents({
       const errorCode = errorEvent.message as ErrorCode;
       console.error('[ServerEvents] Run error:', errorCode);
 
-      const userMessage = strs.errors[errorCode] || strs.errors[ErrorCode.UNKNOWN_ERROR];
+      const userMessage = strs.errors[errorCode] || errorEvent.message || strs.errors[ErrorCode.UNKNOWN_ERROR];
 
       saveAIResponseRef.current(userMessage, 'error');
       setStreamingText('');
