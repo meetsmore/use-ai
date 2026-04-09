@@ -1,4 +1,4 @@
-import type { ClientSession } from '../agents/types';
+import type { ClientSession, AgentInput } from '../agents/types';
 import type { UseAIClientMessage } from '../types';
 
 /**
@@ -8,6 +8,15 @@ import type { UseAIClientMessage } from '../types';
  * @param message - The incoming message from the client
  */
 export type MessageHandler = (session: ClientSession, message: UseAIClientMessage) => Promise<void> | void;
+
+/**
+ * Result from a beforeRunAgent hook indicating the run should be aborted.
+ * Return this from beforeRunAgent to block the run and send the message to the client as RUN_ERROR.
+ */
+export interface BeforeRunAgentResult {
+  abort: true;
+  message: string;
+}
 
 /**
  * Plugin interface for extending UseAIServer functionality.
@@ -70,6 +79,18 @@ export interface UseAIServerPlugin {
    * @param session - The disconnecting client session
    */
   onClientDisconnect?(session: ClientSession): void;
+
+  /**
+   * Optional hook called before an agent run starts.
+   * Use this to perform pre-run checks such as authentication, quota enforcement, etc.
+   *
+   * Return `{ abort: true, message: '...' }` to block the run — the message is sent
+   * to the client as a RUN_ERROR event. Return `void` (or `undefined`) to allow the run.
+   *
+   * @param input - The agent input containing session, messages, tools, and state
+   * @returns Promise resolving to an abort result or void
+   */
+  beforeRunAgent?(input: AgentInput): Promise<BeforeRunAgentResult | void>;
 
   /**
    * Optional cleanup hook called when the server is shutting down.
