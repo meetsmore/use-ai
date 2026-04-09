@@ -24,6 +24,7 @@ import ServerRuntimeApprovalPage from './pages/ServerRuntimeApprovalPage';
 import McpRuntimeApprovalPage from './pages/McpRuntimeApprovalPage';
 import MultimodalPage from './pages/MultimodalPage';
 import MultiAgentPage from './pages/MultiAgentPage';
+import BeforeRunAgentPage from './pages/BeforeRunAgentPage';
 import { NavigationAIProvider } from './providers/NavigationAIProvider';
 
 interface NavCategory {
@@ -78,6 +79,7 @@ const NAV_CATEGORIES: NavCategory[] = [
       { path: '/file-transformers', label: 'File Transformers' },
       { path: '/multimodal', label: 'Multimodal' },
       { path: '/multi-agent', label: 'Multi-Agent' },
+      { path: '/before-run-agent', label: 'beforeRunAgent Hook' },
       { path: '/workflow-demo', label: 'Workflow Integration' },
     ],
   },
@@ -177,6 +179,7 @@ function AppContent() {
         <Route path="/file-transformers"><FileTransformersPage /></Route>
         <Route path="/multimodal"><MultimodalPage /></Route>
         <Route path="/multi-agent"><MultiAgentPage /></Route>
+        <Route path="/before-run-agent"><BeforeRunAgentPage /></Route>
         <Route path="/workflow-demo"><WorkflowDemoPage /></Route>
         <Route path="/error-tracing-test"><ErrorTracingTestPage /></Route>
       </main>
