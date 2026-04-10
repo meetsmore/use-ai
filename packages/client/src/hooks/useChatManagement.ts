@@ -1,9 +1,9 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import type { ChatRepository, Chat, ChatMetadata, CreateChatOptions, PersistedMessageContent, PersistedMessage, PersistedToolCall } from '../providers/chatRepository/types';
+import type { ChatRepository, Chat, ChatMetadata, CreateChatOptions, PersistedMessageContent, PersistedMessage } from '../providers/chatRepository/types';
 import { generateMessageId } from '../providers/chatRepository/types';
 import type { UseAIClient } from '../client';
-import type { Message as AGUIMessage } from '../types';
 import { getTextFromContent } from '../utils/messageContent';
+import { transformMessagesToClientFormat } from '../utils/messageConversion';
 
 // Constants
 const CHAT_TITLE_MAX_LENGTH = 50;
@@ -23,40 +23,6 @@ function generateChatTitle(message: string): string {
   return message.length > CHAT_TITLE_MAX_LENGTH
     ? message.substring(0, CHAT_TITLE_MAX_LENGTH) + '...'
     : message;
-}
-
-/**
- * Transforms persisted messages to AG-UI message format for loading into client.
- * Preserves toolCalls on assistant messages and toolCallId on tool messages
- * so the server can reconstruct valid API messages.
- */
-function transformMessagesToClientFormat(persistedMessages: PersistedMessage[]): AGUIMessage[] {
-  return persistedMessages.map((msg): AGUIMessage => {
-    const textContent = getTextFromContent(msg.content);
-
-    switch (msg.role) {
-      case 'tool':
-        return {
-          id: msg.id,
-          role: 'tool',
-          content: textContent,
-          toolCallId: msg.toolCallId || '',
-        };
-      case 'assistant':
-        return {
-          id: msg.id,
-          role: 'assistant',
-          content: textContent,
-          ...(msg.toolCalls && msg.toolCalls.length > 0 ? { toolCalls: msg.toolCalls } : {}),
-        };
-      case 'user':
-        return {
-          id: msg.id,
-          role: 'user',
-          content: textContent,
-        };
-    }
-  });
 }
 
 export interface UseChatManagementOptions {

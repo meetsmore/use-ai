@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import type { Chat, PersistedMessage, PersistedMessageContent, PersistedContentPart, MessageDisplayMode } from '../providers/chatRepository/types';
 import { getTextFromContent } from '../utils/messageContent';
+import { mergeAssistantMessagesForDisplay } from '../utils/mergeAssistantMessages';
 import type { AgentInfo, FeedbackValue, ToolAnnotations } from '../types';
 import type { FileAttachment, FileUploadConfig, FileProcessingState } from '../fileUpload/types';
 import { MarkdownContent } from './MarkdownContent';
@@ -204,14 +205,12 @@ export function UseAIChatPanel({
   const strings = useStrings();
   const theme = useTheme();
 
-  // Filter out internal protocol messages at render time:
-  // - Tool result messages (role === 'tool')
-  // - Intermediate assistant messages that only contain tool calls (no user-visible text)
-  const displayMessages = messages.filter(m => {
-    if (m.role === 'tool') return false;
-    if (m.role === 'assistant' && m.toolCalls && m.toolCalls.length > 0 && !getTextFromContent(m.content)) return false;
-    return true;
-  });
+  // Merge consecutive assistant messages within each turn into a single
+  // display message. Intermediate messages (with toolCalls) have their text
+  // combined with the final text-only message. Tool messages are filtered out.
+  // This preserves per-step data structure (for LLM context) while showing
+  // a unified bubble to the user.
+  const displayMessages = mergeAssistantMessagesForDisplay(messages);
 
   const [input, setInput] = useState('');
   const chatHistoryDropdown = useDropdownState();

@@ -104,8 +104,6 @@ interface RunContext {
 
   // Streaming state (mutated during run)
   streamTextStarted: boolean;
-  messageId: string | null;
-  hasEmittedTextStart: boolean;
   finalText: string;
   currentStepNumber: number;
   hasAnyContent: boolean;
@@ -126,6 +124,10 @@ interface StepContext {
   readonly activeToolCalls: Map<string, { name: string; args: string }>;
   readonly completedToolCalls: Set<string>;
   stepHadToolCalls: boolean;
+  /** Per-step text message ID — set on TEXT_MESSAGE_START, cleared on TEXT_MESSAGE_END */
+  messageId: string | null;
+  /** Whether TEXT_MESSAGE_START has been emitted in this step */
+  hasEmittedTextStart: boolean;
   stepFinishReason: string | undefined;
 }
 
@@ -436,8 +438,6 @@ export class AISDKAgent implements Agent {
       staticSystemMessages,
 
       streamTextStarted: false,
-      messageId: null,
-      hasEmittedTextStart: false,
       finalText: '',
       currentStepNumber: 0,
       hasAnyContent: false,
@@ -531,6 +531,8 @@ export class AISDKAgent implements Agent {
         activeToolCalls: new Map(),
         completedToolCalls: new Set(),
         stepHadToolCalls: false,
+        messageId: null,
+        hasEmittedTextStart: false,
         stepFinishReason: undefined,
       };
 
@@ -692,22 +694,22 @@ export class AISDKAgent implements Agent {
 
       case 'text-delta': {
         ctx.hasAnyContent = true;
-        // Start text message on first text chunk
-        if (!ctx.hasEmittedTextStart) {
-          ctx.messageId = uuidv4();
+        // Start text message on first text chunk of this step
+        if (!stepCtx.hasEmittedTextStart) {
+          stepCtx.messageId = uuidv4();
           events.emit<TextMessageStartEvent>({
             type: EventType.TEXT_MESSAGE_START,
-            messageId: ctx.messageId,
+            messageId: stepCtx.messageId,
             role: 'assistant',
             timestamp: Date.now(),
           });
-          ctx.hasEmittedTextStart = true;
+          stepCtx.hasEmittedTextStart = true;
         }
 
         // AI SDK v6 uses 'text' property for deltas
         events.emit<TextMessageContentEvent>({
           type: EventType.TEXT_MESSAGE_CONTENT,
-          messageId: ctx.messageId!,
+          messageId: stepCtx.messageId!,
           delta: chunk.text,
           timestamp: Date.now(),
         });
@@ -724,17 +726,31 @@ export class AISDKAgent implements Agent {
       case 'tool-input-start': {
         ctx.hasAnyContent = true;
         stepCtx.stepHadToolCalls = true;
+
+        // Close text message before tool calls so per-step text+tool association is preserved
+        if (stepCtx.messageId) {
+          events.emit<TextMessageEndEvent>({
+            type: EventType.TEXT_MESSAGE_END,
+            messageId: stepCtx.messageId,
+            timestamp: Date.now(),
+          });
+        }
+
         // Find the tool definition to get annotations
         const toolDef = stepCtx.currentTools.find(t => t.name === chunk.toolName);
         const annotations = getToolAnnotations(toolDef);
 
         // Emit TOOL_CALL_START with use-ai extensions (annotations only if present)
         // AI SDK v6 uses 'id' as the toolCallId
+        const parentId = stepCtx.messageId ?? uuidv4();
+        // Clear messageId after capturing it for parentMessageId — text is closed
+        stepCtx.messageId = null;
+
         const toolCallStartEvent: ToolCallStartEvent & ToolCallStartExtensions = {
           type: EventType.TOOL_CALL_START,
           toolCallId: chunk.id,
           toolCallName: chunk.toolName,
-          parentMessageId: ctx.messageId ?? uuidv4(),
+          parentMessageId: parentId,
           timestamp: Date.now(),
         };
         if (annotations) {
@@ -815,6 +831,16 @@ export class AISDKAgent implements Agent {
       }
 
       case 'finish-step': {
+        // Close text message if still open (steps with text but no tool calls)
+        if (stepCtx.messageId) {
+          events.emit<TextMessageEndEvent>({
+            type: EventType.TEXT_MESSAGE_END,
+            messageId: stepCtx.messageId,
+            timestamp: Date.now(),
+          });
+          stepCtx.messageId = null;
+        }
+
         events.emit<StepFinishedEvent>({
           type: EventType.STEP_FINISHED,
           stepName: `step-${ctx.currentStepNumber - 1}`,
@@ -870,14 +896,8 @@ export class AISDKAgent implements Agent {
     events: EventEmitter,
     span: ReturnType<typeof startRunSpan>,
   ): AgentResult {
-    // End text message if we started one
-    if (ctx.hasEmittedTextStart && ctx.messageId) {
-      events.emit<TextMessageEndEvent>({
-        type: EventType.TEXT_MESSAGE_END,
-        messageId: ctx.messageId,
-        timestamp: Date.now(),
-      });
-    }
+    // TEXT_MESSAGE_END is now emitted per-step (in finish-step and tool-input-start),
+    // so no need to emit it here.
 
     // Check for empty response (no text, no tool calls)
     if (!ctx.hasAnyContent) {

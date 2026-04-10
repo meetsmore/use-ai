@@ -253,13 +253,34 @@ export class UseAIClient {
       }
     }
 
-    // Handle run completion - finalize assistant message
+    // Handle step completion - flush per-step messages if tool calls occurred
+    else if (event.type === EventType.STEP_FINISHED) {
+      if (this._currentAssistantToolCalls.length > 0 && this._currentAssistantMessage) {
+        // Create assistant message with text + toolCalls for this step
+        const assistantMsg: Message = {
+          id: this._currentAssistantMessage.id || uuidv4(),
+          role: 'assistant',
+          content: this._currentAssistantMessage.content || '',
+          toolCalls: [...this._currentAssistantToolCalls],
+        };
+        this._messages.push(assistantMsg);
+
+        // Push tool results for this step
+        this._messages.push(...this._pendingToolResults);
+
+        // Reset for next step
+        this._currentAssistantMessage = { id: uuidv4(), role: 'assistant', content: '' };
+        this._currentAssistantToolCalls = [];
+        this._pendingToolResults = [];
+      }
+    }
+
+    // Handle run completion - flush remaining assistant message
     else if (event.type === EventType.RUN_FINISHED) {
-      // Add completed messages to conversation history in correct API order:
-      // assistant(toolCalls) → tool results → assistant(text)
       if (this._currentAssistantMessage) {
         if (this._currentAssistantToolCalls.length > 0) {
-          // Intermediate assistant message with tool calls only
+          // Tool calls not yet flushed by STEP_FINISHED (backward compat:
+          // server didn't emit step events, or single-step with tool calls)
           const toolCallMessage: Message = {
             id: uuidv4(),
             role: 'assistant',
@@ -267,11 +288,8 @@ export class UseAIClient {
             toolCalls: this._currentAssistantToolCalls,
           };
           this._messages.push(toolCallMessage);
-
-          // Tool result messages
           this._messages.push(...this._pendingToolResults);
 
-          // Final assistant message with text only
           const textMessage: Message = {
             id: this._currentAssistantMessage.id!,
             role: 'assistant',
@@ -279,7 +297,7 @@ export class UseAIClient {
           };
           this._messages.push(textMessage);
         } else {
-          // No tool calls - just a text response
+          // No remaining tool calls - just the final text response
           const assistantMessage: Message = {
             id: this._currentAssistantMessage.id!,
             role: 'assistant',

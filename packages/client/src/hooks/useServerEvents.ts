@@ -11,49 +11,10 @@ import type {
 } from '../types';
 import { EventType, ErrorCode, TOOL_APPROVAL_REQUEST } from '../types';
 import type { UseAIClient } from '../client';
-import type { Message } from '../types';
 import type { UseToolSystemReturn } from './useToolSystem';
 import type { UseAIStrings } from '../theme';
 import type { PersistedMessage } from '../providers/chatRepository/types';
-
-/**
- * Extracts intermediate turn messages (assistant messages with tool calls and
- * tool result messages) from the client message history, starting from
- * `startIndex`. Converts them to `PersistedMessage[]` for storage.
- *
- * The final text-only assistant message is excluded here because it is
- * saved separately by `saveAIResponse`.
- *
- * Messages in `client._messages` are already in correct API order
- * (assistant(toolCalls) → tool results → assistant(text)) since the client
- * defers pushing tool results until RUN_FINISHED.
- */
-function extractTurnMessages(messages: Message[], startIndex: number): PersistedMessage[] {
-  const turnSlice = messages.slice(startIndex);
-  const result: PersistedMessage[] = [];
-
-  for (const msg of turnSlice) {
-    if (msg.role === 'assistant' && 'toolCalls' in msg && msg.toolCalls) {
-      result.push({
-        id: msg.id,
-        role: 'assistant',
-        content: '',
-        createdAt: new Date(),
-        toolCalls: msg.toolCalls as PersistedMessage['toolCalls'],
-      });
-    } else if (msg.role === 'tool') {
-      result.push({
-        id: msg.id,
-        role: 'tool',
-        content: typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content),
-        createdAt: new Date(),
-        toolCallId: ('toolCallId' in msg && msg.toolCallId) ? msg.toolCallId as string : undefined,
-      });
-    }
-  }
-
-  return result;
-}
+import { extractTurnMessages } from '../utils/messageConversion';
 
 export interface UseServerEventsOptions {
   /** Tool system for executing tools and looking up tool metadata */
@@ -114,6 +75,10 @@ export function useServerEvents({
   // Track message count at run start to extract turn messages at run end
   const messageCountAtRunStartRef = useRef<number>(0);
 
+  // Tracks whether prior steps in this run emitted text, so we can insert
+  // a paragraph separator (\n\n) in streamingText between steps.
+  const hasTextFromPriorStepRef = useRef<boolean>(false);
+
   // Executing tool state for UI display
   const [executingToolRaw, setExecutingTool] = useState<{
     toolCallId: string;
@@ -145,6 +110,12 @@ export function useServerEvents({
       // The user message was already pushed to client.messages by sendPrompt(),
       // so messages added after this point are from the AI turn.
       messageCountAtRunStartRef.current = client.messages.length;
+      hasTextFromPriorStepRef.current = false;
+    } else if (event.type === EventType.TEXT_MESSAGE_START) {
+      // Add paragraph separator between steps so combined text reads naturally
+      if (hasTextFromPriorStepRef.current) {
+        setStreamingText(prev => prev + '\n\n');
+      }
     } else if (event.type === EventType.TOOL_CALL_START) {
       const e = event as ToolCallStartEvent & Partial<ToolCallStartExtensions>;
 
@@ -193,11 +164,14 @@ export function useServerEvents({
       ts.handleApprovalRequest(e);
     } else if (event.type === EventType.TEXT_MESSAGE_CONTENT) {
       const contentEvent = event as TextMessageContentEvent;
+      hasTextFromPriorStepRef.current = true;
       setStreamingText(prev => prev + contentEvent.delta);
     } else if (event.type === EventType.TEXT_MESSAGE_END) {
-      setStreamingText('');
-      streamingChatIdRef.current = null;
+      // Don't clear streaming text here — wait for RUN_FINISHED so text
+      // stays visible across multi-step runs (no flash between steps).
     } else if (event.type === EventType.RUN_FINISHED) {
+      // Use the last step's text for the final saved message.
+      // Intermediate steps' text is preserved in turnMessages (via extractTurnMessages).
       const content = client.currentMessageContent;
       if (content) {
         const finishedEvent = event as RunFinishedEvent;
@@ -207,6 +181,8 @@ export function useServerEvents({
 
         saveAIResponseRef.current(content, undefined, traceId, turnMessages);
       }
+      setStreamingText('');
+      streamingChatIdRef.current = null;
       // Clear executingTool in case TOOL_CALL_END was never received
       // (e.g., stream truncated by token limit)
       setExecutingTool(null);
