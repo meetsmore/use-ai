@@ -2811,4 +2811,546 @@ describe('AISDKAgent', () => {
       expect(call.providerOptions).toBeUndefined();
     });
   });
+
+  describe('token limit recovery', () => {
+    test('recovers when stream is truncated mid-tool-input (maxOutputTokens exceeded)', async () => {
+      const toolCallId = 'tool-call-truncated';
+      let callCount = 0;
+
+      const mockModel = new MockLanguageModelV3({
+        doStream: async () => {
+          callCount++;
+
+          if (callCount === 1) {
+            // First call: stream gets truncated mid-tool-input (no tool-call chunk)
+            return {
+              stream: simulateReadableStream({
+                chunks: [
+                  { type: 'tool-input-start', id: toolCallId, toolName: 'addRows' },
+                  { type: 'tool-input-delta', id: toolCallId, delta: '{"rows": [{"name": "Al' },
+                  // Stream ends here - no tool-input-end, no tool-call
+                  {
+                    type: 'finish',
+                    finishReason: 'length' as const,
+                    usage: { inputTokens: 100, outputTokens: 4096, totalTokens: 4196 },
+                  },
+                ],
+              }),
+              response: {
+                id: 'response-1',
+                timestamp: new Date(),
+                modelId: 'mock-model',
+                headers: {},
+                messages: [],
+              },
+            };
+          }
+
+          // Second call (after recovery): model retries with shorter args
+          if (callCount === 2) {
+            return {
+              stream: simulateReadableStream({
+                chunks: [
+                  { type: 'text-start', id: 'text-1' },
+                  { type: 'text-delta', id: 'text-1', delta: 'I\'ll add the rows in smaller batches.' },
+                  { type: 'text-end', id: 'text-1' },
+                  {
+                    type: 'finish',
+                    finishReason: 'stop' as const,
+                    usage: { inputTokens: 200, outputTokens: 50, totalTokens: 250 },
+                  },
+                ],
+              }),
+              response: {
+                id: 'response-2',
+                timestamp: new Date(),
+                modelId: 'mock-model',
+                headers: {},
+                messages: [{ role: 'assistant', content: 'I\'ll add the rows in smaller batches.' }],
+              },
+            };
+          }
+
+          throw new Error('Unexpected call count: ' + callCount);
+        },
+      });
+
+      const agent = new AISDKAgent({ model: mockModel });
+
+      const emittedEvents: AGUIEventExtended[] = [];
+      const eventEmitter: EventEmitter = {
+        emit: (event) => emittedEvents.push(event),
+      };
+
+      const input = createTestInput({
+        tools: [
+          {
+            name: 'addRows',
+            description: 'Add rows to a table',
+            parameters: {
+              type: 'object',
+              properties: {
+                rows: { type: 'array', items: { type: 'object' } },
+              },
+              required: ['rows'],
+            },
+          },
+        ],
+      });
+
+      const result = await agent.run(input, eventEmitter);
+
+      // Should succeed after recovery
+      expect(result.success).toBe(true);
+      expect(callCount).toBe(2);
+
+      // Should NOT have emitted TOOL_CALL_END for the incomplete tool call
+      // (emitting it would cause the client to parse incomplete JSON and execute the tool)
+      const toolCallEndEvents = emittedEvents.filter(e => e.type === EventType.TOOL_CALL_END);
+      expect(toolCallEndEvents.length).toBe(0);
+
+      // Should have emitted RUN_FINISHED
+      const runFinished = emittedEvents.find(e => e.type === EventType.RUN_FINISHED);
+      expect(runFinished).toBeDefined();
+    });
+
+    test('respects maxSteps limit when token limit keeps triggering', async () => {
+      let callCount = 0;
+      const maxSteps = 3;
+
+      const mockModel = new MockLanguageModelV3({
+        doStream: async () => {
+          callCount++;
+
+          // Always return truncated stream (never recovers)
+          return {
+            stream: simulateReadableStream({
+              chunks: [
+                { type: 'tool-input-start', id: `tool-call-${callCount}`, toolName: 'addRows' },
+                { type: 'tool-input-delta', id: `tool-call-${callCount}`, delta: '{"rows": [' },
+                {
+                  type: 'finish',
+                  finishReason: 'length' as const,
+                  usage: { inputTokens: 100, outputTokens: 4096, totalTokens: 4196 },
+                },
+              ],
+            }),
+            response: {
+              id: `response-${callCount}`,
+              timestamp: new Date(),
+              modelId: 'mock-model',
+              headers: {},
+              messages: [],
+            },
+          };
+        },
+      });
+
+      const agent = new AISDKAgent({ model: mockModel, maxSteps });
+
+      const emittedEvents: AGUIEventExtended[] = [];
+      const eventEmitter: EventEmitter = {
+        emit: (event) => emittedEvents.push(event),
+      };
+
+      const input = createTestInput({
+        tools: [
+          {
+            name: 'addRows',
+            description: 'Add rows to a table',
+            parameters: {
+              type: 'object',
+              properties: {
+                rows: { type: 'array', items: { type: 'object' } },
+              },
+              required: ['rows'],
+            },
+          },
+        ],
+      });
+
+      await agent.run(input, eventEmitter);
+
+      // Should have stopped at maxSteps
+      expect(callCount).toBe(maxSteps);
+    });
+
+    test('recovery includes truncated args info for each incomplete tool call', async () => {
+      let callCount = 0;
+      let receivedMessages: unknown[] = [];
+
+      const mockModel = new MockLanguageModelV3({
+        doStream: async ({ prompt }) => {
+          callCount++;
+          receivedMessages = prompt as unknown[];
+
+          if (callCount === 1) {
+            // Two tool calls started but neither completed
+            return {
+              stream: simulateReadableStream({
+                chunks: [
+                  { type: 'tool-input-start', id: 'tool-call-a', toolName: 'toolA' },
+                  { type: 'tool-input-delta', id: 'tool-call-a', delta: '{"data": "longValueA' },
+                  { type: 'tool-input-start', id: 'tool-call-b', toolName: 'toolB' },
+                  { type: 'tool-input-delta', id: 'tool-call-b', delta: '{"data": "longValueB' },
+                  {
+                    type: 'finish',
+                    finishReason: 'length' as const,
+                    usage: { inputTokens: 100, outputTokens: 4096, totalTokens: 4196 },
+                  },
+                ],
+              }),
+              response: {
+                id: 'response-1',
+                timestamp: new Date(),
+                modelId: 'mock-model',
+                headers: {},
+                messages: [],
+              },
+            };
+          }
+
+          // Recovery: text response
+          return {
+            stream: simulateReadableStream({
+              chunks: [
+                { type: 'text-start', id: 'text-1' },
+                { type: 'text-delta', id: 'text-1', delta: 'Recovered' },
+                { type: 'text-end', id: 'text-1' },
+                {
+                  type: 'finish',
+                  finishReason: 'stop' as const,
+                  usage: { inputTokens: 200, outputTokens: 10, totalTokens: 210 },
+                },
+              ],
+            }),
+            response: {
+              id: 'response-2',
+              timestamp: new Date(),
+              modelId: 'mock-model',
+              headers: {},
+              messages: [{ role: 'assistant', content: 'Recovered' }],
+            },
+          };
+        },
+      });
+
+      const agent = new AISDKAgent({ model: mockModel });
+
+      const emittedEvents: AGUIEventExtended[] = [];
+      const eventEmitter: EventEmitter = {
+        emit: (event) => emittedEvents.push(event),
+      };
+
+      const input = createTestInput({
+        tools: [
+          {
+            name: 'toolA',
+            description: 'Tool A',
+            parameters: { type: 'object', properties: { data: { type: 'string' } } },
+          },
+          {
+            name: 'toolB',
+            description: 'Tool B',
+            parameters: { type: 'object', properties: { data: { type: 'string' } } },
+          },
+        ],
+      });
+
+      const result = await agent.run(input, eventEmitter);
+      expect(result.success).toBe(true);
+      expect(callCount).toBe(2);
+
+      // No TOOL_CALL_END should have been emitted (would trigger client-side execution)
+      const toolCallEndEvents = emittedEvents.filter(e => e.type === EventType.TOOL_CALL_END);
+      expect(toolCallEndEvents.length).toBe(0);
+
+      // The 2nd model call should have received recovery messages with truncated args info
+      // Collect all tool-result content parts from tool messages
+      const toolResultParts: Array<{ output: { value: string } }> = [];
+      for (const msg of receivedMessages as Array<{ role: string; content: unknown }>) {
+        if (msg.role === 'tool' && Array.isArray(msg.content)) {
+          for (const part of msg.content) {
+            if ((part as { type: string }).type === 'tool-result') {
+              toolResultParts.push(part as { output: { value: string } });
+            }
+          }
+        }
+      }
+      expect(toolResultParts.length).toBe(2);
+
+      // Each tool result should contain the truncated args preview
+      const values = toolResultParts.map(p => p.output.value);
+      expect(values.some(v => v.includes('{"data": "longValueA'))).toBe(true);
+      expect(values.some(v => v.includes('{"data": "longValueB'))).toBe(true);
+      expect(values.every(v => v.includes('cut off mid-stream'))).toBe(true);
+    });
+
+    test('does not trigger recovery when finishReason is not length', async () => {
+      // When finishReason is 'stop' (or anything other than 'length'),
+      // incomplete tool calls should NOT inject recovery messages.
+      // The step loop may still continue (because tool-input-start sets stepHadToolCalls),
+      // but no synthetic tool_result messages should be injected.
+      let callCount = 0;
+      let lastReceivedMessages: unknown[] = [];
+
+      const mockModel = new MockLanguageModelV3({
+        doStream: async ({ prompt }) => {
+          callCount++;
+          lastReceivedMessages = prompt as unknown[];
+
+          if (callCount === 1) {
+            // First call: tool-input-start fires but no tool-call (incomplete),
+            // with finishReason 'stop' instead of 'length'
+            return {
+              stream: simulateReadableStream({
+                chunks: [
+                  { type: 'tool-input-start', id: 'tool-call-1', toolName: 'addRows' },
+                  { type: 'tool-input-delta', id: 'tool-call-1', delta: '{"rows": [' },
+                  {
+                    type: 'finish',
+                    finishReason: 'stop' as const,
+                    usage: { inputTokens: 100, outputTokens: 50, totalTokens: 150 },
+                  },
+                ],
+              }),
+              response: {
+                id: 'response-1',
+                timestamp: new Date(),
+                modelId: 'mock-model',
+                headers: {},
+                messages: [],
+              },
+            };
+          }
+
+          // Second call: model responds with text (step loop continues because stepHadToolCalls was true)
+          return {
+            stream: simulateReadableStream({
+              chunks: [
+                { type: 'text-start', id: 'text-1' },
+                { type: 'text-delta', id: 'text-1', delta: 'Done' },
+                { type: 'text-end', id: 'text-1' },
+                {
+                  type: 'finish',
+                  finishReason: 'stop' as const,
+                  usage: { inputTokens: 100, outputTokens: 10, totalTokens: 110 },
+                },
+              ],
+            }),
+            response: {
+              id: `response-${callCount}`,
+              timestamp: new Date(),
+              modelId: 'mock-model',
+              headers: {},
+              messages: [{ role: 'assistant', content: 'Done' }],
+            },
+          };
+        },
+      });
+
+      const agent = new AISDKAgent({ model: mockModel });
+
+      const emittedEvents: AGUIEventExtended[] = [];
+      const eventEmitter: EventEmitter = {
+        emit: (event) => emittedEvents.push(event),
+      };
+
+      const input = createTestInput({
+        tools: [
+          {
+            name: 'addRows',
+            description: 'Add rows to a table',
+            parameters: {
+              type: 'object',
+              properties: { rows: { type: 'array', items: { type: 'object' } } },
+              required: ['rows'],
+            },
+          },
+        ],
+      });
+
+      const result = await agent.run(input, eventEmitter);
+      expect(result.success).toBe(true);
+
+      // The second call's messages should NOT contain any recovery tool_result
+      // (no "cut off mid-stream by the output token limit" error messages)
+      const toolMessages = (lastReceivedMessages as Array<{ role: string; content: unknown[] }>)
+        .filter(m => m.role === 'tool');
+      expect(toolMessages.length).toBe(0);
+    });
+
+    test('preserves completed tool call results when mixed with incomplete ones in same step', async () => {
+      // Reproduces the bug where maxOutputTokens is low enough that the model
+      // completes 1 tool call, then starts a 2nd that gets truncated.
+      // The recovery path must preserve the completed tool call's result
+      // in conversation history, not drop it via `continue`.
+      const completedToolCallId = 'tool-call-completed';
+      const incompleteToolCallId = 'tool-call-incomplete';
+      let callCount = 0;
+      let secondCallMessages: unknown[] = [];
+
+      const mockModel = new MockLanguageModelV3({
+        doStream: async ({ prompt }) => {
+          callCount++;
+
+          if (callCount === 1) {
+            // Step 1: Model completes 1 tool call, then starts another that gets truncated
+            return {
+              stream: simulateReadableStream({
+                chunks: [
+                  // First tool call - completes successfully
+                  { type: 'tool-input-start', id: completedToolCallId, toolName: 'addTodo' },
+                  { type: 'tool-input-delta', id: completedToolCallId, delta: '{"text":' },
+                  { type: 'tool-input-delta', id: completedToolCallId, delta: '"Buy milk"}' },
+                  { type: 'tool-input-end', id: completedToolCallId },
+                  { type: 'tool-call', toolCallId: completedToolCallId, toolName: 'addTodo', input: '{"text":"Buy milk"}' },
+                  // tool-result will be provided by pendingToolCalls resolver
+                  // Second tool call - starts but gets truncated by token limit
+                  { type: 'tool-input-start', id: incompleteToolCallId, toolName: 'addTodo' },
+                  { type: 'tool-input-delta', id: incompleteToolCallId, delta: '{"text": "Do laun' },
+                  // Stream ends here - no tool-input-end, no tool-call for the second one
+                  {
+                    type: 'finish',
+                    finishReason: 'length' as const,
+                    usage: { inputTokens: 100, outputTokens: 100, totalTokens: 200 },
+                  },
+                ],
+              }),
+              response: {
+                id: 'response-1',
+                timestamp: new Date(),
+                modelId: 'mock-model',
+                headers: {},
+                messages: [
+                  {
+                    role: 'assistant',
+                    content: [
+                      {
+                        type: 'tool-call',
+                        toolCallId: completedToolCallId,
+                        toolName: 'addTodo',
+                        input: { text: 'Buy milk' },
+                      },
+                    ],
+                  },
+                  {
+                    role: 'tool',
+                    content: [
+                      {
+                        type: 'tool-result',
+                        toolCallId: completedToolCallId,
+                        toolName: 'addTodo',
+                        output: { type: 'json', value: { success: true, id: 1 } },
+                      },
+                    ],
+                  },
+                ],
+              },
+            };
+          }
+
+          if (callCount === 2) {
+            // Capture messages sent to model on second call
+            secondCallMessages = prompt as unknown[];
+
+            // Model responds with text after seeing the recovery
+            return {
+              stream: simulateReadableStream({
+                chunks: [
+                  { type: 'text-start', id: 'text-1' },
+                  { type: 'text-delta', id: 'text-1', delta: 'Added the first todo. Let me retry the second.' },
+                  { type: 'text-end', id: 'text-1' },
+                  {
+                    type: 'finish',
+                    finishReason: 'stop' as const,
+                    usage: { inputTokens: 200, outputTokens: 20, totalTokens: 220 },
+                  },
+                ],
+              }),
+              response: {
+                id: 'response-2',
+                timestamp: new Date(),
+                modelId: 'mock-model',
+                headers: {},
+                messages: [{ role: 'assistant', content: 'Added the first todo. Let me retry the second.' }],
+              },
+            };
+          }
+
+          throw new Error('Unexpected call count: ' + callCount);
+        },
+      });
+
+      const agent = new AISDKAgent({ model: mockModel });
+
+      const emittedEvents: AGUIEventExtended[] = [];
+      const eventEmitter: EventEmitter = {
+        emit: (event) => emittedEvents.push(event),
+      };
+
+      const input = createTestInput({
+        tools: [
+          {
+            name: 'addTodo',
+            description: 'Add a todo',
+            parameters: {
+              type: 'object',
+              properties: { text: { type: 'string' } },
+              required: ['text'],
+            },
+          },
+        ],
+      });
+
+      // Start run and resolve the completed tool call
+      const runPromise = agent.run(input, eventEmitter);
+
+      await new Promise<void>((resolve) => {
+        const checkInterval = setInterval(() => {
+          const toolCallEnd = emittedEvents.find(e => e.type === EventType.TOOL_CALL_END);
+          if (toolCallEnd) {
+            clearInterval(checkInterval);
+            const resolver = input.session.pendingToolCalls.get(completedToolCallId);
+            if (resolver) {
+              resolver(JSON.stringify({ success: true, id: 1 }));
+            }
+            resolve();
+          }
+        }, 10);
+        setTimeout(() => { clearInterval(checkInterval); resolve(); }, 5000);
+      });
+
+      const result = await runPromise;
+      expect(result.success).toBe(true);
+      expect(callCount).toBe(2);
+
+      // The second model call must contain the completed tool call's result
+      // in the conversation history (not just recovery error messages)
+      const toolResultMessages = (secondCallMessages as Array<{ role: string; content: unknown[] }>)
+        .filter(m => m.role === 'tool')
+        .flatMap(m => m.content)
+        .filter((c: unknown) => (c as { type: string }).type === 'tool-result');
+
+      // Should have at least 2 tool results: 1 real (completed) + 1 recovery error (incomplete)
+      expect(toolResultMessages.length).toBeGreaterThanOrEqual(2);
+
+      // The completed tool call's result must be present (not dropped)
+      const completedResult = toolResultMessages.find(
+        (c: unknown) => (c as { toolCallId: string }).toolCallId === completedToolCallId,
+      ) as { output: { type: string; value: unknown } } | undefined;
+      expect(completedResult).toBeDefined();
+      // The completed result should contain the actual success response, not a recovery error
+      const outputStr = JSON.stringify(completedResult!.output);
+      expect(outputStr).toContain('success');
+      expect(outputStr).not.toContain('cut off mid-stream by the output token limit');
+
+      // The incomplete tool call should have a recovery error
+      const incompleteResult = toolResultMessages.find(
+        (c: unknown) => (c as { toolCallId: string }).toolCallId === incompleteToolCallId,
+      ) as { output: { type: string; value: string } } | undefined;
+      expect(incompleteResult).toBeDefined();
+      expect(incompleteResult!.output.value).toContain('cut off mid-stream by the output token limit');
+    });
+  });
 });

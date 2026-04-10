@@ -1,4 +1,4 @@
-import { streamText, jsonSchema, LanguageModel, stepCountIs, type ModelMessage, type SystemModelMessage, type JSONValue } from 'ai';
+import { streamText, jsonSchema, LanguageModel, stepCountIs, type ModelMessage, type SystemModelMessage, type AssistantModelMessage, type ToolModelMessage, type JSONValue } from 'ai';
 import type { AttributeValue } from '@opentelemetry/api';
 import type { JSONSchema7 } from 'json-schema';
 import { startRunSpan, flushTelemetry as flushAllTelemetry } from '../telemetry';
@@ -124,7 +124,9 @@ interface RunContext {
 interface StepContext {
   readonly currentTools: ToolDefinition[];
   readonly activeToolCalls: Map<string, { name: string; args: string }>;
+  readonly completedToolCalls: Set<string>;
   stepHadToolCalls: boolean;
+  stepFinishReason: string | undefined;
 }
 
 /**
@@ -557,7 +559,9 @@ export class AISDKAgent implements Agent {
       const stepCtx: StepContext = {
         currentTools: ctx.session.tools,
         activeToolCalls: new Map(),
+        completedToolCalls: new Set(),
         stepHadToolCalls: false,
+        stepFinishReason: undefined,
       };
 
       // Build dynamic state message from current session state (refreshed each step)
@@ -640,10 +644,13 @@ export class AISDKAgent implements Agent {
       ctx.response = response;
 
       // Collect sanitized messages from this step into the accumulator.
-      // This must happen BEFORE the stepHadToolCalls check so that final-step
-      // messages (text responses) are also captured.
       const stepMessages = this.sanitizeMessages(response.messages);
       ctx.allResponseMessages.push(...stepMessages);
+      ctx.currentMessages = [...ctx.currentMessages, ...stepMessages];
+
+      if (this.handleIncompleteToolCalls(ctx, stepCtx)) {
+        continue;
+      }
 
       // Track whether the last completed step had tool calls (for graceful summary)
       ctx.lastStepHadToolCalls = stepCtx.stepHadToolCalls;
@@ -654,18 +661,43 @@ export class AISDKAgent implements Agent {
         break;
       }
 
-      // Tool calls were made - prepare for next iteration
-      // response.messages only contains generated messages, not input messages,
-      // so we must preserve currentMessages to retain the user's original request
-      // and any prior step outputs.
-      ctx.currentMessages = [...ctx.currentMessages, ...stepMessages];
-
       logger.debug('Continuing to next step after tool calls', {
         stepIteration,
         newMessageCount: ctx.currentMessages.length,
         updatedToolCount: ctx.session.tools.length,
       });
     }
+  }
+
+  /**
+   * Detects incomplete tool calls caused by maxOutputTokens truncation and injects
+   * synthetic error tool_results into ctx so the model can retry with shorter arguments.
+   *
+   * When the stream is cut mid-tool-input, tool-input-start fires but tool-call never fires.
+   *
+   * Mutates ctx.allResponseMessages and ctx.currentMessages as a side effect.
+   * @returns true if recovery messages were injected (caller should continue to next step)
+   */
+  private handleIncompleteToolCalls(
+    ctx: RunContext,
+    stepCtx: StepContext,
+  ): boolean {
+    const incompleteToolCalls = [...stepCtx.activeToolCalls.entries()]
+      .filter(([id]) => !stepCtx.completedToolCalls.has(id))
+      .map(([id, call]) => ({ id, ...call }));
+    const recoveryMessages = buildRecoveryToolResults(
+      incompleteToolCalls, stepCtx.stepFinishReason, this.maxOutputTokens,
+    );
+    if (recoveryMessages.length === 0) {
+      return false;
+    }
+    const sanitized = this.sanitizeMessages(recoveryMessages);
+    ctx.allResponseMessages.push(...sanitized);
+    ctx.currentMessages = [...ctx.currentMessages, ...sanitized];
+    logger.warn('Incomplete tool calls detected (likely maxOutputTokens exceeded)', {
+      incompleteCount: incompleteToolCalls.length,
+    });
+    return true;
   }
 
   /**
@@ -762,6 +794,7 @@ export class AISDKAgent implements Agent {
         // Tool call complete - emit TOOL_CALL_END
         // AI SDK will call execute() and stream pauses until it returns
         stepCtx.stepHadToolCalls = true;
+        stepCtx.completedToolCalls.add(chunk.toolCallId);
         const toolCall = stepCtx.activeToolCalls.get(chunk.toolCallId);
         const finalArgs = JSON.stringify(chunk.input);
 
@@ -807,6 +840,11 @@ export class AISDKAgent implements Agent {
         return;
       }
 
+      case 'finish': {
+        stepCtx.stepFinishReason = chunk.finishReason;
+        return;
+      }
+
       case 'finish-step': {
         events.emit<StepFinishedEvent>({
           type: EventType.STEP_FINISHED,
@@ -841,7 +879,7 @@ export class AISDKAgent implements Agent {
       }
 
       // Ignored chunk types:
-      // 'start', 'finish' - internal stream lifecycle
+      // 'start' - internal stream lifecycle
       // 'source' - RAG sources (future)
       // 'file' - generated files (future)
       // 'text-start', 'text-end' - we handle text-delta instead
@@ -1270,4 +1308,63 @@ export class AISDKAgent implements Agent {
     }
   }
 
+}
+
+interface IncompleteToolCall {
+  id: string;
+  name: string;
+  args: string;
+}
+
+/**
+ * Builds recovery messages for tool calls truncated by the output token limit.
+ *
+ * When maxOutputTokens is exceeded mid-stream, tool-input-start fires but tool-call
+ * never fires. This injects synthetic error tool_results so the model can retry
+ * with shorter arguments.
+ *
+ * Returns [assistantMessage, ...toolResultMessages] when recovery is needed,
+ * or an empty array otherwise.
+ *
+ * NOTE: We intentionally do NOT emit TOOL_CALL_END for incomplete calls.
+ * The client's TOOL_CALL_END handler parses args as JSON and executes the tool,
+ * which would fail on truncated JSON. Client-side cleanup of executingTool is
+ * handled instead by the RUN_FINISHED/RUN_ERROR handlers.
+ */
+function buildRecoveryToolResults(
+  incompleteToolCalls: IncompleteToolCall[],
+  stepFinishReason: string | undefined,
+  maxOutputTokens: number,
+): ModelMessage[] {
+  // Guard with finishReason === 'length' to avoid false-positive recovery on other stream errors.
+  if (incompleteToolCalls.length === 0 || stepFinishReason !== 'length') {
+    return [];
+  }
+
+  const recoveryAssistantMessage: AssistantModelMessage = {
+    role: 'assistant',
+    content: incompleteToolCalls.map((toolCall) => ({
+      type: 'tool-call' as const,
+      toolCallId: toolCall.id,
+      toolName: toolCall.name,
+      input: {},
+    })),
+  };
+
+  const recoveryToolResults: ToolModelMessage[] = incompleteToolCalls.map((toolCall) => ({
+    role: 'tool' as const,
+    content: [
+      {
+        type: 'tool-result' as const,
+        toolCallId: toolCall.id,
+        toolName: toolCall.name,
+        output: {
+          type: 'text' as const,
+          value: `Error: Tool call "${toolCall.name}" failed because its arguments were cut off mid-stream by the output token limit (maxOutputTokens: ${maxOutputTokens}). This call was recorded with args={} as a placeholder — retry with shorter arguments. Truncated args (first 200 chars): ${toolCall.args.substring(0, 200)}`,
+        },
+      },
+    ],
+  }));
+
+  return [recoveryAssistantMessage, ...recoveryToolResults];
 }
