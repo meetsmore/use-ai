@@ -2767,6 +2767,51 @@ describe('AISDKAgent', () => {
     });
   });
 
+  describe('providerOptions', () => {
+    test('passes providerOptions to streamText', async () => {
+      const mockModel = createStreamingTextMockModel('Hello');
+      const agent = new AISDKAgent({
+        model: mockModel,
+        providerOptions: {
+          gateway: {
+            models: ['anthropic/claude-opus-4.6', 'google/gemini-3.1-pro-preview'],
+          },
+        },
+      });
+
+      const emittedEvents: AGUIEventExtended[] = [];
+      const eventEmitter: EventEmitter = {
+        emit: (event) => emittedEvents.push(event),
+      };
+
+      const input = createTestInput();
+      await agent.run(input, eventEmitter);
+
+      expect(mockModel.doStreamCalls.length).toBe(1);
+      const call = mockModel.doStreamCalls[0];
+      expect(call.providerOptions).toEqual({
+        gateway: { models: ['anthropic/claude-opus-4.6', 'google/gemini-3.1-pro-preview'] },
+      });
+    });
+
+    test('does not set providerOptions when not configured', async () => {
+      const mockModel = createStreamingTextMockModel('Hello');
+      const agent = new AISDKAgent({ model: mockModel });
+
+      const emittedEvents: AGUIEventExtended[] = [];
+      const eventEmitter: EventEmitter = {
+        emit: (event) => emittedEvents.push(event),
+      };
+
+      const input = createTestInput();
+      await agent.run(input, eventEmitter);
+
+      expect(mockModel.doStreamCalls.length).toBe(1);
+      const call = mockModel.doStreamCalls[0];
+      expect(call.providerOptions).toBeUndefined();
+    });
+  });
+
   describe('token limit recovery', () => {
     test('recovers when stream is truncated mid-tool-input (maxOutputTokens exceeded)', async () => {
       const toolCallId = 'tool-call-truncated';
