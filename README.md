@@ -1196,6 +1196,12 @@ export interface UseAIServerPlugin {
    * @param session - The disconnecting client session
    */
   onClientDisconnect?(session: ClientSession): void;
+
+  /**
+   * Optional hook called before an agent run starts. Useful for things like authentication or quota enforcement.
+   * Return `{ abort: true, message: '...' }` to block the run.
+   */
+  beforeRunAgent?(input: AgentInput): Promise<BeforeRunAgentResult | void>;
 }
 ```
 

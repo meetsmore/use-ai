@@ -22,6 +22,8 @@ root.render(
         userId: 'dummy',
         tenantId: 'example-tenant',
       },
+      // Read token from global state (set by BeforeRunAgentPage demo toggle)
+      ...(window.__useAiDemoToken ? { token: window.__useAiDemoToken } : {}),
     })}
   >
     <InvisibleAIProvider>

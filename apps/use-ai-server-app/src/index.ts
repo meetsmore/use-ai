@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 import { UseAIServer, AISDKAgent, logger, defineServerTool } from '@meetsmore-oss/use-ai-server';
-import type { Agent, McpEndpointConfig, ServerToolConfig } from '@meetsmore-oss/use-ai-server';
+import type { Agent, McpEndpointConfig, ServerToolConfig, UseAIServerPlugin, BeforeRunAgentResult, AgentInput } from '@meetsmore-oss/use-ai-server';
+import type { UseAIForwardedProps } from '@meetsmore-oss/use-ai-core';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { createOpenAI } from '@ai-sdk/openai';
 import { WorkflowsPlugin, DifyWorkflowRunner } from '@meetsmore-oss/use-ai-plugin-workflows';
@@ -219,6 +220,33 @@ function createServerTools(): Record<string, ServerToolConfig> | undefined {
   return tools;
 }
 
+/**
+ * Example plugin demonstrating the beforeRunAgent hook.
+ * Rejects any run where forwardedProps.token contains "invalid".
+ */
+class TokenValidationPlugin implements UseAIServerPlugin {
+  getName(): string {
+    return 'token-validation';
+  }
+
+  registerHandlers(): void {
+    // No custom message handlers needed
+  }
+
+  async beforeRunAgent(input: AgentInput): Promise<BeforeRunAgentResult | void> {
+    const forwardedProps = input.originalInput.forwardedProps as UseAIForwardedProps | undefined;
+    const token = forwardedProps?.token;
+
+    if (token && token.includes('invalid')) {
+      logger.info('[TokenValidationPlugin] Rejecting run — invalid token', {
+        clientId: input.session.clientId,
+        token,
+      });
+      return { abort: true, message: 'Authentication failed: invalid token. (Demo: toggle off "Simulate Failure" to allow the run.)' };
+    }
+  }
+}
+
 logger.info('Starting UseAI server', { logFormat });
 
 (async () => {
@@ -230,7 +258,7 @@ logger.info('Starting UseAI server', { logFormat });
     const serverTools = createServerTools();
 
     // Build plugins array
-    const plugins = [];
+    const plugins: UseAIServerPlugin[] = [new TokenValidationPlugin()];
     if (workflowRunners.size > 0) {
       plugins.push(new WorkflowsPlugin({ runners: workflowRunners }));
     }
@@ -241,7 +269,7 @@ logger.info('Starting UseAI server', { logFormat });
       defaultAgent,
       rateLimitMaxRequests,
       rateLimitWindowMs,
-      plugins: plugins.length > 0 ? plugins : undefined,
+      plugins,
       mcpEndpoints: mcpEndpoints.length > 0 ? mcpEndpoints : undefined,
       tools: serverTools,
       maxHttpBufferSize,

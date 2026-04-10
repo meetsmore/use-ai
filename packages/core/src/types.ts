@@ -314,6 +314,8 @@ export interface UseAIForwardedProps {
   agent?: string;
   /** Telemetry metadata for observability (e.g., Langfuse eval tracing) */
   telemetryMetadata?: Record<string, unknown>;
+  /** Authentication token for server-side validation (e.g., JWT for beforeRunAgent plugin hooks) */
+  token?: string;
 }
 
 /**

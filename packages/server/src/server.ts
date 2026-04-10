@@ -695,20 +695,35 @@ export class UseAIServer {
       },
     };
 
+    // Build agent input
+    const agentInput = {
+      session,
+      runId,
+      messages: incomingMessages,
+      tools: session.tools,
+      state,
+      systemPrompt,
+      originalInput: message.data,
+    };
+
+    // Run beforeRunAgent hooks from all plugins
+    for (const plugin of this.plugins) {
+      if (plugin.beforeRunAgent) {
+        const result = await plugin.beforeRunAgent(agentInput);
+        if (result?.abort) {
+          this.sendEvent(session.socket, {
+            type: EventType.RUN_ERROR,
+            message: result.message,
+            timestamp: Date.now(),
+          });
+          return;
+        }
+      }
+    }
+
     // Delegate to selected agent
     try {
-      await selectedAgent.run(
-        {
-          session,
-          runId,
-          messages: incomingMessages,
-          tools: session.tools,
-          state,
-          systemPrompt,
-          originalInput: message.data,
-        },
-        eventEmitter
-      );
+      await selectedAgent.run(agentInput, eventEmitter);
     } finally {
       // Clear MCP headers after run completes (success or failure)
       delete session.currentMcpHeaders;
