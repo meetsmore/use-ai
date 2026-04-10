@@ -1,4 +1,4 @@
-import { streamText, jsonSchema, LanguageModel, stepCountIs, type ModelMessage, type SystemModelMessage } from 'ai';
+import { streamText, jsonSchema, LanguageModel, stepCountIs, type ModelMessage, type SystemModelMessage, type JSONValue } from 'ai';
 import type { AttributeValue } from '@opentelemetry/api';
 import type { JSONSchema7 } from 'json-schema';
 import { startRunSpan, flushTelemetry as flushAllTelemetry } from '../telemetry';
@@ -279,6 +279,34 @@ export interface AISDKAgentConfig {
   cacheBreakpoint?: CacheBreakpointFn;
 
   /**
+   * Provider-specific options passed directly to `streamText`.
+   * Can be used for AI Gateway features like model fallbacks, provider routing, etc.
+   *
+   * @example
+   * ```typescript
+   * // Model fallbacks via AI Gateway
+   * {
+   *   providerOptions: {
+   *     gateway: {
+   *       models: ['anthropic/claude-opus-4.6', 'google/gemini-3.1-pro-preview'],
+   *     },
+   *   },
+   * }
+   *
+   * // Model fallbacks + provider routing
+   * {
+   *   providerOptions: {
+   *     gateway: {
+   *       models: ['openai/gpt-5-nano', 'anthropic/claude-opus-4.6'],
+   *       order: ['azure', 'openai'],
+   *     },
+   *   },
+   * }
+   * ```
+   */
+  providerOptions?: Record<string, Record<string, JSONValue>>;
+
+  /**
    * Maximum number of tokens the model can output per response.
    * @default 4096
    */
@@ -350,6 +378,7 @@ const DEFAULT_MAX_STEPS = 10;
  */
 export class AISDKAgent implements Agent {
   private model: LanguageModel;
+  private providerOptions?: Record<string, Record<string, JSONValue>>;
   private name: string;
   private annotation?: string;
   private toolFilter?: (tool: ToolDefinition) => boolean;
@@ -361,6 +390,7 @@ export class AISDKAgent implements Agent {
 
   constructor(config: AISDKAgentConfig) {
     this.model = config.model;
+    this.providerOptions = config.providerOptions;
     this.name = config.name || 'ai-sdk';
     this.annotation = config.annotation;
     this.toolFilter = config.toolFilter;
@@ -578,6 +608,7 @@ export class AISDKAgent implements Agent {
         maxOutputTokens: this.maxOutputTokens,
         temperature: this.temperature,
         abortSignal: ctx.session.abortController?.signal,
+        providerOptions: this.providerOptions,
         experimental_telemetry: span.active
           ? { isEnabled: true, functionId: 'use-ai', metadata: stepConfig.metadata }
           : undefined,
