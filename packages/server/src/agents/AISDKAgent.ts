@@ -140,8 +140,12 @@ interface StepContext {
   reasoningLifecycleId: string | null;
   /** Message ID for REASONING_MESSAGE_START / REASONING_MESSAGE_END pair */
   reasoningMessageId: string | null;
-  /** Current reasoning signature from provider metadata (Anthropic) */
-  currentReasoningSignature: string | null;
+  /**
+   * Extracted reasoning signature from provider metadata for multi-turn context.
+   * Contains only the signature field for the active provider (e.g., `{ anthropic: { signature: "..." } }`).
+   * @see REASONING_SIGNATURE_KEYS for supported providers.
+   */
+  currentReasoningSignature: Record<string, Record<string, unknown>> | null;
   stepFinishReason: string | undefined;
 }
 
@@ -340,27 +344,6 @@ export interface AISDKAgentConfig {
   temperature?: number;
 
   /**
-   * Optional reasoning/extended thinking configuration.
-   * When set, enables extended thinking for supported models (e.g., Anthropic Claude).
-   * Provider-agnostic: future providers can add their own reasoning config.
-   *
-   * @example
-   * ```typescript
-   * // Enable Anthropic extended thinking
-   * {
-   *   reasoning: {
-   *     anthropic: { budgetTokens: 10000 }
-   *   }
-   * }
-   * ```
-   */
-  reasoning?: {
-    anthropic?: {
-      budgetTokens: number;
-    };
-  };
-
-  /**
    * Maximum number of model step iterations per run.
    * Each iteration performs one model invocation and may include tool calls.
    * @default 10
@@ -370,6 +353,42 @@ export interface AISDKAgentConfig {
 
 const DEFAULT_MAX_OUTPUT_TOKENS = 4096;
 const DEFAULT_MAX_STEPS = 10;
+
+/**
+ * Maps provider names to their reasoning signature key in providerMetadata.
+ * Used to extract only the encryption/signature data from reasoning chunks,
+ * avoiding leaking non-signature metadata (e.g., itemId) through AG-UI events.
+ *
+ * Currently only Anthropic is tested and supported.
+ * To add a new provider, add an entry here with the provider's signature key name:
+ *   - OpenAI: 'reasoningEncryptedContent' (untested)
+ *   - Google: 'thoughtSignature' (untested)
+ */
+const REASONING_SIGNATURE_KEYS: Record<string, string> = {
+  anthropic: 'signature',
+  // openai: 'reasoningEncryptedContent',   // TODO: uncomment when tested
+  // google: 'thoughtSignature',            // TODO: uncomment when tested
+};
+
+/**
+ * Extracts the reasoning signature from providerMetadata for a known provider.
+ * Returns only the signature field (not other metadata like itemId) wrapped
+ * in the provider namespace, e.g., `{ anthropic: { signature: "..." } }`.
+ *
+ * Returns null if no known provider signature is found.
+ */
+function extractReasoningSignature(
+  providerMetadata: Record<string, Record<string, unknown>> | undefined,
+): Record<string, Record<string, unknown>> | null {
+  if (!providerMetadata) return null;
+  for (const [provider, meta] of Object.entries(providerMetadata)) {
+    const key = REASONING_SIGNATURE_KEYS[provider];
+    if (key && meta[key] != null) {
+      return { [provider]: { [key]: meta[key] } };
+    }
+  }
+  return null;
+}
 
 /**
  * Agent implementation for AI SDK models (Anthropic, OpenAI, Google, etc.).
@@ -386,6 +405,12 @@ const DEFAULT_MAX_STEPS = 10;
  * - Multi-turn conversation history
  * - AG-UI event emission
  * - Optional Langfuse telemetry
+ *
+ * **Reasoning / Extended Thinking:**
+ * Reasoning (extended thinking) is currently only tested with Anthropic models.
+ * The signature extraction logic supports pluggable providers via {@link REASONING_SIGNATURE_KEYS},
+ * but only Anthropic has been verified end-to-end.
+ * OpenAI and Google providers are mapped but commented out pending testing.
  *
  * Used for conversational chat (via useAI hook).
  *
@@ -426,7 +451,6 @@ export class AISDKAgent implements Agent {
   private maxOutputTokens: number;
   private temperature?: number;
   private maxSteps: number;
-  private reasoning?: AISDKAgentConfig['reasoning'];
 
   constructor(config: AISDKAgentConfig) {
     this.model = config.model;
@@ -439,7 +463,6 @@ export class AISDKAgent implements Agent {
     this.maxOutputTokens = config.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS;
     this.temperature = config.temperature;
     this.maxSteps = config.maxSteps ?? DEFAULT_MAX_STEPS;
-    this.reasoning = config.reasoning;
   }
 
   getName(): string {
@@ -655,16 +678,7 @@ export class AISDKAgent implements Agent {
         maxOutputTokens: this.maxOutputTokens,
         temperature: this.temperature,
         abortSignal: ctx.session.abortController?.signal,
-        // Merge extended thinking config with any user-provided providerOptions
-        providerOptions: this.reasoning?.anthropic
-          ? {
-              ...this.providerOptions,
-              anthropic: {
-                ...(this.providerOptions?.anthropic as Record<string, unknown> ?? {}),
-                thinking: { type: 'enabled', budgetTokens: this.reasoning.anthropic.budgetTokens },
-              },
-            }
-          : this.providerOptions,
+        providerOptions: this.providerOptions,
         experimental_telemetry: span.active
           ? { isEnabled: true, functionId: 'use-ai', metadata: stepConfig.metadata }
           : undefined,
@@ -730,6 +744,11 @@ export class AISDKAgent implements Agent {
    * Mutates ctx.allResponseMessages and ctx.currentMessages as a side effect.
    * @returns true if recovery messages were injected (caller should continue to next step)
    */
+  // TODO: Also handle maxOutputTokens exhaustion during reasoning.
+  // When the stream is truncated mid-reasoning (finishReason: 'length'), REASONING_MESSAGE_END
+  // and REASONING_END are never emitted, leaving the client in an incomplete state and losing
+  // accumulated reasoning text. We should detect open reasoning events (stepCtx.hasEmittedReasoningStart
+  // without a corresponding reasoning-end) and emit closing events + log a warning.
   private handleIncompleteToolCalls(
     ctx: RunContext,
     stepCtx: StepContext,
@@ -841,12 +860,13 @@ export class AISDKAgent implements Agent {
         }
 
         // AI SDK's reasoning-delta type doesn't expose providerMetadata,
-        // but Anthropic's provider may include the signature on delta chunks.
+        // but providers may include the signature on delta chunks.
         // Use a type assertion to defensively capture it if present.
-        const signature = (chunk as { providerMetadata?: Record<string, { signature?: string }> })
-          .providerMetadata?.anthropic?.signature;
-        if (signature) {
-          stepCtx.currentReasoningSignature = signature;
+        const deltaSignature = extractReasoningSignature(
+          (chunk as { providerMetadata?: Record<string, Record<string, unknown>> }).providerMetadata,
+        );
+        if (deltaSignature) {
+          stepCtx.currentReasoningSignature = deltaSignature;
         }
 
         if (chunk.text) {
@@ -862,8 +882,9 @@ export class AISDKAgent implements Agent {
 
       case 'reasoning-end': {
         // Capture final signature from reasoning-end event
-        const endSignature = (chunk as { providerMetadata?: Record<string, { signature?: string }> })
-          .providerMetadata?.anthropic?.signature;
+        const endSignature = extractReasoningSignature(
+          (chunk as { providerMetadata?: Record<string, Record<string, unknown>> }).providerMetadata,
+        );
         if (endSignature) {
           stepCtx.currentReasoningSignature = endSignature;
         }
@@ -875,13 +896,15 @@ export class AISDKAgent implements Agent {
           timestamp: Date.now(),
         });
 
-        // Emit encrypted value for Anthropic signature (used for multi-turn context)
+        // Emit encrypted value for provider signature (used for multi-turn context).
+        // The encryptedValue is a JSON-serialized provider-namespaced object,
+        // e.g., `{ "anthropic": { "signature": "..." } }`.
         if (stepCtx.currentReasoningSignature) {
           events.emit<ReasoningEncryptedValueEvent>({
             type: EventType.REASONING_ENCRYPTED_VALUE,
             subtype: 'message',
             entityId: stepCtx.reasoningMessageId!,
-            encryptedValue: JSON.stringify({ anthropic: { signature: stepCtx.currentReasoningSignature } }),
+            encryptedValue: JSON.stringify(stepCtx.currentReasoningSignature),
             timestamp: Date.now(),
           });
         }
@@ -1428,19 +1451,24 @@ export class AISDKAgent implements Agent {
   /**
    * Schema for reasoning content parts (extended thinking).
    * Preserves providerMetadata (e.g., Anthropic's signature) for multi-turn context.
+   *
+   * providerMetadata is stored as an opaque record keyed by provider name.
+   * The transform merges it into providerOptions so the AI SDK sends it back
+   * to the correct provider API for signature verification.
+   *
+   * Currently only Anthropic signatures are tested.
+   * @see REASONING_SIGNATURE_KEYS for the mapping of supported providers.
    */
   private static readonly reasoningContentSchema = z.object({
     type: z.literal('reasoning'),
     text: z.string(),
-    providerMetadata: z.object({
-      anthropic: z.object({ signature: z.string() }).optional(),
-    }).optional(),
+    providerMetadata: z.record(z.record(z.unknown())).optional(),
     providerOptions: z.record(z.unknown()).optional(),
   }).transform(({ type, text, providerMetadata, providerOptions }) => ({
     type,
     text,
-    providerOptions: providerMetadata?.anthropic?.signature
-      ? { ...providerOptions, anthropic: { signature: providerMetadata.anthropic.signature } }
+    providerOptions: providerMetadata
+      ? { ...providerOptions, ...providerMetadata }
       : providerOptions,
   }));
 

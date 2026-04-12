@@ -68,7 +68,7 @@ describe('AISDKAgent reasoning events', () => {
 
     const agent = new AISDKAgent({
       model: mockModel,
-      reasoning: { anthropic: { budgetTokens: 10000 } },
+      providerOptions: { anthropic: { thinking: { type: 'enabled', budgetTokens: 10000 } } },
     });
 
     const emittedEvents: AGUIEventExtended[] = [];
@@ -153,7 +153,7 @@ describe('AISDKAgent reasoning events', () => {
 
     const agent = new AISDKAgent({
       model: mockModel,
-      reasoning: { anthropic: { budgetTokens: 10000 } },
+      providerOptions: { anthropic: { thinking: { type: 'enabled', budgetTokens: 10000 } } },
     });
 
     const emittedEvents: AGUIEventExtended[] = [];
@@ -200,7 +200,7 @@ describe('AISDKAgent reasoning events', () => {
 
     const agent = new AISDKAgent({
       model: mockModel,
-      reasoning: { anthropic: { budgetTokens: 10000 } },
+      providerOptions: { anthropic: { thinking: { type: 'enabled', budgetTokens: 10000 } } },
     });
 
     const emittedEvents: AGUIEventExtended[] = [];
