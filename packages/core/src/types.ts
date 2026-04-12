@@ -32,6 +32,13 @@ import type {
   // Activity events
   ActivitySnapshotEvent,
   ActivityDeltaEvent,
+  // Reasoning events
+  ReasoningStartEvent,
+  ReasoningMessageStartEvent,
+  ReasoningMessageContentEvent,
+  ReasoningMessageEndEvent,
+  ReasoningEndEvent,
+  ReasoningEncryptedValueEvent,
 } from '@ag-ui/core';
 
 /**
@@ -74,6 +81,12 @@ export type {
   CustomEvent,
   ActivitySnapshotEvent,
   ActivityDeltaEvent,
+  ReasoningStartEvent,
+  ReasoningMessageStartEvent,
+  ReasoningMessageContentEvent,
+  ReasoningMessageEndEvent,
+  ReasoningEndEvent,
+  ReasoningEncryptedValueEvent,
 };
 
 /**
@@ -192,6 +205,12 @@ export type AGUIEvent =
   | MessagesSnapshotEvent
   | ActivitySnapshotEvent
   | ActivityDeltaEvent
+  | ReasoningStartEvent
+  | ReasoningMessageStartEvent
+  | ReasoningMessageContentEvent
+  | ReasoningMessageEndEvent
+  | ReasoningEndEvent
+  | ReasoningEncryptedValueEvent
   | RawEvent
   | CustomEvent;
 
@@ -507,3 +526,15 @@ export type MultimodalContent =
  * When multimodal, the array can contain text, images, and files.
  */
 export type UserMessageContent = string | MultimodalContent[];
+
+/**
+ * Reasoning part for persisted messages.
+ * Stores the reasoning text and optional encrypted value for state continuity.
+ * The encryptedValue carries opaque provider data (e.g., Anthropic's signature
+ * for multi-turn reasoning context) as a JSON string.
+ */
+export interface ReasoningPart {
+  text: string;
+  /** Opaque encrypted value for state continuity (e.g., JSON-serialized provider metadata) */
+  encryptedValue?: string;
+}

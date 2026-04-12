@@ -56,6 +56,14 @@ export type {
   // Tool approval types
   ToolApprovalRequestEvent,
   ToolApprovalResponseMessage,
+  // Reasoning event types (AG-UI protocol)
+  ReasoningStartEvent,
+  ReasoningMessageStartEvent,
+  ReasoningMessageContentEvent,
+  ReasoningMessageEndEvent,
+  ReasoningEndEvent,
+  ReasoningEncryptedValueEvent,
+  ReasoningPart,
   // Multimodal content types
   TextContent,
   ImageContent,

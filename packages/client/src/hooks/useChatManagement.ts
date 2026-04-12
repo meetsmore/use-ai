@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import type { ChatRepository, Chat, ChatMetadata, CreateChatOptions, PersistedMessageContent, PersistedMessage } from '../providers/chatRepository/types';
+import type { ReasoningPart } from '../types';
 import { generateMessageId } from '../providers/chatRepository/types';
 import type { UseAIClient } from '../client';
 import { getTextFromContent } from '../utils/messageContent';
@@ -65,7 +66,7 @@ export interface UseChatManagementReturn {
    * the turn are persisted before the final assistant message, preserving the
    * complete tool call context for conversation history.
    */
-  saveAIResponse: (content: string, displayMode?: 'default' | 'error', traceId?: string, turnMessages?: PersistedMessage[]) => Promise<void>;
+  saveAIResponse: (content: string, displayMode?: 'default' | 'error', traceId?: string, turnMessages?: PersistedMessage[], reasoningParts?: ReasoningPart[]) => Promise<void>;
   /** Reloads messages from storage for the given chat ID */
   reloadMessages: (chatId: string) => Promise<void>;
   /** Get the current chat object. Metadata is frozen to prevent accidental mutation. */
@@ -321,7 +322,8 @@ export function useChatManagement({
     content: string,
     displayMode?: 'default' | 'error',
     traceId?: string,
-    turnMessages?: PersistedMessage[]
+    turnMessages?: PersistedMessage[],
+    reasoningParts?: ReasoningPart[]
   ): Promise<void> => {
     const currentChatIdValue = currentChatIdSnapshot.current;
     const pendingChatIdValue = pendingChatIdSnapshot.current;
@@ -353,6 +355,7 @@ export function useChatManagement({
         createdAt: new Date(),
         displayMode,
         traceId,
+        ...(reasoningParts && reasoningParts.length > 0 ? { reasoningParts } : {}),
       };
       chat.messages.push(finalMessage);
 

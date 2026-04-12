@@ -18,6 +18,9 @@ import type {
   MultimodalContent,
   FeedbackValue,
   UseAIForwardedProps,
+  ReasoningMessageContentEvent,
+  ReasoningEncryptedValueEvent,
+  ReasoningPart,
 } from './types';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -89,6 +92,10 @@ export class UseAIClient {
     name: string;
     args: string;
   }> = new Map();
+
+  // Reasoning/thinking assembly
+  private _currentReasoningBlocks: ReasoningPart[] = [];
+  private _currentReasoningBlockText: string = '';
 
   // Feedback tracking
   private _langfuseEnabled = false;
@@ -186,6 +193,8 @@ export class UseAIClient {
       };
       this._currentAssistantToolCalls = [];
       this._pendingToolResults = [];
+      this._currentReasoningBlocks = [];
+      this._currentReasoningBlockText = '';
     }
 
     // Handle text message streaming
@@ -233,6 +242,26 @@ export class UseAIClient {
       }
     }
 
+    // Handle reasoning events (AG-UI protocol)
+    else if (event.type === EventType.REASONING_MESSAGE_START) {
+      this._currentReasoningBlockText = '';
+    } else if (event.type === EventType.REASONING_MESSAGE_CONTENT) {
+      const e = event as ReasoningMessageContentEvent;
+      this._currentReasoningBlockText += e.delta;
+    } else if (event.type === EventType.REASONING_MESSAGE_END) {
+      this._currentReasoningBlocks.push({
+        text: this._currentReasoningBlockText,
+      });
+      this._currentReasoningBlockText = '';
+    } else if (event.type === EventType.REASONING_ENCRYPTED_VALUE) {
+      const e = event as ReasoningEncryptedValueEvent;
+      // Attach encrypted value to the most recent reasoning block
+      if (e.subtype === 'message' && this._currentReasoningBlocks.length > 0) {
+        const lastBlock = this._currentReasoningBlocks[this._currentReasoningBlocks.length - 1];
+        lastBlock.encryptedValue = e.encryptedValue;
+      }
+    }
+
     // Handle server-side tool results (MCP tools, server tools).
     // The server emits TOOL_CALL_RESULT with the actual execution output so the
     // client can store it in conversation history instead of a placeholder.
@@ -257,11 +286,14 @@ export class UseAIClient {
     else if (event.type === EventType.STEP_FINISHED) {
       if (this._currentAssistantToolCalls.length > 0 && this._currentAssistantMessage) {
         // Create assistant message with text + toolCalls for this step
-        const assistantMsg: Message = {
+        // Attach reasoning parts collected during this step
+        const reasoningParts = this._currentReasoningBlocks.length > 0 ? [...this._currentReasoningBlocks] : undefined;
+        const assistantMsg: Message & { reasoningParts?: ReasoningPart[] } = {
           id: this._currentAssistantMessage.id || uuidv4(),
           role: 'assistant',
           content: this._currentAssistantMessage.content || '',
           toolCalls: [...this._currentAssistantToolCalls],
+          ...(reasoningParts ? { reasoningParts } : {}),
         };
         this._messages.push(assistantMsg);
 
@@ -272,20 +304,24 @@ export class UseAIClient {
         this._currentAssistantMessage = { id: uuidv4(), role: 'assistant', content: '' };
         this._currentAssistantToolCalls = [];
         this._pendingToolResults = [];
+        this._currentReasoningBlocks = [];
       }
     }
 
     // Handle run completion - flush remaining assistant message
     else if (event.type === EventType.RUN_FINISHED) {
       if (this._currentAssistantMessage) {
+        const reasoningParts = this._currentReasoningBlocks.length > 0 ? [...this._currentReasoningBlocks] : undefined;
+
         if (this._currentAssistantToolCalls.length > 0) {
           // Tool calls not yet flushed by STEP_FINISHED (backward compat:
           // server didn't emit step events, or single-step with tool calls)
-          const toolCallMessage: Message = {
+          const toolCallMessage: Message & { reasoningParts?: ReasoningPart[] } = {
             id: uuidv4(),
             role: 'assistant',
             content: '',
             toolCalls: this._currentAssistantToolCalls,
+            ...(reasoningParts ? { reasoningParts } : {}),
           };
           this._messages.push(toolCallMessage);
           this._messages.push(...this._pendingToolResults);
@@ -298,15 +334,19 @@ export class UseAIClient {
           this._messages.push(textMessage);
         } else {
           // No remaining tool calls - just the final text response
-          const assistantMessage: Message = {
+          const assistantMessage: Message & { reasoningParts?: ReasoningPart[] } = {
             id: this._currentAssistantMessage.id!,
             role: 'assistant',
             content: this._currentAssistantMessage.content || '',
+            ...(reasoningParts ? { reasoningParts } : {}),
           };
           this._messages.push(assistantMessage);
         }
 
         // Reset for next message
+        // Note: _currentReasoningBlocks is NOT cleared here — external event handlers
+        // (useServerEvents) read currentReasoningBlocks at RUN_FINISHED to persist
+        // reasoningParts to localStorage. Clearing happens at the next RUN_STARTED.
         this._currentAssistantMessage = null;
         this._currentAssistantToolCalls = [];
         this._pendingToolResults = [];
@@ -560,6 +600,13 @@ export class UseAIClient {
    */
   get currentMessageContent(): string {
     return this._currentMessageContent;
+  }
+
+  /**
+   * Gets the current reasoning blocks collected during the current run.
+   */
+  get currentReasoningBlocks(): ReasoningPart[] {
+    return this._currentReasoningBlocks;
   }
 
   /**

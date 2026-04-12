@@ -103,6 +103,14 @@ export const defaultStrings = {
     UNKNOWN_ERROR: 'An unexpected error occurred. Please try again.',
   },
 
+  // Thinking/reasoning display
+  thinking: {
+    /** Label shown while thinking is in progress */
+    inProgress: 'Thinking...',
+    /** Label shown when thinking is complete */
+    complete: 'Thinking complete',
+  },
+
   // Tool execution status
   toolExecution: {
     /** Fallback messages when no tool title is provided (one randomly selected) */

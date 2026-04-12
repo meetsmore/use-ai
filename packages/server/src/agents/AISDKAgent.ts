@@ -29,6 +29,12 @@ import type {
   StepStartedEvent,
   StepFinishedEvent,
   ToolCallStartExtensions,
+  ReasoningStartEvent,
+  ReasoningMessageStartEvent,
+  ReasoningMessageContentEvent,
+  ReasoningMessageEndEvent,
+  ReasoningEndEvent,
+  ReasoningEncryptedValueEvent,
 } from '../types';
 import { logger } from '../logger';
 import { applyCacheBreakpoints, type CacheBreakpointFn } from './anthropicCache';
@@ -128,6 +134,14 @@ interface StepContext {
   messageId: string | null;
   /** Whether TEXT_MESSAGE_START has been emitted in this step */
   hasEmittedTextStart: boolean;
+  /** Whether REASONING_START has been emitted in this step */
+  hasEmittedReasoningStart: boolean;
+  /** Lifecycle ID for REASONING_START / REASONING_END pair */
+  reasoningLifecycleId: string | null;
+  /** Message ID for REASONING_MESSAGE_START / REASONING_MESSAGE_END pair */
+  reasoningMessageId: string | null;
+  /** Current reasoning signature from provider metadata (Anthropic) */
+  currentReasoningSignature: string | null;
   stepFinishReason: string | undefined;
 }
 
@@ -326,6 +340,27 @@ export interface AISDKAgentConfig {
   temperature?: number;
 
   /**
+   * Optional reasoning/extended thinking configuration.
+   * When set, enables extended thinking for supported models (e.g., Anthropic Claude).
+   * Provider-agnostic: future providers can add their own reasoning config.
+   *
+   * @example
+   * ```typescript
+   * // Enable Anthropic extended thinking
+   * {
+   *   reasoning: {
+   *     anthropic: { budgetTokens: 10000 }
+   *   }
+   * }
+   * ```
+   */
+  reasoning?: {
+    anthropic?: {
+      budgetTokens: number;
+    };
+  };
+
+  /**
    * Maximum number of model step iterations per run.
    * Each iteration performs one model invocation and may include tool calls.
    * @default 10
@@ -391,6 +426,7 @@ export class AISDKAgent implements Agent {
   private maxOutputTokens: number;
   private temperature?: number;
   private maxSteps: number;
+  private reasoning?: AISDKAgentConfig['reasoning'];
 
   constructor(config: AISDKAgentConfig) {
     this.model = config.model;
@@ -403,6 +439,7 @@ export class AISDKAgent implements Agent {
     this.maxOutputTokens = config.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS;
     this.temperature = config.temperature;
     this.maxSteps = config.maxSteps ?? DEFAULT_MAX_STEPS;
+    this.reasoning = config.reasoning;
   }
 
   getName(): string {
@@ -563,6 +600,10 @@ export class AISDKAgent implements Agent {
         stepHadToolCalls: false,
         messageId: null,
         hasEmittedTextStart: false,
+        hasEmittedReasoningStart: false,
+        reasoningLifecycleId: null,
+        reasoningMessageId: null,
+        currentReasoningSignature: null,
         stepFinishReason: undefined,
       };
 
@@ -614,7 +655,16 @@ export class AISDKAgent implements Agent {
         maxOutputTokens: this.maxOutputTokens,
         temperature: this.temperature,
         abortSignal: ctx.session.abortController?.signal,
-        providerOptions: this.providerOptions,
+        // Merge extended thinking config with any user-provided providerOptions
+        providerOptions: this.reasoning?.anthropic
+          ? {
+              ...this.providerOptions,
+              anthropic: {
+                ...(this.providerOptions?.anthropic as Record<string, unknown> ?? {}),
+                thinking: { type: 'enabled', budgetTokens: this.reasoning.anthropic.budgetTokens },
+              },
+            }
+          : this.providerOptions,
         experimental_telemetry: span.active
           ? { isEnabled: true, functionId: 'use-ai', metadata: stepConfig.metadata }
           : undefined,
@@ -748,9 +798,100 @@ export class AISDKAgent implements Agent {
         return;
       }
 
+      case 'reasoning-start': {
+        // Emit REASONING_START lifecycle event on first reasoning block per step
+        if (!stepCtx.hasEmittedReasoningStart) {
+          stepCtx.reasoningLifecycleId = uuidv4();
+          events.emit<ReasoningStartEvent>({
+            type: EventType.REASONING_START,
+            messageId: stepCtx.reasoningLifecycleId,
+            timestamp: Date.now(),
+          });
+          stepCtx.hasEmittedReasoningStart = true;
+        }
+        // Emit REASONING_MESSAGE_START for this reasoning block
+        stepCtx.reasoningMessageId = uuidv4();
+        events.emit<ReasoningMessageStartEvent>({
+          type: EventType.REASONING_MESSAGE_START,
+          messageId: stepCtx.reasoningMessageId,
+          role: 'reasoning',
+          timestamp: Date.now(),
+        });
+        stepCtx.currentReasoningSignature = null;
+        return;
+      }
+
       case 'reasoning-delta': {
-        // Extended thinking (Claude) - log for now, future AG-UI support
-        logger.debug('Reasoning', { text: chunk.text });
+        // Emit reasoning start if reasoning-start wasn't received (defensive)
+        if (!stepCtx.hasEmittedReasoningStart) {
+          stepCtx.reasoningLifecycleId = uuidv4();
+          stepCtx.reasoningMessageId = uuidv4();
+          events.emit<ReasoningStartEvent>({
+            type: EventType.REASONING_START,
+            messageId: stepCtx.reasoningLifecycleId,
+            timestamp: Date.now(),
+          });
+          events.emit<ReasoningMessageStartEvent>({
+            type: EventType.REASONING_MESSAGE_START,
+            messageId: stepCtx.reasoningMessageId,
+            role: 'reasoning',
+            timestamp: Date.now(),
+          });
+          stepCtx.hasEmittedReasoningStart = true;
+        }
+
+        // AI SDK's reasoning-delta type doesn't expose providerMetadata,
+        // but Anthropic's provider may include the signature on delta chunks.
+        // Use a type assertion to defensively capture it if present.
+        const signature = (chunk as { providerMetadata?: Record<string, { signature?: string }> })
+          .providerMetadata?.anthropic?.signature;
+        if (signature) {
+          stepCtx.currentReasoningSignature = signature;
+        }
+
+        if (chunk.text) {
+          events.emit<ReasoningMessageContentEvent>({
+            type: EventType.REASONING_MESSAGE_CONTENT,
+            messageId: stepCtx.reasoningMessageId!,
+            delta: chunk.text,
+            timestamp: Date.now(),
+          });
+        }
+        return;
+      }
+
+      case 'reasoning-end': {
+        // Capture final signature from reasoning-end event
+        const endSignature = (chunk as { providerMetadata?: Record<string, { signature?: string }> })
+          .providerMetadata?.anthropic?.signature;
+        if (endSignature) {
+          stepCtx.currentReasoningSignature = endSignature;
+        }
+
+        // End the current reasoning message
+        events.emit<ReasoningMessageEndEvent>({
+          type: EventType.REASONING_MESSAGE_END,
+          messageId: stepCtx.reasoningMessageId!,
+          timestamp: Date.now(),
+        });
+
+        // Emit encrypted value for Anthropic signature (used for multi-turn context)
+        if (stepCtx.currentReasoningSignature) {
+          events.emit<ReasoningEncryptedValueEvent>({
+            type: EventType.REASONING_ENCRYPTED_VALUE,
+            subtype: 'message',
+            entityId: stepCtx.reasoningMessageId!,
+            encryptedValue: JSON.stringify({ anthropic: { signature: stepCtx.currentReasoningSignature } }),
+            timestamp: Date.now(),
+          });
+        }
+
+        // End the reasoning lifecycle
+        events.emit<ReasoningEndEvent>({
+          type: EventType.REASONING_END,
+          messageId: stepCtx.reasoningLifecycleId!,
+          timestamp: Date.now(),
+        });
         return;
       }
 
@@ -909,7 +1050,7 @@ export class AISDKAgent implements Agent {
       // 'source' - RAG sources (future)
       // 'file' - generated files (future)
       // 'text-start', 'text-end' - we handle text-delta instead
-      // 'reasoning-start', 'reasoning-end' - we handle reasoning-delta
+      // reasoning events are handled above (reasoning-start, reasoning-delta, reasoning-end)
       // 'tool-input-end' - we emit TOOL_CALL_END on 'tool-call' instead
       // 'tool-output-denied' - denied tool output cases
       // 'tool-approval-request' - handled in execute wrapper via createApprovalWrapper
@@ -1284,6 +1425,25 @@ export class AISDKAgent implements Agent {
     text: `[Content of file "${val.originalFile.name}" (${val.originalFile.mimeType})]:\n\n${val.text}`,
   }));
 
+  /**
+   * Schema for reasoning content parts (extended thinking).
+   * Preserves providerMetadata (e.g., Anthropic's signature) for multi-turn context.
+   */
+  private static readonly reasoningContentSchema = z.object({
+    type: z.literal('reasoning'),
+    text: z.string(),
+    providerMetadata: z.object({
+      anthropic: z.object({ signature: z.string() }).optional(),
+    }).optional(),
+    providerOptions: z.record(z.unknown()).optional(),
+  }).transform(({ type, text, providerMetadata, providerOptions }) => ({
+    type,
+    text,
+    providerOptions: providerMetadata?.anthropic?.signature
+      ? { ...providerOptions, anthropic: { signature: providerMetadata.anthropic.signature } }
+      : providerOptions,
+  }));
+
   private static readonly contentPartSchema = z.union([
     AISDKAgent.textContentSchema,
     AISDKAgent.imageContentSchema,
@@ -1291,6 +1451,7 @@ export class AISDKAgent implements Agent {
     AISDKAgent.transformedFileContentSchema,
     AISDKAgent.toolCallContentSchema,
     AISDKAgent.toolResultContentSchema,
+    AISDKAgent.reasoningContentSchema,
   ]);
 
   private static readonly messageSchema = z.object({

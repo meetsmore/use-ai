@@ -1,6 +1,6 @@
 {
   "name": "@meetsmore-oss/use-ai-core",
-  "version": "1.9.5",
+  "version": "1.10.0",
   "license": "BUSL-1.1",
   "files": [
     "dist"
@@ -28,7 +28,7 @@
     "build": "bun build ./src/index.ts --outdir ./dist --target node --format esm && tsc --emitDeclarationOnly --declaration --declarationMap"
   },
   "dependencies": {
-    "@ag-ui/core": "^0.0.41"
+    "@ag-ui/core": "^0.0.50"
   },
   "devDependencies": {
     "@types/bun": "latest",

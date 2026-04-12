@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { UseAIServer, AISDKAgent, logger, defineServerTool } from '@meetsmore-oss/use-ai-server';
+import { UseAIServer, AISDKAgent, logger, defineServerTool, createMockReasoningModel } from '@meetsmore-oss/use-ai-server';
 import type { Agent, McpEndpointConfig, ServerToolConfig, UseAIServerPlugin, BeforeRunAgentResult, AgentInput } from '@meetsmore-oss/use-ai-server';
 import type { UseAIForwardedProps } from '@meetsmore-oss/use-ai-core';
 import { createAnthropic } from '@ai-sdk/anthropic';
@@ -36,8 +36,12 @@ function createAgents(): { agents: Record<string, Agent>; defaultAgent: string }
     const anthropic = createAnthropic({ apiKey: anthropicApiKey });
     // Temperature can be set via env var (useful for E2E tests to reduce flakiness)
     const temperature = process.env.AI_TEMPERATURE ? Number(process.env.AI_TEMPERATURE) : undefined;
-    agents.claude = new AISDKAgent({ model: anthropic(model), name: 'Claude', temperature });
-    enabledAgents.push(`claude (${model}${temperature !== undefined ? `, temp=${temperature}` : ''})`);
+    // Extended thinking configuration (opt-in via env var)
+    const thinkingBudget = process.env.THINKING_BUDGET_TOKENS ? Number(process.env.THINKING_BUDGET_TOKENS) : undefined;
+    const reasoning = thinkingBudget ? { anthropic: { budgetTokens: thinkingBudget } } : undefined;
+
+    agents.claude = new AISDKAgent({ model: anthropic(model), name: 'Claude', temperature, reasoning });
+    enabledAgents.push(`claude (${model}${temperature !== undefined ? `, temp=${temperature}` : ''}${reasoning ? `, thinking=${thinkingBudget}` : ''})`);
   }
 
   // Check for OpenAI API key
@@ -47,6 +51,17 @@ function createAgents(): { agents: Record<string, Agent>; defaultAgent: string }
     const openai = createOpenAI({ apiKey: openaiApiKey });
     agents.gpt = new AISDKAgent({ model: openai(model), name: 'ChatGPT' });
     enabledAgents.push(`gpt (${model})`);
+  }
+
+  // Mock agent for UI development (no API key needed)
+  if (process.env.ENABLE_MOCK_AGENT) {
+    agents.mock = new AISDKAgent({
+      model: createMockReasoningModel(),
+      name: 'Mock (Reasoning)',
+      annotation: 'Mock model with reasoning, tool calls, and multi-step flows for UI testing',
+      reasoning: { anthropic: { budgetTokens: 10000 } },
+    });
+    enabledAgents.push('mock (reasoning UI testing)');
   }
 
   // Require at least one agent

@@ -208,6 +208,14 @@ export type {
   // Tool approval types
   ToolApprovalRequestEvent,
   ToolApprovalResponseMessage,
+  // Reasoning event types (AG-UI protocol)
+  ReasoningStartEvent,
+  ReasoningMessageStartEvent,
+  ReasoningMessageContentEvent,
+  ReasoningMessageEndEvent,
+  ReasoningEndEvent,
+  ReasoningEncryptedValueEvent,
+  ReasoningPart,
 } from '@meetsmore-oss/use-ai-core';
 
 export { EventType, ErrorCode, TOOL_APPROVAL_REQUEST } from '@meetsmore-oss/use-ai-core';
