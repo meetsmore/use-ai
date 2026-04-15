@@ -36,14 +36,14 @@ function createAgents(): { agents: Record<string, Agent>; defaultAgent: string }
     const anthropic = createAnthropic({ apiKey: anthropicApiKey });
     // Temperature can be set via env var (useful for E2E tests to reduce flakiness)
     const temperature = process.env.AI_TEMPERATURE ? Number(process.env.AI_TEMPERATURE) : undefined;
-    // Extended thinking configuration (opt-in via env var)
-    const thinkingBudget = process.env.THINKING_BUDGET_TOKENS ? Number(process.env.THINKING_BUDGET_TOKENS) : undefined;
-    const providerOptions = thinkingBudget
-      ? { anthropic: { thinking: { type: 'enabled', budgetTokens: thinkingBudget } } }
+    // Extended thinking configuration (opt-in via env var) — uses adaptive budget
+    const reasoningEnabled = process.env.USE_AI_REASONING === 'true';
+    const providerOptions = reasoningEnabled
+      ? { anthropic: { thinking: { type: 'adaptive' } } }
       : undefined;
 
     agents.claude = new AISDKAgent({ model: anthropic(model), name: 'Claude', temperature, providerOptions });
-    enabledAgents.push(`claude (${model}${temperature !== undefined ? `, temp=${temperature}` : ''}${providerOptions ? `, thinking=${thinkingBudget}` : ''})`);
+    enabledAgents.push(`claude (${model}${temperature !== undefined ? `, temp=${temperature}` : ''}${reasoningEnabled ? `, thinking=adaptive` : ''})`);
   }
 
   // Check for OpenAI API key
@@ -56,12 +56,11 @@ function createAgents(): { agents: Record<string, Agent>; defaultAgent: string }
   }
 
   // Mock agent for UI development (no API key needed)
-  if (process.env.ENABLE_MOCK_AGENT) {
+  if (process.env.USE_AI_ENABLE_MOCK_AGENT) {
     agents.mock = new AISDKAgent({
       model: createMockReasoningModel(),
       name: 'Mock (Reasoning)',
       annotation: 'Mock model with reasoning, tool calls, and multi-step flows for UI testing',
-      providerOptions: { anthropic: { thinking: { type: 'enabled', budgetTokens: 10000 } } },
     });
     enabledAgents.push('mock (reasoning UI testing)');
   }

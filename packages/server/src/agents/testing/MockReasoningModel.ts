@@ -16,10 +16,9 @@
  *   const agent = new AISDKAgent({
  *     model: createMockReasoningModel(),
  *     name: 'Mock (Reasoning)',
- *     reasoning: { anthropic: { budgetTokens: 10000 } },
  *   });
  *
- * Enable in server-app with: ENABLE_MOCK_AGENT=true
+ * Enable in server-app with: USE_AI_ENABLE_MOCK_AGENT=true
  */
 import { MockLanguageModelV3, simulateReadableStream } from 'ai/test';
 

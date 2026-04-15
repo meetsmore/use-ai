@@ -6,10 +6,10 @@ import { setupAutoApprove } from './test-helpers';
  *
  * Requires:
  * - ANTHROPIC_API_KEY set in environment
- * - THINKING_BUDGET_TOKENS set (e.g., 10000) to enable thinking on server
+ * - USE_AI_REASONING=true to enable adaptive thinking on server
  *
  * Run with:
- *   THINKING_BUDGET_TOKENS=10000 bun run test:e2e -- test/extended-thinking.e2e.test.ts
+ *   USE_AI_REASONING=true bun run test:e2e -- test/extended-thinking.e2e.test.ts
  */
 test.describe('Extended Thinking', () => {
   test.setTimeout(90000);
@@ -19,8 +19,8 @@ test.describe('Extended Thinking', () => {
       console.log('Skipping E2E tests: ANTHROPIC_API_KEY not set');
       test.skip();
     }
-    if (!process.env.THINKING_BUDGET_TOKENS) {
-      console.log('Skipping extended thinking E2E: THINKING_BUDGET_TOKENS not set');
+    if (process.env.USE_AI_REASONING !== 'true') {
+      console.log('Skipping extended thinking E2E: USE_AI_REASONING not set to true');
       test.skip();
     }
 
@@ -69,11 +69,11 @@ test.describe('Extended Thinking', () => {
   });
 
   test('mock agent: reasoning is streamed, persisted with signature, and displayed in UI', async ({ page }) => {
-    // This test uses the mock reasoning model (ENABLE_MOCK_AGENT=true) which is
+    // This test uses the mock reasoning model (USE_AI_ENABLE_MOCK_AGENT=true) which is
     // deterministic and requires no API key. It verifies the full reasoning pipeline:
     // streaming → persistence → UI display.
-    if (!process.env.ENABLE_MOCK_AGENT) {
-      console.log('Skipping mock agent test: ENABLE_MOCK_AGENT not set');
+    if (!process.env.USE_AI_ENABLE_MOCK_AGENT) {
+      console.log('Skipping mock agent test: USE_AI_ENABLE_MOCK_AGENT not set');
       test.skip();
     }
 

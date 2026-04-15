@@ -1,26 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import type { ReasoningPart } from '../types';
 import type { UseAITheme, UseAIStrings } from '../theme';
-
-/** Tracks whether the global @keyframes styles have been injected into the DOM. */
-let stylesInjected = false;
-
-function ensureStyles() {
-  if (stylesInjected || typeof document === 'undefined') return;
-  const style = document.createElement('style');
-  style.textContent = `
-    @keyframes use-ai-shimmer {
-      from { background-position: 100% center; }
-      to { background-position: 0% center; }
-    }
-    @keyframes use-ai-reasoning-open {
-      from { opacity: 0; max-height: 0; }
-      to { opacity: 1; max-height: 2000px; }
-    }
-  `;
-  document.head.appendChild(style);
-  stylesInjected = true;
-}
 
 /**
  * Inline SVG icons to avoid external icon library dependencies.
@@ -90,9 +70,6 @@ export function Reasoning({
 }: ReasoningProps) {
   const [isOpen, setIsOpen] = useState(false);
 
-  // Inject global @keyframes once
-  useEffect(() => { ensureStyles(); }, []);
-
   const toggle = useCallback(() => setIsOpen(prev => !prev), []);
 
   // Combine completed parts + streaming block
@@ -107,6 +84,16 @@ export function Reasoning({
 
   return (
     <div data-testid="thinking-timeline" style={{ marginBottom: '8px' }}>
+      <style>{`
+        @keyframes use-ai-shimmer {
+          from { background-position: 100% center; }
+          to { background-position: 0% center; }
+        }
+        @keyframes use-ai-reasoning-open {
+          from { opacity: 0; max-height: 0; }
+          to { opacity: 1; max-height: 2000px; }
+        }
+      `}</style>
       {/* Trigger */}
       <button
         data-testid="thinking-toggle"
