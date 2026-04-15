@@ -6,10 +6,11 @@ import { setupAutoApprove } from './test-helpers';
  *
  * Requires:
  * - ANTHROPIC_API_KEY set in environment
- * - USE_AI_REASONING=true to enable adaptive thinking on server
+ * - USE_AI_ANTHROPIC_REASONING_BUDGET_TOKEN set to a positive integer (e.g. 10000)
+ *   to enable extended thinking on the server
  *
  * Run with:
- *   USE_AI_REASONING=true bun run test:e2e -- test/extended-thinking.e2e.test.ts
+ *   USE_AI_ANTHROPIC_REASONING_BUDGET_TOKEN=10000 bun run test:e2e -- test/extended-thinking.e2e.test.ts
  */
 test.describe('Extended Thinking', () => {
   test.setTimeout(90000);
@@ -19,8 +20,8 @@ test.describe('Extended Thinking', () => {
       console.log('Skipping E2E tests: ANTHROPIC_API_KEY not set');
       test.skip();
     }
-    if (process.env.USE_AI_REASONING !== 'true') {
-      console.log('Skipping extended thinking E2E: USE_AI_REASONING not set to true');
+    if (!Number(process.env.USE_AI_ANTHROPIC_REASONING_BUDGET_TOKEN)) {
+      console.log('Skipping extended thinking E2E: USE_AI_ANTHROPIC_REASONING_BUDGET_TOKEN not set');
       test.skip();
     }
 

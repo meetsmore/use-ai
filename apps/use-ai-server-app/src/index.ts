@@ -46,11 +46,12 @@ function createAgents(): { agents: Record<string, Agent>; defaultAgent: string }
   // Temperature can be set via env var (useful for E2E tests to reduce flakiness)
   const temperature = process.env.AI_TEMPERATURE ? Number(process.env.AI_TEMPERATURE) : undefined;
 
-  // Extended thinking configuration (opt-in via env var) — uses adaptive budget.
+  // Extended thinking configuration (opt-in via env var).
   // Anthropic-specific; applied to Claude agents only (works for both direct API and gateway).
-  const reasoningEnabled = process.env.USE_AI_REASONING === 'true';
-  const claudeProviderOptions: Record<string, Record<string, JSONValue>> | undefined = reasoningEnabled
-    ? { anthropic: { thinking: { type: 'adaptive' } } }
+  // Set USE_AI_ANTHROPIC_REASONING_BUDGET_TOKEN to a positive integer (e.g. 10000) to enable.
+  const reasoningBudgetTokens = Number(process.env.USE_AI_ANTHROPIC_REASONING_BUDGET_TOKEN) || undefined;
+  const claudeProviderOptions: Record<string, Record<string, JSONValue>> | undefined = reasoningBudgetTokens
+    ? { anthropic: { thinking: { type: 'enabled', budgetTokens: reasoningBudgetTokens } } }
     : undefined;
 
   const addAgent = (
@@ -72,7 +73,7 @@ function createAgents(): { agents: Record<string, Agent>; defaultAgent: string }
     const suffix = [
       viaGateway ? 'via gateway' : null,
       temperature !== undefined ? `temp=${temperature}` : null,
-      hasThinking ? 'thinking=adaptive' : null,
+      hasThinking ? `thinking=${reasoningBudgetTokens}` : null,
     ]
       .filter(Boolean)
       .join(', ');
