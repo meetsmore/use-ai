@@ -4,9 +4,13 @@ import type { Agent, McpEndpointConfig, ServerToolConfig, UseAIServerPlugin, Bef
 import type { UseAIForwardedProps } from '@meetsmore-oss/use-ai-core';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { createOpenAI } from '@ai-sdk/openai';
+import { createGateway } from '@ai-sdk/gateway';
+import type { JSONValue } from 'ai';
 import { WorkflowsPlugin, DifyWorkflowRunner } from '@meetsmore-oss/use-ai-plugin-workflows';
 import type { WorkflowRunner } from '@meetsmore-oss/use-ai-plugin-workflows';
 import { z } from 'zod';
+
+type AgentModel = ConstructorParameters<typeof AISDKAgent>[0]['model'];
 
 const port = Number(process.env.PORT) || 8081;
 const rateLimitMaxRequests = Number(process.env.RATE_LIMIT_MAX_REQUESTS) || 0;
@@ -29,30 +33,70 @@ function createAgents(): { agents: Record<string, Agent>; defaultAgent: string }
   const agents: Record<string, Agent> = {};
   const enabledAgents: string[] = [];
 
-  // Check for Anthropic API key
+  // Vercel AI Gateway is preferred when configured: a single AI_GATEWAY_API_KEY
+  // unlocks Claude / GPT via one unified provider. Direct provider keys
+  // (ANTHROPIC_API_KEY / OPENAI_API_KEY) are used as fallbacks when the gateway
+  // key is not set.
+  const gateway = process.env.AI_GATEWAY_API_KEY
+    ? createGateway({ apiKey: process.env.AI_GATEWAY_API_KEY })
+    : undefined;
   const anthropicApiKey = process.env.ANTHROPIC_API_KEY;
-  if (anthropicApiKey) {
-    const model = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-20250514';
-    const anthropic = createAnthropic({ apiKey: anthropicApiKey });
-    // Temperature can be set via env var (useful for E2E tests to reduce flakiness)
-    const temperature = process.env.AI_TEMPERATURE ? Number(process.env.AI_TEMPERATURE) : undefined;
-    // Extended thinking configuration (opt-in via env var) — uses adaptive budget
-    const reasoningEnabled = process.env.USE_AI_REASONING === 'true';
-    const providerOptions = reasoningEnabled
-      ? { anthropic: { thinking: { type: 'adaptive' } } }
-      : undefined;
+  const openaiApiKey = process.env.OPENAI_API_KEY;
 
-    agents.claude = new AISDKAgent({ model: anthropic(model), name: 'Claude', temperature, providerOptions });
-    enabledAgents.push(`claude (${model}${temperature !== undefined ? `, temp=${temperature}` : ''}${reasoningEnabled ? `, thinking=adaptive` : ''})`);
+  // Temperature can be set via env var (useful for E2E tests to reduce flakiness)
+  const temperature = process.env.AI_TEMPERATURE ? Number(process.env.AI_TEMPERATURE) : undefined;
+
+  // Extended thinking configuration (opt-in via env var) — uses adaptive budget.
+  // Anthropic-specific; applied to Claude agents only (works for both direct API and gateway).
+  const reasoningEnabled = process.env.USE_AI_REASONING === 'true';
+  const claudeProviderOptions: Record<string, Record<string, JSONValue>> | undefined = reasoningEnabled
+    ? { anthropic: { thinking: { type: 'adaptive' } } }
+    : undefined;
+
+  const addAgent = (
+    key: string,
+    name: string,
+    model: AgentModel,
+    modelLabel: string,
+    viaGateway: boolean,
+    providerOptions?: Record<string, Record<string, JSONValue>>
+  ): void => {
+    agents[key] = new AISDKAgent({
+      model,
+      name,
+      temperature,
+      annotation: viaGateway ? 'Routed via Vercel AI Gateway' : undefined,
+      providerOptions,
+    });
+    const hasThinking = !!providerOptions?.anthropic && typeof providerOptions.anthropic === 'object' && 'thinking' in providerOptions.anthropic;
+    const suffix = [
+      viaGateway ? 'via gateway' : null,
+      temperature !== undefined ? `temp=${temperature}` : null,
+      hasThinking ? 'thinking=adaptive' : null,
+    ]
+      .filter(Boolean)
+      .join(', ');
+    enabledAgents.push(`${key} (${modelLabel}${suffix ? `, ${suffix}` : ''})`);
+  };
+
+  // Claude: gateway preferred, fall back to direct Anthropic API
+  if (gateway) {
+    const modelId = process.env.AI_GATEWAY_CLAUDE_MODEL || 'anthropic/claude-haiku-4.5';
+    addAgent('claude', 'Claude', gateway(modelId), modelId, true, claudeProviderOptions);
+  } else if (anthropicApiKey) {
+    const modelId = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-20250514';
+    const model = createAnthropic({ apiKey: anthropicApiKey })(modelId);
+    addAgent('claude', 'Claude', model, modelId, false, claudeProviderOptions);
   }
 
-  // Check for OpenAI API key
-  const openaiApiKey = process.env.OPENAI_API_KEY;
-  if (openaiApiKey) {
-    const model = process.env.OPENAI_MODEL || 'gpt-4-turbo';
-    const openai = createOpenAI({ apiKey: openaiApiKey });
-    agents.gpt = new AISDKAgent({ model: openai(model), name: 'ChatGPT' });
-    enabledAgents.push(`gpt (${model})`);
+  // GPT: gateway preferred, fall back to direct OpenAI API
+  if (gateway) {
+    const modelId = process.env.AI_GATEWAY_OPENAI_MODEL || 'openai/gpt-5.4-mini';
+    addAgent('gpt', 'ChatGPT', gateway(modelId), modelId, true);
+  } else if (openaiApiKey) {
+    const modelId = process.env.OPENAI_MODEL || 'gpt-4-turbo';
+    const model = createOpenAI({ apiKey: openaiApiKey })(modelId);
+    addAgent('gpt', 'ChatGPT', model, modelId, false);
   }
 
   // Mock agent for UI development (no API key needed)
@@ -69,6 +113,7 @@ function createAgents(): { agents: Record<string, Agent>; defaultAgent: string }
   if (Object.keys(agents).length === 0) {
     console.error('Error: At least one AI provider API key is required');
     console.error('Please set one of the following:');
+    console.error('  - AI_GATEWAY_API_KEY (for Claude/GPT via Vercel AI Gateway)');
     console.error('  - ANTHROPIC_API_KEY (for Claude)');
     console.error('  - OPENAI_API_KEY (for GPT)');
     process.exit(1);
