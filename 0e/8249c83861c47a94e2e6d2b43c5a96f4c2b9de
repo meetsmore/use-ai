@@ -1,0 +1,40 @@
+packages/client/src/utils/mergeAssistantMessages.ts
+  0356a32376fb6605 19,31,43,49,55,64
+packages/client/src/utils/mergeAssistantMessages.test.ts
+  0356a32376fb6605 85-117
+packages/client/src/hooks/useServerEvents.ts
+  0356a32376fb6605 29-30
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.4",
+  "base_commit_sha": "0e8249c83861c47a94e2e6d2b43c5a96f4c2b9de",
+  "prompts": {
+    "0356a32376fb6605": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d5d7985c-d222-4cf3-9464-1f3f87b3e26b",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent",
+      "messages": [],
+      "total_additions": 41,
+      "total_deletions": 3,
+      "accepted_lines": 41,
+      "overriden_lines": 0
+    },
+    "0e62b54c23ccee91": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b483af93-fbd7-4145-a7d7-0a5ea7cd17f5",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent",
+      "messages": [],
+      "total_additions": 11,
+      "total_deletions": 13,
+      "accepted_lines": 0,
+      "overriden_lines": 4
+    }
+  }
+}

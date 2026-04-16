@@ -1,0 +1,35 @@
+packages/server/src/agents/AISDKAgent.ts
+  f8389a27605f0c2e 554-557,563-569
+packages/client/src/hooks/useServerEvents.ts
+  f8389a27605f0c2e 204
+packages/server/src/agents/AISDKAgent.test.ts
+  f8389a27605f0c2e 5,2591,2698,2795-2796,2834-2836,2843
+packages/client/src/client.test.ts
+  f8389a27605f0c2e 42-49,479,482-483,522-523,526-527,533,562,598-599,602
+packages/client/src/components/UseAIChatPanel.tsx
+  f8389a27605f0c2e 26-32,221-222,225-227,959-961,971,1074
+packages/client/src/theme/strings.ts
+  f8389a27605f0c2e 106-113
+packages/client/src/client.ts
+  f8389a27605f0c2e 26-32,277,298,303
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.23",
+  "base_commit_sha": "19012a87124a6b084c7f07fb497112c6b26aee43",
+  "prompts": {
+    "f8389a27605f0c2e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "477f3a23-12a7-4efe-a25d-a1bccf0cae85",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 80,
+      "total_deletions": 49,
+      "accepted_lines": 78,
+      "overriden_lines": 0
+    }
+  }
+}

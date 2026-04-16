@@ -1,0 +1,81 @@
+packages/client/src/providers/chatRepository/types.ts
+  58ab6ce304357168 60-67
+packages/client/src/hooks/useChatManagement.ts
+  d026678d999eaf28 105
+  58ab6ce304357168 2,63-64,75,79-89,129-160,213-214,304-308,317,322,327,475-478,588-664,686,689-690,823
+  548720e00c2f884c 102-103,108,113-125
+packages/client/src/client.ts
+  79d6087bfc6c8651 112-114,209-211,268-271,273-276,278,281-282,289-300
+packages/server/src/server.ts
+  548720e00c2f884c 479-480,550-564,614-615,617,619,627
+packages/server/src/server.toolcall-preservation.test.ts
+  548720e00c2f884c 3,10,25-27,29,31-44,47-48,52-58,65,96,109,114,120-127,129-130,135-139,146,169,174,177,181,190,195,201,203-207,209-210,215-219,226,242,253,255-259,261-262,267-271,278,309,314,324,330,335,340,346,348-352,354-355,360-364,371,399,401-405,407-408,412,559-637
+  d026678d999eaf28 1-2,4-9,11-24,28,30,45-46,49-51,59-64,66-95,97-108,110-113,115-119,128,131-134,140-145,147-168,170-173,175-176,178-180,182-189,191-194,196-200,202,208,211-214,220-225,227-241,243-252,254,260,263-266,272-277,279-308,310-313,315-323,325-329,331-334,336-339,341-345,347,353,356-359,365-370,372-398,400,406,409-411,638
+  79d6087bfc6c8651 413-558
+packages/client/src/providers/useAIProvider.tsx
+  58ab6ce304357168 451-453,528,573-576,644-645,648-658
+packages/server/src/agents/AISDKAgent.ts
+  79d6087bfc6c8651 619-621,631-632,639-640,833-924
+packages/client/src/hooks/useChatManagement.test.ts
+  58ab6ce304357168 2,4,192-341
+  d026678d999eaf28 1,3,5-191
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.2",
+  "base_commit_sha": "219a1a361153e315bfd33169c9d6061a0c2a8f2a",
+  "prompts": {
+    "548720e00c2f884c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "65fc65c1-61e7-42c1-a5c4-3a78528d2f0e",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 259,
+      "total_deletions": 213,
+      "accepted_lines": 230,
+      "overriden_lines": 0
+    },
+    "58ab6ce304357168": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c296e5d0-ce53-4fa9-9611-bf2e585bcfef",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 358,
+      "total_deletions": 39,
+      "accepted_lines": 332,
+      "overriden_lines": 0
+    },
+    "79d6087bfc6c8651": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "778f1066-77c7-4c03-9cff-00155be410e9",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 281,
+      "total_deletions": 16,
+      "accepted_lines": 275,
+      "overriden_lines": 0
+    },
+    "d026678d999eaf28": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "843b7196-7f91-4e23-9d73-696a4364a3ed",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 1209,
+      "total_deletions": 262,
+      "accepted_lines": 768,
+      "overriden_lines": 1
+    }
+  }
+}

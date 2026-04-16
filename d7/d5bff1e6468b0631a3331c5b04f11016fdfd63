@@ -1,0 +1,25 @@
+packages/server/src/agents/AISDKAgent.ts
+  fbb981f2304a4791 383-386,616-621,629-632,636,675-678
+packages/server/src/agents/AISDKAgent.test.ts
+  fbb981f2304a4791 845-982
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.2",
+  "base_commit_sha": "d7d5bff1e6468b0631a3331c5b04f11016fdfd63",
+  "prompts": {
+    "fbb981f2304a4791": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "379c2bcf-6dfd-428d-a21c-04c2fb9d4c01",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 163,
+      "total_deletions": 40,
+      "accepted_lines": 157,
+      "overriden_lines": 0
+    }
+  }
+}

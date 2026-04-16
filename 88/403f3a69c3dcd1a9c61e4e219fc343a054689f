@@ -1,0 +1,27 @@
+apps/example/src/pages/ErrorTracingTestPage.tsx
+  ba645249cf9406d8 1-138
+apps/example/src/App.tsx
+  ba645249cf9406d8 13,29,89-91
+apps/example/src/pages/ProgrammaticChatPage.tsx
+  ba645249cf9406d8 5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.3",
+  "base_commit_sha": "88403f3a69c3dcd1a9c61e4e219fc343a054689f",
+  "prompts": {
+    "ba645249cf9406d8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5ac8b67a-ce35-4304-aa59-059fb59ea482",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 144,
+      "total_deletions": 42,
+      "accepted_lines": 144,
+      "overriden_lines": 0
+    }
+  }
+}

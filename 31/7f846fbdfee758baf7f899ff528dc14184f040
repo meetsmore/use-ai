@@ -1,0 +1,27 @@
+packages/server/package.json
+  824407435a819cd8 35
+packages/plugin-workflows/package.json
+  824407435a819cd8 34,40,44
+packages/client/package.json
+  824407435a819cd8 36
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.42",
+  "base_commit_sha": "317f846fbdfee758baf7f899ff528dc14184f040",
+  "prompts": {
+    "824407435a819cd8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "63708439-47fa-460c-a267-c3261a2bf62f",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 5,
+      "total_deletions": 5,
+      "accepted_lines": 5,
+      "overriden_lines": 0
+    }
+  }
+}

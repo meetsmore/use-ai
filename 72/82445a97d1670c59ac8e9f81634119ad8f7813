@@ -1,0 +1,25 @@
+packages/server/src/server.ts
+  835c12328796d520 183-216,218-220,222-229,231,233-235,237-245,247-249,251-254,256-262,264,266-272,276-282,284-298,301-303,306-309,317-318,321-324,326-330,332-333
+packages/server/src/types.ts
+  835c12328796d520 1-83
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.37",
+  "base_commit_sha": "7282445a97d1670c59ac8e9f81634119ad8f7813",
+  "prompts": {
+    "835c12328796d520": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e917d47f-2ac1-42f8-9d7e-435d94a279b2",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 223,
+      "total_deletions": 42,
+      "accepted_lines": 209,
+      "overriden_lines": 0
+    }
+  }
+}

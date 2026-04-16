@@ -1,0 +1,31 @@
+packages/client/src/client.test.ts
+  07fef57771ce808b 444-596
+packages/client/src/hooks/useServerEvents.test.ts
+  07fef57771ce808b 405-468
+apps/example/test/reasoning.e2e.test.ts
+  07fef57771ce808b 186-266
+packages/server/src/reasoning.integration.test.ts
+  07fef57771ce808b 113-242
+packages/server/src/agents/AISDKAgent.test.ts
+  07fef57771ce808b 2548-2862
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.22",
+  "base_commit_sha": "30116afd46265af271cdffe9b726f70ad354cb03",
+  "prompts": {
+    "07fef57771ce808b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2e193276-330f-4f60-9d1d-e734858c2ac3",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 745,
+      "total_deletions": 2,
+      "accepted_lines": 743,
+      "overriden_lines": 0
+    }
+  }
+}

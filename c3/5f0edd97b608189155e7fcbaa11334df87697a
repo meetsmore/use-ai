@@ -1,0 +1,23 @@
+packages/client/src/hooks/useServerEvents.ts
+  591ad8c6e6cb9f08 202
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.23",
+  "base_commit_sha": "c35f0edd97b608189155e7fcbaa11334df87697a",
+  "prompts": {
+    "591ad8c6e6cb9f08": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b5b75762-59a5-43a0-a49b-6af302e16ca5",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 4,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  }
+}

@@ -1,0 +1,268 @@
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.3",
+  "base_commit_sha": "58ee48be65333e97a1be2a8ec3dcc4b9bdaffc1d",
+  "prompts": {
+    "09a2bf1b0d355bf0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2a662cbc-b2c1-45e8-bb26-b0e86258e567",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 1032,
+      "total_deletions": 514,
+      "accepted_lines": 678,
+      "overriden_lines": 0
+    },
+    "0e47ff16275b4a0b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e5486854-f04e-489c-9958-525e38201b3b",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 186,
+      "total_deletions": 78,
+      "accepted_lines": 167,
+      "overriden_lines": 1
+    },
+    "163291321ff242c3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "83563422-2d87-4d1e-bbe8-042eae6dd599",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 8,
+      "accepted_lines": 0,
+      "overriden_lines": 0
+    },
+    "366003b5cc45193e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1032d7da-1b15-4b55-8f18-3b0b0e9bf65f",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 58,
+      "total_deletions": 22,
+      "accepted_lines": 4,
+      "overriden_lines": 0
+    },
+    "381e84f2714af141": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "675707bb-1d21-409e-9582-737ad374ebc4",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 233,
+      "total_deletions": 142,
+      "accepted_lines": 196,
+      "overriden_lines": 0
+    },
+    "3f2f65bcba0c7c06": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "668f7dd2-c676-4d7f-b03f-7eb2a4b6f1ae",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 52,
+      "total_deletions": 8,
+      "accepted_lines": 49,
+      "overriden_lines": 1
+    },
+    "41e383ab245ab928": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c0ce8edc-d1d9-4739-b6b9-b5f6a76154ea",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 251,
+      "total_deletions": 91,
+      "accepted_lines": 205,
+      "overriden_lines": 0
+    },
+    "59a841142eca312e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8f5546b9-6821-4cbd-9fb6-88c5e974a60b",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 140,
+      "total_deletions": 60,
+      "accepted_lines": 80,
+      "overriden_lines": 0
+    },
+    "77662abc34c2b353": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8bac0019-00c3-4861-a19f-effda2d37479",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Masuda Hiroto <masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 171,
+      "total_deletions": 138,
+      "accepted_lines": 152,
+      "overriden_lines": 2
+    },
+    "998b0478c8c77391": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9b39af1e-72bd-4b0e-b182-9cf078a973a1",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 180,
+      "overriden_lines": 0
+    },
+    "a821407f8c344b94": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5588e61d-575b-422d-b2d6-83d45df4009d",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 415,
+      "total_deletions": 54,
+      "accepted_lines": 411,
+      "overriden_lines": 0
+    },
+    "a90f24caa8152953": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "370c2f00-cbac-4362-8e73-d75eee6da792",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 24,
+      "total_deletions": 26,
+      "accepted_lines": 15,
+      "overriden_lines": 0
+    },
+    "b10b0263598a66d1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4b5ce7f3-1395-42f7-ba09-2960f96ccc92",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 1118,
+      "total_deletions": 17,
+      "accepted_lines": 1342,
+      "overriden_lines": 0
+    },
+    "b2d384b6a5338781": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4c4311f3-0885-4474-88e3-ba4f1eef93ee",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 3,
+      "total_deletions": 3,
+      "accepted_lines": 3,
+      "overriden_lines": 0
+    },
+    "c17411b654cd6f05": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6fdd470b-ccf5-44a7-9e5b-5d93eef69650",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 3,
+      "total_deletions": 1,
+      "accepted_lines": 3,
+      "overriden_lines": 0
+    },
+    "c3cea4f4ff2deb51": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4c2d3e93-8182-4d5a-a7b4-9a3e16ea7837",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 300,
+      "total_deletions": 61,
+      "accepted_lines": 297,
+      "overriden_lines": 0
+    },
+    "da931e9ecbbd8c3a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9aca59fa-5464-4150-8030-9cb2b68ee32e",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 620,
+      "total_deletions": 220,
+      "accepted_lines": 399,
+      "overriden_lines": 2
+    },
+    "e3e4948fc938e1d9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e261be72-11c5-4198-9b3f-f28646807656",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 299,
+      "overriden_lines": 0
+    },
+    "fbb981f2304a4791": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "379c2bcf-6dfd-428d-a21c-04c2fb9d4c01",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 163,
+      "total_deletions": 40,
+      "accepted_lines": 157,
+      "overriden_lines": 0
+    },
+    "ff051f8b3e567aff": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "45c2eae2-d8e0-430a-9979-d673a8e9a93e",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 1,
+      "accepted_lines": 0,
+      "overriden_lines": 0
+    }
+  }
+}

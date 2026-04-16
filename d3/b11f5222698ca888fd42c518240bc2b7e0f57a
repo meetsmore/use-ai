@@ -1,0 +1,37 @@
+packages/client/src/hooks/useToolSystem.ts
+  39274cceee4a4fc1 1-411
+packages/client/src/hooks/useServerEvents.ts
+  39274cceee4a4fc1 1-188
+packages/client/src/providers/useAIProvider.tsx
+  39274cceee4a4fc1 19,22-23,27-28,91,95,100-103,125,139,161-162,193-194,381-382,434-435,451,453,459,461,472-477,481,500-505,519,531,537,539,549,555,557,562,564-565,567,590,593,597,611,618,620,638,640-649,651,658-662,665,668-676,693,695-696,700,704,708-713,732,734-736,752,755-760,771,774-776,799,801,839
+packages/client/src/useAI.ts
+  39274cceee4a4fc1 78-79
+packages/client/src/hooks/useMessageQueue.ts
+  39274cceee4a4fc1 1-162
+packages/client/src/index.ts
+  39274cceee4a4fc1 44,124-125,128-131,140-153
+packages/client/test/disabling-at-runtime.integration.test.tsx
+  39274cceee4a4fc1 142-143,198-199,253-254
+packages/client/src/hooks/useChatManagement.ts
+  39274cceee4a4fc1 188,193,209,218,246,263,421,425
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.4",
+  "base_commit_sha": "d3b11f5222698ca888fd42c518240bc2b7e0f57a",
+  "prompts": {
+    "39274cceee4a4fc1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "842ef62c-f8d7-4ebc-9c08-d5029f232b3c",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 1102,
+      "total_deletions": 748,
+      "accepted_lines": 1090,
+      "overriden_lines": 0
+    }
+  }
+}

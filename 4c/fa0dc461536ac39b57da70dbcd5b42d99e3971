@@ -1,0 +1,42 @@
+packages/server/src/index.ts
+  b435304c4fbc791f 23-25
+packages/server/package.json
+  b435304c4fbc791f 42
+packages/server/src/tools/defineServerTool.ts
+  b435304c4fbc791f 89-94
+packages/server/src/core-architecture.integration.test.ts
+  b435304c4fbc791f 25
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "4cfa0dc461536ac39b57da70dbcd5b42d99e3971",
+  "prompts": {
+    "13bb47f5758d74fb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f174180e-82a6-47a5-bad8-7d1321e10d10",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 123,
+      "total_deletions": 0,
+      "accepted_lines": 123,
+      "overriden_lines": 0
+    },
+    "b435304c4fbc791f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "93836754-a4d8-463c-a43a-2005c308ff69",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 20,
+      "total_deletions": 11,
+      "accepted_lines": 13,
+      "overriden_lines": 0
+    }
+  }
+}

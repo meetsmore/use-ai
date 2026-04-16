@@ -1,0 +1,81 @@
+packages/server/src/agents/AISDKAgent.reasoning.test.ts
+  5f584f48b02cc69f 71,156,203
+apps/use-ai-server-app/src/index.ts
+  5f584f48b02cc69f 41-43,45-46,64
+packages/server/src/agents/AISDKAgent.ts
+  5f584f48b02cc69f 681
+  cb004a0725872704 143-148,358-392,409-414,863,865-869,885-887,899-901,907,1454-1460,1465,1470-1471
+  37e05509a25d6cc0 747-751
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8",
+  "base_commit_sha": "4ee6af1cc20beeb1a7e2d3a56aeb5b40c9f707df",
+  "prompts": {
+    "37e05509a25d6cc0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5512fba4-6c31-420f-9019-2ddeb8d97d8a",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent",
+      "messages": [],
+      "total_additions": 18,
+      "total_deletions": 13,
+      "accepted_lines": 5,
+      "overriden_lines": 0
+    },
+    "5f584f48b02cc69f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "08e0a18c-feac-4217-ab17-8af1278fb461",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent",
+      "messages": [],
+      "total_additions": 10,
+      "total_deletions": 40,
+      "accepted_lines": 10,
+      "overriden_lines": 0
+    },
+    "9531d2b71fb69b4a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ceff8c3f-d110-4a08-a5b7-18730a2c526e",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent",
+      "messages": [],
+      "total_additions": 53,
+      "total_deletions": 53,
+      "accepted_lines": 53,
+      "overriden_lines": 0
+    },
+    "caa897b4c19a01e6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b67f328f-c2dc-41fe-9afa-1b3944a7de35",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent",
+      "messages": [],
+      "total_additions": 135,
+      "total_deletions": 0,
+      "accepted_lines": 135,
+      "overriden_lines": 0
+    },
+    "cb004a0725872704": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a39df527-6cdb-4909-ba03-0402440cf6d9",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent",
+      "messages": [],
+      "total_additions": 1650,
+      "total_deletions": 16,
+      "accepted_lines": 1650,
+      "overriden_lines": 0
+    }
+  }
+}

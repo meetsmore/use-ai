@@ -1,0 +1,86 @@
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.6",
+  "base_commit_sha": "0aedb0a9c75590d34996324926181bfcdd142963",
+  "prompts": {
+    "3f2f65bcba0c7c06": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "668f7dd2-c676-4d7f-b03f-7eb2a4b6f1ae",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 52,
+      "total_deletions": 8,
+      "accepted_lines": 114,
+      "overriden_lines": 0
+    },
+    "66e28924eb2ef582": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b8125d80-c7b3-47c2-90f5-37b010e1e45c",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "yuma.ito@meetsmore.com",
+      "messages": [],
+      "total_additions": 4,
+      "total_deletions": 2,
+      "accepted_lines": 1,
+      "overriden_lines": 2
+    },
+    "80cdf743eea1c833": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dbaf51da-63ea-4b38-b1e3-6433e4979460",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 2995,
+      "total_deletions": 805,
+      "accepted_lines": 204,
+      "overriden_lines": 0
+    },
+    "855026b2ec36df9a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bf5892f9-d960-4c42-a39f-5013699b6b79",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 15,
+      "total_deletions": 4,
+      "accepted_lines": 15,
+      "overriden_lines": 0
+    },
+    "cb1d99356a9cf8a7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0c5016c5-8662-4399-973b-52d7f7897cc7",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 6,
+      "total_deletions": 4,
+      "accepted_lines": 1,
+      "overriden_lines": 1
+    },
+    "feaf8b65ca280b8b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "76cb2670-8ae4-4698-8b35-6ada2d9d3b72",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 2,
+      "total_deletions": 2,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  }
+}

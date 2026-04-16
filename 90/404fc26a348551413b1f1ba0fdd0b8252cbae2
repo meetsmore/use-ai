@@ -1,0 +1,27 @@
+apps/example/test/remote-mcp-tools.e2e.test.ts
+  5ce0c4f48568fb90 121-178
+packages/client/src/client.test.ts
+  5ce0c4f48568fb90 423-496
+packages/server/src/agents/AISDKAgent.test.ts
+  5ce0c4f48568fb90 2223-2312
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.23",
+  "base_commit_sha": "90404fc26a348551413b1f1ba0fdd0b8252cbae2",
+  "prompts": {
+    "5ce0c4f48568fb90": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b0f58baf-71c4-4f54-a996-fe88137dcc56",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 222,
+      "total_deletions": 0,
+      "accepted_lines": 222,
+      "overriden_lines": 0
+    }
+  }
+}

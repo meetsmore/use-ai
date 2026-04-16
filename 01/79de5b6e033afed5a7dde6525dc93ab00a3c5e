@@ -1,0 +1,23 @@
+README.md
+  cb1d99356a9cf8a7 1192
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.5",
+  "base_commit_sha": "0179de5b6e033afed5a7dde6525dc93ab00a3c5e",
+  "prompts": {
+    "cb1d99356a9cf8a7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0c5016c5-8662-4399-973b-52d7f7897cc7",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 6,
+      "total_deletions": 4,
+      "accepted_lines": 1,
+      "overriden_lines": 1
+    }
+  }
+}

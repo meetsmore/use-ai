@@ -1,0 +1,23 @@
+packages/server/src/agents/AISDKAgent.ts
+  877372e68b80d5d7 554-558,560-562
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.23",
+  "base_commit_sha": "5025608cc5bf50f28c481c1e68d51cf11a76a11a",
+  "prompts": {
+    "877372e68b80d5d7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8f2f0aa7-eca2-43a8-ad83-3f96129ffb0d",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 8,
+      "total_deletions": 7,
+      "accepted_lines": 8,
+      "overriden_lines": 0
+    }
+  }
+}

@@ -1,0 +1,43 @@
+apps/example/test/reasoning.e2e.test.ts
+  aca7067484b5bbe0 107
+packages/client/src/hooks/useServerEvents.test.ts
+  aca7067484b5bbe0 102,117
+packages/server/src/agents/AISDKAgent.test.ts
+  aca7067484b5bbe0 2437,2474,2479,2522,2547,2550,2569,2576,2589
+packages/client/src/client.ts
+  aca7067484b5bbe0 30,95-96,213,217
+packages/client/src/providers/chatRepository/types.ts
+  aca7067484b5bbe0 65-66,71-73
+packages/server/src/agents/AISDKAgent.ts
+  aca7067484b5bbe0 230,234,237-241,302,314,473,475,584,1104-1106,1111-1113,1115,1118-1119
+packages/server/src/reasoning.integration.test.ts
+  aca7067484b5bbe0 56,74,89
+packages/core/src/types.ts
+  aca7067484b5bbe0 247,251-255
+packages/server/src/server.ts
+  aca7067484b5bbe0 609,613-614,616,621,626
+packages/client/src/client.test.ts
+  aca7067484b5bbe0 47,454,466,476,490,504
+apps/use-ai-server-app/src/index.ts
+  aca7067484b5bbe0 44-45
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.23",
+  "base_commit_sha": "9d1b42f2d7804a14f0b12cf7f90c0beb0de4dad9",
+  "prompts": {
+    "aca7067484b5bbe0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6b7f651b-14e5-43a9-9b08-d7d6057400fb",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 66,
+      "total_deletions": 56,
+      "accepted_lines": 66,
+      "overriden_lines": 0
+    }
+  }
+}

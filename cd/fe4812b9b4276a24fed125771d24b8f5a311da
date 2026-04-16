@@ -1,0 +1,37 @@
+apps/example/test/tool-approval.e2e.test.ts
+  db319dc1bb376065 163-208
+  18072c9002c9fdd7 1,57-77,245-246,275-276
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.1",
+  "base_commit_sha": "cdfe4812b9b4276a24fed125771d24b8f5a311da",
+  "prompts": {
+    "18072c9002c9fdd7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a25ca16f-304b-4647-8e54-c79fba68234d",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 27,
+      "total_deletions": 5,
+      "accepted_lines": 27,
+      "overriden_lines": 0
+    },
+    "db319dc1bb376065": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "69c2fc47-dc76-4a10-86d7-fe78f3249785",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 103,
+      "total_deletions": 57,
+      "accepted_lines": 46,
+      "overriden_lines": 0
+    }
+  }
+}

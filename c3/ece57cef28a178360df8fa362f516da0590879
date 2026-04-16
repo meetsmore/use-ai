@@ -1,0 +1,34 @@
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.10",
+  "base_commit_sha": "c3ece57cef28a178360df8fa362f516da0590879",
+  "prompts": {
+    "13bb47f5758d74fb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f174180e-82a6-47a5-bad8-7d1321e10d10",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 123,
+      "overriden_lines": 0
+    },
+    "c1efc3d4a80e46af": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dc6a60e6-1134-4a5f-8961-01827bb0fce8",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 1,
+      "accepted_lines": 0,
+      "overriden_lines": 0
+    }
+  }
+}

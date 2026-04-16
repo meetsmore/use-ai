@@ -1,0 +1,34 @@
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.5",
+  "base_commit_sha": "4e7b7f7b1356cabee5a1cd23ae249299c0fe0143",
+  "prompts": {
+    "0e62b54c23ccee91": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b483af93-fbd7-4145-a7d7-0a5ea7cd17f5",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 4,
+      "overriden_lines": 0
+    },
+    "139400dad71144d9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "601041b2-b56c-4df3-8e11-68168d314d51",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent",
+      "messages": [],
+      "total_additions": 1248,
+      "total_deletions": 74,
+      "accepted_lines": 13,
+      "overriden_lines": 3
+    }
+  }
+}

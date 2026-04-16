@@ -1,0 +1,91 @@
+packages/client/src/fileUpload/processAttachments.test.ts
+  f5c649f5434b4571 1-248
+packages/client/src/components/UseAIChatPanel.tsx
+  f5c649f5434b4571 129,135,920,944
+packages/client/src/components/ProgressBar.tsx
+  f5c649f5434b4571 1-76
+packages/server/src/agents/AISDKAgent.ts
+  f5c649f5434b4571 843-860,865
+packages/client/src/fileUpload/index.ts
+  f5c649f5434b4571 7-10,14-17
+packages/client/src/index.ts
+  f5c649f5434b4571 65-66,72-75,77
+packages/server/src/server.ts
+  f5c649f5434b4571 475-483
+packages/client/src/providers/useAIProvider.tsx
+  f5c649f5434b4571 647-649,651,654-656,658-673,677,679-681
+packages/client/src/components/FileChip.tsx
+  f5c649f5434b4571 2,4-5,17-18,54,56,60-62,77-78,132,137,143,146,158-203
+apps/example/src/App.tsx
+  f5c649f5434b4571 11,25,79-81
+packages/client/src/client.ts
+  f5c649f5434b4571 331,337-342
+apps/example/test/file-transformers.e2e.test.ts
+  f5c649f5434b4571 1-283
+packages/client/src/components/Spinner.tsx
+  f5c649f5434b4571 1-75
+packages/client/src/fileUpload/processAttachments.ts
+  f5c649f5434b4571 1-143
+packages/client/src/fileUpload/types.ts
+  f5c649f5434b4571 31-35,60-103,124-129
+packages/client/src/fileUpload/mimeTypeMatcher.test.ts
+  f5c649f5434b4571 1-133
+apps/example/src/pages/FileTransformersPage.tsx
+  f5c649f5434b4571 1-300
+packages/client/src/hooks/useFileUpload.tsx
+  f5c649f5434b4571 2,4,80-81,149,157,171,175-206,209,234-241,243-250,252,259-263,271,390
+docs/plans/file-transformers.md
+  8a99496d5766b280 1-21,23-78,80-96,98-170,172-244,246-461,463-809,811-1065,1067-1107
+packages/core/src/types.ts
+  f5c649f5434b4571 353-371,377,380
+packages/client/src/fileUpload/mimeTypeMatcher.ts
+  f5c649f5434b4571 1-77
+packages/core/src/index.ts
+  f5c649f5434b4571 50
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.34",
+  "base_commit_sha": "b4449cf5befa24ec3a548e55f886485977bbccf0",
+  "prompts": {
+    "8a99496d5766b280": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5e57928d-e21c-4ba2-8b5f-7eea8dacd8bc",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 1500,
+      "total_deletions": 418,
+      "accepted_lines": 1099,
+      "overriden_lines": 0
+    },
+    "cdae58660ead1854": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5bfc182b-6c91-4a79-90b1-d50c7f2dddd6",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 233,
+      "total_deletions": 0,
+      "accepted_lines": 233,
+      "overriden_lines": 0
+    },
+    "f5c649f5434b4571": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0e81313e-4593-436c-bc57-1ac4ae561957",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 1724,
+      "total_deletions": 130,
+      "accepted_lines": 1636,
+      "overriden_lines": 0
+    }
+  }
+}

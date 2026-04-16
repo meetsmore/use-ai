@@ -1,0 +1,41 @@
+package.json
+  c1bd345fc8a9a973 33-34
+.gitignore
+  c1bd345fc8a9a973 20-22
+typedoc.json
+  b7add8531105821f 1-8,10-11,18
+  c1bd345fc8a9a973 9,12-17
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.42",
+  "base_commit_sha": "70bad17a7c55dded5f03c633ffa367795ab31360",
+  "prompts": {
+    "b7add8531105821f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e5735f4f-4703-4362-964c-77843977dc67",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 24,
+      "total_deletions": 7,
+      "accepted_lines": 11,
+      "overriden_lines": 0
+    },
+    "c1bd345fc8a9a973": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cb6afdcd-fff1-4b4b-a0f3-1b3744e8f65d",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 15,
+      "total_deletions": 7,
+      "accepted_lines": 13,
+      "overriden_lines": 0
+    }
+  }
+}

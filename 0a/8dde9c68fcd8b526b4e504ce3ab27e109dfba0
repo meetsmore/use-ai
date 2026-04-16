@@ -1,0 +1,25 @@
+packages/server/src/core-architecture.integration.test.ts
+  9090ea8e2cade200 25
+apps/example/test/model-select.e2e.test.ts
+  9090ea8e2cade200 292-301
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.3",
+  "base_commit_sha": "0a8dde9c68fcd8b526b4e504ce3ab27e109dfba0",
+  "prompts": {
+    "9090ea8e2cade200": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "46f0403e-d84e-4e23-bf41-c153bd71d37e",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent",
+      "messages": [],
+      "total_additions": 11,
+      "total_deletions": 1,
+      "accepted_lines": 11,
+      "overriden_lines": 0
+    }
+  }
+}

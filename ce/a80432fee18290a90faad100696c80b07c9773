@@ -1,0 +1,40 @@
+packages/client/src/hooks/useChatManagement.ts
+  99da73825bcc253c 24,572,574
+packages/client/src/index.ts
+  99da73825bcc253c 44
+packages/client/src/providers/useAIProvider.tsx
+  56b4d97e65d5f025 738-740
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.42",
+  "base_commit_sha": "cea80432fee18290a90faad100696c80b07c9773",
+  "prompts": {
+    "56b4d97e65d5f025": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "15d646cb-caac-4f44-bc64-723eb9619633",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "yuma.ito@meetsmore.com",
+      "messages": [],
+      "total_additions": 6,
+      "total_deletions": 3,
+      "accepted_lines": 3,
+      "overriden_lines": 0
+    },
+    "99da73825bcc253c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3f98011f-dddb-450b-a604-58a1b50d64dd",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "yuma.ito@meetsmore.com",
+      "messages": [],
+      "total_additions": 5,
+      "total_deletions": 17,
+      "accepted_lines": 4,
+      "overriden_lines": 0
+    }
+  }
+}

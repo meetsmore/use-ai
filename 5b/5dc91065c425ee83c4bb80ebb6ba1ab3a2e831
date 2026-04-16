@@ -1,0 +1,29 @@
+packages/client/src/hooks/useFileUpload.test.tsx
+  30b843135b9ca9c7 3-4,241-290
+packages/client/src/hooks/useFileUpload.tsx
+  30b843135b9ca9c7 2,5,178,183,189
+packages/client/src/fileUpload/processAttachments.ts
+  30b843135b9ca9c7 45
+packages/client/src/fileUpload/index.ts
+  30b843135b9ca9c7 17
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.34",
+  "base_commit_sha": "5b5dc91065c425ee83c4bb80ebb6ba1ab3a2e831",
+  "prompts": {
+    "30b843135b9ca9c7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2f5f9ba0-d82b-4052-85bd-c9337e62cc5a",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 67,
+      "total_deletions": 13,
+      "accepted_lines": 59,
+      "overriden_lines": 0
+    }
+  }
+}

@@ -1,0 +1,23 @@
+packages/server/src/rate-limiting.integration.test.ts
+  c2810156b6b6e963 187-219
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.37",
+  "base_commit_sha": "76287b8f84d6af0b2e06d031706610df10a8b947",
+  "prompts": {
+    "c2810156b6b6e963": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "84c4c611-5962-412f-acd7-dc1dfd07ea6b",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 33,
+      "total_deletions": 0,
+      "accepted_lines": 33,
+      "overriden_lines": 0
+    }
+  }
+}

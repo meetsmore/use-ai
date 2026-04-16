@@ -1,0 +1,21 @@
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.34",
+  "base_commit_sha": "b5dca99bb8579b99e19d91678bb1d3f98d79d7ec",
+  "prompts": {
+    "942e5ff18cd08a7c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "52a9436c-3586-4cd1-a719-10199715cd6d",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Masuda Hiroto <masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 4,
+      "accepted_lines": 0,
+      "overriden_lines": 0
+    }
+  }
+}

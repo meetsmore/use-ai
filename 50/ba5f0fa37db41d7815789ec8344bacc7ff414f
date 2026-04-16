@@ -1,0 +1,23 @@
+packages/client/src/fileUpload/processAttachments.test.ts
+  99da73825bcc253c 280,283-287,290,301-315
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.42",
+  "base_commit_sha": "50ba5f0fa37db41d7815789ec8344bacc7ff414f",
+  "prompts": {
+    "99da73825bcc253c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3f98011f-dddb-450b-a604-58a1b50d64dd",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "yuma.ito@meetsmore.com",
+      "messages": [],
+      "total_additions": 24,
+      "total_deletions": 3,
+      "accepted_lines": 24,
+      "overriden_lines": 0
+    }
+  }
+}

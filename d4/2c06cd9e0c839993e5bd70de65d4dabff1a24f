@@ -1,0 +1,36 @@
+packages/server/src/core-architecture.integration.test.ts
+  15028128c9cb4ac6 25
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.3",
+  "base_commit_sha": "d42c06cd9e0c839993e5bd70de65d4dabff1a24f",
+  "prompts": {
+    "0985a52e8afc7998": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "de9d81e5-aa6e-4209-ae25-51f987c74d7f",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 0,
+      "overriden_lines": 1
+    },
+    "15028128c9cb4ac6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7d7a5af7-631d-4b11-9d5a-8f010cbcbd05",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "deer-agent",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 1,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  }
+}

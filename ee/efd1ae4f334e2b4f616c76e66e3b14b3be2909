@@ -1,0 +1,23 @@
+packages/server/src/error-handling.integration.test.ts
+  379a2303b0e378e9 353-356,365-376,414,417-429,441-444,453-464,508,511-523
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.42",
+  "base_commit_sha": "eeefd1ae4f334e2b4f616c76e66e3b14b3be2909",
+  "prompts": {
+    "379a2303b0e378e9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "375956d6-3cdc-477c-9a85-9c268dfcb0cb",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 60,
+      "total_deletions": 22,
+      "accepted_lines": 60,
+      "overriden_lines": 0
+    }
+  }
+}

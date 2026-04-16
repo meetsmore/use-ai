@@ -1,0 +1,37 @@
+packages/server/src/error-handling.integration.test.ts
+  09d5181b6a3efd89 199-202,214-225,271-279,281-283
+  379a2303b0e378e9 1-2,11-13,19,286-328,330,332-610
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.42",
+  "base_commit_sha": "15e65823c268c5a192d3e48c37f97caa3b92d5fe",
+  "prompts": {
+    "09d5181b6a3efd89": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e93f8b6b-d699-42e6-906b-062bf4e46963",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 31,
+      "total_deletions": 25,
+      "accepted_lines": 29,
+      "overriden_lines": 0
+    },
+    "379a2303b0e378e9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "375956d6-3cdc-477c-9a85-9c268dfcb0cb",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 343,
+      "total_deletions": 11,
+      "accepted_lines": 332,
+      "overriden_lines": 0
+    }
+  }
+}

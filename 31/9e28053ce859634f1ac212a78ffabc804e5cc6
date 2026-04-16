@@ -1,0 +1,25 @@
+apps/use-ai-server-app/package.json
+  2572218eb19e9b24 26
+apps/use-ai-server-app/src/index.ts
+  2572218eb19e9b24 4,225-226
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.5",
+  "base_commit_sha": "319e28053ce859634f1ac212a78ffabc804e5cc6",
+  "prompts": {
+    "2572218eb19e9b24": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e109b994-0ea0-4cb5-b528-67ee403ee8d4",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 9,
+      "total_deletions": 14,
+      "accepted_lines": 4,
+      "overriden_lines": 0
+    }
+  }
+}

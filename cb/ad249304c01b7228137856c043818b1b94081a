@@ -1,0 +1,33 @@
+packages/server/src/telemetry.ts
+  2572218eb19e9b24 17,20-25,58,61-62,64,68,76-86,89-90,92-116,125
+apps/use-ai-server-app/src/index.ts
+  2572218eb19e9b24 206-207,210-212
+packages/server/src/telemetry.test.ts
+  2572218eb19e9b24 5,18,25-30,34,36-37,40-46,49-50
+CLAUDE.md
+  2572218eb19e9b24 231
+packages/server/src/types.ts
+  2572218eb19e9b24 156-160
+README.md
+  2572218eb19e9b24 968-969,971-972,1140,1146-1148,1150-1151,1161,1180,1191
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.5",
+  "base_commit_sha": "cbad249304c01b7228137856c043818b1b94081a",
+  "prompts": {
+    "2572218eb19e9b24": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e109b994-0ea0-4cb5-b528-67ee403ee8d4",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 147,
+      "total_deletions": 151,
+      "accepted_lines": 98,
+      "overriden_lines": 0
+    }
+  }
+}

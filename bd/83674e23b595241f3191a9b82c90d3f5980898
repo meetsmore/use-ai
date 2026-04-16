@@ -1,0 +1,21 @@
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.1",
+  "base_commit_sha": "bd83674e23b595241f3191a9b82c90d3f5980898",
+  "prompts": {
+    "def409e6234ffeb1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f31e1bca-b0fa-4067-90ef-5ebfbf3b3d69",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 16,
+      "accepted_lines": 0,
+      "overriden_lines": 0
+    }
+  }
+}

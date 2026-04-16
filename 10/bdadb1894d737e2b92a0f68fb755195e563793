@@ -1,0 +1,40 @@
+apps/example/src/pages/ServerRuntimeApprovalPage.tsx
+  e8e50c1b729c6084 1-119
+apps/example/src/pages/RuntimeApprovalPage.tsx
+  e8e50c1b729c6084 1-214
+apps/use-ai-server-app/src/index.ts
+  e8e50c1b729c6084 187-210
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "10bdadb1894d737e2b92a0f68fb755195e563793",
+  "prompts": {
+    "5fbafc80ba40231b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "01db9704-6ada-47dd-9224-262c247df9e1",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    },
+    "e8e50c1b729c6084": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0b5c9d74-4fff-4eb3-9255-e334146b21a4",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 357,
+      "overriden_lines": 0
+    }
+  }
+}

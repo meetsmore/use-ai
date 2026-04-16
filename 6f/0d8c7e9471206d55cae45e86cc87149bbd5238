@@ -1,0 +1,25 @@
+packages/server/src/server.ts
+  09679ea7099eb838 83,88,91,110,243,246,254,266-269,280-286,304,322,333,357,362,374,381,400,404,426,438-439,449-450,453,459,465,478,485,491,504,508,515,522,527,535,538,545,556,564,571,584,586,605,612-615,617,620-621,624-625,627-628,632,635,642,657,665,711,724-735,743,754,765,769,783-790,796,801,811,831-836,842,857-863,878,882-883,885
+apps/use-ai-server-app/src/index.ts
+  09679ea7099eb838 19,23,28,34,43,52,61,76,82,85-86,89-90,94,96,126,131,137-140
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.37",
+  "base_commit_sha": "6f0d8c7e9471206d55cae45e86cc87149bbd5238",
+  "prompts": {
+    "09679ea7099eb838": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "21a5472c-ceb1-4a8a-907f-dcb0ef86a42a",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 135,
+      "total_deletions": 6,
+      "accepted_lines": 135,
+      "overriden_lines": 0
+    }
+  }
+}

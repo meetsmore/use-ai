@@ -1,0 +1,23 @@
+packages/client/src/fileUpload/mimeTypeMatcher.test.ts
+  66e28924eb2ef582 60-61,70-71,80-81,89-90,98-99,108-109,113-114
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.42",
+  "base_commit_sha": "992d7d98e572394ce7e17ac3ecde5d45d1298079",
+  "prompts": {
+    "66e28924eb2ef582": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b8125d80-c7b3-47c2-90f5-37b010e1e45c",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "yuma.ito@meetsmore.com",
+      "messages": [],
+      "total_additions": 14,
+      "total_deletions": 7,
+      "accepted_lines": 14,
+      "overriden_lines": 0
+    }
+  }
+}

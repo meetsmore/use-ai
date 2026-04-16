@@ -1,0 +1,23 @@
+packages/server/src/runtime/runtime-adapter.integration.test.ts
+  179d87336b449c2e 71,81
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.42",
+  "base_commit_sha": "a39f842e62009d622f5517584830a74ab5d748fd",
+  "prompts": {
+    "179d87336b449c2e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f1239f6d-27f3-4c5e-859e-05a2f18fbe7e",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 2,
+      "total_deletions": 2,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    }
+  }
+}

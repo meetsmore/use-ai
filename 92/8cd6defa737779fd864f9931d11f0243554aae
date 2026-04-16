@@ -1,0 +1,23 @@
+packages/server/src/agents/AISDKAgent.ts
+  c17411b654cd6f05 709,712
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "928cd6defa737779fd864f9931d11f0243554aae",
+  "prompts": {
+    "c17411b654cd6f05": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6fdd470b-ccf5-44a7-9e5b-5d93eef69650",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 3,
+      "total_deletions": 1,
+      "accepted_lines": 3,
+      "overriden_lines": 0
+    }
+  }
+}

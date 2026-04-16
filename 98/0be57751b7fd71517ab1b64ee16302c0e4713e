@@ -1,0 +1,39 @@
+packages/client/src/providers/chatRepository/types.ts
+  e0b70dc9b6cd52a3 92-93
+packages/client/src/hooks/useServerEvents.test.ts
+  e0b70dc9b6cd52a3 101,106,137-144,154,158,346-347,352,381-388,397,399,441,461,463-464,467
+packages/client/src/components/UseAIChatPanel.tsx
+  e0b70dc9b6cd52a3 215,221,239,951-978
+packages/client/src/hooks/useServerEvents.ts
+  e0b70dc9b6cd52a3 64,226-227,238
+packages/server/src/server.ts
+  e0b70dc9b6cd52a3 612-614,616,619-623,626
+packages/client/src/client.ts
+  e0b70dc9b6cd52a3 264-265,294
+packages/server/src/agents/AISDKAgent.ts
+  e0b70dc9b6cd52a3 1093-1098,1104-1110
+apps/example/test/reasoning.e2e.test.ts
+  e0b70dc9b6cd52a3 27,59-60,69-72,74-75,80-81,84-154,174
+packages/client/src/hooks/useChatManagement.ts
+  e0b70dc9b6cd52a3 103
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.22",
+  "base_commit_sha": "980be57751b7fd71517ab1b64ee16302c0e4713e",
+  "prompts": {
+    "e0b70dc9b6cd52a3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "37969cea-08ae-431a-b308-8200fb7b96a6",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 181,
+      "total_deletions": 116,
+      "accepted_lines": 179,
+      "overriden_lines": 0
+    }
+  }
+}

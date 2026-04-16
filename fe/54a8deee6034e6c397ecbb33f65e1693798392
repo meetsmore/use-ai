@@ -1,0 +1,66 @@
+.env.example
+  58210774d82ae39a 30-39
+apps/use-ai-server-app/src/index.ts
+  58210774d82ae39a 7,12,35-41,43-77,80-87,89-93,100
+apps/use-ai-server-app/package.json
+  58210774d82ae39a 23
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8",
+  "base_commit_sha": "fe54a8deee6034e6c397ecbb33f65e1693798392",
+  "prompts": {
+    "58210774d82ae39a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9abcd8ab-67d5-406d-828c-ecf2fe800f22",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent",
+      "messages": [],
+      "total_additions": 192,
+      "total_deletions": 90,
+      "accepted_lines": 75,
+      "overriden_lines": 0
+    },
+    "9531d2b71fb69b4a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ceff8c3f-d110-4a08-a5b7-18730a2c526e",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 0,
+      "overriden_lines": 0
+    },
+    "caa897b4c19a01e6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b67f328f-c2dc-41fe-9afa-1b3944a7de35",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 0,
+      "overriden_lines": 0
+    },
+    "cb004a0725872704": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a39df527-6cdb-4909-ba03-0402440cf6d9",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1387,
+      "overriden_lines": 2
+    }
+  }
+}

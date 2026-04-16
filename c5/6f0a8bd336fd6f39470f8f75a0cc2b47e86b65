@@ -1,0 +1,23 @@
+.github/workflows/release.yml
+  f15c024bf38fc47c 43
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.37",
+  "base_commit_sha": "c56f0a8bd336fd6f39470f8f75a0cc2b47e86b65",
+  "prompts": {
+    "f15c024bf38fc47c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6205fdc6-f7ce-437d-a517-8c907f78c862",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 4,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  }
+}

@@ -1,0 +1,51 @@
+apps/example/test/extended-thinking.e2e.test.ts
+  2e213f55bcd5e8eb 9-10,13,23-24
+apps/use-ai-server-app/src/index.ts
+  2e213f55bcd5e8eb 49,51-54,76
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8",
+  "base_commit_sha": "c83bc72931a4e226600afe6adbb2b453aa4acd20",
+  "prompts": {
+    "2e213f55bcd5e8eb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1445320c-2215-4309-9085-d97a6307c7f0",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent",
+      "messages": [],
+      "total_additions": 11,
+      "total_deletions": 9,
+      "accepted_lines": 11,
+      "overriden_lines": 0
+    },
+    "890639026f35ebc8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d690a210-be61-4fda-bf76-9a7f943c8076",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 11,
+      "overriden_lines": 0
+    },
+    "c77299ca3389cb4a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1a7377b3-4719-4857-b001-a594fb1c3ac4",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 0,
+      "overriden_lines": 0
+    }
+  }
+}

@@ -1,0 +1,27 @@
+packages/server/src/plugins/FeedbackPlugin.test.ts
+  95f722c23c7021e5 1-307
+packages/server/src/instrumentation.test.ts
+  95f722c23c7021e5 1-70
+packages/server/src/feedback.integration.test.ts
+  95f722c23c7021e5 1-380
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.37",
+  "base_commit_sha": "e091f61534886e89123c74e7314d02cea1f54468",
+  "prompts": {
+    "95f722c23c7021e5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "99b4e0ff-fd61-4e6a-a331-ec323bbe2d81",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 798,
+      "total_deletions": 36,
+      "accepted_lines": 757,
+      "overriden_lines": 0
+    }
+  }
+}

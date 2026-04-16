@@ -1,0 +1,38 @@
+apps/example/src/pages/EmbeddedChatPage.tsx
+  b7828362f00b7422 2,4,47-179,217,220,226-257,369-371,458-474,476-532
+packages/client/src/providers/useAIProvider.tsx
+  b7828362f00b7422 316-339,396,410-415,465,814,853,856,869,891
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.34",
+  "base_commit_sha": "89e4e1cfbaef78e87a8404e4db3f9c9cf2c7fa71",
+  "prompts": {
+    "65b3228705e78526": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a091eef7-6407-4d5d-aad5-0e053cd5476b",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 451,
+      "total_deletions": 0,
+      "accepted_lines": 451,
+      "overriden_lines": 0
+    },
+    "b7828362f00b7422": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5a112a0f-eaf1-40ec-a387-cb14228e3b51",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 461,
+      "total_deletions": 9,
+      "accepted_lines": 461,
+      "overriden_lines": 0
+    }
+  }
+}

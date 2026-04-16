@@ -1,0 +1,43 @@
+packages/client/src/client.ts
+  0834bb2f6c499d71 315-316
+apps/example/src/index.react16.tsx
+  0834bb2f6c499d71 14-15,17
+apps/example/src/pages/RemoteMcpToolsPage.tsx
+  0834bb2f6c499d71 22,55,64-68
+packages/client/src/providers/useAIProvider.forwardedPropsProvider.test.tsx
+  0834bb2f6c499d71 62,75,84-85,90-91,93-94,115,122,128-129,148,151-152,154-155,162,168-169,174-175,177-179,198,201-205,212-214,216-217,220-221,240,247-248,251-252,257,261-263,289,291-383
+packages/server/src/mcp/RemoteMcpToolsProvider.ts
+  0834bb2f6c499d71 72
+packages/core/src/types.ts
+  0834bb2f6c499d71 241-242
+packages/client/src/client.test.ts
+  0834bb2f6c499d71 317,325,332,338,346-349,359,376,384
+apps/example/src/index.tsx
+  0834bb2f6c499d71 15-16,18,21,23
+packages/server/src/agents/AISDKAgent.ts
+  0834bb2f6c499d71 393
+packages/client/src/hooks/useChatManagement.ts
+  0834bb2f6c499d71 21-22,24,109,570,597-598
+packages/client/src/providers/useAIProvider.tsx
+  0834bb2f6c499d71 241-244,247-272,275,409,455,483,485,714,788-790,793-795,799,803-804,807
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.42",
+  "base_commit_sha": "4f44b6192e367cd8f4ca7d57ee857595f2e4d9b0",
+  "prompts": {
+    "0834bb2f6c499d71": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bb491bad-2d56-468f-98c1-5c962b6bc19f",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 235,
+      "total_deletions": 179,
+      "accepted_lines": 227,
+      "overriden_lines": 0
+    }
+  }
+}

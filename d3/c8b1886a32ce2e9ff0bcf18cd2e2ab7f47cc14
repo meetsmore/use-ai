@@ -1,0 +1,23 @@
+apps/use-ai-server-app/src/index.ts
+  58210774d82ae39a 36,94
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8",
+  "base_commit_sha": "d3c8b1886a32ce2e9ff0bcf18cd2e2ab7f47cc14",
+  "prompts": {
+    "58210774d82ae39a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9abcd8ab-67d5-406d-828c-ecf2fe800f22",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent",
+      "messages": [],
+      "total_additions": 3888,
+      "total_deletions": 8,
+      "accepted_lines": 3888,
+      "overriden_lines": 0
+    }
+  }
+}

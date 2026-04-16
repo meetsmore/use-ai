@@ -1,0 +1,25 @@
+README.md
+  3f2f65bcba0c7c06 38,488,497-499,504-544
+CLAUDE.md
+  3f2f65bcba0c7c06 92,96,238
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.42",
+  "base_commit_sha": "e6ab95d3fbc1e9dcbac704f49fc28128259abbea",
+  "prompts": {
+    "3f2f65bcba0c7c06": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "668f7dd2-c676-4d7f-b03f-7eb2a4b6f1ae",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 52,
+      "total_deletions": 8,
+      "accepted_lines": 49,
+      "overriden_lines": 1
+    }
+  }
+}

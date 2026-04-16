@@ -1,0 +1,27 @@
+packages/server/src/server.ts
+  c2810156b6b6e963 27,190-194
+packages/server/src/bun-config.ts
+  c2810156b6b6e963 1-118
+packages/server/src/types.ts
+  c2810156b6b6e963 2,6-13,19,22,24,26-27
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.37",
+  "base_commit_sha": "f1ac5a3724208e96cc80a70ba2028f4fdb56f03b",
+  "prompts": {
+    "c2810156b6b6e963": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "84c4c611-5962-412f-acd7-dc1dfd07ea6b",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 260,
+      "total_deletions": 386,
+      "accepted_lines": 138,
+      "overriden_lines": 0
+    }
+  }
+}

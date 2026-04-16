@@ -1,0 +1,23 @@
+packages/client/src/fileUpload/processAttachments.ts
+  66e28924eb2ef582 44-49,75,81,94,172
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.42",
+  "base_commit_sha": "f7259459b049595b1d1ce7fe7d0b74b2946482fe",
+  "prompts": {
+    "66e28924eb2ef582": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b8125d80-c7b3-47c2-90f5-37b010e1e45c",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "yuma.ito@meetsmore.com",
+      "messages": [],
+      "total_additions": 11,
+      "total_deletions": 1,
+      "accepted_lines": 10,
+      "overriden_lines": 0
+    }
+  }
+}

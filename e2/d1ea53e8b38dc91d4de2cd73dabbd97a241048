@@ -1,0 +1,23 @@
+packages/server/src/server.ts
+  e142962dc61f00c2 161,164
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.37",
+  "base_commit_sha": "e2d1ea53e8b38dc91d4de2cd73dabbd97a241048",
+  "prompts": {
+    "e142962dc61f00c2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cec31323-b994-420e-81b2-3f6bcc61083e",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 2,
+      "total_deletions": 2,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    }
+  }
+}

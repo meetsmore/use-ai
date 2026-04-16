@@ -1,0 +1,57 @@
+packages/client/src/defineTool.ts
+  3aedc9a29542cc72 5-21,26-27,177
+docs/plans/status-texts.md
+  3aedc9a29542cc72 128,138,140-154,158,169,171-175,177
+  6ffb26722894e3a9 1-127,129-137,139,155-157,159-168,170,176,178-237
+packages/client/src/providers/useAIProvider.tsx
+  3aedc9a29542cc72 2,431-437,542-553,557-559,803-807,841,872
+packages/client/src/defineTool.test.ts
+  3aedc9a29542cc72 172-173,177,180-181,184,188,195,202,211,214-215,221,224-246
+packages/client/src/components/UseAIChat.tsx
+  3aedc9a29542cc72 73-74,159
+apps/example/src/useCalculatorLogic.ts
+  3aedc9a29542cc72 83-84,90-91
+packages/client/src/theme/strings.ts
+  3aedc9a29542cc72 103-108
+packages/client/src/components/UseAIChatPanel.tsx
+  3aedc9a29542cc72 88-89,119,874,963-967
+apps/example/src/useTodoLogic.ts
+  3aedc9a29542cc72 85-86,95,103-104,111
+packages/client/src/index.ts
+  3aedc9a29542cc72 45
+apps/example/src/components/ListItem.tsx
+  3aedc9a29542cc72 30-31,46-47,68-69,90-91,103-104,117-118
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.42",
+  "base_commit_sha": "a6f722ada99f7c8a8ce4a8117190fb055bf753f3",
+  "prompts": {
+    "3aedc9a29542cc72": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "97a7e249-cedb-497b-b7a7-894f1e3f87aa",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 162,
+      "total_deletions": 56,
+      "accepted_lines": 153,
+      "overriden_lines": 0
+    },
+    "6ffb26722894e3a9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "144b365b-235e-45ce-ab09-e52f0dcbdd6e",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 262,
+      "total_deletions": 38,
+      "accepted_lines": 212,
+      "overriden_lines": 0
+    }
+  }
+}
