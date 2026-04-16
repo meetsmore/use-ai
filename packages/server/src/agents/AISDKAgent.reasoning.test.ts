@@ -4,6 +4,7 @@ import type { AgentInput, EventEmitter, AGUIEventExtended } from './types';
 import { EventType } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 import { MockLanguageModelV3, simulateReadableStream } from 'ai/test';
+import type { JSONValue } from 'ai';
 
 // Helpers
 
@@ -40,24 +41,23 @@ function createTestInput(overrides: Partial<AgentInput> = {}): AgentInput {
 
 /** Create a MockLanguageModelV3 from stream chunks and response text. */
 function createMockModel(chunks: unknown[], responseText: string, modelId = 'mock-model') {
-  return new MockLanguageModelV3({
-    doStream: async () => ({
-      stream: simulateReadableStream({ chunks }),
-      response: {
-        id: 'response-1',
-        timestamp: new Date(),
-        modelId,
-        headers: {},
-        messages: [{ role: 'assistant', content: responseText }],
-      },
-    }),
+  const doStream = async () => ({
+    stream: simulateReadableStream({ chunks }),
+    response: {
+      id: 'response-1',
+      timestamp: new Date(),
+      modelId,
+      headers: {},
+      messages: [{ role: 'assistant', content: responseText }],
+    },
   });
+  return new MockLanguageModelV3({ doStream: doStream as never });
 }
 
 /** Run an agent and return the collected events + result. */
 async function runAgent(
   model: InstanceType<typeof MockLanguageModelV3>,
-  providerOptions?: Record<string, Record<string, unknown>>,
+  providerOptions?: Record<string, Record<string, JSONValue>>,
 ) {
   const agent = new AISDKAgent({ model, providerOptions });
   const events: AGUIEventExtended[] = [];
