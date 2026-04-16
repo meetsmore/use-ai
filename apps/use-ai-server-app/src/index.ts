@@ -1,10 +1,11 @@
 #!/usr/bin/env bun
-import { UseAIServer, AISDKAgent, logger, defineServerTool } from '@meetsmore-oss/use-ai-server';
+import { UseAIServer, AISDKAgent, logger, defineServerTool, createMockReasoningModel } from '@meetsmore-oss/use-ai-server';
 import type { Agent, McpEndpointConfig, ServerToolConfig, UseAIServerPlugin, BeforeRunAgentResult, AgentInput } from '@meetsmore-oss/use-ai-server';
 import type { UseAIForwardedProps } from '@meetsmore-oss/use-ai-core';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { createOpenAI } from '@ai-sdk/openai';
 import { createGateway } from '@ai-sdk/gateway';
+import type { JSONValue } from 'ai';
 import { WorkflowsPlugin, DifyWorkflowRunner } from '@meetsmore-oss/use-ai-plugin-workflows';
 import type { WorkflowRunner } from '@meetsmore-oss/use-ai-plugin-workflows';
 import { z } from 'zod';
@@ -45,22 +46,34 @@ function createAgents(): { agents: Record<string, Agent>; defaultAgent: string }
   // Temperature can be set via env var (useful for E2E tests to reduce flakiness)
   const temperature = process.env.AI_TEMPERATURE ? Number(process.env.AI_TEMPERATURE) : undefined;
 
+  // Extended thinking configuration (opt-in via env var).
+  // Anthropic-specific; applied to Claude agents only (works for both direct API and gateway).
+  // Set USE_AI_ANTHROPIC_REASONING_BUDGET_TOKEN to a positive integer (e.g. 10000) to enable.
+  const reasoningBudgetTokens = Number(process.env.USE_AI_ANTHROPIC_REASONING_BUDGET_TOKEN) || undefined;
+  const claudeProviderOptions: Record<string, Record<string, JSONValue>> | undefined = reasoningBudgetTokens
+    ? { anthropic: { thinking: { type: 'enabled', budgetTokens: reasoningBudgetTokens } } }
+    : undefined;
+
   const addAgent = (
     key: string,
     name: string,
     model: AgentModel,
     modelLabel: string,
-    viaGateway: boolean
+    viaGateway: boolean,
+    providerOptions?: Record<string, Record<string, JSONValue>>
   ): void => {
     agents[key] = new AISDKAgent({
       model,
       name,
       temperature,
       annotation: viaGateway ? 'Routed via Vercel AI Gateway' : undefined,
+      providerOptions,
     });
+    const hasThinking = !!providerOptions?.anthropic && typeof providerOptions.anthropic === 'object' && 'thinking' in providerOptions.anthropic;
     const suffix = [
       viaGateway ? 'via gateway' : null,
       temperature !== undefined ? `temp=${temperature}` : null,
+      hasThinking ? `thinking=${reasoningBudgetTokens}` : null,
     ]
       .filter(Boolean)
       .join(', ');
@@ -70,11 +83,11 @@ function createAgents(): { agents: Record<string, Agent>; defaultAgent: string }
   // Claude: gateway preferred, fall back to direct Anthropic API
   if (gateway) {
     const modelId = process.env.AI_GATEWAY_CLAUDE_MODEL || 'anthropic/claude-haiku-4.5';
-    addAgent('claude', 'Claude', gateway(modelId), modelId, true);
+    addAgent('claude', 'Claude', gateway(modelId), modelId, true, claudeProviderOptions);
   } else if (anthropicApiKey) {
     const modelId = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-20250514';
     const model = createAnthropic({ apiKey: anthropicApiKey })(modelId);
-    addAgent('claude', 'Claude', model, modelId, false);
+    addAgent('claude', 'Claude', model, modelId, false, claudeProviderOptions);
   }
 
   // GPT: gateway preferred, fall back to direct OpenAI API
@@ -85,6 +98,16 @@ function createAgents(): { agents: Record<string, Agent>; defaultAgent: string }
     const modelId = process.env.OPENAI_MODEL || 'gpt-4-turbo';
     const model = createOpenAI({ apiKey: openaiApiKey })(modelId);
     addAgent('gpt', 'ChatGPT', model, modelId, false);
+  }
+
+  // Mock agent for UI development (no API key needed)
+  if (process.env.USE_AI_ENABLE_MOCK_AGENT) {
+    agents.mock = new AISDKAgent({
+      model: createMockReasoningModel(),
+      name: 'Mock (Reasoning)',
+      annotation: 'Mock model with reasoning, tool calls, and multi-step flows for UI testing',
+    });
+    enabledAgents.push('mock (reasoning UI testing)');
   }
 
   // Require at least one agent

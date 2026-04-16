@@ -1,5 +1,5 @@
 import type { PersistedFileMetadata } from '../../fileUpload/types';
-import type { FeedbackValue } from '@meetsmore-oss/use-ai-core';
+import type { FeedbackValue, ReasoningPart } from '@meetsmore-oss/use-ai-core';
 
 /**
  * Arbitrary metadata attached to a chat.
@@ -79,6 +79,11 @@ export interface PersistedMessage {
    * @example "toolu_01abc123"
    */
   toolCallId?: string;
+  /**
+   * Reasoning parts from extended thinking (only for assistant messages).
+   * Contains reasoning text and optional encrypted value for state continuity.
+   */
+  reasoningParts?: ReasoningPart[];
 }
 
 /**

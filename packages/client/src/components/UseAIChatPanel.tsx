@@ -13,6 +13,9 @@ import { useDropdownState } from '../hooks/useDropdownState';
 import { useTheme, useStrings } from '../theme';
 import type { UseAIStrings, UseAITheme } from '../theme';
 import { ToolApprovalDialog } from './ToolApprovalDialog';
+import { Reasoning } from './Reasoning';
+
+import type { ReasoningPart } from '../types';
 
 // Re-export types for backwards compatibility
 export type UseAIChatPanelStrings = UseAIStrings;
@@ -127,6 +130,8 @@ export interface UseAIChatPanelProps {
   connected: boolean;
   /** Currently streaming text from assistant (real-time updates) */
   streamingText?: string;
+  /** Currently streaming reasoning text from extended thinking */
+  streamingReasoning?: string;
   currentChatId?: string | null;
   onNewChat?: () => Promise<string | void>;
   onLoadChat?: (chatId: string) => Promise<void>;
@@ -177,6 +182,7 @@ export function UseAIChatPanel({
   loading,
   connected,
   streamingText = '',
+  streamingReasoning = '',
   currentChatId,
   onNewChat,
   onLoadChat,
@@ -913,7 +919,16 @@ export function UseAIChatPanel({
                 </div>
               )}
               {message.role === 'assistant' ? (
-                <MarkdownContent content={getTextFromContent(message.content)} />
+                <>
+                  {message.reasoningParts && message.reasoningParts.length > 0 && (
+                    <Reasoning
+                      reasoningParts={message.reasoningParts}
+                      theme={theme}
+                      strings={strings}
+                    />
+                  )}
+                  <MarkdownContent content={getTextFromContent(message.content)} />
+                </>
               ) : (
                 getTextFromContent(message.content)
               )}
@@ -992,8 +1007,22 @@ export function UseAIChatPanel({
                 maxWidth: '80%',
               }}
             >
-              {streamingText ? (
-                <MarkdownContent content={streamingText} />
+              {streamingText || streamingReasoning ? (
+                <>
+                  {streamingReasoning && (
+                    <Reasoning
+                      reasoningParts={[]}
+                      isStreaming={true}
+                      streamingText={streamingReasoning}
+                      theme={theme}
+                      strings={strings}
+                    />
+                  )}
+                  {streamingText && <MarkdownContent content={streamingText} />}
+                  {!streamingText && (
+                    <span className="dots" style={{ opacity: 0.6 }}>...</span>
+                  )}
+                </>
               ) : fileProcessing && fileProcessing.status === 'processing' ? (
                 <div>
                   <span style={{ opacity: 0.6 }}>{strings.input.processingFile}</span>

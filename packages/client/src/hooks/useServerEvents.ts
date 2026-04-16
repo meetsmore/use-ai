@@ -8,6 +8,8 @@ import type {
   TextMessageContentEvent,
   ToolCallStartExtensions,
   ToolApprovalRequestEvent,
+  ReasoningMessageContentEvent,
+  ReasoningPart,
 } from '../types';
 import { EventType, ErrorCode, TOOL_APPROVAL_REQUEST } from '../types';
 import type { UseAIClient } from '../client';
@@ -20,7 +22,7 @@ export interface UseServerEventsOptions {
   /** Tool system for executing tools and looking up tool metadata */
   toolSystem: UseToolSystemReturn;
   /** Saves an AI response to chat storage */
-  saveAIResponse: (content: string, displayMode?: 'default' | 'error', traceId?: string, turnMessages?: PersistedMessage[]) => Promise<void>;
+  saveAIResponse: (content: string, displayMode?: 'default' | 'error', traceId?: string, turnMessages?: PersistedMessage[], reasoningParts?: ReasoningPart[]) => Promise<void>;
   /** UI strings for error messages and tool execution fallbacks */
   strings: UseAIStrings;
 }
@@ -42,6 +44,8 @@ export interface UseServerEventsReturn {
   executingTool: ExecutingToolDisplay | null;
   /** Ref tracking which chat the current streaming text belongs to */
   streamingChatIdRef: React.MutableRefObject<string | null>;
+  /** Current streaming reasoning text from extended thinking */
+  streamingReasoning: string;
   /**
    * Handles a server event. Called from the provider's client subscription.
    * Takes the client instance so it can access client-internal state
@@ -70,6 +74,7 @@ export function useServerEvents({
 }: UseServerEventsOptions): UseServerEventsReturn {
   const [loading, setLoading] = useState(false);
   const [streamingText, setStreamingText] = useState('');
+  const [streamingReasoning, setStreamingReasoning] = useState('');
   const streamingChatIdRef = useRef<string | null>(null);
 
   // Track message count at run start to extract turn messages at run end
@@ -111,6 +116,13 @@ export function useServerEvents({
       // so messages added after this point are from the AI turn.
       messageCountAtRunStartRef.current = client.messages.length;
       hasTextFromPriorStepRef.current = false;
+      setStreamingReasoning('');
+    } else if (event.type === EventType.REASONING_MESSAGE_START) {
+      // Add paragraph separator between reasoning from different steps
+      setStreamingReasoning(prev => prev ? prev + '\n\n' : prev);
+    } else if (event.type === EventType.REASONING_MESSAGE_CONTENT) {
+      const reasoningEvent = event as ReasoningMessageContentEvent;
+      setStreamingReasoning(prev => prev + reasoningEvent.delta);
     } else if (event.type === EventType.TEXT_MESSAGE_START) {
       // Add paragraph separator between steps so combined text reads naturally
       if (hasTextFromPriorStepRef.current) {
@@ -179,9 +191,15 @@ export function useServerEvents({
 
         const turnMessages = extractTurnMessages(client.messages, messageCountAtRunStartRef.current);
 
-        saveAIResponseRef.current(content, undefined, traceId, turnMessages);
+        // Collect reasoning parts from the final step (not flushed by STEP_FINISHED)
+        const reasoningParts = client.currentReasoningBlocks.length > 0
+          ? [...client.currentReasoningBlocks]
+          : undefined;
+
+        saveAIResponseRef.current(content, undefined, traceId, turnMessages, reasoningParts);
       }
       setStreamingText('');
+      setStreamingReasoning('');
       streamingChatIdRef.current = null;
       // Clear executingTool in case TOOL_CALL_END was never received
       // (e.g., stream truncated by token limit)
@@ -196,6 +214,7 @@ export function useServerEvents({
 
       saveAIResponseRef.current(userMessage, 'error');
       setStreamingText('');
+      setStreamingReasoning('');
       streamingChatIdRef.current = null;
 
       // Clear executingTool in case TOOL_CALL_END was never received
@@ -216,6 +235,7 @@ export function useServerEvents({
     clearStreamingText,
     executingTool,
     streamingChatIdRef,
+    streamingReasoning,
     handleServerEvent,
   };
 }

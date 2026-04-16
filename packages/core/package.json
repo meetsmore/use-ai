@@ -28,7 +28,7 @@
     "build": "bun build ./src/index.ts --outdir ./dist --target node --format esm && tsc --emitDeclarationOnly --declaration --declarationMap"
   },
   "dependencies": {
-    "@ag-ui/core": "^0.0.41"
+    "@ag-ui/core": "^0.0.50"
   },
   "devDependencies": {
     "@types/bun": "latest",

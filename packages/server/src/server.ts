@@ -605,6 +605,15 @@ export class UseAIServer {
       } else if (msg.role === 'assistant') {
         const textContent = getStringContent(msg.content);
 
+        // Check for reasoning parts (extended thinking, persisted from previous runs).
+        // encryptedValue contains JSON-serialized provider metadata (e.g., Anthropic signature).
+        // AISDKAgent.reasoningContentSchema transforms it to providerOptions
+        // (the format the AI SDK sends to the Anthropic API for signature verification).
+        const reasoningParts = (msg as { reasoningParts?: Array<{
+          text: string;
+          encryptedValue?: string;
+        }> }).reasoningParts;
+
         // Check for AG-UI toolCalls on the message (sent by client on reconnection)
         const toolCalls = (msg as { toolCalls?: Array<{
           id: string;
@@ -612,26 +621,58 @@ export class UseAIServer {
           function: { name: string; arguments: string };
         }> }).toolCalls;
 
-        if (toolCalls && toolCalls.length > 0) {
-          // Convert to AI SDK ModelMessage format: array of content blocks with tool-call entries
-          const content: Array<{ type: 'text'; text: string } | { type: 'tool-call'; toolCallId: string; toolName: string; input: unknown }> = [];
+        // Build content blocks when reasoning or tool calls are present
+        const hasReasoning = reasoningParts && reasoningParts.length > 0;
+        const hasToolCalls = toolCalls && toolCalls.length > 0;
+
+        if (hasReasoning || hasToolCalls) {
+          const content: Array<
+            | { type: 'text'; text: string }
+            | { type: 'tool-call'; toolCallId: string; toolName: string; input: unknown }
+            | { type: 'reasoning'; text: string; providerMetadata?: Record<string, unknown> }
+          > = [];
+
+          // Add reasoning parts first (before text/tool-calls) for multi-turn context
+          if (hasReasoning) {
+            for (const rp of reasoningParts) {
+              // Deserialize encryptedValue back to providerMetadata for AI SDK format
+              let providerMetadata: Record<string, unknown> | undefined;
+              if (rp.encryptedValue) {
+                try {
+                  providerMetadata = JSON.parse(rp.encryptedValue);
+                } catch {
+                  // Ignore malformed encryptedValue
+                }
+              }
+              content.push({
+                type: 'reasoning',
+                text: rp.text,
+                ...(providerMetadata ? { providerMetadata } : {}),
+              });
+            }
+          }
+
           if (textContent) {
             content.push({ type: 'text', text: textContent });
           }
-          for (const tc of toolCalls) {
-            let input: unknown;
-            try {
-              input = JSON.parse(tc.function.arguments);
-            } catch {
-              input = tc.function.arguments;
+
+          if (hasToolCalls) {
+            for (const tc of toolCalls) {
+              let input: unknown;
+              try {
+                input = JSON.parse(tc.function.arguments);
+              } catch {
+                input = tc.function.arguments;
+              }
+              content.push({
+                type: 'tool-call',
+                toolCallId: tc.id,
+                toolName: tc.function.name,
+                input,
+              });
             }
-            content.push({
-              type: 'tool-call',
-              toolCallId: tc.id,
-              toolName: tc.function.name,
-              input,
-            });
           }
+
           return {
             role: 'assistant' as const,
             content,

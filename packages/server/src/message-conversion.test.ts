@@ -348,3 +348,190 @@ describe('Bug 2: Server message conversion preserves tool calls on reconnection'
     ws.disconnect();
   });
 });
+
+describe('Reasoning parts roundtrip through message conversion', () => {
+  test('assistant messages with reasoningParts should include reasoning content blocks when sent to model', async () => {
+    const port = 18904;
+
+    // Track what messages the AI SDK model receives
+    let capturedMessages: unknown[] = [];
+
+    const { MockLanguageModelV3, simulateReadableStream } = await import('ai/test');
+
+    const mockModel = new MockLanguageModelV3({
+      doStream: async ({ prompt }) => {
+        capturedMessages = prompt;
+        return {
+          stream: simulateReadableStream({
+            chunks: [
+              { type: 'text-start', id: 'text-1' },
+              { type: 'text-delta', id: 'text-1', delta: 'Response' },
+              { type: 'text-end', id: 'text-1' },
+              { type: 'finish', finishReason: 'stop' as const, usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 } },
+            ],
+          }),
+          response: {
+            id: 'response-1',
+            timestamp: new Date(),
+            modelId: 'mock-model',
+            headers: {},
+            messages: [{ role: 'assistant', content: 'Response' }],
+          },
+        };
+      },
+    });
+
+    const agent = new AISDKAgent({ model: mockModel });
+    const server = new UseAIServer({
+      agents: { test: agent },
+      defaultAgent: 'test',
+      port,
+    });
+    cleanup.trackServer(server);
+
+    const { io } = await import('socket.io-client');
+    const ws = io(`http://localhost:${port}`, { transports: ['websocket'] });
+    cleanup.trackSocket(ws);
+    await new Promise<void>((resolve) => ws.on('connect', resolve));
+
+    const threadId = uuidv4();
+
+    // Send a message that includes reasoning parts from a previous turn
+    sendRunAgent(ws, {
+      prompt: 'Follow up question',
+      tools: [],
+      threadId,
+      previousMessages: [
+        { id: uuidv4(), role: 'user', content: 'What is 2+2?' },
+        {
+          id: uuidv4(),
+          role: 'assistant',
+          content: '4',
+          reasoningParts: [
+            { text: 'Let me think: 2+2=4', encryptedValue: JSON.stringify({ anthropic: { signature: 'test-sig-abc' } }) },
+          ],
+        } as AGUIMessage & { reasoningParts: Array<{ text: string; encryptedValue?: string }> },
+      ],
+    });
+
+    await collectEventsUntilDone(ws);
+
+    // Verify that the model received the reasoning content blocks
+    const assistantMessages = (capturedMessages as Array<{ role: string; content: unknown }>)
+      .filter(m => m.role === 'assistant');
+    expect(assistantMessages.length).toBeGreaterThanOrEqual(1);
+
+    // The first assistant message should have reasoning + text content blocks
+    const firstAssistant = assistantMessages[0];
+    expect(Array.isArray(firstAssistant.content)).toBe(true);
+    const contentBlocks = firstAssistant.content as Array<{ type: string; text?: string; providerMetadata?: unknown }>;
+
+    const reasoningBlock = contentBlocks.find(b => b.type === 'reasoning');
+    expect(reasoningBlock).toBeDefined();
+    expect(reasoningBlock!.text).toBe('Let me think: 2+2=4');
+
+    const textBlock = contentBlocks.find(b => b.type === 'text');
+    expect(textBlock).toBeDefined();
+    expect(textBlock!.text).toBe('4');
+
+    ws.disconnect();
+  });
+
+  test('reasoning signature is converted from encryptedValue to providerOptions for API round-trip', async () => {
+    const port = 18905;
+
+    let capturedMessages: unknown[] = [];
+
+    const { MockLanguageModelV3, simulateReadableStream } = await import('ai/test');
+
+    const mockModel = new MockLanguageModelV3({
+      doStream: async ({ prompt }) => {
+        capturedMessages = prompt;
+        return {
+          stream: simulateReadableStream({
+            chunks: [
+              { type: 'text-start', id: 'text-1' },
+              { type: 'text-delta', id: 'text-1', delta: 'OK' },
+              { type: 'text-end', id: 'text-1' },
+              { type: 'finish', finishReason: 'stop' as const, usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 } },
+            ],
+          }),
+          response: {
+            id: 'response-1',
+            timestamp: new Date(),
+            modelId: 'mock-model',
+            headers: {},
+            messages: [{ role: 'assistant', content: 'OK' }],
+          },
+        };
+      },
+    });
+
+    const agent = new AISDKAgent({ model: mockModel });
+    const server = new UseAIServer({
+      agents: { test: agent },
+      defaultAgent: 'test',
+      port,
+    });
+    cleanup.trackServer(server);
+
+    const { io } = await import('socket.io-client');
+    const ws = io(`http://localhost:${port}`, { transports: ['websocket'] });
+    cleanup.trackSocket(ws);
+    await new Promise<void>((resolve) => ws.on('connect', resolve));
+
+    const threadId = uuidv4();
+    const testSignature = 'EqQBCgIYAhIM1gbcDa9GJwZA2b3hGgxBdjrkzLoky3dl1pk...';
+
+    sendRunAgent(ws, {
+      prompt: 'What number did you think of?',
+      tools: [],
+      threadId,
+      previousMessages: [
+        { id: uuidv4(), role: 'user', content: 'Think of a number' },
+        {
+          id: uuidv4(),
+          role: 'assistant',
+          content: 'OK',
+          reasoningParts: [
+            {
+              text: 'I will think of the number 42.',
+              encryptedValue: JSON.stringify({ anthropic: { signature: testSignature } }),
+            },
+          ],
+        } as AGUIMessage & { reasoningParts: Array<{ text: string; encryptedValue?: string }> },
+      ],
+    });
+
+    await collectEventsUntilDone(ws);
+
+    // Find the assistant message with reasoning
+    const assistantMessages = (capturedMessages as Array<{ role: string; content: unknown; providerOptions?: unknown }>)
+      .filter(m => m.role === 'assistant');
+    expect(assistantMessages.length).toBeGreaterThanOrEqual(1);
+
+    const firstAssistant = assistantMessages[0];
+    const contentBlocks = firstAssistant.content as Array<{
+      type: string;
+      text?: string;
+      providerOptions?: Record<string, unknown>;
+      providerMetadata?: Record<string, unknown>;
+    }>;
+
+    const reasoningBlock = contentBlocks.find(b => b.type === 'reasoning');
+    expect(reasoningBlock).toBeDefined();
+
+    // The signature must be in providerOptions (what AI SDK sends to the API),
+    // NOT in providerMetadata (which is deserialized from encryptedValue).
+    // Without this conversion, the Anthropic API cannot verify the thinking block
+    // and reasoning context is lost across turns.
+    expect(reasoningBlock!.providerOptions).toEqual({
+      anthropic: { signature: testSignature },
+    });
+
+    // providerMetadata should NOT be present (it's the input format, not the output)
+    expect(reasoningBlock!.providerMetadata).toBeUndefined();
+
+    ws.disconnect();
+  });
+});

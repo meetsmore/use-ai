@@ -124,4 +124,47 @@ describe('mergeAssistantMessagesForDisplay', () => {
     ]);
     expect(result[1].content).toBe('From array.\n\nFrom string.');
   });
+
+  it('collects reasoning parts from intermediate and final messages', () => {
+    const result = mergeAssistantMessagesForDisplay([
+      msg({ id: '1', role: 'user', content: 'Go' }),
+      msg({
+        id: '2', role: 'assistant', content: 'Step 0.',
+        toolCalls: [tc('tc1', 't')],
+        reasoningParts: [{ text: 'Thinking step 0', encryptedValue: JSON.stringify({ anthropic: { signature: 'sig0' } }) }],
+      }),
+      msg({ id: '3', role: 'tool', content: '{}', toolCallId: 'tc1' }),
+      msg({
+        id: '4', role: 'assistant', content: 'Final.',
+        reasoningParts: [{ text: 'Thinking final', encryptedValue: JSON.stringify({ anthropic: { signature: 'sig1' } }) }],
+      }),
+    ]);
+    expect(result).toHaveLength(2);
+    expect(result[1].reasoningParts).toHaveLength(2);
+    expect(result[1].reasoningParts![0].text).toBe('Thinking step 0');
+    expect(result[1].reasoningParts![1].text).toBe('Thinking final');
+  });
+
+  it('preserves reasoning on trailing pending flush', () => {
+    const result = mergeAssistantMessagesForDisplay([
+      msg({ id: '1', role: 'user', content: 'Go' }),
+      msg({
+        id: '2', role: 'assistant', content: 'Working...',
+        toolCalls: [tc('tc1', 't')],
+        reasoningParts: [{ text: 'Planning' }],
+      }),
+      msg({ id: '3', role: 'tool', content: '{}', toolCallId: 'tc1' }),
+    ]);
+    expect(result).toHaveLength(2);
+    expect(result[1].reasoningParts).toHaveLength(1);
+    expect(result[1].reasoningParts![0].text).toBe('Planning');
+  });
+
+  it('does not add reasoningParts when none exist', () => {
+    const result = mergeAssistantMessagesForDisplay([
+      msg({ id: '1', role: 'user', content: 'Hi' }),
+      msg({ id: '2', role: 'assistant', content: 'Hello!' }),
+    ]);
+    expect(result[1].reasoningParts).toBeUndefined();
+  });
 });

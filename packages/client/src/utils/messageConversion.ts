@@ -1,5 +1,5 @@
 import type { PersistedMessage } from '../providers/chatRepository/types';
-import type { Message as AGUIMessage, Message } from '../types';
+import type { Message as AGUIMessage, Message, ReasoningPart } from '../types';
 import { getTextFromContent } from './messageContent';
 
 /**
@@ -25,6 +25,7 @@ export function transformMessagesToClientFormat(persistedMessages: PersistedMess
           role: 'assistant',
           content: textContent,
           ...(msg.toolCalls && msg.toolCalls.length > 0 ? { toolCalls: msg.toolCalls } : {}),
+          ...(msg.reasoningParts && msg.reasoningParts.length > 0 ? { reasoningParts: msg.reasoningParts } : {}),
         };
       case 'user':
         return {
@@ -55,12 +56,16 @@ export function extractTurnMessages(messages: Message[], startIndex: number): Pe
 
   for (const msg of turnSlice) {
     if (msg.role === 'assistant' && 'toolCalls' in msg && msg.toolCalls) {
+      const reasoningParts = ('reasoningParts' in msg && msg.reasoningParts)
+        ? msg.reasoningParts as ReasoningPart[]
+        : undefined;
       result.push({
         id: msg.id,
         role: 'assistant',
         content: typeof msg.content === 'string' ? msg.content : '',
         createdAt: new Date(),
         toolCalls: msg.toolCalls as PersistedMessage['toolCalls'],
+        ...(reasoningParts ? { reasoningParts } : {}),
       });
     } else if (msg.role === 'tool') {
       result.push({

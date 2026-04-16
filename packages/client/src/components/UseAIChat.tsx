@@ -22,6 +22,8 @@ export interface ChatUIContextValue {
   messages: PersistedMessage[];
   /** Currently streaming text from assistant (real-time updates) */
   streamingText: string;
+  /** Currently streaming reasoning text from extended thinking */
+  streamingReasoning: string;
   /** Aggregated suggestions from all useAI hooks */
   suggestions: string[];
   /** File upload configuration */
@@ -166,6 +168,7 @@ export function UseAIChat({ floating = false }: UseAIChatProps) {
     loading: ctx.loading,
     connected: ctx.connected,
     streamingText: ctx.streamingText,
+    streamingReasoning: ctx.streamingReasoning,
     currentChatId: ctx.history.currentId,
     onNewChat: ctx.history.create,
     onLoadChat: ctx.history.load,

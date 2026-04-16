@@ -52,7 +52,7 @@ test.describe('AI responds to latest message only', () => {
 
     // Step 1: Ask AI to add shopping list for tonkatsu ramen
     console.log('[Test] Step 1: Adding shopping list for tonkatsu ramen');
-    await chatInput.fill('add a shopping list to make tonkatsu ramen');
+    await chatInput.fill('Add a shopping list for tonkatsu ramen — one todo per ingredient, up to 8 items');
     await sendButton.click();
 
     // Wait for AI to add items
