@@ -619,6 +619,7 @@ export class UseAIServer {
           id: string;
           type: string;
           function: { name: string; arguments: string };
+          encryptedValue?: string;
         }> }).toolCalls;
 
         // Build content blocks when reasoning or tool calls are present
@@ -628,7 +629,7 @@ export class UseAIServer {
         if (hasReasoning || hasToolCalls) {
           const content: Array<
             | { type: 'text'; text: string }
-            | { type: 'tool-call'; toolCallId: string; toolName: string; input: unknown }
+            | { type: 'tool-call'; toolCallId: string; toolName: string; input: unknown; providerMetadata?: Record<string, unknown> }
             | { type: 'reasoning'; text: string; providerMetadata?: Record<string, unknown> }
           > = [];
 
@@ -664,11 +665,21 @@ export class UseAIServer {
               } catch {
                 input = tc.function.arguments;
               }
+              // Deserialize encryptedValue to providerMetadata (Gemini thoughtSignature)
+              let tcProviderMetadata: Record<string, unknown> | undefined;
+              if (tc.encryptedValue) {
+                try {
+                  tcProviderMetadata = JSON.parse(tc.encryptedValue);
+                } catch {
+                  // Ignore malformed encryptedValue
+                }
+              }
               content.push({
                 type: 'tool-call',
                 toolCallId: tc.id,
                 toolName: tc.function.name,
                 input,
+                ...(tcProviderMetadata ? { providerMetadata: tcProviderMetadata } : {}),
               });
             }
           }
@@ -698,12 +709,33 @@ export class UseAIServer {
 
         // AG-UI ToolMessage has no toolName field. Resolve it by scanning back
         // through the preceding assistant messages' toolCalls.
+        // Also look up encryptedValue for Gemini thoughtSignature propagation to tool results.
         let toolName: string | undefined;
+        let toolEncryptedValue: string | undefined;
         for (let i = msgIndex - 1; i >= 0; i--) {
-          const prevToolCalls = (messages[i] as { toolCalls?: Array<{ id: string; function: { name: string } }> }).toolCalls;
+          const prevToolCalls = (messages[i] as { toolCalls?: Array<{
+            id: string;
+            function: { name: string };
+            encryptedValue?: string;
+          }> }).toolCalls;
           if (prevToolCalls) {
             const match = prevToolCalls.find(tc => tc.id === toolCallId);
-            if (match) { toolName = match.function.name; break; }
+            if (match) {
+              toolName = match.function.name;
+              toolEncryptedValue = match.encryptedValue;
+              break;
+            }
+          }
+        }
+
+        // Deserialize encryptedValue to providerMetadata for tool result
+        // (Gemini requires thoughtSignature on both tool-call and tool-result parts)
+        let toolResultProviderMetadata: Record<string, unknown> | undefined;
+        if (toolEncryptedValue) {
+          try {
+            toolResultProviderMetadata = JSON.parse(toolEncryptedValue);
+          } catch {
+            // Ignore malformed encryptedValue
           }
         }
 
@@ -715,6 +747,7 @@ export class UseAIServer {
               toolCallId,
               toolName: toolName || 'unknown',
               output,
+              ...(toolResultProviderMetadata ? { providerMetadata: toolResultProviderMetadata } : {}),
             },
           ],
         } as ToolModelMessage;

@@ -534,4 +534,126 @@ describe('Reasoning parts roundtrip through message conversion', () => {
 
     ws.disconnect();
   });
+
+  test('Gemini thoughtSignature on tool calls is converted from encryptedValue to providerOptions for API round-trip', async () => {
+    const port = 18906;
+
+    let capturedMessages: unknown[] = [];
+
+    const { MockLanguageModelV3, simulateReadableStream } = await import('ai/test');
+
+    const mockModel = new MockLanguageModelV3({
+      doStream: async ({ prompt }) => {
+        capturedMessages = prompt;
+        return {
+          stream: simulateReadableStream({
+            chunks: [
+              { type: 'text-start', id: 'text-1' },
+              { type: 'text-delta', id: 'text-1', delta: 'The result is 12.' },
+              { type: 'text-end', id: 'text-1' },
+              { type: 'finish', finishReason: 'stop' as const, usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 } },
+            ],
+          }),
+          response: {
+            id: 'response-1',
+            timestamp: new Date(),
+            modelId: 'mock-model',
+            headers: {},
+            messages: [{ role: 'assistant', content: 'The result is 12.' }],
+          },
+        };
+      },
+    });
+
+    const agent = new AISDKAgent({ model: mockModel });
+    const server = new UseAIServer({
+      agents: { test: agent },
+      defaultAgent: 'test',
+      port,
+    });
+    cleanup.trackServer(server);
+
+    const { io } = await import('socket.io-client');
+    const ws = io(`http://localhost:${port}`, { transports: ['websocket'] });
+    cleanup.trackSocket(ws);
+    await new Promise<void>((resolve) => ws.on('connect', resolve));
+
+    const threadId = uuidv4();
+    const testThoughtSignature = 'test-thought-signature-abc';
+
+    sendRunAgent(ws, {
+      prompt: 'What was the result?',
+      tools: [],
+      threadId,
+      previousMessages: [
+        { id: uuidv4(), role: 'user', content: 'Add 5 and 7 using the add tool.' },
+        {
+          id: uuidv4(),
+          role: 'assistant',
+          content: 'I need to add 5 and 7.',
+          toolCalls: [
+            {
+              id: 'tc_gemini_abc',
+              type: 'function',
+              function: { name: 'add', arguments: '{"a":5,"b":7}' },
+              encryptedValue: JSON.stringify({ google: { thoughtSignature: testThoughtSignature } }),
+            },
+          ],
+        } as AGUIMessage & { toolCalls: Array<{ id: string; type: string; function: { name: string; arguments: string }; encryptedValue?: string }> },
+        {
+          id: uuidv4(),
+          role: 'tool',
+          content: '{"result":12}',
+          toolCallId: 'tc_gemini_abc',
+          tool_call_id: 'tc_gemini_abc',
+        } as unknown as AGUIMessage,
+      ],
+    });
+
+    await collectEventsUntilDone(ws);
+
+    // Find the assistant message with tool calls
+    const assistantMessages = (capturedMessages as Array<{ role: string; content: unknown }>)
+      .filter(m => m.role === 'assistant');
+    expect(assistantMessages.length).toBeGreaterThanOrEqual(1);
+
+    const firstAssistant = assistantMessages[0];
+    const contentBlocks = firstAssistant.content as Array<{
+      type: string;
+      toolCallId?: string;
+      providerOptions?: Record<string, unknown>;
+      providerMetadata?: Record<string, unknown>;
+    }>;
+
+    // The tool-call content block should have providerOptions with Google thoughtSignature
+    const toolCallBlock = contentBlocks.find(b => b.type === 'tool-call');
+    expect(toolCallBlock).toBeDefined();
+    expect(toolCallBlock!.providerOptions).toEqual({
+      google: { thoughtSignature: testThoughtSignature },
+    });
+    // providerMetadata should NOT be present (it's the input format)
+    expect(toolCallBlock!.providerMetadata).toBeUndefined();
+
+    // Find the tool result message
+    const toolMessages = (capturedMessages as Array<{ role: string; content: unknown }>)
+      .filter(m => m.role === 'tool');
+    expect(toolMessages.length).toBeGreaterThanOrEqual(1);
+
+    const toolMessage = toolMessages[0];
+    const toolResultBlocks = toolMessage.content as Array<{
+      type: string;
+      providerOptions?: Record<string, unknown>;
+      providerMetadata?: Record<string, unknown>;
+    }>;
+
+    // The tool-result content block should also have providerOptions with Google thoughtSignature
+    const toolResultBlock = toolResultBlocks.find(b => b.type === 'tool-result');
+    expect(toolResultBlock).toBeDefined();
+    expect(toolResultBlock!.providerOptions).toEqual({
+      google: { thoughtSignature: testThoughtSignature },
+    });
+    expect(toolResultBlock!.providerMetadata).toBeUndefined();
+
+    ws.disconnect();
+  });
 });
