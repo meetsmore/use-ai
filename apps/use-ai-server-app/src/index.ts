@@ -54,6 +54,20 @@ function createAgents(): { agents: Record<string, Agent>; defaultAgent: string }
     ? { anthropic: { thinking: { type: 'enabled', budgetTokens: reasoningBudgetTokens } } }
     : undefined;
 
+  // OpenAI reasoning configuration (opt-in via env vars).
+  // Applied to GPT agents only (works for both direct API and gateway).
+  // Set USE_AI_OPENAI_REASONING_EFFORT to enable (none|minimal|low|medium|high|xhigh).
+  // Set USE_AI_OPENAI_REASONING_SUMMARY to receive reasoning text (auto|detailed|concise).
+  const openaiReasoningEffort = process.env.USE_AI_OPENAI_REASONING_EFFORT || undefined;
+  const openaiReasoningSummary = process.env.USE_AI_OPENAI_REASONING_SUMMARY || undefined;
+  const gptProviderOptions: Record<string, Record<string, JSONValue>> | undefined =
+    (openaiReasoningEffort || openaiReasoningSummary)
+      ? { openai: {
+          ...(openaiReasoningEffort ? { reasoningEffort: openaiReasoningEffort } : {}),
+          ...(openaiReasoningSummary ? { reasoningSummary: openaiReasoningSummary } : {}),
+        } }
+      : undefined;
+
   const addAgent = (
     key: string,
     name: string,
@@ -70,10 +84,12 @@ function createAgents(): { agents: Record<string, Agent>; defaultAgent: string }
       providerOptions,
     });
     const hasThinking = !!providerOptions?.anthropic && typeof providerOptions.anthropic === 'object' && 'thinking' in providerOptions.anthropic;
+    const hasOpenaiReasoning = !!providerOptions?.openai && typeof providerOptions.openai === 'object' && 'reasoningEffort' in providerOptions.openai;
     const suffix = [
       viaGateway ? 'via gateway' : null,
       temperature !== undefined ? `temp=${temperature}` : null,
       hasThinking ? `thinking=${reasoningBudgetTokens}` : null,
+      hasOpenaiReasoning ? `reasoning=${openaiReasoningEffort}` : null,
     ]
       .filter(Boolean)
       .join(', ');
@@ -93,11 +109,11 @@ function createAgents(): { agents: Record<string, Agent>; defaultAgent: string }
   // GPT: gateway preferred, fall back to direct OpenAI API
   if (gateway) {
     const modelId = process.env.AI_GATEWAY_OPENAI_MODEL || 'openai/gpt-5.4-mini';
-    addAgent('gpt', 'ChatGPT', gateway(modelId), modelId, true);
+    addAgent('gpt', 'ChatGPT', gateway(modelId), modelId, true, gptProviderOptions);
   } else if (openaiApiKey) {
     const modelId = process.env.OPENAI_MODEL || 'gpt-4-turbo';
     const model = createOpenAI({ apiKey: openaiApiKey })(modelId);
-    addAgent('gpt', 'ChatGPT', model, modelId, false);
+    addAgent('gpt', 'ChatGPT', model, modelId, false, gptProviderOptions);
   }
 
   // Mock agent for UI development (no API key needed)

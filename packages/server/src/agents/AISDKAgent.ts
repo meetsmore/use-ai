@@ -355,25 +355,29 @@ const DEFAULT_MAX_OUTPUT_TOKENS = 4096;
 const DEFAULT_MAX_STEPS = 10;
 
 /**
- * Maps provider names to their reasoning signature key in providerMetadata.
- * Used to extract only the encryption/signature data from reasoning chunks,
- * avoiding leaking non-signature metadata (e.g., itemId) through AG-UI events.
+ * Maps provider names to their reasoning context keys in providerMetadata.
+ * The first key is the primary signature/encryption key (its presence triggers extraction).
+ * All listed keys are extracted and preserved for multi-turn context.
  *
- * Currently only Anthropic is tested and supported.
- * To add a new provider, add an entry here with the provider's signature key name:
- *   - OpenAI: 'reasoningEncryptedContent' (untested)
- *   - Google: 'thoughtSignature' (untested)
+ * For OpenAI, `itemId` is required alongside `reasoningEncryptedContent` because the
+ * Responses API uses it to reconstruct reasoning items via `item_reference` or inline
+ * reasoning objects in multi-turn conversations.
+ *
+ * Anthropic and OpenAI are tested and supported.
+ * To add a new provider, add an entry here with the provider's context keys:
+ *   - Google: ['thoughtSignature'] (untested)
  */
-const REASONING_SIGNATURE_KEYS: Record<string, string> = {
-  anthropic: 'signature',
-  // openai: 'reasoningEncryptedContent',   // TODO: uncomment when tested
-  // google: 'thoughtSignature',            // TODO: uncomment when tested
+const REASONING_CONTEXT_KEYS: Record<string, string[]> = {
+  anthropic: ['signature'],
+  openai: ['reasoningEncryptedContent', 'itemId'],
+  // google: ['thoughtSignature'],            // TODO: uncomment when tested
 };
 
 /**
- * Extracts the reasoning signature from providerMetadata for a known provider.
- * Returns only the signature field (not other metadata like itemId) wrapped
- * in the provider namespace, e.g., `{ anthropic: { signature: "..." } }`.
+ * Extracts reasoning context from providerMetadata for a known provider.
+ * Returns the context keys (signature + any required metadata like itemId) wrapped
+ * in the provider namespace, e.g., `{ anthropic: { signature: "..." } }` or
+ * `{ openai: { reasoningEncryptedContent: "...", itemId: "..." } }`.
  *
  * Returns null if no known provider signature is found.
  */
@@ -382,10 +386,17 @@ function extractReasoningSignature(
 ): Record<string, Record<string, unknown>> | null {
   if (!providerMetadata) return null;
   for (const [provider, meta] of Object.entries(providerMetadata)) {
-    const key = REASONING_SIGNATURE_KEYS[provider];
-    if (key && meta[key] != null) {
-      return { [provider]: { [key]: meta[key] } };
+    const keys = REASONING_CONTEXT_KEYS[provider];
+    if (!keys || keys.length === 0) continue;
+    // Primary key (first in array) must be present to trigger extraction
+    if (meta[keys[0]] == null) continue;
+    const extracted: Record<string, unknown> = {};
+    for (const key of keys) {
+      if (meta[key] != null) {
+        extracted[key] = meta[key];
+      }
     }
+    return { [provider]: extracted };
   }
   return null;
 }
@@ -407,10 +418,10 @@ function extractReasoningSignature(
  * - Optional Langfuse telemetry
  *
  * **Reasoning / Extended Thinking:**
- * Reasoning (extended thinking) is currently only tested with Anthropic models.
- * The signature extraction logic supports pluggable providers via {@link REASONING_SIGNATURE_KEYS},
- * but only Anthropic has been verified end-to-end.
- * OpenAI and Google providers are mapped but commented out pending testing.
+ * Reasoning (extended thinking) is tested with Anthropic and OpenAI models.
+ * The signature extraction logic supports pluggable providers via {@link REASONING_SIGNATURE_KEYS}.
+ * Anthropic and OpenAI have been verified end-to-end.
+ * Google provider is mapped but commented out pending testing.
  *
  * Used for conversational chat (via useAI hook).
  *
@@ -1456,7 +1467,7 @@ export class AISDKAgent implements Agent {
    * The transform merges it into providerOptions so the AI SDK sends it back
    * to the correct provider API for signature verification.
    *
-   * Currently only Anthropic signatures are tested.
+   * Anthropic and OpenAI signatures are tested.
    * @see REASONING_SIGNATURE_KEYS for the mapping of supported providers.
    */
   private static readonly reasoningContentSchema = z.object({

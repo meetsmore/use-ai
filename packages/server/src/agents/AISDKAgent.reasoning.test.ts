@@ -4,6 +4,7 @@ import type { AgentInput, EventEmitter, AGUIEventExtended } from './types';
 import { EventType } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 import { MockLanguageModelV3, simulateReadableStream } from 'ai/test';
+import type { JSONValue } from 'ai';
 
 function createTestInput(overrides: Partial<AgentInput> = {}): AgentInput {
   const threadId = uuidv4();
@@ -266,5 +267,122 @@ describe('AISDKAgent reasoning events', () => {
       ].includes(e.type as EventType)
     );
     expect(reasoningEvents).toHaveLength(0);
+  });
+});
+
+describe('AISDKAgent reasoning events (OpenAI)', () => {
+  function createOpenAIMockModel(chunks: unknown[], responseText: string) {
+    const doStream = async () => ({
+      stream: simulateReadableStream({ chunks }),
+      response: {
+        id: 'response-1',
+        timestamp: new Date(),
+        modelId: 'gpt-5.4-mini',
+        headers: {},
+        messages: [{ role: 'assistant', content: responseText }],
+      },
+    });
+    return new MockLanguageModelV3({ doStream: doStream as never });
+  }
+
+  const openaiProviderOptions: Record<string, Record<string, JSONValue>> = {
+    openai: { reasoningSummary: 'detailed', reasoningEffort: 'low' },
+  };
+
+  function openaiChunks(opts: { initialEncrypted?: string; finalEncrypted?: string } = {}) {
+    const initial = opts.initialEncrypted ?? 'gAAAAA_initial_encrypted';
+    const final = opts.finalEncrypted ?? 'gAAAAA_final_encrypted';
+    return [
+      {
+        type: 'reasoning-start',
+        id: 'rs_abc123:0',
+        providerMetadata: { openai: { itemId: 'rs_abc123', reasoningEncryptedContent: initial } },
+      },
+      {
+        type: 'reasoning-delta',
+        id: 'rs_abc123:0',
+        delta: 'Let me think about this',
+        providerMetadata: { openai: { itemId: 'rs_abc123' } },
+      },
+      {
+        type: 'reasoning-delta',
+        id: 'rs_abc123:0',
+        delta: ' step by step.',
+        providerMetadata: { openai: { itemId: 'rs_abc123' } },
+      },
+      {
+        type: 'reasoning-end',
+        id: 'rs_abc123:0',
+        providerMetadata: { openai: { itemId: 'rs_abc123', reasoningEncryptedContent: final } },
+      },
+      { type: 'text-start', id: 'msg_xyz789' },
+      { type: 'text-delta', id: 'msg_xyz789', delta: '2 + 2 = 4.' },
+      { type: 'text-end', id: 'msg_xyz789' },
+      {
+        type: 'finish' as const,
+        finishReason: 'stop' as const,
+        usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
+      },
+    ];
+  }
+
+  test('emits REASONING_* events in correct order for OpenAI reasoning model', async () => {
+    const mockModel = createOpenAIMockModel(openaiChunks(), '2 + 2 = 4.');
+    const agent = new AISDKAgent({ model: mockModel, providerOptions: openaiProviderOptions });
+
+    const emittedEvents: AGUIEventExtended[] = [];
+    const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
+    const result = await agent.run(createTestInput(), eventEmitter);
+    expect(result.success).toBe(true);
+
+    const content = emittedEvents.filter(e => e.type === EventType.REASONING_MESSAGE_CONTENT);
+    expect(content).toHaveLength(2);
+    expect((content[0] as { delta: string }).delta).toBe('Let me think about this');
+    expect((content[1] as { delta: string }).delta).toBe(' step by step.');
+
+    const relevantTypes = [
+      EventType.REASONING_START, EventType.REASONING_MESSAGE_START,
+      EventType.REASONING_MESSAGE_CONTENT, EventType.REASONING_MESSAGE_END,
+      EventType.REASONING_END,
+      EventType.TEXT_MESSAGE_START, EventType.TEXT_MESSAGE_CONTENT, EventType.TEXT_MESSAGE_END,
+    ] as string[];
+    const ordered = emittedEvents
+      .filter(e => relevantTypes.includes(e.type as string))
+      .map(e => e.type);
+
+    expect(ordered).toEqual([
+      EventType.REASONING_START,
+      EventType.REASONING_MESSAGE_START,
+      EventType.REASONING_MESSAGE_CONTENT,
+      EventType.REASONING_MESSAGE_CONTENT,
+      EventType.REASONING_MESSAGE_END,
+      EventType.REASONING_END,
+      EventType.TEXT_MESSAGE_START,
+      EventType.TEXT_MESSAGE_CONTENT,
+      EventType.TEXT_MESSAGE_END,
+    ]);
+  });
+
+  test('captures reasoningEncryptedContent + itemId, using final value from reasoning-end', async () => {
+    const mockModel = createOpenAIMockModel(
+      openaiChunks({ initialEncrypted: 'gAAAAA_INITIAL', finalEncrypted: 'gAAAAA_FINAL' }),
+      'Answer.',
+    );
+    const agent = new AISDKAgent({ model: mockModel, providerOptions: openaiProviderOptions });
+
+    const emittedEvents: AGUIEventExtended[] = [];
+    const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
+    await agent.run(createTestInput(), eventEmitter);
+
+    const ev = emittedEvents.find(e => e.type === EventType.REASONING_ENCRYPTED_VALUE);
+    expect(ev).toBeDefined();
+    expect((ev as { subtype: string }).subtype).toBe('message');
+
+    // The final reasoning-end value should be used (not initial from reasoning-start).
+    // Both reasoningEncryptedContent and itemId must be preserved for multi-turn context.
+    const parsed = JSON.parse((ev as { encryptedValue: string }).encryptedValue);
+    expect(parsed).toEqual({
+      openai: { reasoningEncryptedContent: 'gAAAAA_FINAL', itemId: 'rs_abc123' },
+    });
   });
 });
