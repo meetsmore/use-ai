@@ -59,6 +59,13 @@ export interface PersistedToolCall {
     /** JSON-serialized arguments */
     arguments: string;
   };
+  /**
+   * Encrypted reasoning context for multi-turn preservation.
+   * JSON-serialized provider metadata (e.g., Gemini's thoughtSignature).
+   * Required for Gemini models where thoughtSignature must be sent back
+   * on both tool-call and tool-result parts in subsequent turns.
+   */
+  encryptedValue?: string;
 }
 
 export interface PersistedMessage {

@@ -386,3 +386,192 @@ describe('AISDKAgent reasoning events (OpenAI)', () => {
     });
   });
 });
+
+describe('AISDKAgent reasoning events (Google/Gemini)', () => {
+  /**
+   * Gemini models attach thoughtSignature to tool call chunks rather than reasoning chunks.
+   * No reasoning-start/delta/end events are emitted. The signature appears on
+   * tool-input-start and tool-call chunks.
+   *
+   * Uses server-side tools (_server.execute) so AI SDK can execute tool calls
+   * without waiting for a client response.
+   */
+
+  const thoughtSignature = 'test-thought-signature';
+
+  const addTool = {
+    name: 'add',
+    description: 'Add two numbers',
+    parameters: { type: 'object' as const, properties: {} },
+    _server: { execute: () => ({ ok: true }) },
+  };
+
+  function createGeminiTestInput() {
+    const threadId = uuidv4();
+    const runId = uuidv4();
+    return {
+      session: {
+        socket: {} as never,
+        clientId: 'client-1',
+        threadId: 'thread-1',
+        tools: [] as never[],
+        state: null,
+        pendingToolCalls: new Map(),
+        pendingToolApprovals: new Map(),
+        ipAddress: '127.0.0.1',
+      },
+      runId,
+      messages: [{ role: 'user' as const, content: 'Add 5 and 7' }],
+      tools: [addTool],
+      state: null,
+      originalInput: {
+        threadId,
+        runId,
+        messages: [{ id: uuidv4(), role: 'user' as const, content: 'Add 5 and 7' }],
+        tools: [],
+        state: null,
+        context: [],
+        forwardedProps: {},
+      },
+    };
+  }
+
+  function createGeminiMockModel(chunks: unknown[]) {
+    return new MockLanguageModelV3({
+      doStream: (async () => ({
+        stream: simulateReadableStream({ chunks }),
+        response: {
+          id: 'response-1',
+          timestamp: new Date(),
+          modelId: 'google/gemini-3.1-flash-lite-preview',
+          headers: {},
+          messages: [{ role: 'assistant', content: [{ type: 'tool-call', toolCallId: 'tc_gemini_123', toolName: 'add', input: {} }] }],
+        },
+      })) as never,
+    });
+  }
+
+  function geminiToolCallChunks(sig: string = thoughtSignature) {
+    return [
+      {
+        type: 'tool-input-start',
+        id: 'tc_gemini_123',
+        toolName: 'add',
+        providerMetadata: { google: { thoughtSignature: sig } },
+      },
+      { type: 'tool-input-delta', id: 'tc_gemini_123', delta: '{}' },
+      { type: 'tool-input-end', id: 'tc_gemini_123' },
+      {
+        type: 'tool-call',
+        toolCallId: 'tc_gemini_123',
+        toolName: 'add',
+        input: '{}',
+        providerMetadata: { google: { thoughtSignature: sig } },
+      },
+      {
+        type: 'finish' as const,
+        finishReason: 'tool-calls' as const,
+        usage: { inputTokens: 36, outputTokens: 50, totalTokens: 200, reasoningTokens: 114 },
+      },
+    ];
+  }
+
+  test('captures thoughtSignature from tool call chunks and emits REASONING_ENCRYPTED_VALUE with subtype tool-call', async () => {
+    const mockModel = createGeminiMockModel(geminiToolCallChunks());
+    const agent = new AISDKAgent({ model: mockModel, maxSteps: 1 });
+
+    const emittedEvents: AGUIEventExtended[] = [];
+    const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
+    const result = await agent.run(createGeminiTestInput(), eventEmitter);
+    expect(result.success).toBe(true);
+
+    // Verify REASONING_ENCRYPTED_VALUE is emitted with subtype 'tool-call'
+    const encryptedEvents = emittedEvents.filter(e => e.type === EventType.REASONING_ENCRYPTED_VALUE);
+    expect(encryptedEvents.length).toBeGreaterThanOrEqual(1);
+
+    const ev = encryptedEvents[0] as { subtype: string; entityId: string; encryptedValue: string };
+    expect(ev.subtype).toBe('tool-call');
+    expect(ev.entityId).toBe('tc_gemini_123');
+
+    const parsed = JSON.parse(ev.encryptedValue);
+    expect(parsed).toEqual({
+      google: { thoughtSignature },
+    });
+  });
+
+  test('does not emit reasoning block events (no reasoning-start/delta/end) for Gemini', async () => {
+    const mockModel = createGeminiMockModel(geminiToolCallChunks());
+    const agent = new AISDKAgent({ model: mockModel, maxSteps: 1 });
+
+    const emittedEvents: AGUIEventExtended[] = [];
+    const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
+    await agent.run(createGeminiTestInput(), eventEmitter);
+
+    // Gemini does not emit reasoning-start/delta/end — thinking is internal
+    const reasoningBlockEvents = emittedEvents.filter(e =>
+      [
+        EventType.REASONING_START,
+        EventType.REASONING_MESSAGE_START,
+        EventType.REASONING_MESSAGE_CONTENT,
+        EventType.REASONING_MESSAGE_END,
+        EventType.REASONING_END,
+      ].includes(e.type as EventType)
+    );
+    expect(reasoningBlockEvents).toHaveLength(0);
+  });
+
+  test('emits REASONING_ENCRYPTED_VALUE after TOOL_CALL_END', async () => {
+    const mockModel = createGeminiMockModel(geminiToolCallChunks());
+    const agent = new AISDKAgent({ model: mockModel, maxSteps: 1 });
+
+    const emittedEvents: AGUIEventExtended[] = [];
+    const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
+    await agent.run(createGeminiTestInput(), eventEmitter);
+
+    const relevantTypes = [
+      EventType.TOOL_CALL_START,
+      EventType.TOOL_CALL_END,
+      EventType.REASONING_ENCRYPTED_VALUE,
+    ] as string[];
+    const ordered = emittedEvents
+      .filter(e => relevantTypes.includes(e.type as string))
+      .map(e => e.type);
+
+    // REASONING_ENCRYPTED_VALUE should follow TOOL_CALL_END
+    expect(ordered).toContain(EventType.TOOL_CALL_START);
+    expect(ordered).toContain(EventType.TOOL_CALL_END);
+    expect(ordered).toContain(EventType.REASONING_ENCRYPTED_VALUE);
+
+    const tcEndIdx = ordered.indexOf(EventType.TOOL_CALL_END);
+    const encIdx = ordered.indexOf(EventType.REASONING_ENCRYPTED_VALUE);
+    expect(encIdx).toBeGreaterThan(tcEndIdx);
+  });
+
+  test('does not emit REASONING_ENCRYPTED_VALUE when no thoughtSignature on tool calls', async () => {
+    const chunks = [
+      { type: 'tool-input-start', id: 'tc_no_sig', toolName: 'add' },
+      { type: 'tool-input-delta', id: 'tc_no_sig', delta: '{}' },
+      { type: 'tool-input-end', id: 'tc_no_sig' },
+      { type: 'tool-call', toolCallId: 'tc_no_sig', toolName: 'add', input: '{}' },
+      { type: 'finish' as const, finishReason: 'tool-calls' as const, usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 } },
+    ];
+
+    const mockModel = new MockLanguageModelV3({
+      doStream: (async () => ({
+        stream: simulateReadableStream({ chunks }),
+        response: {
+          id: 'response-1', timestamp: new Date(), modelId: 'mock-model', headers: {},
+          messages: [{ role: 'assistant', content: [{ type: 'tool-call', toolCallId: 'tc_no_sig', toolName: 'add', input: {} }] }],
+        },
+      })) as never,
+    });
+    const agent = new AISDKAgent({ model: mockModel, maxSteps: 1 });
+
+    const emittedEvents: AGUIEventExtended[] = [];
+    const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
+    await agent.run(createGeminiTestInput(), eventEmitter);
+
+    const encryptedEvents = emittedEvents.filter(e => e.type === EventType.REASONING_ENCRYPTED_VALUE);
+    expect(encryptedEvents).toHaveLength(0);
+  });
+});

@@ -146,6 +146,12 @@ interface StepContext {
    * @see REASONING_SIGNATURE_KEYS for supported providers.
    */
   currentReasoningSignature: Record<string, Record<string, unknown>> | null;
+  /**
+   * Extracted reasoning signatures from tool call chunks (Gemini thoughtSignature).
+   * Gemini attaches thoughtSignature to tool-call parts rather than reasoning parts.
+   * Maps toolCallId → provider-namespaced signature.
+   */
+  toolCallSignatures: Map<string, Record<string, Record<string, unknown>>>;
   stepFinishReason: string | undefined;
 }
 
@@ -363,14 +369,17 @@ const DEFAULT_MAX_STEPS = 10;
  * Responses API uses it to reconstruct reasoning items via `item_reference` or inline
  * reasoning objects in multi-turn conversations.
  *
- * Anthropic and OpenAI are tested and supported.
- * To add a new provider, add an entry here with the provider's context keys:
- *   - Google: ['thoughtSignature'] (untested)
+ * Anthropic, OpenAI, and Google are tested and supported.
+ * To add a new provider, add an entry here with the provider's context keys.
+ *
+ * Note: Google (Gemini) attaches thoughtSignature to tool call chunks rather than
+ * reasoning chunks. The signature is captured in tool-input-start and tool-call
+ * handlers and emitted via REASONING_ENCRYPTED_VALUE with subtype 'tool-call'.
  */
 const REASONING_CONTEXT_KEYS: Record<string, string[]> = {
   anthropic: ['signature'],
   openai: ['reasoningEncryptedContent', 'itemId'],
-  // google: ['thoughtSignature'],            // TODO: uncomment when tested
+  google: ['thoughtSignature'],
 };
 
 /**
@@ -638,6 +647,7 @@ export class AISDKAgent implements Agent {
         reasoningLifecycleId: null,
         reasoningMessageId: null,
         currentReasoningSignature: null,
+        toolCallSignatures: new Map(),
         stepFinishReason: undefined,
       };
 
@@ -964,6 +974,16 @@ export class AISDKAgent implements Agent {
         }
         events.emit(toolCallStartEvent);
         stepCtx.activeToolCalls.set(chunk.id, { name: chunk.toolName, args: '' });
+
+        // Gemini: extract thoughtSignature from tool-input-start providerMetadata.
+        // Unlike Anthropic/OpenAI where signatures are on reasoning chunks,
+        // Gemini attaches thoughtSignature to tool call chunks.
+        const toolStartSig = extractReasoningSignature(
+          (chunk as { providerMetadata?: Record<string, Record<string, unknown>> }).providerMetadata,
+        );
+        if (toolStartSig) {
+          stepCtx.toolCallSignatures.set(chunk.id, toolStartSig);
+        }
         return;
       }
 
@@ -989,6 +1009,14 @@ export class AISDKAgent implements Agent {
         const toolCall = stepCtx.activeToolCalls.get(chunk.toolCallId);
         const finalArgs = JSON.stringify(chunk.input);
 
+        // Gemini: extract/update thoughtSignature from tool-call providerMetadata
+        const toolCallSig = extractReasoningSignature(
+          (chunk as { providerMetadata?: Record<string, Record<string, unknown>> }).providerMetadata,
+        );
+        if (toolCallSig) {
+          stepCtx.toolCallSignatures.set(chunk.toolCallId, toolCallSig);
+        }
+
         // If no args were streamed at all (tool-input-delta was never called),
         // send the complete args as a single delta.
         // This handles cases where AI SDK skips streaming for empty args.
@@ -1010,6 +1038,20 @@ export class AISDKAgent implements Agent {
           toolCallId: chunk.toolCallId,
           timestamp: Date.now(),
         });
+
+        // Emit encrypted value for tool call signature (Gemini thoughtSignature).
+        // This is emitted after TOOL_CALL_END, matching the pattern where
+        // REASONING_ENCRYPTED_VALUE follows REASONING_MESSAGE_END.
+        const sig = stepCtx.toolCallSignatures.get(chunk.toolCallId);
+        if (sig) {
+          events.emit<ReasoningEncryptedValueEvent>({
+            type: EventType.REASONING_ENCRYPTED_VALUE,
+            subtype: 'tool-call',
+            entityId: chunk.toolCallId,
+            encryptedValue: JSON.stringify(sig),
+            timestamp: Date.now(),
+          });
+        }
         return;
       }
 
@@ -1410,20 +1452,57 @@ export class AISDKAgent implements Agent {
    * automatically stripping any provider-specific fields (like 'id', 'tool_use_id').
    * Using .strip() to silently remove unknown fields rather than throwing errors.
    */
+  /**
+   * Schema for tool-result content parts.
+   * Preserves providerMetadata (e.g., Gemini's thoughtSignature) for multi-turn context.
+   * The transform merges providerMetadata into providerOptions so the AI SDK sends it
+   * to the correct provider API (required for Gemini thoughtSignature on tool results).
+   */
   private static readonly toolResultContentSchema = z.object({
     type: z.literal('tool-result'),
     toolCallId: z.string(),
     toolName: z.string(),
     output: z.unknown(),
     isError: z.boolean().optional(),
-  }).strip();
+    providerMetadata: z.record(z.record(z.unknown())).optional(),
+    providerOptions: z.record(z.unknown()).optional(),
+  }).transform(({ type, toolCallId, toolName, output, isError, providerMetadata, providerOptions }) => ({
+    type,
+    toolCallId,
+    toolName,
+    output,
+    ...(isError !== undefined ? { isError } : {}),
+    ...(providerMetadata || providerOptions ? {
+      providerOptions: providerMetadata
+        ? { ...providerOptions, ...providerMetadata }
+        : providerOptions,
+    } : {}),
+  }));
 
+  /**
+   * Schema for tool-call content parts.
+   * Preserves providerMetadata (e.g., Gemini's thoughtSignature) for multi-turn context.
+   * The transform merges providerMetadata into providerOptions so the AI SDK sends it
+   * to the correct provider API (required for Gemini thoughtSignature on tool calls).
+   */
   private static readonly toolCallContentSchema = z.object({
     type: z.literal('tool-call'),
     toolCallId: z.string(),
     toolName: z.string(),
     input: z.unknown(),
-  }).strip();
+    providerMetadata: z.record(z.record(z.unknown())).optional(),
+    providerOptions: z.record(z.unknown()).optional(),
+  }).transform(({ type, toolCallId, toolName, input, providerMetadata, providerOptions }) => ({
+    type,
+    toolCallId,
+    toolName,
+    input,
+    ...(providerMetadata || providerOptions ? {
+      providerOptions: providerMetadata
+        ? { ...providerOptions, ...providerMetadata }
+        : providerOptions,
+    } : {}),
+  }));
 
   private static readonly textContentSchema = z.object({
     type: z.literal('text'),

@@ -83,7 +83,7 @@ export class UseAIClient {
 
   // Assistant message assembly (for tracking full conversation history)
   private _currentAssistantMessage: { id: string; role: 'assistant'; content: string } | null = null;
-  private _currentAssistantToolCalls: Array<{ id: string; type: 'function'; function: { name: string; arguments: string } }> = [];
+  private _currentAssistantToolCalls: Array<{ id: string; type: 'function'; function: { name: string; arguments: string }; encryptedValue?: string }> = [];
   // Tool results collected during a turn, pushed to _messages in correct order at RUN_FINISHED
   private _pendingToolResults: Message[] = [];
 
@@ -255,10 +255,17 @@ export class UseAIClient {
       this._currentReasoningBlockText = '';
     } else if (event.type === EventType.REASONING_ENCRYPTED_VALUE) {
       const e = event as ReasoningEncryptedValueEvent;
-      // Attach encrypted value to the most recent reasoning block
       if (e.subtype === 'message' && this._currentReasoningBlocks.length > 0) {
+        // Attach encrypted value to the most recent reasoning block (Anthropic/OpenAI)
         const lastBlock = this._currentReasoningBlocks[this._currentReasoningBlocks.length - 1];
         lastBlock.encryptedValue = e.encryptedValue;
+      } else if (e.subtype === 'tool-call' && e.entityId) {
+        // Gemini: attach encrypted value (thoughtSignature) to the tool call.
+        // entityId is the toolCallId for this subtype.
+        const tc = this._currentAssistantToolCalls.find(tc => tc.id === e.entityId);
+        if (tc) {
+          tc.encryptedValue = e.encryptedValue;
+        }
       }
     }
 

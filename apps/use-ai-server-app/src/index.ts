@@ -68,6 +68,20 @@ function createAgents(): { agents: Record<string, Agent>; defaultAgent: string }
         } }
       : undefined;
 
+  // Google Gemini reasoning configuration (opt-in via env vars).
+  // Applied to Gemini agents only (works for both direct API and gateway).
+  // Set USE_AI_GEMINI_THINKING_LEVEL to enable (minimal|low|medium|high).
+  const geminiThinkingLevel = process.env.USE_AI_GEMINI_THINKING_LEVEL || undefined;
+  const geminiProviderOptions: Record<string, Record<string, JSONValue>> | undefined =
+    geminiThinkingLevel
+      ? { google: {
+          thinkingConfig: {
+            thinkingLevel: geminiThinkingLevel,
+            includeThoughts: true,
+          },
+        } }
+      : undefined;
+
   const addAgent = (
     key: string,
     name: string,
@@ -85,11 +99,13 @@ function createAgents(): { agents: Record<string, Agent>; defaultAgent: string }
     });
     const hasThinking = !!providerOptions?.anthropic && typeof providerOptions.anthropic === 'object' && 'thinking' in providerOptions.anthropic;
     const hasOpenaiReasoning = !!providerOptions?.openai && typeof providerOptions.openai === 'object' && 'reasoningEffort' in providerOptions.openai;
+    const hasGeminiThinking = !!providerOptions?.google && typeof providerOptions.google === 'object' && 'thinkingConfig' in providerOptions.google;
     const suffix = [
       viaGateway ? 'via gateway' : null,
       temperature !== undefined ? `temp=${temperature}` : null,
       hasThinking ? `thinking=${reasoningBudgetTokens}` : null,
       hasOpenaiReasoning ? `reasoning=${openaiReasoningEffort}` : null,
+      hasGeminiThinking ? `thinking=${geminiThinkingLevel}` : null,
     ]
       .filter(Boolean)
       .join(', ');
@@ -114,6 +130,12 @@ function createAgents(): { agents: Record<string, Agent>; defaultAgent: string }
     const modelId = process.env.OPENAI_MODEL || 'gpt-4-turbo';
     const model = createOpenAI({ apiKey: openaiApiKey })(modelId);
     addAgent('gpt', 'ChatGPT', model, modelId, false, gptProviderOptions);
+  }
+
+  // Gemini: gateway only (requires AI_GATEWAY_API_KEY)
+  if (gateway) {
+    const modelId = process.env.USE_AI_GEMINI_MODEL || 'google/gemini-3.1-flash-lite-preview';
+    addAgent('gemini', 'Gemini', gateway(modelId), modelId, true, geminiProviderOptions);
   }
 
   // Mock agent for UI development (no API key needed)
