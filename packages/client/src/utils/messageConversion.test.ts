@@ -4,6 +4,61 @@ import type { PersistedMessage, PersistedToolCall } from '../providers/chatRepos
 import type { Message } from '../types';
 
 describe('transformMessagesToClientFormat', () => {
+  describe('user message multimodal reconstruction', () => {
+    it('passes string user content through unchanged', () => {
+      const persisted: PersistedMessage[] = [
+        { id: 'u1', role: 'user', content: 'plain', createdAt: new Date() },
+      ];
+      const result = transformMessagesToClientFormat(persisted);
+      expect(result[0].content).toBe('plain');
+    });
+
+    it('wraps transformed_file parts into the server-compatible text format', () => {
+      const persisted: PersistedMessage[] = [
+        {
+          id: 'u1',
+          role: 'user',
+          content: [
+            { type: 'text', text: 'intro' },
+            {
+              type: 'transformed_file',
+              text: 'OCR body',
+              originalFile: { name: 'doc.pdf', mimeType: 'application/pdf', size: 10 },
+            },
+          ],
+          createdAt: new Date(),
+        },
+      ];
+      const result = transformMessagesToClientFormat(persisted);
+      expect(Array.isArray(result[0].content)).toBe(true);
+      const parts = result[0].content as Array<{ type: string; text: string }>;
+      expect(parts).toHaveLength(2);
+      expect(parts[0]).toEqual({ type: 'text', text: 'intro' });
+      expect(parts[1]).toEqual({
+        type: 'text',
+        text: '[Content of file "doc.pdf" (application/pdf)]:\n\nOCR body',
+      });
+    });
+
+    it('drops legacy metadata-only file parts silently', () => {
+      const persisted: PersistedMessage[] = [
+        {
+          id: 'u1',
+          role: 'user',
+          content: [
+            { type: 'text', text: 'hi' },
+            { type: 'file', file: { name: 'x.pdf', mimeType: 'application/pdf', size: 1 } },
+          ],
+          createdAt: new Date(),
+        },
+      ];
+      const result = transformMessagesToClientFormat(persisted);
+      const parts = result[0].content as Array<{ type: string; text: string }>;
+      expect(parts).toHaveLength(1);
+      expect(parts[0]).toEqual({ type: 'text', text: 'hi' });
+    });
+  });
+
   describe('tool data preservation', () => {
     it('should preserve toolCalls on assistant messages', () => {
       const persistedMessages: PersistedMessage[] = [

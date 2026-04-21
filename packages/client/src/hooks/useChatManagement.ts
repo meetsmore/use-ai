@@ -3,7 +3,7 @@ import type { ChatRepository, Chat, ChatMetadata, CreateChatOptions, PersistedMe
 import type { ReasoningPart } from '../types';
 import { generateMessageId } from '../providers/chatRepository/types';
 import type { UseAIClient } from '../client';
-import { getTextFromContent } from '../utils/messageContent';
+import { getDisplayTextFromContent } from '../utils/messageContent';
 import { transformMessagesToClientFormat } from '../utils/messageConversion';
 
 // Constants
@@ -297,9 +297,10 @@ export function useChatManagement({
       };
       chat.messages.push(newMessage);
 
-      // Auto-generate title from text content
+      // Auto-generate title from text content (display variant so the
+      // title doesn't include transformed_file text).
       if (!chat.title) {
-        const text = getTextFromContent(content);
+        const text = getDisplayTextFromContent(content);
         if (text) {
           chat.title = generateChatTitle(text);
         }
@@ -363,7 +364,7 @@ export function useChatManagement({
       if (!chat.title) {
         const firstUserMessage = chat.messages.find(msg => msg.role === 'user');
         if (firstUserMessage) {
-          const textContent = getTextFromContent(firstUserMessage.content);
+          const textContent = getDisplayTextFromContent(firstUserMessage.content);
           if (textContent) {
             chat.title = generateChatTitle(textContent);
           }
