@@ -39,11 +39,7 @@ export interface PersistedTransformedFileContent {
   type: 'transformed_file';
   /** The transformed text representation (e.g. OCR'd markdown). */
   text: string;
-  originalFile: {
-    name: string;
-    mimeType: string;
-    size: number;
-  };
+  originalFile: PersistedFileMetadata;
 }
 
 /**
