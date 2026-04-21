@@ -7,7 +7,7 @@ function createContextValue(overrides: Partial<ChatUIContextValue> = {}): ChatUI
   return {
     connected: true,
     loading: false,
-    sendMessage: mock(() => {}),
+    sendMessage: mock(async () => {}),
     messages: [],
     streamingText: '',
     streamingReasoning: '',

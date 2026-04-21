@@ -17,7 +17,7 @@ export interface ChatUIContextValue {
   /** Whether the AI is processing */
   loading: boolean;
   /** Send a message with optional file attachments */
-  sendMessage: (message: string, attachments?: FileAttachment[]) => void;
+  sendMessage: (message: string, attachments?: FileAttachment[]) => Promise<void>;
   /** Current messages in the conversation */
   messages: PersistedMessage[];
   /** Currently streaming text from assistant (real-time updates) */
