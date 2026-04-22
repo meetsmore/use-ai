@@ -1,92 +1,58 @@
-import React from 'react';
-import { UseAIProvider, UseAIChat, type FileTransformer } from '@meetsmore-oss/use-ai-client';
-import { CollapsibleCode } from '../components/CollapsibleCode';
-import { docStyles } from '../styles/docStyles';
+import {
+  type FileTransformer,
+  UseAIChat,
+  UseAIProvider,
+} from '@meetsmore-oss/use-ai-client'
+import React from 'react'
+import { CollapsibleCode } from '../components/CollapsibleCode'
+import { docStyles } from '../styles/docStyles'
+
+const PDF_MOCK_TEXT =
+  'This is a mock PDF transcription. The document describes a quarterly sales report with three sections: summary, regional breakdown, and outlook for next quarter.'
+
+const IMAGE_MOCK_TEXT =
+  'This is a mock image description. The picture shows a red apple sitting on a wooden table next to a blue coffee mug, lit by natural sunlight from the left.'
 
 /**
- * PDF Transformer - Simulates processing with progress updates.
- * Shows the circular progress indicator filling up.
+ * PDF Transformer - Returns a fixed mock string per file and reports
+ * progress in 5 steps (shows the circular progress UI).
  */
 const pdfTransformer: FileTransformer = {
-  async transform(file, _context, onProgress) {
-    console.log(`[PDF Transformer] Starting to process: ${file.name}`);
+  async transform(files, _context, onProgress) {
+    console.log(`[PDF Transformer] Processing ${files.length} file(s)`)
 
-    // Simulate processing in 5 steps
-    const steps = [
-      { progress: 20, message: 'Reading PDF...' },
-      { progress: 40, message: 'Extracting text...' },
-      { progress: 60, message: 'Parsing content...' },
-      { progress: 80, message: 'Formatting output...' },
-      { progress: 100, message: 'Complete!' },
-    ];
-
-    for (const step of steps) {
-      await sleep(800); // 800ms per step = 4 seconds total
-      console.log(`[PDF Transformer] ${step.message} (${step.progress}%)`);
-      onProgress?.(step.progress);
+    const steps = [20, 40, 60, 80, 100]
+    for (const progress of steps) {
+      await sleep(800) // 800ms per step = 4 seconds total
+      onProgress?.(progress)
     }
 
-    // Return a mock "extracted" content
-    return `[Extracted PDF Content from "${file.name}"]
-
-This is simulated extracted text from the PDF file.
-The transformer processed ${file.size} bytes.
-
---- Mock Content ---
-Page 1: Introduction
-This document contains important information about the topic.
-
-Page 2: Details
-Here are the specific details you need to know.
-
-Page 3: Conclusion
-In summary, this PDF has been successfully processed.
---- End of Content ---`;
+    return files.map(() => PDF_MOCK_TEXT)
   },
-};
-
-/**
- * Image Transformer - Simulates processing without progress updates.
- * Shows the infinite spinner (indeterminate progress).
- */
-const imageTransformer: FileTransformer = {
-  async transform(file, _context) {
-    console.log(`[Image Transformer] Starting to process: ${file.name}`);
-
-    // Simulate processing without progress updates (shows spinner)
-    await sleep(2000); // 2 seconds
-
-    console.log(`[Image Transformer] Complete!`);
-
-    // Return a mock "description" of the image
-    return `[Image Analysis for "${file.name}"]
-
-Image Type: ${file.type}
-File Size: ${formatFileSize(file.size)}
-Dimensions: (simulated) 1920x1080
-
---- AI Description ---
-This image appears to contain visual content that has been analyzed.
-The transformer processed the image without granular progress updates,
-demonstrating the infinite spinner (indeterminate progress) UI.
---- End of Analysis ---`;
-  },
-};
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+/**
+ * Image Transformer - Returns a fixed mock string per file without
+ * reporting progress (shows the infinite spinner).
+ */
+const imageTransformer: FileTransformer = {
+  async transform(files, _context) {
+    console.log(`[Image Transformer] Processing ${files.length} file(s)`)
+
+    await sleep(2000) // 2 seconds
+
+    return files.map(() => IMAGE_MOCK_TEXT)
+  },
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
 export default function FileTransformersPage() {
   return (
     <UseAIProvider
-      serverUrl="ws://localhost:8081"
+      serverUrl='ws://localhost:8081'
       renderChat={false}
       fileUploadConfig={{
         maxFileSize: 10 * 1024 * 1024, // 10MB
@@ -103,9 +69,10 @@ export default function FileTransformersPage() {
         <div style={{ ...docStyles.infoCard, marginBottom: '24px' }}>
           <h3 style={docStyles.subtitle}>About</h3>
           <p style={docStyles.text}>
-            File transformers process uploaded files before sending them to the AI, converting
-            binary content (PDFs, images) into text representations. Transformers can report
-            progress (circular indicator) or run without progress updates (infinite spinner).
+            File transformers process uploaded files before sending them to the
+            AI, converting binary content (PDFs, images) into text
+            representations. Transformers can report progress (circular
+            indicator) or run without progress updates (infinite spinner).
           </p>
         </div>
 
@@ -114,11 +81,14 @@ export default function FileTransformersPage() {
 
           <div style={styles.transformerSection}>
             <h4 style={styles.transformerTitle}>
-              1. PDF Transformer <span style={styles.badge}>Progress Indicator</span>
+              1. PDF Transformer{' '}
+              <span style={styles.badge}>Progress Indicator</span>
             </h4>
             <p style={styles.transformerDescription}>
-              Upload any PDF file. You'll see a <strong>circular progress indicator</strong> that
-              fills up as the transformer "processes" the file (simulated with 5 steps over ~4 seconds).
+              Upload any PDF file. You'll see a{' '}
+              <strong>circular progress indicator</strong> that fills up as the
+              transformer "processes" the file (simulated with 5 steps over ~4
+              seconds).
             </p>
             <ul style={styles.list}>
               <li>Click the attachment button (paperclip icon) in the chat</li>
@@ -133,8 +103,10 @@ export default function FileTransformersPage() {
               2. Image Transformer <span style={styles.badgeAlt}>Spinner</span>
             </h4>
             <p style={styles.transformerDescription}>
-              Upload any image file (PNG, JPG, GIF, etc.). You'll see an <strong>infinite spinner</strong>
-              since this transformer doesn't report progress (simulated with a 2-second delay).
+              Upload any image file (PNG, JPG, GIF, etc.). You'll see an{' '}
+              <strong>infinite spinner</strong>
+              since this transformer doesn't report progress (simulated with a
+              2-second delay).
             </p>
             <ul style={styles.list}>
               <li>Click the attachment button in the chat</li>
@@ -145,16 +117,17 @@ export default function FileTransformersPage() {
           </div>
 
           <div style={styles.note}>
-            <strong>Note:</strong> The transformers convert files to text before sending to the AI.
-            The AI receives the transformed text content, not the original file data. Check the browser
-            console to see transformer logs.
+            <strong>Note:</strong> The transformers convert files to text before
+            sending to the AI. The AI receives the transformed text content, not
+            the original file data. Check the browser console to see transformer
+            logs.
           </div>
         </div>
 
         <div style={styles.codeSection}>
           <h3 style={styles.sectionTitle}>Code Example</h3>
           <CollapsibleCode>
-{`// Configure transformers in UseAIProvider
+            {`// Configure transformers in UseAIProvider
 <UseAIProvider
   serverUrl="ws://localhost:8081"
   fileUploadConfig={{
@@ -193,7 +166,7 @@ export default function FileTransformersPage() {
         </div>
       </div>
     </UseAIProvider>
-  );
+  )
 }
 
 const styles: Record<string, React.CSSProperties> = {
@@ -305,4 +278,4 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     overflow: 'hidden',
   },
-};
+}
