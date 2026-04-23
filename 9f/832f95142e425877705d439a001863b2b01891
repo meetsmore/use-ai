@@ -1,0 +1,23 @@
+packages/client/src/components/UseAIChatPanel.tsx
+  f22874e099363356 773
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.2",
+  "base_commit_sha": "9f832f95142e425877705d439a001863b2b01891",
+  "prompts": {
+    "f22874e099363356": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fdd905e2-06ea-442e-9948-e0604c55e1a0",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Fumiya Karasawa",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 1,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  }
+}
