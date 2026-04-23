@@ -770,7 +770,7 @@ export function UseAIChatPanel({
               <div
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: 'repeat(2, 1fr)',
+                  gridTemplateColumns: '1fr',
                   gap: '8px',
                   width: '100%',
                   maxWidth: '320px',
