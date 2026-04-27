@@ -6,10 +6,11 @@ import { UseAIFloatingChatWrapper, CloseButton } from '../components/UseAIFloati
 import { __UseAIChatContext, type ChatUIContextValue } from '../components/UseAIChat';
 import { UseAIClient } from '../client';
 import { convertToolsToDefinitions, type ToolsDefinition } from '../defineTool';
-import type { ChatRepository, Chat, ChatMetadata, CreateChatOptions, PersistedMessage, PersistedMessageContent, PersistedContentPart } from './chatRepository/types';
+import type { ChatRepository, Chat, ChatMetadata, CreateChatOptions, PersistedMessage, PersistedMessageContent } from './chatRepository/types';
 import { LocalStorageChatRepository } from './chatRepository/LocalStorageChatRepository';
 import type { FileAttachment, FileUploadConfig, FileProcessingState } from '../fileUpload/types';
 import { processAttachments } from '../fileUpload/processAttachments';
+import { buildPersistedParts } from '../fileUpload/buildPersistedParts';
 import { EmbedFileUploadBackend } from '../fileUpload/EmbedFileUploadBackend';
 import type { MultimodalContent } from '@meetsmore-oss/use-ai-core';
 import type { CommandRepository, SavedCommand } from '../commands/types';
@@ -585,30 +586,11 @@ export function UseAIProvider({
     let multimodalContent: MultimodalContent[] | undefined;
 
     if (attachments && attachments.length > 0) {
-      const persistedParts: PersistedContentPart[] = [];
-      if (message.trim()) {
-        persistedParts.push({ type: 'text', text: message });
-      }
-      for (const attachment of attachments) {
-        persistedParts.push({
-          type: 'file',
-          file: {
-            name: attachment.file.name,
-            size: attachment.file.size,
-            mimeType: attachment.file.type,
-          },
-        });
-      }
-      persistedContent = persistedParts;
-
-      if (activeChatId) {
-        await chatManagement.saveUserMessage(activeChatId, persistedContent);
-      }
-
       serverEvents.setLoading(true);
 
+      let fileContent: MultimodalContent[];
       try {
-        const fileContent = await processAttachments(attachments, {
+        fileContent = await processAttachments(attachments, {
           getCurrentChat: chatManagement.getCurrentChat,
           backend: fileUploadConfig?.backend,
           transformers: fileUploadConfig?.transformers,
@@ -616,18 +598,27 @@ export function UseAIProvider({
             setFileProcessingState(state);
           },
         });
-
-        multimodalContent = [];
-        if (message.trim()) {
-          multimodalContent.push({ type: 'text', text: message });
-        }
-        multimodalContent.push(...fileContent);
       } catch (error) {
         serverEvents.setLoading(false);
         throw error;
       } finally {
         setFileProcessingState(null);
       }
+
+      // Persist the transformed text alongside attachment metadata so the
+      // full context survives a localStorage rehydration. See
+      // docs/plans/bugfix-transformed-file-persistence.md.
+      persistedContent = buildPersistedParts(message, attachments, fileContent);
+
+      if (activeChatId) {
+        await chatManagement.saveUserMessage(activeChatId, persistedContent);
+      }
+
+      multimodalContent = [];
+      if (message.trim()) {
+        multimodalContent.push({ type: 'text', text: message });
+      }
+      multimodalContent.push(...fileContent);
     } else {
       if (activeChatId) {
         await chatManagement.saveUserMessage(activeChatId, persistedContent);

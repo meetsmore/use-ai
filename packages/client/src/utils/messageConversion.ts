@@ -9,30 +9,46 @@ import { getTextFromContent } from './messageContent';
  */
 export function transformMessagesToClientFormat(persistedMessages: PersistedMessage[]): AGUIMessage[] {
   return persistedMessages.map((msg): AGUIMessage => {
-    const textContent = getTextFromContent(msg.content);
-
     switch (msg.role) {
       case 'tool':
         return {
           id: msg.id,
           role: 'tool',
-          content: textContent,
+          content: getTextFromContent(msg.content),
           toolCallId: msg.toolCallId || '',
         };
       case 'assistant':
         return {
           id: msg.id,
           role: 'assistant',
-          content: textContent,
+          content: getTextFromContent(msg.content),
           ...(msg.toolCalls && msg.toolCalls.length > 0 ? { toolCalls: msg.toolCalls } : {}),
           ...(msg.reasoningParts && msg.reasoningParts.length > 0 ? { reasoningParts: msg.reasoningParts } : {}),
         };
-      case 'user':
-        return {
-          id: msg.id,
-          role: 'user',
-          content: textContent,
-        };
+      case 'user': {
+        if (typeof msg.content === 'string') {
+          return { id: msg.id, role: 'user', content: msg.content };
+        }
+        // Preserve multipart structure so the LLM sees the full original
+        // input (including transformed file text) after rehydration.
+        // transformed_file parts are wrapped in the same format the server
+        // emits on fresh sends (see packages/server/src/server.ts).
+        const parts = msg.content.flatMap((p) => {
+          if (p.type === 'text') {
+            return [{ type: 'text' as const, text: p.text }];
+          }
+          if (p.type === 'transformed_file') {
+            return [{
+              type: 'text' as const,
+              text: `[Content of file "${p.originalFile.name}" (${p.originalFile.mimeType})]:\n\n${p.text}`,
+            }];
+          }
+          // Legacy metadata-only 'file' parts cannot be reconstructed —
+          // drop them so the rest of the history still loads.
+          return [];
+        });
+        return { id: msg.id, role: 'user', content: parts };
+      }
     }
   });
 }

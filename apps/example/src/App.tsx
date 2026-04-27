@@ -11,6 +11,7 @@ import ServerToolsPage from './pages/ServerToolsPage';
 import EmbeddedChatPage from './pages/EmbeddedChatPage';
 import ProgrammaticChatPage from './pages/ProgrammaticChatPage';
 import FileTransformersPage from './pages/FileTransformersPage';
+import SendMessageFileTransformerPage from './pages/SendMessageFileTransformerPage';
 import ErrorTracingTestPage from './pages/ErrorTracingTestPage';
 import ClientToolsPage from './pages/ClientToolsPage';
 import ChatHistoryPage from './pages/ChatHistoryPage';
@@ -77,6 +78,7 @@ const NAV_CATEGORIES: NavCategory[] = [
     items: [
       { path: '/invisible-test', label: 'Invisible Providers' },
       { path: '/file-transformers', label: 'File Transformers' },
+      { path: '/send-message-file-transformer', label: 'File Transformer via sendMessage' },
       { path: '/multimodal', label: 'Multimodal' },
       { path: '/multi-agent', label: 'Multi-Agent' },
       { path: '/before-run-agent', label: 'beforeRunAgent Hook' },
@@ -177,6 +179,7 @@ function AppContent() {
         <Route path="/mcp-runtime-approval"><McpRuntimeApprovalPage /></Route>
         <Route path="/invisible-test"><InvisibleTestPage /></Route>
         <Route path="/file-transformers"><FileTransformersPage /></Route>
+        <Route path="/send-message-file-transformer"><SendMessageFileTransformerPage /></Route>
         <Route path="/multimodal"><MultimodalPage /></Route>
         <Route path="/multi-agent"><MultiAgentPage /></Route>
         <Route path="/before-run-agent"><BeforeRunAgentPage /></Route>

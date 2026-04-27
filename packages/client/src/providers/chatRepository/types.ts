@@ -31,10 +31,25 @@ export interface PersistedFileContent {
 }
 
 /**
- * Content part for persisted messages.
- * Can be text or file metadata.
+ * Transformed file content part for persisted messages.
+ * Stores the text produced by a client-side FileTransformer (e.g. OCR result)
+ * so the full context survives a page reload / Socket.IO reconnect.
  */
-export type PersistedContentPart = PersistedTextContent | PersistedFileContent;
+export interface PersistedTransformedFileContent {
+  type: 'transformed_file';
+  /** The transformed text representation (e.g. OCR'd markdown). */
+  text: string;
+  originalFile: PersistedFileMetadata;
+}
+
+/**
+ * Content part for persisted messages.
+ * Can be text, file metadata, or transformed file content.
+ */
+export type PersistedContentPart =
+  | PersistedTextContent
+  | PersistedFileContent
+  | PersistedTransformedFileContent;
 
 /**
  * Content that can be persisted.

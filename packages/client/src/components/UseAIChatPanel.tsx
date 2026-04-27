@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import type { Chat, PersistedMessage, PersistedMessageContent, PersistedContentPart, MessageDisplayMode } from '../providers/chatRepository/types';
-import { getTextFromContent } from '../utils/messageContent';
+import { getTextFromContent, getDisplayTextFromContent } from '../utils/messageContent';
 import { mergeAssistantMessagesForDisplay } from '../utils/mergeAssistantMessages';
 import type { AgentInfo, FeedbackValue, ToolAnnotations } from '../types';
 import type { FileAttachment, FileUploadConfig, FileProcessingState } from '../fileUpload/types';
@@ -424,7 +424,7 @@ export function UseAIChatPanel({
                   if (displayMessages.length > 0) {
                     const firstUserMsg = displayMessages.find((m) => m.role === 'user');
                     if (firstUserMsg) {
-                      const textContent = getTextFromContent(firstUserMsg.content);
+                      const textContent = getDisplayTextFromContent(firstUserMsg.content);
                       const maxLength = 30;
                       return textContent.length > maxLength
                         ? textContent.substring(0, maxLength) + '...'
@@ -845,7 +845,7 @@ export function UseAIChatPanel({
                   data-testid="save-command-button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    const messageText = getTextFromContent(message.content);
+                    const messageText = getDisplayTextFromContent(message.content);
                     slashCommands.startSavingCommand(message.id, messageText);
                   }}
                   title="Save as slash command"
@@ -930,13 +930,15 @@ export function UseAIChatPanel({
                   <MarkdownContent content={getTextFromContent(message.content)} />
                 </>
               ) : (
-                getTextFromContent(message.content)
+                // User/tool bubbles: display-only text so transformed_file
+                // (e.g. OCR body) isn't dumped into the chat bubble.
+                getDisplayTextFromContent(message.content)
               )}
               </div>
               {/* Inline save command UI - glued to chat bubble */}
               {slashCommands.renderInlineSaveUI({
                 messageId: message.id,
-                messageText: getTextFromContent(message.content),
+                messageText: getDisplayTextFromContent(message.content),
               })}
             </div>
             {/* Feedback buttons - only for assistant messages with traceId */}
