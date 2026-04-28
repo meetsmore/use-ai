@@ -69,6 +69,14 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Published version: $VERSION"
 
+      - name: Sync bun.lock with bumped workspace versions
+        run: |
+          bun install --lockfile-only
+          if ! git diff --quiet bun.lock; then
+            git add bun.lock
+            git commit -m "chore: sync bun.lock for v${{ steps.get-version.outputs.version }}"
+          fi
+
       - name: Push changes
         run: git push --follow-tags
 
