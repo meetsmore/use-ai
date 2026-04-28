@@ -1,6 +1,6 @@
 {
   "name": "@meetsmore-oss/use-ai-server",
-  "version": "1.12.0",
+  "version": "1.12.1",
   "license": "BUSL-1.1",
   "files": [
     "dist"
