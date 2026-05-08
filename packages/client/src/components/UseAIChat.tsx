@@ -100,6 +100,13 @@ export interface ChatUIContextValue {
     /** Submit feedback for a message */
     submit: (messageId: string, traceId: string, feedback: FeedbackValue) => void;
   };
+  /**
+   * Whether pressing Enter (without modifier) sends the message in the
+   * built-in chat panel. `false` switches Enter to inserting a newline,
+   * leaving Cmd/Ctrl+Enter as the submit shortcut. Recommended for mobile.
+   * @default true
+   */
+  enterToSend?: boolean;
 }
 
 /**
@@ -132,6 +139,15 @@ export interface UseAIChatProps {
    * When false (default), renders inline filling its container.
    */
   floating?: boolean;
+  /**
+   * Whether pressing Enter (without modifier) sends the message.
+   * - `true` (default): Enter sends, Shift+Enter inserts a newline. Suitable for desktop.
+   * - `false`: Enter inserts a newline. Cmd/Ctrl+Enter still sends. Recommended for mobile,
+   *   where soft keyboards lack modifier keys and the user taps the send button.
+   *
+   * Overrides the value provided on `UseAIProvider` for this instance.
+   */
+  enterToSend?: boolean;
 }
 
 /**
@@ -159,10 +175,11 @@ export interface UseAIChatProps {
  * </UseAIProvider>
  * ```
  */
-export function UseAIChat({ floating = false }: UseAIChatProps) {
+export function UseAIChat({ floating = false, enterToSend }: UseAIChatProps) {
   const ctx = useChatUIContext();
 
   const chatPanelProps = {
+    enterToSend: enterToSend ?? ctx.enterToSend,
     onSendMessage: ctx.sendMessage,
     messages: ctx.messages,
     loading: ctx.loading,

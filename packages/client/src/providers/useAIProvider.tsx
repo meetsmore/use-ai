@@ -369,6 +369,31 @@ export interface UseAIProviderProps extends UseAIConfig {
    * ```
    */
   onOpenChange?: (isOpen: boolean) => void;
+  /**
+   * Whether pressing Enter (without modifier) sends the message in the
+   * built-in chat panel.
+   * - `true` (default): Enter sends, Shift+Enter inserts a newline. Suitable for desktop.
+   * - `false`: Enter inserts a newline. Cmd/Ctrl+Enter still sends. Recommended for
+   *   mobile/touch devices where soft keyboards lack modifier keys and the user is
+   *   expected to tap the send button.
+   *
+   * Can be overridden per-instance via the `enterToSend` prop on `<UseAIChat>`.
+   *
+   * @default true
+   *
+   * @example
+   * ```tsx
+   * import { isMobileApp } from '@/lib/is-mobile';
+   *
+   * <UseAIProvider
+   *   serverUrl="wss://your-server.com"
+   *   enterToSend={!isMobileApp()}
+   * >
+   *   <App />
+   * </UseAIProvider>
+   * ```
+   */
+  enterToSend?: boolean;
 }
 
 /**
@@ -428,6 +453,7 @@ export function UseAIProvider({
   strings: customStrings,
   visibleAgentIds,
   onOpenChange,
+  enterToSend = true,
 }: UseAIProviderProps) {
   const fileUploadConfig = fileUploadConfigProp === false
     ? undefined
@@ -749,6 +775,7 @@ export function UseAIProvider({
       enabled: feedback.enabled,
       submit: feedback.submitFeedback,
     },
+    enterToSend,
   };
 
   const isUIDisabled = CustomButton === null || CustomChat === null;
@@ -784,6 +811,7 @@ export function UseAIProvider({
     pendingApprovals: toolSystem.pendingApprovals,
     onApproveToolCall: toolSystem.pendingApprovals.length > 0 ? toolSystem.approveAll : undefined,
     onRejectToolCall: toolSystem.pendingApprovals.length > 0 ? toolSystem.rejectAll : undefined,
+    enterToSend,
   };
 
   const renderDefaultChat = () => {
