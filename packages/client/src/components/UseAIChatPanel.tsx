@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import type { Chat, PersistedMessage, PersistedMessageContent, PersistedContentPart, MessageDisplayMode } from '../providers/chatRepository/types';
 import { getTextFromContent, getDisplayTextFromContent } from '../utils/messageContent';
 import { mergeAssistantMessagesForDisplay } from '../utils/mergeAssistantMessages';
-import { shouldSubmitOnEnter } from '../utils/keyboard';
+import { shouldSubmitOnEnter, type SubmitMode } from '../utils/keyboard';
 import type { AgentInfo, FeedbackValue, ToolAnnotations } from '../types';
 import type { FileAttachment, FileUploadConfig, FileProcessingState } from '../fileUpload/types';
 import { MarkdownContent } from './MarkdownContent';
@@ -172,17 +172,19 @@ export interface UseAIChatPanelProps {
   /** Callback to reject all pending tool calls */
   onRejectToolCall?: (reason?: string) => void;
   /**
-   * Whether pressing Enter (without modifier) sends the message.
-   * - `true` (default): Enter sends, Shift+Enter inserts a newline. Suitable for desktop.
-   * - `false`: Enter inserts a newline. Cmd/Ctrl+Enter still sends (when a physical
-   *   keyboard is attached). Recommended for mobile, where soft keyboards lack
-   *   modifier keys and the user is expected to tap the send button.
+   * How the textarea should treat the Enter key.
    *
-   * IME composition is always respected regardless of this setting.
+   * - `'enter'` (default): Enter submits, Shift+Enter inserts a newline. Suitable
+   *   for desktop.
+   * - `'mod-enter'`: Enter inserts a newline. Cmd/Ctrl+Enter submits. Recommended
+   *   for mobile, where soft keyboards lack modifier keys and the user is
+   *   expected to tap the send button.
    *
-   * @default true
+   * IME composition is always respected regardless of mode.
+   *
+   * @default 'enter'
    */
-  enterToSend?: boolean;
+  submitMode?: SubmitMode;
 }
 
 /**
@@ -220,7 +222,7 @@ export function UseAIChatPanel({
   pendingApprovals = [],
   onApproveToolCall,
   onRejectToolCall,
-  enterToSend = true,
+  submitMode = 'enter',
 }: UseAIChatPanelProps) {
   const strings = useStrings();
   const theme = useTheme();
@@ -328,7 +330,7 @@ export function UseAIChatPanel({
       return;
     }
 
-    if (shouldSubmitOnEnter(e, enterToSend)) {
+    if (shouldSubmitOnEnter(e, submitMode)) {
       e.preventDefault();
       handleSend();
     }

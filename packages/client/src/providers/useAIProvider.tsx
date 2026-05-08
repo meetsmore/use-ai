@@ -18,6 +18,7 @@ import { useChatManagement } from '../hooks/useChatManagement';
 import { useAgentSelection } from '../hooks/useAgentSelection';
 import { useCommandManagement } from '../hooks/useCommandManagement';
 import { useToolSystem, type RegisterToolsOptions } from '../hooks/useToolSystem';
+import type { SubmitMode } from '../utils/keyboard';
 import { usePromptState } from '../hooks/usePromptState';
 import { useFeedback } from '../hooks/useFeedback';
 import { useServerEvents } from '../hooks/useServerEvents';
@@ -370,16 +371,17 @@ export interface UseAIProviderProps extends UseAIConfig {
    */
   onOpenChange?: (isOpen: boolean) => void;
   /**
-   * Whether pressing Enter (without modifier) sends the message in the
-   * built-in chat panel.
-   * - `true` (default): Enter sends, Shift+Enter inserts a newline. Suitable for desktop.
-   * - `false`: Enter inserts a newline. Cmd/Ctrl+Enter still sends. Recommended for
-   *   mobile/touch devices where soft keyboards lack modifier keys and the user is
-   *   expected to tap the send button.
+   * How the built-in chat panel should treat the Enter key.
    *
-   * Can be overridden per-instance via the `enterToSend` prop on `<UseAIChat>`.
+   * - `'enter'` (default): Enter submits, Shift+Enter inserts a newline.
+   *   Typical desktop behavior.
+   * - `'mod-enter'`: Enter inserts a newline. Cmd/Ctrl+Enter submits.
+   *   Recommended for mobile/touch devices where soft keyboards lack modifier
+   *   keys and the user is expected to tap the send button.
    *
-   * @default true
+   * Can be overridden per-instance via the `submitMode` prop on `<UseAIChat>`.
+   *
+   * @default 'enter'
    *
    * @example
    * ```tsx
@@ -387,13 +389,13 @@ export interface UseAIProviderProps extends UseAIConfig {
    *
    * <UseAIProvider
    *   serverUrl="wss://your-server.com"
-   *   enterToSend={!isMobileApp()}
+   *   submitMode={isMobileApp() ? 'mod-enter' : 'enter'}
    * >
    *   <App />
    * </UseAIProvider>
    * ```
    */
-  enterToSend?: boolean;
+  submitMode?: SubmitMode;
 }
 
 /**
@@ -453,7 +455,7 @@ export function UseAIProvider({
   strings: customStrings,
   visibleAgentIds,
   onOpenChange,
-  enterToSend = true,
+  submitMode = 'enter',
 }: UseAIProviderProps) {
   const fileUploadConfig = fileUploadConfigProp === false
     ? undefined
@@ -775,7 +777,7 @@ export function UseAIProvider({
       enabled: feedback.enabled,
       submit: feedback.submitFeedback,
     },
-    enterToSend,
+    submitMode,
   };
 
   const isUIDisabled = CustomButton === null || CustomChat === null;
@@ -811,7 +813,7 @@ export function UseAIProvider({
     pendingApprovals: toolSystem.pendingApprovals,
     onApproveToolCall: toolSystem.pendingApprovals.length > 0 ? toolSystem.approveAll : undefined,
     onRejectToolCall: toolSystem.pendingApprovals.length > 0 ? toolSystem.rejectAll : undefined,
-    enterToSend,
+    submitMode,
   };
 
   const renderDefaultChat = () => {

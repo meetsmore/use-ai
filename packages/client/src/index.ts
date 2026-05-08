@@ -27,6 +27,7 @@ export { UseAIFloatingChatWrapper, CloseButton } from './components/UseAIFloatin
 export { UseAIFloatingButton } from './components/UseAIFloatingButton';
 export { UseAIChat } from './components/UseAIChat';
 export type { UseAIChatProps } from './components/UseAIChat';
+export type { SubmitMode } from './utils/keyboard';
 
 export type { UseAIOptions, UseAIResult } from './useAI';
 export type { UseAIWorkflowResult, TriggerWorkflowOptions, WorkflowProgress } from './useAIWorkflow';

@@ -26,6 +26,7 @@ import McpRuntimeApprovalPage from './pages/McpRuntimeApprovalPage';
 import MultimodalPage from './pages/MultimodalPage';
 import MultiAgentPage from './pages/MultiAgentPage';
 import BeforeRunAgentPage from './pages/BeforeRunAgentPage';
+import SubmitModePage from './pages/SubmitModePage';
 import { NavigationAIProvider } from './providers/NavigationAIProvider';
 
 interface NavCategory {
@@ -66,6 +67,7 @@ const NAV_CATEGORIES: NavCategory[] = [
     items: [
       { path: '/custom-ui', label: 'Custom UI' },
       { path: '/theme-i18n', label: 'Theme & i18n' },
+      { path: '/submit-mode', label: 'Submit Mode (Enter key)' },
       { path: '/suggestions', label: 'Suggestions' },
       { path: '/destructive-approval', label: 'Destructive Approval' },
       { path: '/runtime-approval', label: 'Runtime Approval (Client)' },
@@ -172,6 +174,7 @@ function AppContent() {
         <Route path="/slash-commands"><SlashCommandsPage /></Route>
         <Route path="/custom-ui"><CustomUIPage /></Route>
         <Route path="/theme-i18n"><ThemeI18nPage /></Route>
+        <Route path="/submit-mode"><SubmitModePage /></Route>
         <Route path="/suggestions"><SuggestionsPage /></Route>
         <Route path="/destructive-approval"><DestructiveApprovalPage /></Route>
         <Route path="/runtime-approval"><RuntimeApprovalPage /></Route>

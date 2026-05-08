@@ -1,4 +1,17 @@
 /**
+ * How the chat textarea should treat the Enter key.
+ *
+ * - `'enter'`     — Enter submits the message, Shift+Enter inserts a newline.
+ *                   Typical desktop behavior.
+ * - `'mod-enter'` — Enter inserts a newline. Cmd/Ctrl+Enter submits the message.
+ *                   Recommended on mobile, where soft keyboards lack modifier
+ *                   keys and the user is expected to tap the send button.
+ *                   ("mod" follows the CodeMirror/ProseMirror convention of
+ *                   meaning Cmd on macOS and Ctrl elsewhere.)
+ */
+export type SubmitMode = 'enter' | 'mod-enter';
+
+/**
  * Subset of `React.KeyboardEvent` consumed by `shouldSubmitOnEnter`.
  * Kept structural so the helper can be unit-tested without a React event.
  */
@@ -14,20 +27,18 @@ export interface SubmitKeyEvent {
 /**
  * Decide whether a keydown event in the chat textarea should submit the message.
  *
- * - During IME composition (Japanese/Korean/etc.), Enter must never submit.
- *   Safari reports `isComposing === false` when pressing Enter to confirm an
- *   IME input, so we additionally check `keyCode === 229`.
- *   Reference: https://zenn.dev/spacemarket/articles/149aa284ef7b08
- * - When `enterToSend` is `true`, plain Enter submits and Shift+Enter inserts a newline.
- * - When `enterToSend` is `false`, plain Enter inserts a newline; only Cmd/Ctrl+Enter
- *   submits (so users on physical keyboards still have a shortcut).
+ * IME composition (Japanese, Korean, Chinese, etc.) never submits. Safari
+ * reports `isComposing === false` when pressing Enter to confirm an IME input,
+ * so we additionally check `keyCode === 229` as a Safari-specific fallback.
+ * Reference: https://zenn.dev/spacemarket/articles/149aa284ef7b08
  */
-export function shouldSubmitOnEnter(e: SubmitKeyEvent, enterToSend: boolean): boolean {
+export function shouldSubmitOnEnter(e: SubmitKeyEvent, mode: SubmitMode): boolean {
   if (e.key !== 'Enter' || e.nativeEvent.isComposing || e.keyCode === 229) {
     return false;
   }
-  if (enterToSend) {
+  if (mode === 'enter') {
     return !e.shiftKey;
   }
+  // 'mod-enter'
   return e.metaKey || e.ctrlKey;
 }

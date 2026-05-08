@@ -1,6 +1,7 @@
 import React, { createContext, useContext } from 'react';
 import { UseAIChatPanel } from './UseAIChatPanel';
 import { UseAIFloatingChatWrapper, CloseButton } from './UseAIFloatingChatWrapper';
+import type { SubmitMode } from '../utils/keyboard';
 import type { PersistedMessage } from '../providers/chatRepository/types';
 import type { AgentInfo, FeedbackValue, ToolAnnotations } from '../types';
 import type { FileUploadConfig, FileAttachment, FileProcessingState } from '../fileUpload/types';
@@ -101,12 +102,17 @@ export interface ChatUIContextValue {
     submit: (messageId: string, traceId: string, feedback: FeedbackValue) => void;
   };
   /**
-   * Whether pressing Enter (without modifier) sends the message in the
-   * built-in chat panel. `false` switches Enter to inserting a newline,
-   * leaving Cmd/Ctrl+Enter as the submit shortcut. Recommended for mobile.
-   * @default true
+   * How the chat textarea should treat the Enter key.
+   *
+   * - `'enter'` (default): Enter submits, Shift+Enter inserts a newline.
+   * - `'mod-enter'`: Enter inserts a newline. Cmd/Ctrl+Enter submits.
+   *
+   * Recommended to set to `'mod-enter'` on mobile, where soft keyboards lack
+   * modifier keys and the user is expected to tap the send button.
+   *
+   * @default 'enter'
    */
-  enterToSend?: boolean;
+  submitMode?: SubmitMode;
 }
 
 /**
@@ -140,14 +146,13 @@ export interface UseAIChatProps {
    */
   floating?: boolean;
   /**
-   * Whether pressing Enter (without modifier) sends the message.
-   * - `true` (default): Enter sends, Shift+Enter inserts a newline. Suitable for desktop.
-   * - `false`: Enter inserts a newline. Cmd/Ctrl+Enter still sends. Recommended for mobile,
-   *   where soft keyboards lack modifier keys and the user taps the send button.
+   * How the chat textarea should treat the Enter key. Overrides the value
+   * provided on `UseAIProvider` for this instance.
    *
-   * Overrides the value provided on `UseAIProvider` for this instance.
+   * - `'enter'` (default): Enter submits, Shift+Enter inserts a newline.
+   * - `'mod-enter'`: Enter inserts a newline. Cmd/Ctrl+Enter submits.
    */
-  enterToSend?: boolean;
+  submitMode?: SubmitMode;
 }
 
 /**
@@ -175,11 +180,11 @@ export interface UseAIChatProps {
  * </UseAIProvider>
  * ```
  */
-export function UseAIChat({ floating = false, enterToSend }: UseAIChatProps) {
+export function UseAIChat({ floating = false, submitMode }: UseAIChatProps) {
   const ctx = useChatUIContext();
 
   const chatPanelProps = {
-    enterToSend: enterToSend ?? ctx.enterToSend,
+    submitMode: submitMode ?? ctx.submitMode,
     onSendMessage: ctx.sendMessage,
     messages: ctx.messages,
     loading: ctx.loading,
