@@ -1,0 +1,32 @@
+packages/core/src/types.ts
+  s_4b795258923875::t_3533f0e9d1b0c8 53-59
+packages/client/src/client.ts
+  s_4b795258923875::t_5dbdadf205aef1 123,125
+  s_4b795258923875::t_7350103933b586 61-64,66
+packages/client/src/hooks/useServerEvents.disconnect.test.tsx
+  s_4b795258923875::t_fe30948376c0e2 1-77
+packages/client/src/hooks/useServerEvents.ts
+  s_4b795258923875::t_a9132e976fc5d3 237-252,267
+  s_4b795258923875::t_11be55aeb0a5f6 55-60
+  s_4b795258923875::t_c38a8858a16223 86-90
+packages/client/src/theme/strings.ts
+  s_4b795258923875::t_ed403e54d56c0e 102-103
+packages/client/src/providers/useAIProvider.tsx
+  s_4b795258923875::t_9f1b5d7edcf078 511-516,524-530
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "0d0daad173f1dc3bef0cb1c58e52b643924ce6c5",
+  "prompts": {},
+  "sessions": {
+    "s_4b795258923875": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "afb7f88c-b441-402b-aa6b-f8120d163cc7",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>"
+    }
+  }
+}
