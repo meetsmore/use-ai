@@ -50,6 +50,13 @@ export enum ErrorCode {
   API_OVERLOADED = 'API_OVERLOADED',
   /** Error when rate limit is exceeded (HTTP 429) */
   RATE_LIMITED = 'RATE_LIMITED',
+  /**
+   * Error when the connection to the server was lost mid-run.
+   * Synthesized by the client when a disconnect occurs while an AI run is in
+   * progress; the server-side session is unrecoverable, so the in-flight
+   * response is dropped and the UI is reset.
+   */
+  CONNECTION_LOST = 'CONNECTION_LOST',
   /** Generic error for unknown or unexpected errors */
   UNKNOWN_ERROR = 'UNKNOWN_ERROR',
 }

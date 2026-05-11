@@ -508,6 +508,12 @@ export function UseAIProvider({
   const handleServerEventRef = useRef(serverEvents.handleServerEvent);
   handleServerEventRef.current = serverEvents.handleServerEvent;
 
+  // Same pattern for handleDisconnect: the connection subscription is set up
+  // once per client lifecycle, but the handler closes over state that may
+  // change between renders.
+  const handleDisconnectRef = useRef(serverEvents.handleDisconnect);
+  handleDisconnectRef.current = serverEvents.handleDisconnect;
+
   useEffect(() => {
     console.log('[UseAIProvider] Initializing client with serverUrl:', serverUrl);
     const client = new UseAIClient(serverUrl);
@@ -515,6 +521,13 @@ export function UseAIProvider({
     const unsubscribeConnection = client.onConnectionStateChange((isConnected) => {
       console.log('[UseAIProvider] Connection state changed:', isConnected);
       setConnected(isConnected);
+      if (!isConnected) {
+        // The server destroys its session on disconnect (keyed by socket.id),
+        // so any in-flight run is unrecoverable even after Socket.IO reconnects.
+        // Reset UI state so the user can send a new message instead of being
+        // stuck in a permanent "loading" state.
+        handleDisconnectRef.current();
+      }
     });
 
     console.log('[UseAIProvider] Connecting...');
