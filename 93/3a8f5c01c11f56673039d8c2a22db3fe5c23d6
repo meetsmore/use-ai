@@ -1,0 +1,49 @@
+packages/server/src/types.ts
+  s_5f9e45b23562f8::t_9101a15c8e4861 208
+  s_5f9e45b23562f8::t_1526e67518e104 209
+packages/client/src/types.ts
+  s_5f9e45b23562f8::t_50fe4115c9e4ea 57
+  s_5f9e45b23562f8::t_9101a15c8e4861 56
+packages/core/src/types.ts
+  s_5f9e45b23562f8::t_3b8630ff3e7524 337-338,344,346,360
+  s_5f9e45b23562f8::t_6412644a4a9327 326
+  s_5f9e45b23562f8::t_ba2ed7387f7452 327-336
+  s_5f9e45b23562f8::t_9101a15c8e4861 339-343,345,347-350,352,359,362-363,365-366,380,382,384-385
+  s_5f9e45b23562f8::t_32598b5367f3ab 353-358,361
+  s_5f9e45b23562f8::t_1903d93154e787 381
+  s_5f9e45b23562f8::t_7835e47ac7fe54 383
+  s_5f9e45b23562f8::t_2a3d508142060e 351
+  s_5f9e45b23562f8::t_8e7176cea053fa 364
+packages/core/src/index.ts
+  s_5f9e45b23562f8::t_9101a15c8e4861 51
+  s_5f9e45b23562f8::t_7193c062720371 52
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "933a8f5c01c11f56673039d8c2a22db3fe5c23d6",
+  "prompts": {
+    "6703063e3a88440b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3763546a-503e-4e43-94ec-f22468b37207",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "yuma.ito <yuma.ito@meetsmore.com>",
+      "total_additions": 1,
+      "total_deletions": 1,
+      "accepted_lines": 0,
+      "overriden_lines": 0
+    }
+  },
+  "sessions": {
+    "s_5f9e45b23562f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c339308e-df7e-4ed7-ba09-86cfefa91f57",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "yuma.ito <yuma.ito@meetsmore.com>"
+    }
+  }
+}
