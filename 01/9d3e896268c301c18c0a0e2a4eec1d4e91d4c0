@@ -1,0 +1,31 @@
+packages/server/src/agents/anthropicCache.ts
+  s_5f9e45b23562f8::t_5907d9a0f7cacf 100
+  s_5f9e45b23562f8::t_4f790e933db134 4-6
+  s_5f9e45b23562f8::t_25738df1beb8f1 67-81,101-105,159
+  s_5f9e45b23562f8::t_d91b4a5cea93ab 85-88,91
+packages/server/src/agents/anthropicCache.test.ts
+  s_5f9e45b23562f8::t_549242269007d6 11-14
+  s_5f9e45b23562f8::t_fa005dbc49aecd 1-7,9-10,15-81,83-84,180-181
+  s_5f9e45b23562f8::t_4265fe3673421d 82
+  s_5f9e45b23562f8::t_d119cb730d3316 157
+  s_5f9e45b23562f8::t_22a7a080d93c5c 87
+  s_5f9e45b23562f8::t_e910db92c946f5 121
+  s_5f9e45b23562f8::t_58ab293516aa77 85-86,88-120,122-156,158-179
+  s_5f9e45b23562f8::t_f64ffe4076e861 8
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "019d3e896268c301c18c0a0e2a4eec1d4e91d4c0",
+  "prompts": {},
+  "sessions": {
+    "s_5f9e45b23562f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c339308e-df7e-4ed7-ba09-86cfefa91f57",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "yuma.ito <yuma.ito@meetsmore.com>"
+    }
+  }
+}
