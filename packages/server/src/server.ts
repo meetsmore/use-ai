@@ -415,6 +415,7 @@ export class UseAIServer {
     const forwardedProps = rawForwardedProps as UseAIForwardedProps | undefined;
     const mcpHeaders = forwardedProps?.mcpHeaders;
     const requestedAgent = forwardedProps?.agent;
+    const systemPrompts = forwardedProps?.systemPrompts;
 
     // Select agent: use requested agent if valid, otherwise fall back to default
     let selectedAgent = this.agent;
@@ -759,9 +760,6 @@ export class UseAIServer {
       };
     });
 
-    // Build system prompt
-    const systemPrompt = this.buildSystemPrompt(session, state);
-
     // Create event emitter that forwards all events to client
     const eventEmitter: EventEmitter = {
       emit: <T extends AGUIEventExtended>(event: T) => {
@@ -769,14 +767,14 @@ export class UseAIServer {
       },
     };
 
-    // Build agent input
+    // System prompts are supplied via `AISDKAgentConfig.systemPrompts` (backend) or `forwardedProps.systemPrompts` (client-forwarded).
     const agentInput = {
       session,
       runId,
       messages: incomingMessages,
       tools: session.tools,
       state,
-      systemPrompt,
+      systemPrompts,
       originalInput: message.data,
     };
 
@@ -802,11 +800,6 @@ export class UseAIServer {
       // Clear MCP headers after run completes (success or failure)
       delete session.currentMcpHeaders;
     }
-  }
-
-  private buildSystemPrompt(session: ClientSession, state: unknown): string | undefined {
-    if (!state) return undefined;
-    return 'You are interacting with a web application. Use the available tools to interact with and modify the UI based on user requests.';
   }
 
   private handleToolResult(session: ClientSession, message: ToolResultMessage) {

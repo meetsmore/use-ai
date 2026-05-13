@@ -5,7 +5,7 @@ import { startRunSpan, flushTelemetry as flushAllTelemetry } from '../telemetry'
 import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
 import type { Agent, AgentInput, EventEmitter, AgentResult, ClientSession } from './types';
-import type { ToolDefinition, UseAIForwardedProps } from '../types';
+import type { ToolDefinition, UseAIForwardedProps, SystemPromptEntry } from '../types';
 import type { RemoteToolDefinition } from '../mcp';
 import { isUseAIInternalResponse } from '../mcp/useAIInternalResponse';
 import { isMcpConfirmationResponse, handleMcpConfirmation } from '../mcp/mcpConfirmation';
@@ -200,40 +200,43 @@ export interface AISDKAgentConfig {
   annotation?: string;
 
   /**
-   * Optional system prompt to configure the agent's behavior.
-   * This prompt is set on the backend and not exposed to the frontend,
-   * making it suitable for sensitive instructions.
+   * Backend-provided system prompt entries.
    *
-   * Can be a string, a function returning a string, or an async function
-   * returning a Promise<string>. Use a function when the prompt needs to
-   * be dynamically resolved (e.g., fetched from Langfuse or other external
-   * sources) so updates take effect immediately without server restart.
+   * Returns an array of {@link SystemPromptEntry}; each entry becomes an independent SystemModelMessage. Backend entries are merged with {@link AgentInput.systemPrompts} (the client-forwarded entries) with backend entries first.
    *
-   * When both this and the runtime systemPrompt (from AgentInput) are provided,
-   * they are combined with this config prompt coming first.
+   * The function may be sync or async, and is called on every run.
    *
    * @example
    * ```typescript
-   * // Static prompt
+   * // Sync function
    * {
-   *   systemPrompt: 'You are a helpful assistant.'
+   *   systemPrompts: () => [
+   *     {
+   *       content: prompt,
+   *       providerOptions: {
+   *         anthropic: { cacheControl: { type: 'ephemeral', ttl: '5m' } },
+   *       },
+   *     },
+   *   ],
    * }
    *
-   * // Sync function (e.g., reading from cache)
+   * // Async function
    * {
-   *   systemPrompt: () => promptCache.get('my-prompt')
-   * }
-   *
-   * // Async function (e.g., fetching from Langfuse)
-   * {
-   *   systemPrompt: async () => {
+   *   systemPrompts: async () => {
    *     const prompt = await langfuse.getPrompt('my-prompt');
-   *     return prompt.compile();
-   *   }
+   *     return [
+   *       {
+   *         content: prompt.compile(),
+   *         providerOptions: {
+   *           anthropic: { cacheControl: { type: 'ephemeral', ttl: '5m' } },
+   *         },
+   *       },
+   *     ];
+   *   },
    * }
    * ```
    */
-  systemPrompt?: string | (() => string | Promise<string>);
+  systemPrompts?: () => SystemPromptEntry[] | Promise<SystemPromptEntry[]>;
 
   /**
    * Optional filter function for tools.
@@ -259,48 +262,29 @@ export interface AISDKAgentConfig {
   toolFilter?: (tool: ToolDefinition) => boolean;
 
   /**
-   * Anthropic-specific: Configure cache breakpoints for prompt caching.
-   * Only applies when using Anthropic models (Claude).
+   * Anthropic-specific: configure cache breakpoints for prompt caching. Only applies when using Anthropic models (Claude).
    *
-   * Prompt caching reduces costs and latency by caching message prefixes.
-   * Cache breakpoints mark where the cacheable prefix ends.
+   * The function receives each message with positional context and returns `true` (or a TTL string) to add a cache breakpoint after that message.
    *
-   * The function receives each message with positional context and returns
-   * true to add a cache breakpoint after that message.
-   *
-   * System prompt is included as role: 'system' at index 0 when present.
+   * **Warning**: Anthropic enforces a 4-breakpoint maximum per request. The total counts both breakpoints attached here and those attached via {@link SystemPromptEntry.providerOptions}; overflow emits `logger.warn`. Attach system-message cache control via `SystemPromptEntry.providerOptions` rather than from this function to avoid double-counting.
    *
    * @see https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching
    *
    * @example
    * ```typescript
-   * // Cache system prompt + last message (most common pattern)
-   * {
-   *   cacheBreakpoint: (msg) => msg.role === 'system' || msg.isLast
-   * }
-   *
-   * // Cache only the last message
+   * // Cache the last user message.
    * {
    *   cacheBreakpoint: (msg) => msg.isLast
    * }
    *
-   * // Cache system prompt only
+   * // Cache the last message with an explicit TTL.
    * {
-   *   cacheBreakpoint: (msg) => msg.role === 'system'
+   *   cacheBreakpoint: (msg) => msg.isLast ? '5m' : false
    * }
    *
-   * // Cache first 3 messages + last
+   * // Cache first 3 messages + last.
    * {
    *   cacheBreakpoint: (msg) => msg.index < 3 || msg.isLast
-   * }
-   *
-   * // System prompt with 1h TTL, last message with 5m TTL
-   * {
-   *   cacheBreakpoint: (msg) => {
-   *     if (msg.role === 'system') return '1h';
-   *     if (msg.isLast) return '5m';
-   *     return false;
-   *   }
    * }
    * ```
    */
@@ -466,7 +450,7 @@ export class AISDKAgent implements Agent {
   private name: string;
   private annotation?: string;
   private toolFilter?: (tool: ToolDefinition) => boolean;
-  private systemPrompt?: string | (() => string | Promise<string>);
+  private systemPrompts?: () => SystemPromptEntry[] | Promise<SystemPromptEntry[]>;
   private cacheBreakpoint?: CacheBreakpointFn;
   private maxOutputTokens: number;
   private temperature?: number;
@@ -478,7 +462,7 @@ export class AISDKAgent implements Agent {
     this.name = config.name || 'ai-sdk';
     this.annotation = config.annotation;
     this.toolFilter = config.toolFilter;
-    this.systemPrompt = config.systemPrompt;
+    this.systemPrompts = config.systemPrompts;
     this.cacheBreakpoint = config.cacheBreakpoint;
     this.maxOutputTokens = config.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS;
     this.temperature = config.temperature;
@@ -522,7 +506,7 @@ export class AISDKAgent implements Agent {
    * Resolves system prompt and initializes all mutable state.
    */
   private async createRunContext(input: AgentInput): Promise<RunContext> {
-    const { session, runId, messages, tools, state, systemPrompt: runtimeSystemPrompt, originalInput } = input;
+    const { session, runId, messages, tools, state, systemPrompts: runtimeSystemPrompts, originalInput } = input;
 
     // Sync session.tools with input.tools if not already set
     // This ensures tools are available for step-by-step execution
@@ -531,9 +515,9 @@ export class AISDKAgent implements Agent {
       session.tools = tools;
     }
 
-    // Resolve config system prompt (may be async, e.g., fetched from Langfuse)
-    const configSystemPrompt = await this.resolveSystemPrompt();
-    const staticSystemMessages = this.buildStaticSystemMessages(configSystemPrompt, runtimeSystemPrompt);
+    // Resolve backend system prompts (may be async, e.g., fetched from Langfuse)
+    const backendEntries = await this.resolveBackendSystemPrompts();
+    const staticSystemMessages = this.buildStaticSystemMessages(backendEntries, runtimeSystemPrompts);
 
     // Sanitize messages before sending to ensure no provider-specific fields leak through
     const sanitizedInputMessages = this.sanitizeMessages(messages);
@@ -1244,47 +1228,44 @@ export class AISDKAgent implements Agent {
   }
 
   /**
-   * Resolves the systemPrompt configuration value.
-   * Handles string, sync function, and async function cases.
+   * Resolves the backend (config) `systemPrompts` function to an array of entries.
+   * Handles sync and async functions transparently.
    *
-   * @returns The resolved system prompt string, or undefined if not configured or empty
+   * @returns The resolved entries, or undefined if not configured or the result is empty
    */
-  private async resolveSystemPrompt(): Promise<string | undefined> {
-    if (!this.systemPrompt) {
+  private async resolveBackendSystemPrompts(): Promise<SystemPromptEntry[] | undefined> {
+    if (!this.systemPrompts) {
       return undefined;
     }
 
-    if (typeof this.systemPrompt === 'string') {
-      return this.systemPrompt;
-    }
-
-    // It's a function - call it and await the result (works for both sync and async)
-    const result = await this.systemPrompt();
-    return result || undefined;
+    const result = await this.systemPrompts();
+    return result && result.length > 0 ? result : undefined;
   }
 
   /**
-   * Builds an array of static system messages from config and runtime prompts.
-   * These are built once per run and remain constant across steps (cacheable prefix).
+   * Builds static system messages by concatenating backend entries before input entries. Built once per run; constant across steps within the run.
    *
-   * @param configPrompt - Resolved system prompt from agent config (already resolved via resolveSystemPrompt)
-   * @param runtimePrompt - System prompt from AgentInput (static instructions from server)
-   * @returns Array of SystemModelMessage objects, or undefined if both are empty
+   * Each entry becomes one SystemModelMessage with its `providerOptions` (if any) attached verbatim.
+   *
+   * @param backendEntries - Entries from `AISDKAgentConfig.systemPrompts()`
+   * @param inputEntries - Entries from `AgentInput.systemPrompts`
+   * @returns Array of SystemModelMessage objects, or undefined if both inputs are empty
    */
-  private buildStaticSystemMessages(configPrompt?: string, runtimePrompt?: string): SystemModelMessage[] | undefined {
-    const messages: SystemModelMessage[] = [];
+  private buildStaticSystemMessages(
+    backendEntries: SystemPromptEntry[] | undefined,
+    inputEntries: SystemPromptEntry[] | undefined,
+  ): SystemModelMessage[] | undefined {
+    const merged = [...(backendEntries ?? []), ...(inputEntries ?? [])];
+    if (merged.length === 0) return undefined;
 
-    // Config prompt (from backend initialization) comes first
-    if (configPrompt) {
-      messages.push({ role: 'system', content: configPrompt });
-    }
-
-    // Runtime prompt (from server.buildSystemPrompt — static instructions) is added as separate message
-    if (runtimePrompt) {
-      messages.push({ role: 'system', content: runtimePrompt });
-    }
-
-    return messages.length > 0 ? messages : undefined;
+    return merged.map(entry => {
+      const msg: SystemModelMessage = { role: 'system', content: entry.content };
+      if (entry.providerOptions) {
+        // SystemPromptEntry.providerOptions (Record<string, Record<string, JsonValue>>) is structurally compatible with SystemModelMessage['providerOptions'] (the AI SDK's SharedV3ProviderOptions = Record<string, JSONObject>).
+        msg.providerOptions = entry.providerOptions;
+      }
+      return msg;
+    });
   }
 
   /**

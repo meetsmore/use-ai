@@ -52,8 +52,10 @@ export interface AgentInput {
   tools: ToolDefinition[];
   /** Current application state (if any) */
   state: unknown;
-  /** Optional system prompt to guide the agent */
-  systemPrompt?: string;
+  /**
+   * Optional system prompt entries forwarded from the client (request-time entries). Each entry is sent as an independent SystemModelMessage. When the agent also has backend-configured entries, those are merged before the request-time entries.
+   */
+  systemPrompts?: import('@meetsmore-oss/use-ai-core').SystemPromptEntry[];
   /** The original RunAgentInput from AG-UI protocol (for emitting RUN_STARTED event) */
   originalInput: import('../types').RunAgentInput;
 }

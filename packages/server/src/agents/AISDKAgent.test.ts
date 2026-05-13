@@ -117,6 +117,34 @@ function createTestInput(overrides: Partial<AgentInput> = {}): AgentInput {
   };
 }
 
+/**
+ * Helper to create a mock stream result with captured messages
+ */
+function createMockStreamResult(capturedMessages: { messages: unknown[] }) {
+  return (options: { messages: unknown[] }) => {
+    capturedMessages.messages = options.messages;
+    return {
+      fullStream: (async function* () {
+        yield { type: 'text-start', id: 'text-1' };
+        yield { type: 'text-delta', id: 'text-1', text: 'Response' };
+        yield { type: 'text-end', id: 'text-1' };
+        yield {
+          type: 'finish',
+          finishReason: 'stop',
+          usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
+        };
+      })(),
+      response: Promise.resolve({
+        id: 'response-1',
+        timestamp: new Date(),
+        modelId: 'claude-3-5-sonnet-20241022',
+        headers: {},
+        messages: [{ role: 'assistant', content: 'Response' }],
+      }),
+    };
+  };
+}
+
 describe('AISDKAgent', () => {
   test('implements Agent interface', () => {
     const mockModel = createStreamingTextMockModel('Default response');
@@ -1147,13 +1175,13 @@ describe('AISDKAgent', () => {
       });
     }
 
-    test('uses config systemPrompt when provided', async () => {
+    test('uses config systemPrompts when provided', async () => {
       const capturedMessages = { values: [] as Array<{ role: string; content: string }> };
       const mockModel = createSystemMessageCapturingMockModel(capturedMessages);
 
       const agent = new AISDKAgent({
         model: mockModel,
-        systemPrompt: 'You are a helpful assistant.',
+        systemPrompts: () => [{ content: 'You are a helpful assistant.' }],
       });
 
       const emittedEvents: AGUIEventExtended[] = [];
@@ -1173,7 +1201,7 @@ describe('AISDKAgent', () => {
 
       const agent = new AISDKAgent({
         model: mockModel,
-        systemPrompt: 'You are a helpful assistant.',
+        systemPrompts: () => [{ content: 'You are a helpful assistant.' }],
       });
 
       const emittedEvents: AGUIEventExtended[] = [];
@@ -1181,7 +1209,7 @@ describe('AISDKAgent', () => {
 
       const testState = { todos: [] };
       const input = createTestInput({
-        systemPrompt: 'Use tools to modify the UI.',
+        systemPrompts: [{ content: 'Use tools to modify the UI.' }],
         state: testState,
       });
       // Also set session.state so buildStateMessage picks it up
@@ -1189,7 +1217,7 @@ describe('AISDKAgent', () => {
       const result = await agent.run(input, eventEmitter);
 
       expect(result.success).toBe(true);
-      // Config prompt, runtime instructions, and state are sent as 3 separate system messages
+      // Config entry, runtime entry, and state are sent as 3 separate system messages
       expect(capturedMessages.values.length).toBe(3);
       expect(capturedMessages.values[0].role).toBe('system');
       expect(capturedMessages.values[0].content).toBe('You are a helpful assistant.');
@@ -1199,13 +1227,13 @@ describe('AISDKAgent', () => {
       expect(capturedMessages.values[2].content).toContain('"todos": []');
     });
 
-    test('uses only runtime systemPrompt and state when config is not set', async () => {
+    test('uses only runtime systemPrompts and state when config is not set', async () => {
       const capturedMessages = { values: [] as Array<{ role: string; content: string }> };
       const mockModel = createSystemMessageCapturingMockModel(capturedMessages);
 
       const agent = new AISDKAgent({
         model: mockModel,
-        // No systemPrompt in config
+        // No systemPrompts in config
       });
 
       const emittedEvents: AGUIEventExtended[] = [];
@@ -1213,20 +1241,20 @@ describe('AISDKAgent', () => {
 
       const testState = { page: '/home' };
       const input = createTestInput({
-        systemPrompt: 'Use tools to modify the UI.',
+        systemPrompts: [{ content: 'Use tools to modify the UI.' }],
         state: testState,
       });
       input.session.state = testState;
       const result = await agent.run(input, eventEmitter);
 
       expect(result.success).toBe(true);
-      // Runtime instructions + state (no config prompt)
+      // Runtime entries + state (no config entries)
       expect(capturedMessages.values.length).toBe(2);
       expect(capturedMessages.values[0].content).toBe('Use tools to modify the UI.');
       expect(capturedMessages.values[1].content).toContain('/home');
     });
 
-    test('no systemPrompt when both config and runtime are undefined', async () => {
+    test('no systemPrompts when both config and runtime are undefined', async () => {
       const capturedMessages = { values: [] as Array<{ role: string; content: string }> };
       const mockModel = createSystemMessageCapturingMockModel(capturedMessages);
 
@@ -1244,7 +1272,48 @@ describe('AISDKAgent', () => {
       expect(capturedMessages.values.length).toBe(0);
     });
 
-    test('supports function-based systemPrompt for dynamic resolution', async () => {
+    // Backend entries (from config.systemPrompts()) precede input entries (from AgentInput.systemPrompts) in the resulting messages array.
+    test('merge order: backend entries precede input entries (multi-entry regression)', async () => {
+      const capturedMessages = { values: [] as Array<{ role: string; content: string }> };
+      const mockModel = createSystemMessageCapturingMockModel(capturedMessages);
+
+      const agent = new AISDKAgent({
+        model: mockModel,
+        // Backend entries
+        systemPrompts: () => [
+          { content: 'a1' },
+          { content: 'a2' },
+        ],
+      });
+
+      const emittedEvents: AGUIEventExtended[] = [];
+      const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
+
+      // Input entries — forwarded from the client
+      const input = createTestInput({
+        systemPrompts: [
+          { content: 'b1' },
+          { content: 'b2' },
+        ],
+      });
+
+      const result = await agent.run(input, eventEmitter);
+
+      expect(result.success).toBe(true);
+      // Exactly 4 system messages, no state appended (input.state is null).
+      expect(capturedMessages.values.length).toBe(4);
+      // All four must be system role.
+      capturedMessages.values.forEach((m) => expect(m.role).toBe('system'));
+      // Order: backend first, then input.
+      expect(capturedMessages.values.map((m) => m.content)).toEqual([
+        'a1',
+        'a2',
+        'b1',
+        'b2',
+      ]);
+    });
+
+    test('supports function-based systemPrompts for dynamic resolution', async () => {
       const capturedMessages = { values: [] as Array<{ role: string; content: string }> };
       const mockModel = createSystemMessageCapturingMockModel(capturedMessages);
 
@@ -1252,7 +1321,7 @@ describe('AISDKAgent', () => {
       let dynamicPromptValue = 'Initial prompt';
       const agent = new AISDKAgent({
         model: mockModel,
-        systemPrompt: () => dynamicPromptValue,
+        systemPrompts: () => [{ content: dynamicPromptValue }],
       });
 
       const emittedEvents: AGUIEventExtended[] = [];
@@ -1276,40 +1345,40 @@ describe('AISDKAgent', () => {
       expect(capturedMessages.values[0].content).toBe('Updated prompt from Langfuse');
     });
 
-    test('function-based systemPrompt returning empty string is skipped', async () => {
+    test('function-based systemPrompts returning empty array is skipped', async () => {
       const capturedMessages = { values: [] as Array<{ role: string; content: string }> };
       const mockModel = createSystemMessageCapturingMockModel(capturedMessages);
 
       const agent = new AISDKAgent({
         model: mockModel,
-        systemPrompt: () => '',
+        systemPrompts: () => [],
       });
 
       const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
 
       const input = createTestInput({
-        systemPrompt: 'Runtime prompt only',
+        systemPrompts: [{ content: 'Runtime prompt only' }],
       });
       const result = await agent.run(input, eventEmitter);
 
       expect(result.success).toBe(true);
-      // Only runtime prompt should be present since function returned empty string
+      // Only runtime prompt should be present since config returned empty array
       expect(capturedMessages.values.length).toBe(1);
       expect(capturedMessages.values[0].content).toBe('Runtime prompt only');
     });
 
-    test('supports async function-based systemPrompt', async () => {
+    test('supports async function-based systemPrompts', async () => {
       const capturedMessages = { values: [] as Array<{ role: string; content: string }> };
       const mockModel = createSystemMessageCapturingMockModel(capturedMessages);
 
       // Simulate fetching from Langfuse or other async source
       const agent = new AISDKAgent({
         model: mockModel,
-        systemPrompt: async () => {
+        systemPrompts: async () => {
           // Simulate async operation (e.g., Langfuse API call)
           await new Promise((resolve) => setTimeout(resolve, 10));
-          return 'Async prompt from Langfuse';
+          return [{ content: 'Async prompt from Langfuse' }];
         },
       });
 
@@ -1324,7 +1393,7 @@ describe('AISDKAgent', () => {
       expect(capturedMessages.values[0].content).toBe('Async prompt from Langfuse');
     });
 
-    test('async systemPrompt is resolved fresh on each run', async () => {
+    test('async systemPrompts is resolved fresh on each run', async () => {
       const capturedMessages = { values: [] as Array<{ role: string; content: string }> };
       const mockModel = createSystemMessageCapturingMockModel(capturedMessages);
 
@@ -1332,9 +1401,9 @@ describe('AISDKAgent', () => {
       let promptVersion = 1;
       const agent = new AISDKAgent({
         model: mockModel,
-        systemPrompt: async () => {
+        systemPrompts: async () => {
           await new Promise((resolve) => setTimeout(resolve, 5));
-          return `Prompt version ${promptVersion}`;
+          return [{ content: `Prompt version ${promptVersion}` }];
         },
       });
 
@@ -1353,15 +1422,15 @@ describe('AISDKAgent', () => {
       expect(capturedMessages.values[0].content).toBe('Prompt version 2');
     });
 
-    test('async systemPrompt returning empty string is skipped', async () => {
+    test('async systemPrompts returning empty array is skipped', async () => {
       const capturedMessages = { values: [] as Array<{ role: string; content: string }> };
       const mockModel = createSystemMessageCapturingMockModel(capturedMessages);
 
       const agent = new AISDKAgent({
         model: mockModel,
-        systemPrompt: async () => {
+        systemPrompts: async () => {
           await new Promise((resolve) => setTimeout(resolve, 5));
-          return '';
+          return [];
         },
       });
 
@@ -1369,7 +1438,7 @@ describe('AISDKAgent', () => {
       const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
 
       const input = createTestInput({
-        systemPrompt: 'Runtime prompt only',
+        systemPrompts: [{ content: 'Runtime prompt only' }],
       });
       const result = await agent.run(input, eventEmitter);
 
@@ -1472,7 +1541,7 @@ describe('AISDKAgent', () => {
           },
         ],
         state: initialState,
-        systemPrompt: 'You are interacting with a web application.',
+        systemPrompts: [{ content: 'You are interacting with a web application.' }],
       });
       input.session.state = initialState;
 
@@ -1525,6 +1594,160 @@ describe('AISDKAgent', () => {
       const step1StaticMsgs = capturedPerStep[0].filter(m => !m.content.includes('currentPage'));
       const step2StaticMsgs = capturedPerStep[1].filter(m => !m.content.includes('currentPage'));
       expect(step1StaticMsgs).toEqual(step2StaticMsgs);
+    });
+
+    test('entry-level providerOptions on config systemPrompts is forwarded to streamText', async () => {
+      // cache_control on SystemPromptEntry.providerOptions reaches streamText (no cacheBreakpoint function configured).
+      const captured = { messages: [] as unknown[] };
+      const aiModule = await import('ai');
+      const originalStreamText = aiModule.streamText;
+
+      mock.module('ai', () => ({
+        ...aiModule,
+        streamText: createMockStreamResult(captured),
+      }));
+
+      try {
+        const mockModel = new MockLanguageModelV3({});
+
+        const agent = new AISDKAgent({
+          model: mockModel,
+          systemPrompts: () => [
+            {
+              content: 'You are a helpful assistant.',
+              providerOptions: {
+                anthropic: { cacheControl: { type: 'ephemeral', ttl: '1h' } },
+              },
+            },
+          ],
+        });
+
+        const eventEmitter: EventEmitter = { emit: () => {} };
+        await agent.run(createTestInput(), eventEmitter);
+
+        // System message is index 0, followed by user message.
+        const systemMsg = captured.messages[0] as {
+          role: string;
+          content: string;
+          providerOptions?: {
+            anthropic?: { cacheControl?: { type: string; ttl?: string } };
+          };
+        };
+        expect(systemMsg.role).toBe('system');
+        expect(systemMsg.content).toBe('You are a helpful assistant.');
+        expect(systemMsg.providerOptions?.anthropic?.cacheControl).toEqual({
+          type: 'ephemeral',
+          ttl: '1h',
+        });
+      } finally {
+        mock.module('ai', () => ({
+          ...aiModule,
+          streamText: originalStreamText,
+        }));
+      }
+    });
+
+    test('entry-level providerOptions on runtime AgentInput.systemPrompts is forwarded to streamText', async () => {
+      // Same forwarding path, with the entry coming from runtime input rather than config.
+      const captured = { messages: [] as unknown[] };
+      const aiModule = await import('ai');
+      const originalStreamText = aiModule.streamText;
+
+      mock.module('ai', () => ({
+        ...aiModule,
+        streamText: createMockStreamResult(captured),
+      }));
+
+      try {
+        const mockModel = new MockLanguageModelV3({});
+
+        const agent = new AISDKAgent({ model: mockModel });
+
+        const eventEmitter: EventEmitter = { emit: () => {} };
+        await agent.run(
+          createTestInput({
+            systemPrompts: [
+              {
+                content: 'Runtime system prompt.',
+                providerOptions: {
+                  anthropic: { cacheControl: { type: 'ephemeral', ttl: '5m' } },
+                },
+              },
+            ],
+          }),
+          eventEmitter,
+        );
+
+        const systemMsg = captured.messages[0] as {
+          role: string;
+          content: string;
+          providerOptions?: {
+            anthropic?: { cacheControl?: { type: string; ttl?: string } };
+          };
+        };
+        expect(systemMsg.role).toBe('system');
+        expect(systemMsg.content).toBe('Runtime system prompt.');
+        expect(systemMsg.providerOptions?.anthropic?.cacheControl).toEqual({
+          type: 'ephemeral',
+          ttl: '5m',
+        });
+      } finally {
+        mock.module('ai', () => ({
+          ...aiModule,
+          streamText: originalStreamText,
+        }));
+      }
+    });
+
+    test('entries without providerOptions do not get a providerOptions field', async () => {
+      // An entry without providerOptions must not surface an empty providerOptions key — some providers treat its presence as meaningful.
+      const captured = { messages: [] as unknown[] };
+      const aiModule = await import('ai');
+      const originalStreamText = aiModule.streamText;
+
+      mock.module('ai', () => ({
+        ...aiModule,
+        streamText: createMockStreamResult(captured),
+      }));
+
+      try {
+        const mockModel = new MockLanguageModelV3({});
+
+        const agent = new AISDKAgent({
+          model: mockModel,
+          systemPrompts: () => [
+            // Entry A: cache_control attached.
+            {
+              content: 'Cached entry',
+              providerOptions: {
+                anthropic: { cacheControl: { type: 'ephemeral', ttl: '5m' } },
+              },
+            },
+            // Entry B: no providerOptions.
+            {
+              content: 'Plain entry',
+            },
+          ],
+        });
+
+        const eventEmitter: EventEmitter = { emit: () => {} };
+        await agent.run(createTestInput(), eventEmitter);
+
+        const cachedMsg = captured.messages[0] as {
+          providerOptions?: unknown;
+        };
+        const plainMsg = captured.messages[1] as {
+          providerOptions?: unknown;
+        };
+
+        expect(cachedMsg.providerOptions).toBeDefined();
+        expect(plainMsg.providerOptions).toBeUndefined();
+      } finally {
+        mock.module('ai', () => ({
+          ...aiModule,
+          streamText: originalStreamText,
+        }));
+      }
     });
   });
 
@@ -1743,34 +1966,6 @@ describe('AISDKAgent', () => {
 
   describe('Prompt caching (cacheBreakpoint)', () => {
     /**
-     * Helper to create a mock stream result with captured messages
-     */
-    function createMockStreamResult(capturedMessages: { messages: unknown[] }) {
-      return (options: { messages: unknown[] }) => {
-        capturedMessages.messages = options.messages;
-        return {
-          fullStream: (async function* () {
-            yield { type: 'text-start', id: 'text-1' };
-            yield { type: 'text-delta', id: 'text-1', text: 'Response' };
-            yield { type: 'text-end', id: 'text-1' };
-            yield {
-              type: 'finish',
-              finishReason: 'stop',
-              usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
-            };
-          })(),
-          response: Promise.resolve({
-            id: 'response-1',
-            timestamp: new Date(),
-            modelId: 'claude-3-5-sonnet-20241022',
-            headers: {},
-            messages: [{ role: 'assistant', content: 'Response' }],
-          }),
-        };
-      };
-    }
-
-    /**
      * Helper to create a mock Anthropic model
      */
     function createAnthropicMockModel() {
@@ -1807,7 +2002,7 @@ describe('AISDKAgent', () => {
       const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
 
       const input = createTestInput({
-        systemPrompt: 'You are a helpful assistant.',
+        systemPrompts: [{ content: 'You are a helpful assistant.' }],
       });
 
       await agent.run(input, eventEmitter);
@@ -1844,7 +2039,7 @@ describe('AISDKAgent', () => {
       const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
 
       const input = createTestInput({
-        systemPrompt: 'You are a helpful assistant.',
+        systemPrompts: [{ content: 'You are a helpful assistant.' }],
         messages: [
           { role: 'user', content: 'Hello' },
           { role: 'assistant', content: 'Hi there!' },
@@ -1907,7 +2102,7 @@ describe('AISDKAgent', () => {
       const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
 
       const input = createTestInput({
-        systemPrompt: 'System prompt',
+        systemPrompts: [{ content: 'System prompt' }],
         messages: [
           { role: 'user', content: 'Hello' },
           { role: 'assistant', content: 'Hi!' },
@@ -1968,7 +2163,7 @@ describe('AISDKAgent', () => {
       const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
 
       const input = createTestInput({
-        systemPrompt: 'You are a helpful assistant.',
+        systemPrompts: [{ content: 'You are a helpful assistant.' }],
       });
 
       await agent.run(input, eventEmitter);
@@ -2006,7 +2201,7 @@ describe('AISDKAgent', () => {
       const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
 
       const input = createTestInput({
-        systemPrompt: 'You are a helpful assistant.',
+        systemPrompts: [{ content: 'You are a helpful assistant.' }],
       });
 
       await agent.run(input, eventEmitter);
@@ -2047,7 +2242,7 @@ describe('AISDKAgent', () => {
       const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
 
       const input = createTestInput({
-        systemPrompt: 'You are a helpful assistant.',
+        systemPrompts: [{ content: 'You are a helpful assistant.' }],
       });
 
       await agent.run(input, eventEmitter);
