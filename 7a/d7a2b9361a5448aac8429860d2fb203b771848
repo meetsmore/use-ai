@@ -1,0 +1,53 @@
+packages/client/src/hooks/useStableSystemPrompts.ts
+  s_5f9e45b23562f8::t_1234dc2673b8c8 1-8,10-18,20-48
+  s_5f9e45b23562f8::t_945091a8695a95 9,19
+packages/client/src/providers/useAIProvider.tsx
+  s_5f9e45b23562f8::t_889d96d1c5d991 248,252-259,262-263
+  s_5f9e45b23562f8::t_888b22a143412d 467-469
+  s_5f9e45b23562f8::t_baf2c104327355 246
+  s_5f9e45b23562f8::t_01689f635ed8b9 260
+  s_5f9e45b23562f8::t_9101a15c8e4861 2,245,247,249-251,264-268,666,669,679
+  s_5f9e45b23562f8::t_44ead6d4e7cb65 432-439,450
+  s_5f9e45b23562f8::t_80211d28c1794d 261
+  s_5f9e45b23562f8::t_6ea0e4bcb0b887 665
+  s_5f9e45b23562f8::t_f863cec49f2cb9 22
+packages/client/test/tool-state-aggregation.test.tsx
+  s_5f9e45b23562f8::t_eda03ea3d9f66b 23-28
+  s_5f9e45b23562f8::t_9101a15c8e4861 8,22,29-30,43,101
+  s_5f9e45b23562f8::t_a57b4888ae6dfc 100
+packages/client/src/hooks/usePromptState.ts
+  s_5f9e45b23562f8::t_5566f3e2e9a146 23
+  s_5f9e45b23562f8::t_9101a15c8e4861 1,21,46
+  s_5f9e45b23562f8::t_afeed3ac2603e8 64
+packages/client/src/hooks/useStableSystemPrompts.test.ts
+  s_5f9e45b23562f8::t_0edacebc58acbf 120,131
+  s_5f9e45b23562f8::t_c4289035643eff 157-158
+  s_5f9e45b23562f8::t_f27b596e2c5ef8 42-43,54,63,66
+  s_5f9e45b23562f8::t_2d1e4eb8c5c175 1-41,44-53,55-62,64-65,67-119,121-130,132-144,146-156,159-170
+  s_5f9e45b23562f8::t_86ef8f50efbb27 145
+packages/client/test/useAI.integration.test.tsx
+  s_5f9e45b23562f8::t_98ceccf8e21874 666-668,670-671
+  s_5f9e45b23562f8::t_7ac40c679a975f 587-589,591-592
+  s_5f9e45b23562f8::t_451e2c287c7101 590,669
+  s_5f9e45b23562f8::t_810b148ab37c56 651,655,659
+  s_5f9e45b23562f8::t_304086ef7e6e28 675
+  s_5f9e45b23562f8::t_9101a15c8e4861 9,583-586,593,599,614-615,617,623,652-654,658,660,663-665,672,678,681-682,684,690,719-721,723-726
+  s_5f9e45b23562f8::t_61b25b99d9055e 598
+  s_5f9e45b23562f8::t_754aba24743387 718,722
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "7ad7a2b9361a5448aac8429860d2fb203b771848",
+  "prompts": {},
+  "sessions": {
+    "s_5f9e45b23562f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c339308e-df7e-4ed7-ba09-86cfefa91f57",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "yuma.ito <yuma.ito@meetsmore.com>"
+    }
+  }
+}
