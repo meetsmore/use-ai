@@ -1,9 +1,7 @@
-import { useState, useCallback, useRef, useMemo, useEffect } from 'react';
+import { useState, useCallback, useRef, useMemo } from 'react';
 import type { UseAIClient } from '../client';
 
 export interface UsePromptStateOptions {
-  /** System prompt to include in state */
-  systemPrompt?: string;
   /** Reference to the UseAIClient for state updates */
   clientRef: React.MutableRefObject<UseAIClient | null>;
   /** Whether the client is connected to the server */
@@ -20,7 +18,9 @@ export interface UsePromptStateReturn {
 }
 
 /**
- * Hook for managing prompt state across multiple useAI hooks.
+ * Hook for managing per-step state context from `useAI({ prompt })` hooks.
+ *
+ * Scope: aggregates per-component `prompt` strings into `state.context`. System prompts are out of scope — they travel on `forwardedProps.systemPrompts`.
  *
  * Handles:
  * - Storing prompts and suggestions per component
@@ -28,7 +28,6 @@ export interface UsePromptStateReturn {
  * - Aggregating suggestions from all components
  */
 export function usePromptState({
-  systemPrompt,
   clientRef,
   connected,
 }: UsePromptStateOptions): UsePromptStateReturn {
@@ -36,26 +35,15 @@ export function usePromptState({
   const suggestionsRef = useRef<Map<string, string[]>>(new Map());
   const [suggestionsVersion, setSuggestionsVersion] = useState(0);
 
-  // Build state from all prompts
   const buildStateFromPrompts = useCallback(() => {
     const promptParts: string[] = [];
-    if (systemPrompt) {
-      promptParts.push(systemPrompt);
-    }
     for (const [, prompt] of promptsRef.current.entries()) {
       if (prompt) {
         promptParts.push(prompt);
       }
     }
     return promptParts.length > 0 ? { context: promptParts.join('\n\n---\n\n') } : null;
-  }, [systemPrompt]);
-
-  // Sync system prompt to client when connected
-  useEffect(() => {
-    if (connected && clientRef.current && systemPrompt) {
-      clientRef.current.updateState(buildStateFromPrompts());
-    }
-  }, [connected, clientRef, systemPrompt, buildStateFromPrompts]);
+  }, []);
 
   const updatePrompt = useCallback((id: string, prompt?: string, suggestions?: string[]) => {
     if (prompt) {
@@ -73,9 +61,7 @@ export function usePromptState({
       if (hadSuggestions) setSuggestionsVersion(v => v + 1);
     }
 
-    // Update client state immediately when prompts change
-    // `connected` in deps ensures this callback reference changes when connection is established,
-    // triggering useAI's effect to re-run and sync prompts to the client
+    // `connected` is in deps so this callback's reference changes when connection is established, which re-runs downstream effects that sync prompts to the client.
     if (clientRef.current) {
       clientRef.current.updateState(buildStateFromPrompts());
     }

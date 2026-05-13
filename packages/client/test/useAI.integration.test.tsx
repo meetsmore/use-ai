@@ -6,6 +6,7 @@ import { UseAIProvider, useAIContext } from '../src/providers/useAIProvider';
 import { useAI } from '../src/useAI';
 import { defineTool } from '../src/defineTool';
 import { UseAIFloatingButton } from '../src/components/UseAIFloatingButton';
+import { __UseAIChatContext } from '../src/components/UseAIChat';
 import {
   setupMockWebSocket,
   restoreMockWebSocket,
@@ -579,13 +580,23 @@ describe('useAI Integration Tests', () => {
     });
   });
 
-  describe('systemPrompt is included in state when sending messages', () => {
-    it('should include systemPrompt in run_agent state when useAI provides a prompt', async () => {
-      const systemPrompt = 'You are a helpful SQL assistant. Always respond in Japanese.';
+  describe('systemPrompts is forwarded on run_agent messages', () => {
+    it('should include systemPrompts in forwardedProps when useAI provides a per-step prompt', async () => {
+      const systemPromptContent = 'You are a helpful SQL assistant. Always respond in Japanese.';
+      const systemPrompts = [
+        {
+          content: systemPromptContent,
+          providerOptions: {
+            anthropic: { cacheControl: { type: 'ephemeral', ttl: '5m' } },
+          },
+        },
+      ];
       let sendPromptFn: ((message: string) => Promise<void>) | null = null;
 
       const TestComponent = () => {
         const { client, connected } = useAIContext();
+        // The chat UI context exposes the Provider's `handleSendMessage` (onSendMessage), which bypasses the message queue's loading wait.
+        const chatUI = React.useContext(__UseAIChatContext);
         const [todos] = React.useState(['Buy milk', 'Walk dog']);
 
         const tools = useStableTools({
@@ -599,20 +610,17 @@ describe('useAI Integration Tests', () => {
         const componentPrompt = `Current todos: ${todos.join(', ')}`;
         useAI({ tools, prompt: componentPrompt });
 
-        // Expose sendPrompt for testing
         React.useEffect(() => {
-          if (client && connected) {
-            sendPromptFn = async (message: string) => {
-              client.sendPrompt(message);
-            };
+          if (client && connected && chatUI) {
+            sendPromptFn = (message: string) => chatUI.sendMessage(message);
           }
-        }, [client, connected]);
+        }, [client, connected, chatUI]);
 
         return <div data-testid="connected">{connected ? 'yes' : 'no'}</div>;
       };
 
       const { getByTestId } = render(
-        <UseAIProvider serverUrl="ws://localhost:8081" systemPrompt={systemPrompt}>
+        <UseAIProvider serverUrl="ws://localhost:8081" systemPrompts={systemPrompts}>
           <TestComponent />
         </UseAIProvider>
       );
@@ -638,39 +646,48 @@ describe('useAI Integration Tests', () => {
         expect(runAgentMsg).toBeDefined();
       });
 
-      // Verify the state includes the system prompt
       const runAgentMsg = getSentMessages().find(msg => msg.type === 'run_agent');
-      expect(runAgentMsg.data.state).toBeDefined();
-      expect(runAgentMsg.data.state.context).toBeDefined();
 
-      // The context should include the system prompt
-      expect(runAgentMsg.data.state.context).toContain(systemPrompt);
-      // The context should also include the component's prompt
+      // systemPrompts travels on forwardedProps.
+      expect(runAgentMsg.data.forwardedProps).toBeDefined();
+      expect(runAgentMsg.data.forwardedProps.systemPrompts).toEqual(systemPrompts);
+
+      // Per-component prompts still travel on state.context.
+      expect(runAgentMsg.data.state).toBeDefined();
       expect(runAgentMsg.data.state.context).toContain('Current todos: Buy milk, Walk dog');
+
+      // System prompt content does not appear in state.context.
+      expect(runAgentMsg.data.state.context).not.toContain(systemPromptContent);
     });
 
-    it('should include systemPrompt in run_agent state even when no useAI hook is present', async () => {
-      const systemPrompt = 'You are a helpful assistant. Always be polite.';
+    it('should include systemPrompts in run_agent forwardedProps even when no useAI hook is present', async () => {
+      const systemPromptContent = 'You are a helpful assistant. Always be polite.';
+      const systemPrompts = [
+        {
+          content: systemPromptContent,
+          providerOptions: {
+            anthropic: { cacheControl: { type: 'ephemeral', ttl: '5m' } },
+          },
+        },
+      ];
       let sendPromptFn: ((message: string) => Promise<void>) | null = null;
 
-      // This component does NOT use useAI hook - only uses the provider context
+      // Component does NOT call useAI — it only uses the provider context.
       const TestComponent = () => {
         const { client, connected } = useAIContext();
+        const chatUI = React.useContext(__UseAIChatContext);
 
-        // Expose sendPrompt for testing
         React.useEffect(() => {
-          if (client && connected) {
-            sendPromptFn = async (message: string) => {
-              client.sendPrompt(message);
-            };
+          if (client && connected && chatUI) {
+            sendPromptFn = (message: string) => chatUI.sendMessage(message);
           }
-        }, [client, connected]);
+        }, [client, connected, chatUI]);
 
         return <div data-testid="connected">{connected ? 'yes' : 'no'}</div>;
       };
 
       const { getByTestId } = render(
-        <UseAIProvider serverUrl="ws://localhost:8081" systemPrompt={systemPrompt}>
+        <UseAIProvider serverUrl="ws://localhost:8081" systemPrompts={systemPrompts}>
           <TestComponent />
         </UseAIProvider>
       );
@@ -696,13 +713,17 @@ describe('useAI Integration Tests', () => {
         expect(runAgentMsg).toBeDefined();
       });
 
-      // Verify the state includes the system prompt
       const runAgentMsg = getSentMessages().find(msg => msg.type === 'run_agent');
-      expect(runAgentMsg.data.state).toBeDefined();
-      expect(runAgentMsg.data.state.context).toBeDefined();
 
-      // The context should include the system prompt
-      expect(runAgentMsg.data.state.context).toContain(systemPrompt);
+      // systemPrompts travels on forwardedProps.
+      expect(runAgentMsg.data.forwardedProps).toBeDefined();
+      expect(runAgentMsg.data.forwardedProps.systemPrompts).toEqual(systemPrompts);
+
+      // With no useAI({ prompt }) registered, state.context is empty/null; the system prompt must not appear there.
+      const context = runAgentMsg.data.state?.context;
+      if (context) {
+        expect(context).not.toContain(systemPromptContent);
+      }
     });
   });
 });

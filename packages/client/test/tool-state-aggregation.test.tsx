@@ -5,6 +5,7 @@ import { UseAIProvider } from '../src/providers/useAIProvider';
 import { useAI } from '../src/useAI';
 import { defineTool } from '../src/defineTool';
 import { z } from 'zod';
+import type { SystemPromptEntry } from '../src/types';
 import {
   setupMockWebSocket,
   restoreMockWebSocket,
@@ -18,6 +19,15 @@ const addTodo = defineTool(
   (input) => ({ success: true, text: input.text })
 );
 
+const TEST_SYSTEM_PROMPTS: SystemPromptEntry[] = [
+  {
+    content: 'You are a helpful assistant.',
+    providerOptions: {
+      anthropic: { cacheControl: { type: 'ephemeral', ttl: '5m' } },
+    },
+  },
+];
+
 describe('tool_result sends aggregated state from all hooks', () => {
   beforeEach(() => {
     setupMockWebSocket();
@@ -30,7 +40,7 @@ describe('tool_result sends aggregated state from all hooks', () => {
   it('should include prompts from all useAI hooks in tool_result state, not just the owning hook', async () => {
     function Wrapper({ children }: { children: ReactNode }) {
       return (
-        <UseAIProvider serverUrl="ws://localhost:8081" systemPrompt="You are a helpful assistant.">
+        <UseAIProvider serverUrl="ws://localhost:8081" systemPrompts={TEST_SYSTEM_PROMPTS}>
           <ComponentA />
           <ComponentB />
           {children}
@@ -87,7 +97,7 @@ describe('tool_result sends aggregated state from all hooks', () => {
     expect(state.context).toContain('Todo List');
     expect(state.context).toContain('Navigation: current page is /home');
 
-    // It should also include the system prompt
-    expect(state.context).toContain('You are a helpful assistant.');
+    // System prompts travel on `forwardedProps.systemPrompts` of `run_agent` messages, not in `state.context`.
+    expect(state.context).not.toContain('You are a helpful assistant.');
   });
 });

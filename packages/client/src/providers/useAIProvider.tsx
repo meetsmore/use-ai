@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
-import type { UseAIConfig, AGUIEvent, AgentInfo, UseAIForwardedProps } from '../types';
+import type { UseAIConfig, AGUIEvent, AgentInfo, UseAIForwardedProps, SystemPromptEntry } from '../types';
 import { UseAIFloatingButton } from '../components/UseAIFloatingButton';
 import { UseAIChatPanel } from '../components/UseAIChatPanel';
 import { UseAIFloatingChatWrapper, CloseButton } from '../components/UseAIFloatingChatWrapper';
@@ -19,6 +19,7 @@ import { useAgentSelection } from '../hooks/useAgentSelection';
 import { useCommandManagement } from '../hooks/useCommandManagement';
 import { useToolSystem, type RegisterToolsOptions } from '../hooks/useToolSystem';
 import { usePromptState } from '../hooks/usePromptState';
+import { useStableSystemPrompts } from '../hooks/useStableSystemPrompts';
 import { useFeedback } from '../hooks/useFeedback';
 import { useServerEvents } from '../hooks/useServerEvents';
 import { useMessageQueue, type SendMessageOptions } from '../hooks/useMessageQueue';
@@ -241,7 +242,30 @@ export interface ChatPanelProps {
 
 export interface UseAIProviderProps extends UseAIConfig {
   children: ReactNode;
-  systemPrompt?: string;
+  /**
+   * Array of system prompt entries. Each entry becomes an independent system message on the server; entries with `providerOptions` have those options forwarded to the underlying LLM call (e.g., `providerOptions.anthropic.cacheControl` for Anthropic prompt caching).
+   *
+   * The Provider internally stabilizes this prop, so inline arrays are fine — `useMemo` is not required (mirrors `useAI({ tools, prompt })` ergonomics).
+   *
+   * @example
+   * ```tsx
+   * <UseAIProvider
+   *   serverUrl="..."
+   *   systemPrompts={[
+   *     {
+   *       content: 'You are a helpful assistant.',
+   *       providerOptions: {
+   *         anthropic: { cacheControl: { type: 'ephemeral', ttl: '5m' } },
+   *       },
+   *     },
+   *     { content: `<context>${someContext}</context>` },
+   *   ]}
+   * >
+   *   ...
+   * </UseAIProvider>
+   * ```
+   */
+  systemPrompts?: SystemPromptEntry[];
   CustomButton?: React.ComponentType<FloatingButtonProps> | null;
   CustomChat?: React.ComponentType<ChatPanelProps> | null;
   /**
@@ -405,7 +429,14 @@ const DEFAULT_FILE_UPLOAD_CONFIG: FileUploadConfig = {
  *   return (
  *     <UseAIProvider
  *       serverUrl="wss://your-server.com"
- *       systemPrompt="You are a helpful assistant for managing todos"
+ *       systemPrompts={[
+ *         {
+ *           content: 'You are a helpful assistant for managing todos',
+ *           providerOptions: {
+ *             anthropic: { cacheControl: { type: 'ephemeral', ttl: '5m' } },
+ *           },
+ *         },
+ *       ]}
  *     >
  *       <YourApp />
  *     </UseAIProvider>
@@ -416,7 +447,7 @@ const DEFAULT_FILE_UPLOAD_CONFIG: FileUploadConfig = {
 export function UseAIProvider({
   serverUrl,
   children,
-  systemPrompt,
+  systemPrompts: systemPromptsProp,
   CustomButton,
   CustomChat,
   chatRepository,
@@ -432,6 +463,9 @@ export function UseAIProvider({
   const fileUploadConfig = fileUploadConfigProp === false
     ? undefined
     : (fileUploadConfigProp ?? DEFAULT_FILE_UPLOAD_CONFIG);
+
+  // Stabilize systemPrompts so inline-defined arrays don't trigger unnecessary re-sends.
+  const systemPrompts = useStableSystemPrompts(systemPromptsProp);
 
   const theme = { ...defaultTheme, ...customTheme };
   const strings = { ...defaultStrings, ...customStrings };
@@ -456,7 +490,6 @@ export function UseAIProvider({
   // ── Hooks ───────────────────────────────────────────────────────────────
 
   const promptState = usePromptState({
-    systemPrompt,
     clientRef,
     connected,
   });
@@ -629,9 +662,11 @@ export function UseAIProvider({
     const providerResult = forwardedPropsProvider ? forwardedPropsProvider() : {};
     const providerProps = providerResult instanceof Promise ? await providerResult : providerResult;
 
-    const mergedForwardedProps = {
+    // Provider-level `systemPrompts` always wins over per-message overrides so the prompt prefix stays stable across messages.
+    const mergedForwardedProps: UseAIForwardedProps = {
       ...providerProps,
       ...messageForwardedProps,
+      ...(systemPrompts ? { systemPrompts } : {}),
     };
 
     await clientRef.current.sendPrompt(
@@ -641,7 +676,7 @@ export function UseAIProvider({
         ? mergedForwardedProps
         : undefined
     );
-  }, [chatManagement, serverEvents, fileUploadConfig, forwardedPropsProvider]);
+  }, [chatManagement, serverEvents, fileUploadConfig, forwardedPropsProvider, systemPrompts]);
 
   // ── Message Queue (programmatic sendMessage) ────────────────────────────
 
