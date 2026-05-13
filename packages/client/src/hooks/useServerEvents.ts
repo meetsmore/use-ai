@@ -52,6 +52,12 @@ export interface UseServerEventsReturn {
    * (currentToolCalls, currentMessageContent).
    */
   handleServerEvent: (client: UseAIClient, event: AGUIEvent) => Promise<void>;
+  /**
+   * Handles a connection loss. When a disconnect occurs mid-run the server
+   * session is destroyed and the run cannot resume, so we surface an error
+   * message and clear in-flight UI state. No-op when no run is active.
+   */
+  handleDisconnect: () => void;
 }
 
 /**
@@ -76,6 +82,11 @@ export function useServerEvents({
   const [streamingText, setStreamingText] = useState('');
   const [streamingReasoning, setStreamingReasoning] = useState('');
   const streamingChatIdRef = useRef<string | null>(null);
+
+  // Mirror of `loading` for use from stable callbacks (handleDisconnect) where
+  // the value would otherwise be captured at hook construction time.
+  const loadingRef = useRef(loading);
+  loadingRef.current = loading;
 
   // Track message count at run start to extract turn messages at run end
   const messageCountAtRunStartRef = useRef<number>(0);
@@ -223,6 +234,22 @@ export function useServerEvents({
     }
   }, []);
 
+  const handleDisconnect = useCallback(() => {
+    // Only surface an error / reset state when a run is in-flight. An idle
+    // disconnect (no loading) doesn't need a phantom error message in the chat.
+    if (!loadingRef.current) return;
+
+    const strs = stringsRef.current;
+    const message = strs.errors[ErrorCode.CONNECTION_LOST] || strs.errors[ErrorCode.UNKNOWN_ERROR];
+
+    saveAIResponseRef.current(message, 'error');
+    setStreamingText('');
+    setStreamingReasoning('');
+    streamingChatIdRef.current = null;
+    setExecutingTool(null);
+    setLoading(false);
+  }, []);
+
   // Compute display value for UI
   const executingTool = executingToolRaw ? {
     displayText: executingToolRaw.title ?? executingToolFallbackRef.current ?? strings.toolExecution.fallbackMessages[0],
@@ -237,5 +264,6 @@ export function useServerEvents({
     streamingChatIdRef,
     streamingReasoning,
     handleServerEvent,
+    handleDisconnect,
   };
 }

@@ -99,6 +99,8 @@ export const defaultStrings = {
     API_OVERLOADED: 'The AI service is currently experiencing high demand. Please try again in a moment.',
     /** Error when rate limited */
     RATE_LIMITED: 'Too many requests. Please wait a moment before trying again.',
+    /** Error when the connection was lost while a response was being generated */
+    CONNECTION_LOST: 'The connection was lost. Please send your message again.',
     /** Error for unknown/unexpected errors */
     UNKNOWN_ERROR: 'An unexpected error occurred. Please try again.',
   },

@@ -58,9 +58,12 @@ export type ToolCallHandler = (
 export class UseAIClient {
   private socket: Socket | null = null;
   private eventHandlers: Map<string, AGUIEventHandler> = new Map();
-  private reconnectAttempts = 0;
-  private maxReconnectAttempts = 5;
+  // Reconnect indefinitely so clients recover after extended outages (mobile
+  // app backgrounded long enough for server pingTimeout, airplane mode, etc.).
+  // Socket.IO applies exponential backoff capped at reconnectionDelayMax,
+  // so steady-state retry frequency is ~one attempt per 10s.
   private reconnectDelay = 1000;
+  private reconnectDelayMax = 10_000;
 
   // Session state
   private _threadId: string | null = null;
@@ -117,15 +120,15 @@ export class UseAIClient {
     this.socket = io(this.serverUrl, {
       transports: ['polling', 'websocket'],
       reconnection: true,
-      reconnectionAttempts: this.maxReconnectAttempts,
+      reconnectionAttempts: Infinity,
       reconnectionDelay: this.reconnectDelay,
+      reconnectionDelayMax: this.reconnectDelayMax,
       withCredentials: true,
     });
 
     this.socket.on('connect', () => {
       console.log('[UseAI] Connected to server');
       console.log('[UseAI] Transport:', this.socket?.io?.engine?.transport?.name);
-      this.reconnectAttempts = 0;
 
       // Listen for transport upgrades (only if engine is available)
       const engine = this.socket?.io?.engine;
