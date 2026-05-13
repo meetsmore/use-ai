@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import type { Chat, PersistedMessage, PersistedMessageContent, PersistedContentPart, MessageDisplayMode } from '../providers/chatRepository/types';
 import { getTextFromContent, getDisplayTextFromContent } from '../utils/messageContent';
 import { mergeAssistantMessagesForDisplay } from '../utils/mergeAssistantMessages';
+import { shouldSubmitOnEnter, type SubmitMode } from '../utils/keyboard';
 import type { AgentInfo, FeedbackValue, ToolAnnotations } from '../types';
 import type { FileAttachment, FileUploadConfig, FileProcessingState } from '../fileUpload/types';
 import { MarkdownContent } from './MarkdownContent';
@@ -170,6 +171,20 @@ export interface UseAIChatPanelProps {
   onApproveToolCall?: () => void;
   /** Callback to reject all pending tool calls */
   onRejectToolCall?: (reason?: string) => void;
+  /**
+   * How the textarea should treat the Enter key.
+   *
+   * - `'enter'` (default): Enter submits, Shift+Enter inserts a newline. Suitable
+   *   for desktop.
+   * - `'mod-enter'`: Enter inserts a newline. Cmd/Ctrl+Enter submits. Recommended
+   *   for mobile, where soft keyboards lack modifier keys and the user is
+   *   expected to tap the send button.
+   *
+   * IME composition is always respected regardless of mode.
+   *
+   * @default 'enter'
+   */
+  submitMode?: SubmitMode;
 }
 
 /**
@@ -207,6 +222,7 @@ export function UseAIChatPanel({
   pendingApprovals = [],
   onApproveToolCall,
   onRejectToolCall,
+  submitMode = 'enter',
 }: UseAIChatPanelProps) {
   const strings = useStrings();
   const theme = useTheme();
@@ -314,11 +330,7 @@ export function UseAIChatPanel({
       return;
     }
 
-    // Normal send on Enter (except during IME composition, e.g: Japanese input)
-    // On Safari, `isComposing` becomes false when pressing Enter to confirm IME input.
-    // We use `e.keyCode` to handle this Safari-specific behavior, even though it is deprecated.
-    // Reference: https://zenn.dev/spacemarket/articles/149aa284ef7b08
-    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing && !(e.keyCode === 229)) {
+    if (shouldSubmitOnEnter(e, submitMode)) {
       e.preventDefault();
       handleSend();
     }
