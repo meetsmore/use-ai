@@ -1,8 +1,9 @@
 /**
  * Anthropic prompt caching utilities for AI SDK Agent.
  *
- * This module handles cache breakpoint configuration for Anthropic models (Claude).
- * Prompt caching reduces costs and latency by caching message prefixes.
+ * Handles cache breakpoint configuration for Anthropic models (Claude). Prompt caching reduces costs and latency by caching message prefixes.
+ *
+ * Responsibilities of this module: attach `providerOptions.anthropic.cacheControl` per the `cacheBreakpoint` function, and run a 4-breakpoint diagnostic across the final messages array. Entry-level `providerOptions.anthropic.cacheControl` attached upstream is counted by the diagnostic but not attached here.
  *
  * @see https://platform.claude.com/docs/en/build-with-claude/prompt-caching
  */
@@ -63,17 +64,31 @@ export function isAnthropicModel(model: LanguageModel): boolean {
   return provider?.startsWith('anthropic') ?? false;
 }
 
+function runFourBreakpointDiagnostic(messages: ModelMessage[]): void {
+  // Anthropic enforces a 4-breakpoint maximum per request.
+  const totalCacheBreakpoints = messages.filter(m =>
+    (m as { providerOptions?: { anthropic?: { cacheControl?: unknown } } })
+      .providerOptions?.anthropic?.cacheControl
+  ).length;
+
+  if (totalCacheBreakpoints > 4) {
+    logger.warn('Cache breakpoint count exceeds Anthropic limit (4)', {
+      totalCacheBreakpoints,
+      hint: 'Anthropic enforces a 4-breakpoint maximum per request. Reduce cache_control attachments from cacheBreakpoint and/or entry-level providerOptions.',
+    });
+  }
+}
+
 /**
  * Applies cache breakpoints to messages for Anthropic prompt caching.
- * Only applies when:
- * 1. cacheBreakpoint config is provided
- * 2. Model is an Anthropic model
  *
- * Adds providerOptions.anthropic.cacheControl to messages where
- * the cacheBreakpoint function returns true.
+ * Behaviour:
+ * - Non-Anthropic models: returns `messages` unchanged (cache_control is Anthropic-specific).
+ * - Anthropic models with a `cacheBreakpoint` function: attaches `providerOptions.anthropic.cacheControl` to each message where the function returns a truthy value.
+ * - Anthropic models without a `cacheBreakpoint`: leaves the array untouched, but still runs the 4-breakpoint diagnostic.
  *
  * @param messages - The messages array (system prompt should be prepended as role: 'system')
- * @param cacheBreakpoint - Function to determine which messages should have cache breakpoints
+ * @param cacheBreakpoint - Function to determine which messages should have cache breakpoints (optional)
  * @param model - The AI SDK LanguageModel to check if it's Anthropic
  * @returns Messages with cache control providerOptions added where applicable
  */
@@ -82,8 +97,12 @@ export function applyCacheBreakpoints(
   cacheBreakpoint: CacheBreakpointFn | undefined,
   model: LanguageModel
 ): ModelMessage[] {
-  // Skip if no cacheBreakpoint configured or not Anthropic model
-  if (!cacheBreakpoint || !isAnthropicModel(model)) {
+  if (!isAnthropicModel(model)) {
+    return messages;
+  }
+
+  if (!cacheBreakpoint) {
+    runFourBreakpointDiagnostic(messages);
     return messages;
   }
 
@@ -137,5 +156,6 @@ export function applyCacheBreakpoints(
     });
   }
 
+  runFourBreakpointDiagnostic(result);
   return result;
 }
