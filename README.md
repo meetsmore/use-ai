@@ -345,7 +345,14 @@ import { UseAIProvider } from '@meetsmore-oss/use-ai-client';
 root.render(
   <UseAIProvider
     serverUrl="wss://your-server.com"
-    systemPrompt="Be concise and friendly in your responses."
+    systemPrompts={[
+      {
+        content: 'Be concise and friendly in your responses.',
+        providerOptions: {
+          anthropic: { cacheControl: { type: 'ephemeral', ttl: '5m' } },
+        },
+      },
+    ]}
     renderChat={true}  // set false to disable built-in chat UI
   >
     <App />

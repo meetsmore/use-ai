@@ -10,7 +10,14 @@ if (!container) throw new Error('Root element not found');
 ReactDOM.render(
   <UseAIProvider
     serverUrl="ws://localhost:8081"
-    systemPrompt="You are a helpful AI assistant for a demo application. Be concise and friendly in your responses."
+    systemPrompts={[
+      {
+        content: 'You are a helpful AI assistant for a demo application. Be concise and friendly in your responses.',
+        providerOptions: {
+          anthropic: { cacheControl: { type: 'ephemeral', ttl: '5m' } },
+        },
+      },
+    ]}
     forwardedPropsProvider={() => ({
       mcpHeaders: {
         'http://localhost:3002': {
