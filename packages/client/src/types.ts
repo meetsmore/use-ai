@@ -53,6 +53,8 @@ export type {
   McpHeadersMap,
   AgentInfo,
   UseAIForwardedProps,
+  SystemPromptEntry,
+  JsonValue,
   // Tool approval types
   ToolApprovalRequestEvent,
   ToolApprovalResponseMessage,

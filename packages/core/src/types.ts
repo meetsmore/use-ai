@@ -323,6 +323,48 @@ export interface AgentInfo {
 }
 
 /**
+ * JSON-compatible value. Structurally matches the AI SDK's `ModelMessage.providerOptions` value type so {@link SystemPromptEntry.providerOptions} is assignable without a cast.
+ */
+export type JsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | JsonValue[]
+  | { [key: string]: JsonValue };
+
+/**
+ * System prompt entry for the `systemPrompts` protocol field.
+ * Each entry becomes an independent SystemModelMessage sent to the LLM, with optional provider-specific options attached per entry via {@link SystemPromptEntry.providerOptions}.
+ *
+ * @see UseAIForwardedProps.systemPrompts
+ */
+export interface SystemPromptEntry {
+  /**
+   * The system prompt content. Sent as a single SystemModelMessage.
+   *
+   * When `providerOptions` enables prompt caching, `content` must be a static string for that entry — dynamic substrings (timestamps, UUIDs, per-request data) miss the cache.
+   */
+  content: string;
+
+  /**
+   * Provider-specific options forwarded to the underlying LLM call. Mirrors AI SDK's `ModelMessage.providerOptions` shape.
+   *
+   * Anthropic prompt cache control:
+   * ```ts
+   * providerOptions: {
+   *   anthropic: { cacheControl: { type: 'ephemeral', ttl: '5m' } }
+   * }
+   * ```
+   *
+   * Provider keys that the active model does not recognize are silently ignored by the AI SDK provider layer.
+   *
+   * @see https://platform.claude.com/docs/en/build-with-claude/prompt-caching
+   */
+  providerOptions?: Record<string, Record<string, JsonValue>>;
+}
+
+/**
  * Extended forwardedProps type for use-ai protocol.
  * Uses AG-UI's forwardedProps extension point for use-ai specific features.
  */
@@ -335,6 +377,12 @@ export interface UseAIForwardedProps {
   telemetryMetadata?: Record<string, unknown>;
   /** Authentication token for server-side validation (e.g., JWT for beforeRunAgent plugin hooks) */
   token?: string;
+  /**
+   * System prompts to send as independent system messages to the agent. Each entry becomes a SystemModelMessage; entries with `providerOptions` have those options forwarded to the underlying LLM call (e.g., `providerOptions.anthropic.cacheControl` for Anthropic prompt caching).
+   *
+   * When the agent also has backend-configured entries, those are concatenated before this array on the server side.
+   */
+  systemPrompts?: SystemPromptEntry[];
 }
 
 /**

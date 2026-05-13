@@ -205,6 +205,8 @@ export type {
   UseAIClientMessage,
   RunWorkflowMessage,
   UseAIForwardedProps,
+  SystemPromptEntry,
+  JsonValue,
   // Tool approval types
   ToolApprovalRequestEvent,
   ToolApprovalResponseMessage,
