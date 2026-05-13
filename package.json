@@ -11,7 +11,7 @@
     "url": "https://github.com/meetsmore/use-ai.git"
   },
   "private": true,
-  "packageManager": "bun@1.3.2",
+  "packageManager": "bun@1.3.13",
   "workspaces": [
     "packages/*",
     "apps/*"
@@ -35,7 +35,7 @@
     "kill": "(lsof -ti:3000 2>/dev/null | xargs -r kill; lsof -ti:3002 2>/dev/null | xargs -r kill; lsof -ti:8081 2>/dev/null | xargs -r kill) && echo 'Killed processes on ports 3000, 3002, 8081' || echo 'No processes to kill'"
   },
   "devDependencies": {
-    "@types/bun": "latest",
+    "@types/bun": "^1.3.13",
     "turbo": "^2.6.1",
     "typedoc": "^0.28.16",
     "typedoc-plugin-markdown": "^4.10.0",
