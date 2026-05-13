@@ -1,0 +1,27 @@
+README.md
+  s_5f9e45b23562f8::t_a5b722af06f889 354
+  s_5f9e45b23562f8::t_d9a0f6e0b11b2c 348-353,355
+apps/example/src/index.react16.tsx
+  s_5f9e45b23562f8::t_d3d96c41f5e340 13-18,20
+  s_5f9e45b23562f8::t_5dfc32215f564e 19
+apps/example/src/index.tsx
+  s_5f9e45b23562f8::t_be385cc71ed829 16
+  s_5f9e45b23562f8::t_ce52ef4d275cad 14-15,17-18,20-21
+  s_5f9e45b23562f8::t_9b1fa26c059c00 19
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "6ca76dcae41bbeffca70d4f7a7f820621763816e",
+  "prompts": {},
+  "sessions": {
+    "s_5f9e45b23562f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c339308e-df7e-4ed7-ba09-86cfefa91f57",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "yuma.ito <yuma.ito@meetsmore.com>"
+    }
+  }
+}
