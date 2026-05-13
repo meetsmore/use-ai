@@ -1,6 +1,6 @@
 {
   "name": "@meetsmore-oss/use-ai-plugin-workflows",
-  "version": "1.12.1",
+  "version": "1.13.0",
   "license": "BUSL-1.1",
   "files": [
     "dist"
