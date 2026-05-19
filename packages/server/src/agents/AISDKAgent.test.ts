@@ -3352,5 +3352,297 @@ describe('AISDKAgent', () => {
       expect(incompleteResult).toBeDefined();
       expect(incompleteResult!.output.value).toContain('cut off mid-stream by the output token limit');
     });
+
+    test('recovers when stream is truncated mid-text (maxOutputTokens exceeded)', async () => {
+      // When text generation hits maxOutputTokens, finishReason is 'length' but no
+      // tool call is active. The agent should:
+      //   1. Close TEXT_MESSAGE_END so the frontend isn't stuck mid-stream
+      //   2. Inject a fallback instruction and re-run with a tight token cap
+      //   3. The fallback iteration produces a brief acknowledgment
+      let callCount = 0;
+      let secondCallMessages: unknown[] = [];
+
+      const mockModel = new MockLanguageModelV3({
+        doStream: async ({ prompt, maxOutputTokens }) => {
+          callCount++;
+
+          if (callCount === 1) {
+            // First call: text starts streaming, then gets truncated.
+            return {
+              stream: simulateReadableStream({
+                chunks: [
+                  { type: 'text-start', id: 'text-1' },
+                  { type: 'text-delta', id: 'text-1', delta: 'This is a very long answer that runs out of toke' },
+                  // Stream ends mid-text — no text-end, no finish-step
+                  {
+                    type: 'finish',
+                    finishReason: 'length' as const,
+                    usage: { inputTokens: 100, outputTokens: 4096, totalTokens: 4196 },
+                  },
+                ],
+              }),
+              response: {
+                id: 'response-1',
+                timestamp: new Date(),
+                modelId: 'mock-model',
+                headers: {},
+                messages: [{ role: 'assistant', content: 'This is a very long answer that runs out of toke' }],
+              },
+            };
+          }
+
+          if (callCount === 2) {
+            // Capture messages and maxOutputTokens for assertions.
+            secondCallMessages = prompt as unknown[];
+            (mockModel as unknown as { _secondCallMaxOutputTokens?: number })._secondCallMaxOutputTokens = maxOutputTokens;
+
+            return {
+              stream: simulateReadableStream({
+                chunks: [
+                  { type: 'text-start', id: 'text-2' },
+                  { type: 'text-delta', id: 'text-2', delta: '出力が長くなったため、一旦ここで終了します。' },
+                  { type: 'text-end', id: 'text-2' },
+                  {
+                    type: 'finish',
+                    finishReason: 'stop' as const,
+                    usage: { inputTokens: 200, outputTokens: 20, totalTokens: 220 },
+                  },
+                ],
+              }),
+              response: {
+                id: 'response-2',
+                timestamp: new Date(),
+                modelId: 'mock-model',
+                headers: {},
+                messages: [{ role: 'assistant', content: '出力が長くなったため、一旦ここで終了します。' }],
+              },
+            };
+          }
+
+          throw new Error('Unexpected call count: ' + callCount);
+        },
+      });
+
+      const agent = new AISDKAgent({ model: mockModel });
+
+      const emittedEvents: AGUIEventExtended[] = [];
+      const eventEmitter: EventEmitter = {
+        emit: (event) => emittedEvents.push(event),
+      };
+
+      const input = createTestInput();
+      const result = await agent.run(input, eventEmitter);
+
+      expect(result.success).toBe(true);
+      expect(callCount).toBe(2);
+
+      // The truncated text and the fallback acknowledgment must be merged
+      // into ONE TEXT_MESSAGE (same messageId, single START + single END) so
+      // the client renders one continuous bubble instead of the truncated
+      // text disappearing when a new TEXT_MESSAGE_START arrives.
+      const textStartEvents = emittedEvents.filter(e => e.type === EventType.TEXT_MESSAGE_START);
+      const textEndEvents = emittedEvents.filter(e => e.type === EventType.TEXT_MESSAGE_END);
+      expect(textStartEvents.length).toBe(1);
+      expect(textEndEvents.length).toBe(1);
+      const sharedMessageId = (textStartEvents[0] as { messageId: string }).messageId;
+      expect((textEndEvents[0] as { messageId: string }).messageId).toBe(sharedMessageId);
+      // All TEXT_MESSAGE_CONTENT deltas (truncated + separator + fallback)
+      // must reference the same messageId.
+      const textContents = emittedEvents.filter(e => e.type === EventType.TEXT_MESSAGE_CONTENT);
+      expect(textContents.every(e => (e as { messageId: string }).messageId === sharedMessageId)).toBe(true);
+      // A "\n\n" separator delta must be emitted between the truncated text
+      // and the fallback acknowledgment so they read as separate paragraphs.
+      expect(textContents.some(e => (e as { delta: string }).delta === '\n\n')).toBe(true);
+
+      // The fallback iteration must use the tight token cap, not the agent default.
+      const secondCallTokens = (mockModel as unknown as { _secondCallMaxOutputTokens?: number })._secondCallMaxOutputTokens;
+      expect(secondCallTokens).toBeDefined();
+      expect(secondCallTokens! <= 256).toBe(true);
+
+      // The fallback iteration must have received the truncation instruction.
+      const userMessages = (secondCallMessages as Array<{ role: string; content: unknown }>)
+        .filter(m => m.role === 'user');
+      const joined = userMessages.map(m => typeof m.content === 'string' ? m.content : JSON.stringify(m.content)).join(' ');
+      expect(joined).toContain('Output too long');
+
+      // RUN_FINISHED should have been emitted normally.
+      const runFinished = emittedEvents.find(e => e.type === EventType.RUN_FINISHED);
+      expect(runFinished).toBeDefined();
+    });
+
+    test('truncation mid-reasoning: skips close events and drops partial assistant from LLM resend', async () => {
+      // When reasoning is truncated, REASONING_MESSAGE_END / REASONING_END are
+      // intentionally NOT emitted — the client side gates its persisted
+      // _currentReasoningBlocks on REASONING_MESSAGE_END, so skipping it drops
+      // the partial block cleanly without provider-specific signature checks.
+      // We also strip the partial assistant message from LLM resend history so
+      // signature-verifying providers (Anthropic) don't reject the next call.
+      let callCount = 0;
+      let secondCallMessages: unknown = null;
+
+      const mockModel = new MockLanguageModelV3({
+        doStream: async (options) => {
+          callCount++;
+
+          if (callCount === 1) {
+            return {
+              stream: simulateReadableStream({
+                chunks: [
+                  { type: 'reasoning-start', id: 'r1' },
+                  { type: 'reasoning-delta', id: 'r1', delta: 'Let me think about this in great detail...' },
+                  // Stream ends mid-reasoning — no reasoning-end
+                  {
+                    type: 'finish',
+                    finishReason: 'length' as const,
+                    usage: { inputTokens: 100, outputTokens: 4096, totalTokens: 4196 },
+                  },
+                ],
+              }),
+              response: {
+                id: 'response-1',
+                timestamp: new Date(),
+                modelId: 'mock-model',
+                headers: {},
+                // Simulate what the AI SDK would surface: an assistant message
+                // with a partial reasoning part. With the new design this
+                // entire message should be stripped before the fallback call.
+                messages: [{
+                  role: 'assistant',
+                  content: [
+                    { type: 'reasoning', text: 'Let me think about this in great detail...' },
+                  ],
+                }],
+              },
+            };
+          }
+
+          secondCallMessages = options.prompt;
+          // Fallback iteration: brief acknowledgment
+          return {
+            stream: simulateReadableStream({
+              chunks: [
+                { type: 'text-start', id: 'text-1' },
+                { type: 'text-delta', id: 'text-1', delta: 'Output too long, stopping.' },
+                { type: 'text-end', id: 'text-1' },
+                {
+                  type: 'finish',
+                  finishReason: 'stop' as const,
+                  usage: { inputTokens: 200, outputTokens: 10, totalTokens: 210 },
+                },
+              ],
+            }),
+            response: {
+              id: 'response-2',
+              timestamp: new Date(),
+              modelId: 'mock-model',
+              headers: {},
+              messages: [{ role: 'assistant', content: 'Output too long, stopping.' }],
+            },
+          };
+        },
+      });
+
+      const agent = new AISDKAgent({
+        model: mockModel,
+        providerOptions: { anthropic: { thinking: { type: 'enabled', budgetTokens: 10000 } } },
+      });
+
+      const emittedEvents: AGUIEventExtended[] = [];
+      const eventEmitter: EventEmitter = {
+        emit: (event) => emittedEvents.push(event),
+      };
+
+      const input = createTestInput();
+      const result = await agent.run(input, eventEmitter);
+
+      expect(result.success).toBe(true);
+      expect(callCount).toBe(2);
+
+      // Reasoning open events were emitted in step 1...
+      const reasoningStart = emittedEvents.filter(e => e.type === EventType.REASONING_START);
+      const reasoningMsgStart = emittedEvents.filter(e => e.type === EventType.REASONING_MESSAGE_START);
+      expect(reasoningStart.length).toBe(1);
+      expect(reasoningMsgStart.length).toBe(1);
+
+      // ...but the close events MUST NOT be emitted. The client uses absence
+      // of REASONING_MESSAGE_END as the signal to drop the partial block.
+      const reasoningMsgEnd = emittedEvents.filter(e => e.type === EventType.REASONING_MESSAGE_END);
+      const reasoningEnd = emittedEvents.filter(e => e.type === EventType.REASONING_END);
+      expect(reasoningMsgEnd.length).toBe(0);
+      expect(reasoningEnd.length).toBe(0);
+
+      // The partial reasoning assistant message must be stripped before the
+      // fallback call, otherwise Anthropic would reject with
+      // "Invalid signature in thinking block".
+      expect(secondCallMessages).not.toBeNull();
+      const assistantMessages = (secondCallMessages as Array<{ role: string; content: unknown }>)
+        .filter(m => m.role === 'assistant');
+      expect(assistantMessages.length).toBe(0);
+
+      // The fallback instruction was injected.
+      const userMessages = (secondCallMessages as Array<{ role: string; content: unknown }>)
+        .filter(m => m.role === 'user');
+      const joined = userMessages.map(m => typeof m.content === 'string' ? m.content : JSON.stringify(m.content)).join(' ');
+      expect(joined).toContain('Output too long');
+    });
+
+    test('does not loop forever if the fallback iteration also gets truncated', async () => {
+      // If the model ignores the fallback instruction and produces another long
+      // response, we should NOT recurse into yet another fallback. The run should
+      // end (no infinite loop), emitting closing events for the second truncated stream.
+      let callCount = 0;
+
+      const mockModel = new MockLanguageModelV3({
+        doStream: async () => {
+          callCount++;
+          return {
+            stream: simulateReadableStream({
+              chunks: [
+                { type: 'text-start', id: `text-${callCount}` },
+                { type: 'text-delta', id: `text-${callCount}`, delta: 'long output...' },
+                {
+                  type: 'finish',
+                  finishReason: 'length' as const,
+                  usage: { inputTokens: 100, outputTokens: 256, totalTokens: 356 },
+                },
+              ],
+            }),
+            response: {
+              id: `response-${callCount}`,
+              timestamp: new Date(),
+              modelId: 'mock-model',
+              headers: {},
+              messages: [{ role: 'assistant', content: 'long output...' }],
+            },
+          };
+        },
+      });
+
+      const agent = new AISDKAgent({ model: mockModel });
+
+      const emittedEvents: AGUIEventExtended[] = [];
+      const eventEmitter: EventEmitter = {
+        emit: (event) => emittedEvents.push(event),
+      };
+
+      const input = createTestInput();
+      const result = await agent.run(input, eventEmitter);
+
+      // Should NOT loop. Exactly 2 calls: the original + 1 fallback that also got truncated.
+      expect(callCount).toBe(2);
+      expect(result.success).toBe(true);
+
+      // Both truncated streams are merged into a single TEXT_MESSAGE (one
+      // START / one END pair) and that END must be emitted so the frontend
+      // exits streaming state.
+      const textStartEvents = emittedEvents.filter(e => e.type === EventType.TEXT_MESSAGE_START);
+      const textEndEvents = emittedEvents.filter(e => e.type === EventType.TEXT_MESSAGE_END);
+      expect(textStartEvents.length).toBe(1);
+      expect(textEndEvents.length).toBe(1);
+
+      // Run should finish (RUN_FINISHED), not error.
+      const runFinished = emittedEvents.find(e => e.type === EventType.RUN_FINISHED);
+      expect(runFinished).toBeDefined();
+    });
   });
 });

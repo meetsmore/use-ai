@@ -119,6 +119,19 @@ interface RunContext {
   response: Awaited<ReturnType<typeof streamText>['response']> | null;
   /** Whether the last completed step had tool calls (for graceful summary) */
   lastStepHadToolCalls: boolean;
+  /**
+   * Set to true when the previous step was truncated mid-text/reasoning by
+   * maxOutputTokens. The next step runs as a "fallback" with a tight token cap
+   * and a terse instruction to produce a brief truncation acknowledgment.
+   */
+  truncationFallbackPending: boolean;
+  /**
+   * If the truncated step was producing a text message, its messageId is
+   * carried over so the fallback step appends to the same TEXT_MESSAGE
+   * (no new TEXT_MESSAGE_START / END pair), keeping the partial output and
+   * the acknowledgment visible as one continuous bubble on the client.
+   */
+  pendingTextMessageId: string | null;
 }
 
 /**
@@ -136,9 +149,18 @@ interface StepContext {
   hasEmittedTextStart: boolean;
   /** Whether REASONING_START has been emitted in this step */
   hasEmittedReasoningStart: boolean;
-  /** Lifecycle ID for REASONING_START / REASONING_END pair */
+  /**
+   * Lifecycle ID for REASONING_START / REASONING_END pair.
+   * Cleared (set to null) when REASONING_END is emitted, so a non-null value
+   * after the chunk loop means reasoning was truncated mid-stream.
+   */
   reasoningLifecycleId: string | null;
-  /** Message ID for REASONING_MESSAGE_START / REASONING_MESSAGE_END pair */
+  /**
+   * Message ID for REASONING_MESSAGE_START / REASONING_MESSAGE_END pair.
+   * Cleared (set to null) when REASONING_MESSAGE_END is emitted. A non-null
+   * value after the chunk loop signals truncation mid-reasoning — used to
+   * drop the partial assistant message from the LLM resend history.
+   */
   reasoningMessageId: string | null;
   /**
    * Extracted reasoning signature from provider metadata for multi-turn context.
@@ -359,6 +381,14 @@ export interface AISDKAgentConfig {
 
 const DEFAULT_MAX_OUTPUT_TOKENS = 4096;
 const DEFAULT_MAX_STEPS = 10;
+/** Token cap for the fallback iteration after a text/reasoning truncation. */
+const TRUNCATION_FALLBACK_MAX_TOKENS = 256;
+/**
+ * Minimal instruction injected for the fallback iteration. Kept short to
+ * minimize prompt tokens. The model is asked to respond in the user's language.
+ */
+const TRUNCATION_FALLBACK_INSTRUCTION =
+  'Output too long. Reply with one terse sentence in the user\'s language saying you are stopping here because the output got too long (e.g. "出力が長くなったので停止します。"). No apology, nothing else.';
 
 /**
  * Maps provider names to their reasoning context keys in providerMetadata.
@@ -555,6 +585,8 @@ export class AISDKAgent implements Agent {
       allResponseMessages: [],
       response: null,
       lastStepHadToolCalls: false,
+      truncationFallbackPending: false,
+      pendingTextMessageId: null,
     };
   }
 
@@ -636,6 +668,11 @@ export class AISDKAgent implements Agent {
       const isGracefulSummaryStep = stepIteration === this.maxSteps;
       if (isGracefulSummaryStep && !ctx.lastStepHadToolCalls) break;
 
+      // Capture and clear: this step inherits the fallback flag set by the
+      // previous truncated step, then the flag is reset so it doesn't leak.
+      const isTruncationFallbackStep = ctx.truncationFallbackPending;
+      ctx.truncationFallbackPending = false;
+
       const stepCtx: StepContext = {
         currentTools: ctx.session.tools,
         activeToolCalls: new Map(),
@@ -679,6 +716,7 @@ export class AISDKAgent implements Agent {
       };
 
       this.applyGracefulSummaryOverrides(isGracefulSummaryStep, stepConfig);
+      this.applyTruncationFallbackOverrides(isTruncationFallbackStep, stepConfig);
 
       logger.debug('Starting step iteration', { stepIteration, ...stepConfig.metadata });
 
@@ -690,13 +728,16 @@ export class AISDKAgent implements Agent {
       );
 
       ctx.streamTextStarted = true;
+      const stepMaxOutputTokens = isTruncationFallbackStep
+        ? Math.min(this.maxOutputTokens, TRUNCATION_FALLBACK_MAX_TOKENS)
+        : this.maxOutputTokens;
       const createStream = () => streamText({
         model: this.model,
         messages: messagesWithCache,
         tools: stepConfig.tools,
         // Run ONE step at a time to allow tool refresh between steps
         stopWhen: stepCountIs(1),
-        maxOutputTokens: this.maxOutputTokens,
+        maxOutputTokens: stepMaxOutputTokens,
         temperature: this.temperature,
         abortSignal: ctx.session.abortController?.signal,
         providerOptions: this.providerOptions,
@@ -715,6 +756,22 @@ export class AISDKAgent implements Agent {
         this.processStreamChunk(chunk, ctx, stepCtx, events);
       }
 
+      // End-of-step bookkeeping. Done here, after the chunk loop, because
+      // AI SDK emits finish-step BEFORE finish — so stepFinishReason isn't
+      // known inside the chunk handler, but it IS needed to decide whether
+      // to emit TEXT_MESSAGE_END (normal) or carry the messageId over for
+      // the fallback step (truncated).
+      //
+      // STEP_FINISHED is emitted last so its position relative to the
+      // closing TEXT/REASONING events is unchanged from the prior
+      // implementation (close events first, then STEP_FINISHED).
+      this.closeStepStreamEvents(ctx, stepCtx, events);
+      events.emit<StepFinishedEvent>({
+        type: EventType.STEP_FINISHED,
+        stepName: `step-${ctx.currentStepNumber - 1}`,
+        timestamp: Date.now(),
+      });
+
       // Check if stream was aborted
       if (ctx.session.abortController?.signal.aborted) {
         span.endWithError('Run aborted by user');
@@ -731,11 +788,22 @@ export class AISDKAgent implements Agent {
       ctx.response = response;
 
       // Collect sanitized messages from this step into the accumulator.
-      const stepMessages = this.sanitizeMessages(response.messages);
+      const rawStepMessages = this.sanitizeMessages(response.messages);
+      const stepMessages = this.stripTruncatedReasoningAssistant(
+        rawStepMessages,
+        stepCtx,
+      );
       ctx.allResponseMessages.push(...stepMessages);
       ctx.currentMessages = [...ctx.currentMessages, ...stepMessages];
 
       if (this.handleIncompleteToolCalls(ctx, stepCtx)) {
+        // closeStepStreamEvents (called above) already closed any open
+        // text/reasoning before this branch, so the frontend isn't stuck
+        // when we re-run the step with shorter tool arguments.
+        continue;
+      }
+
+      if (this.handleTruncatedOutput(ctx, stepCtx, isTruncationFallbackStep)) {
         continue;
       }
 
@@ -757,6 +825,128 @@ export class AISDKAgent implements Agent {
   }
 
   /**
+   * Emits closing AG-UI events for any open text streams at the end of a step.
+   * Called once per step iteration from executeStepLoop after the chunk loop,
+   * so stepFinishReason is known.
+   *
+   * Reasoning close events are NOT emitted here. Clean reasoning closure
+   * happens inside processStreamChunk's reasoning-end branch (which also
+   * nulls out reasoningMessageId / reasoningLifecycleId). If reasoning was
+   * truncated mid-stream by maxOutputTokens, we intentionally skip emitting
+   * REASONING_MESSAGE_END / REASONING_END so the client never pushes the
+   * partial block to `_currentReasoningBlocks`. The partial block is then
+   * dropped from the LLM resend history in executeStepLoop.
+   *
+   * Text behavior:
+   * - Normal finish → emit TEXT_MESSAGE_END.
+   * - finishReason === 'length' → carry messageId over to ctx.pendingTextMessageId
+   *   so the upcoming fallback step can continue writing to the same
+   *   TEXT_MESSAGE (one bubble on the client).
+   */
+  private closeStepStreamEvents(ctx: RunContext, stepCtx: StepContext, events: EventEmitter): void {
+    if (stepCtx.messageId) {
+      if (stepCtx.stepFinishReason === 'length') {
+        ctx.pendingTextMessageId = stepCtx.messageId;
+      } else {
+        events.emit<TextMessageEndEvent>({
+          type: EventType.TEXT_MESSAGE_END,
+          messageId: stepCtx.messageId,
+          timestamp: Date.now(),
+        });
+      }
+      stepCtx.messageId = null;
+    }
+  }
+
+  /**
+   * Closes a TEXT_MESSAGE that was carried across a step boundary for
+   * truncation recovery but never reused (i.e. the fallback step didn't
+   * emit any text). Idempotent — no-ops when there's nothing to flush.
+   */
+  private flushPendingTextMessage(ctx: RunContext, events: EventEmitter): void {
+    if (!ctx.pendingTextMessageId) return;
+    events.emit<TextMessageEndEvent>({
+      type: EventType.TEXT_MESSAGE_END,
+      messageId: ctx.pendingTextMessageId,
+      timestamp: Date.now(),
+    });
+    ctx.pendingTextMessageId = null;
+  }
+
+  /**
+   * When a step is truncated mid-reasoning by maxOutputTokens, the last
+   * assistant message contains a partial reasoning block without a complete
+   * provider signature. Sending it back to providers that verify signatures
+   * (e.g. Anthropic's `Invalid signature in thinking block`) breaks the run.
+   *
+   * Signal: stepCtx.reasoningMessageId is non-null after the chunk loop iff
+   * REASONING_MESSAGE_END never fired (clean-close clears the id). When that
+   * coincides with finishReason === 'length', the last assistant message has
+   * nothing useful in it (truncation happens at a single point — no text or
+   * tool calls can follow open reasoning in the same step), so dropping the
+   * whole message is safe and provider-agnostic.
+   */
+  private stripTruncatedReasoningAssistant(
+    messages: ModelMessage[],
+    stepCtx: StepContext,
+  ): ModelMessage[] {
+    const isReasoningTruncation =
+      stepCtx.stepFinishReason === 'length' && stepCtx.reasoningMessageId !== null;
+    if (!isReasoningTruncation) return messages;
+    if (messages.length === 0) return messages;
+    const last = messages[messages.length - 1];
+    if (last.role !== 'assistant') return messages;
+    logger.warn('Dropped assistant message with partial reasoning before LLM resend (truncated mid-reasoning)');
+    return messages.slice(0, -1);
+  }
+
+  /**
+   * Detects text/reasoning truncation caused by maxOutputTokens (finishReason === 'length'
+   * with no incomplete tool calls). Emits closing events to restore the frontend, then
+   * queues a tightly-capped fallback iteration that asks the model to briefly acknowledge
+   * the truncation in the user's language.
+   *
+   * @returns true if a fallback iteration was queued (caller should continue to next step)
+   */
+  private handleTruncatedOutput(
+    ctx: RunContext,
+    stepCtx: StepContext,
+    isFallbackStep: boolean,
+  ): boolean {
+    if (stepCtx.stepFinishReason !== 'length') {
+      return false;
+    }
+
+    // closeStepStreamEvents (called from executeStepLoop before us) has
+    // already either emitted TEXT_MESSAGE_END or carried the messageId over
+    // to ctx.pendingTextMessageId for text recovery. Reasoning close events
+    // are intentionally skipped on truncation so the partial block never
+    // lands in the client's _currentReasoningBlocks. The partial assistant
+    // message was already stripped from the LLM resend history by
+    // stripTruncatedReasoningAssistant. No close work needed here.
+
+    if (isFallbackStep) {
+      // The fallback iteration itself was truncated. Any unconsumed pending
+      // text message will be flushed by finalizeRun's safety net — no extra
+      // work required here.
+      logger.warn('Truncation fallback iteration also exceeded output token limit; ending run');
+      return false;
+    }
+
+    const fallbackMessage: ModelMessage = {
+      role: 'user',
+      content: TRUNCATION_FALLBACK_INSTRUCTION,
+    };
+    ctx.currentMessages = [...ctx.currentMessages, fallbackMessage];
+    ctx.truncationFallbackPending = true;
+    logger.warn('Output truncated mid-text/reasoning by maxOutputTokens; running fallback iteration', {
+      maxOutputTokens: this.maxOutputTokens,
+      appendingToMessageId: ctx.pendingTextMessageId ?? undefined,
+    });
+    return true;
+  }
+
+  /**
    * Detects incomplete tool calls caused by maxOutputTokens truncation and injects
    * synthetic error tool_results into ctx so the model can retry with shorter arguments.
    *
@@ -765,11 +955,6 @@ export class AISDKAgent implements Agent {
    * Mutates ctx.allResponseMessages and ctx.currentMessages as a side effect.
    * @returns true if recovery messages were injected (caller should continue to next step)
    */
-  // TODO: Also handle maxOutputTokens exhaustion during reasoning.
-  // When the stream is truncated mid-reasoning (finishReason: 'length'), REASONING_MESSAGE_END
-  // and REASONING_END are never emitted, leaving the client in an incomplete state and losing
-  // accumulated reasoning text. We should detect open reasoning events (stepCtx.hasEmittedReasoningStart
-  // without a corresponding reasoning-end) and emit closing events + log a warning.
   private handleIncompleteToolCalls(
     ctx: RunContext,
     stepCtx: StepContext,
@@ -817,13 +1002,31 @@ export class AISDKAgent implements Agent {
         ctx.hasAnyContent = true;
         // Start text message on first text chunk of this step
         if (!stepCtx.hasEmittedTextStart) {
-          stepCtx.messageId = uuidv4();
-          events.emit<TextMessageStartEvent>({
-            type: EventType.TEXT_MESSAGE_START,
-            messageId: stepCtx.messageId,
-            role: 'assistant',
-            timestamp: Date.now(),
-          });
+          if (ctx.pendingTextMessageId) {
+            // Truncation recovery: append the fallback text to the previous
+            // step's TEXT_MESSAGE (with a paragraph separator) instead of
+            // opening a new one. The client only flushes intermediate
+            // assistant messages on STEP_FINISHED when the step has tool
+            // calls, so a fresh TEXT_MESSAGE_START would reset the streaming
+            // buffer and discard the truncated text before it is committed.
+            stepCtx.messageId = ctx.pendingTextMessageId;
+            ctx.pendingTextMessageId = null;
+            events.emit<TextMessageContentEvent>({
+              type: EventType.TEXT_MESSAGE_CONTENT,
+              messageId: stepCtx.messageId,
+              delta: '\n\n',
+              timestamp: Date.now(),
+            });
+            ctx.finalText += '\n\n';
+          } else {
+            stepCtx.messageId = uuidv4();
+            events.emit<TextMessageStartEvent>({
+              type: EventType.TEXT_MESSAGE_START,
+              messageId: stepCtx.messageId,
+              role: 'assistant',
+              timestamp: Date.now(),
+            });
+          }
           stepCtx.hasEmittedTextStart = true;
         }
 
@@ -936,6 +1139,12 @@ export class AISDKAgent implements Agent {
           messageId: stepCtx.reasoningLifecycleId!,
           timestamp: Date.now(),
         });
+
+        // Mark reasoning as cleanly closed by nulling both ids. A non-null
+        // value after the chunk loop signals truncation mid-reasoning, which
+        // triggers stripping the partial assistant message from LLM resend.
+        stepCtx.reasoningMessageId = null;
+        stepCtx.reasoningLifecycleId = null;
         return;
       }
 
@@ -1079,21 +1288,12 @@ export class AISDKAgent implements Agent {
       }
 
       case 'finish-step': {
-        // Close text message if still open (steps with text but no tool calls)
-        if (stepCtx.messageId) {
-          events.emit<TextMessageEndEvent>({
-            type: EventType.TEXT_MESSAGE_END,
-            messageId: stepCtx.messageId,
-            timestamp: Date.now(),
-          });
-          stepCtx.messageId = null;
-        }
-
-        events.emit<StepFinishedEvent>({
-          type: EventType.STEP_FINISHED,
-          stepName: `step-${ctx.currentStepNumber - 1}`,
-          timestamp: Date.now(),
-        });
+        // Intentionally a no-op. End-of-step bookkeeping (closing open
+        // text/reasoning messages and emitting STEP_FINISHED) is handled
+        // in executeStepLoop after the chunk loop, because AI SDK emits
+        // finish-step BEFORE finish — so stepFinishReason isn't yet known
+        // here, and we need it to choose between closing TEXT_MESSAGE_END
+        // normally and carrying the messageId over for truncation recovery.
         return;
       }
 
@@ -1146,6 +1346,10 @@ export class AISDKAgent implements Agent {
   ): AgentResult {
     // TEXT_MESSAGE_END is now emitted per-step (in finish-step and tool-input-start),
     // so no need to emit it here.
+
+    // Safety net: if a truncation-recovery pending text message was never
+    // re-opened by the fallback step, close it now.
+    this.flushPendingTextMessage(ctx, events);
 
     // Check for empty response (no text, no tool calls)
     if (!ctx.hasAnyContent) {
@@ -1315,6 +1519,22 @@ export class AISDKAgent implements Agent {
     stepConfig.messages.push({ role: 'user', content: 'max steps reached, summarize progress' });
     stepConfig.tools = undefined;
     Object.assign(stepConfig.metadata, { toolCount: 0, gracefulSummary: true });
+  }
+
+  /**
+   * Strips tools and tags telemetry for fallback iterations that follow a
+   * text/reasoning truncation. The fallback instruction itself was already
+   * injected into ctx.currentMessages by handleTruncatedOutput; this just
+   * ensures the model doesn't try to call tools again in the brief recovery
+   * response.
+   */
+  private applyTruncationFallbackOverrides(
+    isTruncationFallbackStep: boolean,
+    stepConfig: { messages: ModelMessage[]; tools: unknown; metadata: Record<string, AttributeValue> }
+  ): void {
+    if (!isTruncationFallbackStep) return;
+    stepConfig.tools = undefined;
+    Object.assign(stepConfig.metadata, { toolCount: 0, truncationFallback: true });
   }
 
   /**
