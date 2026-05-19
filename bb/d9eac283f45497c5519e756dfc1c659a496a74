@@ -1,0 +1,19 @@
+packages/server/package.json
+  s_7edb1291ecd604::t_8042484181bd82 49
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.10",
+  "base_commit_sha": "bbd9eac283f45497c5519e756dfc1c659a496a74",
+  "prompts": {},
+  "sessions": {
+    "s_7edb1291ecd604": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f6fb0fc8-534b-4942-af9a-c8d61919add0",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>"
+    }
+  }
+}
