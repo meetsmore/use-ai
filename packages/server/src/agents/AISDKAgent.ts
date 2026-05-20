@@ -140,9 +140,9 @@ interface StepContext {
   hasEmittedTextStart: boolean;
   /** Whether REASONING_START has been emitted in this step */
   hasEmittedReasoningStart: boolean;
-  /** Cleared on REASONING_END; non-null after the chunk loop signals mid-stream truncation. */
+  /** Lifecycle ID for REASONING_START / REASONING_END pair */
   reasoningLifecycleId: string | null;
-  /** Cleared on REASONING_MESSAGE_END; non-null after the chunk loop triggers dropping the partial assistant message. */
+  /** Message ID for REASONING_MESSAGE_START / REASONING_MESSAGE_END pair */
   reasoningMessageId: string | null;
   /**
    * Extracted reasoning signature from provider metadata for multi-turn context.
@@ -625,8 +625,8 @@ export class AISDKAgent implements Agent {
           typeof msg.content === 'string'
             ? msg.content.substring(0, 80) + (msg.content.length > 80 ? '...' : '')
             : Array.isArray(msg.content)
-            ? `${msg.content.length} content blocks`
-            : 'complex content',
+              ? `${msg.content.length} content blocks`
+              : 'complex content',
       })),
       systemMessages: ctx.staticSystemMessages?.map(m => m.content.substring(0, 80) + (m.content.length > 80 ? '...' : '')),
     });
@@ -843,6 +843,16 @@ export class AISDKAgent implements Agent {
    * Detection signal: reasoningMessageId is cleared on a clean
    * REASONING_MESSAGE_END, so a non-null value paired with
    * stepFinishReason === 'length' marks reasoning truncation.
+   *
+   * Practical note on when this triggers: on Anthropic, both adaptive
+   * thinking and manual `budget_tokens` are designed so that thinking
+   * stays within max_tokens (adaptive treats max_tokens as a hard limit
+   * on thinking + response; manual mode requires max_tokens > budget_tokens),
+   * so mid-reasoning truncation is not expected under normal use.
+   * Behavior on other providers is unverified. The Vercel AI SDK stream protocol
+   * does not preclude a `reasoning-start` / `reasoning-delta` sequence ending
+   * without a `reasoning-end`, so we keep this guard.
+   * Not exercised against real provider traffic — covered only by unit tests.
    */
   private stripTruncatedReasoningAssistant(
     messages: ModelMessage[],
