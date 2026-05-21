@@ -360,6 +360,9 @@ export class UseAIClient {
         this._currentAssistantMessage = null;
         this._currentAssistantToolCalls = [];
         this._pendingToolResults = [];
+        // Mid-stream-truncated reasoning never gets REASONING_MESSAGE_END,
+        // so the partial buffer would otherwise leak into the next run.
+        this._currentReasoningBlockText = '';
       }
     }
 
