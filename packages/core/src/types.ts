@@ -57,6 +57,12 @@ export enum ErrorCode {
    * response is dropped and the UI is reset.
    */
   CONNECTION_LOST = 'CONNECTION_LOST',
+  /**
+   * Signals a user-initiated abort of an in-flight run.
+   * Emitted via RUN_ERROR so the client can distinguish a deliberate
+   * cancellation from a real error and persist the partial response.
+   */
+  ABORTED = 'ABORTED',
   /** Generic error for unknown or unexpected errors */
   UNKNOWN_ERROR = 'UNKNOWN_ERROR',
 }

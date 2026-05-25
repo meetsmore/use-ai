@@ -494,6 +494,134 @@ describe('UseAIClient', () => {
       expect(toolResults).toHaveLength(1); // Only one, not duplicated
     });
 
+    test('abortRun emits abort_run with the in-flight runId from sendPrompt', () => {
+      const client = new UseAIClient('http://localhost:8081');
+      client.connect();
+      mockSocket.connected = true;
+      emitSocketEvent('connect');
+
+      client.sendPrompt('Hello');
+      const runId = client.currentRunId;
+      expect(typeof runId).toBe('string');
+
+      // Clear prior emit calls (run_agent) for a clean assertion.
+      const emitMock = mockSocket.emit as ReturnType<typeof mock>;
+      emitMock.mockClear();
+
+      client.abortRun();
+
+      expect(emitMock).toHaveBeenCalledWith('message', {
+        type: 'abort_run',
+        data: { runId },
+      });
+    });
+
+    test('abortRun is a no-op when no run is in flight', () => {
+      const client = new UseAIClient('http://localhost:8081');
+      client.connect();
+      mockSocket.connected = true;
+      emitSocketEvent('connect');
+
+      const emitMock = mockSocket.emit as ReturnType<typeof mock>;
+      emitMock.mockClear();
+
+      client.abortRun();
+
+      expect(emitMock).not.toHaveBeenCalled();
+    });
+
+    test('currentRunId is cleared after RUN_FINISHED', () => {
+      const client = new UseAIClient('http://localhost:8081');
+      client.connect();
+      mockSocket.connected = true;
+      emitSocketEvent('connect');
+
+      client.sendPrompt('Hello');
+      expect(client.currentRunId).not.toBeNull();
+
+      emitSocketEvent('event', { type: 'RUN_STARTED', threadId: 't', runId: 'r' });
+      emitSocketEvent('event', { type: 'TEXT_MESSAGE_START', messageId: 'm' });
+      emitSocketEvent('event', { type: 'TEXT_MESSAGE_END', messageId: 'm' });
+      emitSocketEvent('event', { type: 'RUN_FINISHED', threadId: 't', runId: 'r' });
+
+      expect(client.currentRunId).toBeNull();
+    });
+
+    test('currentRunId is cleared after RUN_ERROR', () => {
+      const client = new UseAIClient('http://localhost:8081');
+      client.connect();
+      mockSocket.connected = true;
+      emitSocketEvent('connect');
+
+      client.sendPrompt('Hello');
+      expect(client.currentRunId).not.toBeNull();
+
+      emitSocketEvent('event', { type: 'RUN_ERROR', message: 'ABORTED' });
+
+      expect(client.currentRunId).toBeNull();
+    });
+
+    test('flushPartialStateForAbort synthesizes tool_results for unanswered tool_use blocks', () => {
+      const client = new UseAIClient('http://localhost:8081');
+      client.connect();
+      mockSocket.connected = true;
+      emitSocketEvent('connect');
+
+      client.sendPrompt('Add two todos');
+
+      emitSocketEvent('event', { type: 'RUN_STARTED', threadId: 't', runId: 'r' });
+      // Two tool_use blocks streamed, but the client never responds for the
+      // second one (aborted mid-execution).
+      emitSocketEvent('event', { type: 'TOOL_CALL_START', toolCallId: 'tc1', toolCallName: 'addTodo' });
+      emitSocketEvent('event', { type: 'TOOL_CALL_ARGS', toolCallId: 'tc1', delta: '{"text":"a"}' });
+      emitSocketEvent('event', { type: 'TOOL_CALL_END', toolCallId: 'tc1' });
+      emitSocketEvent('event', { type: 'TOOL_CALL_START', toolCallId: 'tc2', toolCallName: 'addTodo' });
+      emitSocketEvent('event', { type: 'TOOL_CALL_ARGS', toolCallId: 'tc2', delta: '{"text":"b"}' });
+      emitSocketEvent('event', { type: 'TOOL_CALL_END', toolCallId: 'tc2' });
+
+      // Only the first tool got a result before abort.
+      client.sendToolResponse('tc1', { ok: 1 });
+
+      client.flushPartialStateForAbort();
+
+      const msgs = client.messages;
+      // user + assistant(toolCalls) + tool(tc1) + tool(tc2-synthetic)
+      expect(msgs).toHaveLength(4);
+
+      const assistant = msgs[1] as Record<string, unknown>;
+      expect(assistant.role).toBe('assistant');
+      const toolCalls = assistant.toolCalls as Array<{ id: string }>;
+      expect(toolCalls.map(t => t.id)).toEqual(['tc1', 'tc2']);
+
+      const tools = msgs.filter(m => m.role === 'tool') as Array<{ toolCallId?: string; content: string }>;
+      expect(tools.map(t => t.toolCallId).sort()).toEqual(['tc1', 'tc2']);
+
+      const synthetic = tools.find(t => t.toolCallId === 'tc2');
+      expect(synthetic).toBeDefined();
+      expect(JSON.parse(synthetic!.content)).toMatchObject({ aborted: true });
+    });
+
+    test('flushPartialStateForAbort preserves mid-stream partial text in _messages', () => {
+      const client = new UseAIClient('http://localhost:8081');
+      client.connect();
+      mockSocket.connected = true;
+      emitSocketEvent('connect');
+
+      client.sendPrompt('Tell me a story');
+
+      emitSocketEvent('event', { type: 'RUN_STARTED', threadId: 't', runId: 'r' });
+      emitSocketEvent('event', { type: 'TEXT_MESSAGE_START', messageId: 'm' });
+      emitSocketEvent('event', { type: 'TEXT_MESSAGE_CONTENT', messageId: 'm', delta: 'Once upon a' });
+      // Note: no TEXT_MESSAGE_END — mid-stream abort.
+
+      client.flushPartialStateForAbort();
+
+      const msgs = client.messages;
+      expect(msgs).toHaveLength(2);
+      expect(msgs[1].role).toBe('assistant');
+      expect(msgs[1].content).toBe('Once upon a');
+    });
+
     test('simple text response (no tool calls) still works', () => {
       const client = new UseAIClient('http://localhost:8081');
       client.connect();

@@ -134,6 +134,11 @@ export interface UseAIContextValue {
   agents: AgentContextValue;
   /** Command management */
   commands: CommandContextValue;
+  /**
+   * Aborts the in-flight run, if any. Persists the partial response and
+   * leaves the conversation in a state where the user can send a follow-up.
+   */
+  abortRun: () => void;
 }
 
 /**
@@ -190,6 +195,7 @@ const noOpContextValue: UseAIContextValue = {
     rename: async () => {},
     delete: async () => {},
   },
+  abortRun: () => {},
 };
 
 // ── Component Props ─────────────────────────────────────────────────────────
@@ -218,6 +224,11 @@ export interface ChatPanelProps {
   onClose: () => void;
   /** Callback when a message is sent */
   onSendMessage: (message: string) => void;
+  /**
+   * Aborts the in-flight run. No-op when no run is active.
+   * Use this to wire a "stop" button while `loading` is true.
+   */
+  onAbort: () => void;
   /** Array of messages in the conversation */
   messages: PersistedMessage[];
   /** Whether the AI is currently processing */
@@ -611,6 +622,12 @@ export function UseAIProvider({
     }
   }, [toolSystem.hasTools, toolSystem.aggregatedTools, connected]);
 
+  // ── Abort ───────────────────────────────────────────────────────────────
+
+  const abortRun = useCallback(() => {
+    clientRef.current?.abortRun();
+  }, []);
+
   // ── Message Sending ─────────────────────────────────────────────────────
 
   const handleSendMessage = useCallback(async (message: string, attachments?: FileAttachment[], messageForwardedProps?: UseAIForwardedProps) => {
@@ -735,6 +752,7 @@ export function UseAIProvider({
       rename: renameCommand,
       delete: deleteCommand,
     },
+    abortRun,
   };
 
   // ── Chat UI ─────────────────────────────────────────────────────────────
@@ -748,6 +766,7 @@ export function UseAIProvider({
     connected,
     loading: serverEvents.loading,
     sendMessage: handleSendMessage,
+    abortRun,
     messages,
     streamingText: effectiveStreamingText,
     streamingReasoning: effectiveStreamingReasoning,
@@ -799,6 +818,7 @@ export function UseAIProvider({
 
   const chatPanelProps = {
     onSendMessage: handleSendMessage,
+    onAbort: abortRun,
     messages,
     loading: serverEvents.loading,
     connected,
@@ -848,6 +868,7 @@ export function UseAIProvider({
         isOpen={isChatOpen}
         onClose={() => handleSetChatOpen(false)}
         onSendMessage={handleSendMessage}
+        onAbort={abortRun}
         messages={messages}
         loading={serverEvents.loading}
         connected={connected}

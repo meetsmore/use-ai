@@ -70,6 +70,9 @@ export class UseAIClient {
   private _tools: ToolDefinition[] = [];
   private _messages: Message[] = [];
   private _state: unknown = null;
+  // Tracks the in-flight run so abortRun() can target it. Set by sendPrompt
+  // and cleared at RUN_FINISHED / RUN_ERROR.
+  private _currentRunId: string | null = null;
 
   // Agent selection
   private _availableAgents: AgentInfo[] = [];
@@ -366,6 +369,12 @@ export class UseAIClient {
       }
     }
 
+    // Clear the in-flight run id once the run terminates (either way).
+    // RUN_ERROR is also used for user-initiated aborts (ErrorCode.ABORTED).
+    if (event.type === EventType.RUN_FINISHED || event.type === EventType.RUN_ERROR) {
+      this._currentRunId = null;
+    }
+
     // Notify all registered handlers
     this.eventHandlers.forEach((handler) => handler(event));
   }
@@ -443,9 +452,11 @@ export class UseAIClient {
     this._messages.push(userMessage);
 
     // Create RunAgentInput
+    const runId = uuidv4();
+    this._currentRunId = runId;
     const runInput: RunAgentInput = {
       threadId: this.threadId, // Use getter to ensure non-null
-      runId: uuidv4(),
+      runId,
       messages: this._messages,
       tools: this._tools.map(t => ({
         name: t.name,
@@ -507,6 +518,107 @@ export class UseAIClient {
     this._pendingToolResults.push(toolResultMsg);
 
     this.send(toolResultMessage);
+  }
+
+  /**
+   * Aborts the in-flight run, if any.
+   * Sends an `abort_run` message to the server which cancels the AI stream
+   * and rejects any pending tool/approval waits. The server then emits
+   * `RUN_ERROR` with `ErrorCode.ABORTED`, which the client handles by
+   * persisting the partial response.
+   *
+   * No-op when no run is in flight.
+   */
+  abortRun(): void {
+    const runId = this._currentRunId;
+    if (!runId) return;
+    this.send({
+      type: 'abort_run',
+      data: { runId },
+    });
+  }
+
+  /**
+   * Flushes any unflushed mid-run state into `_messages` so conversation
+   * history stays valid after a user-initiated abort.
+   *
+   * Specifically:
+   * - If the current step has completed tool_use blocks that never got a
+   *   matching tool_result (because the user aborted before client-side
+   *   execution finished), push the assistant message with those tool_use
+   *   blocks plus a synthetic "aborted" tool_result for each unanswered one.
+   *   Without this, the next sendPrompt would send a tool_use without its
+   *   pair and the Anthropic API would reject it.
+   * - If text was streaming when aborted (no TEXT_MESSAGE_END), push the
+   *   partial text as a final assistant message so the AI sees it next turn.
+   *
+   * Idempotent: clears the per-run scratch buffers when done.
+   */
+  flushPartialStateForAbort(): void {
+    // Case 1: Mid-step with completed tool calls. We must close the tool_use
+    // blocks with matching tool_result entries to keep the API happy.
+    if (this._currentAssistantMessage && this._currentAssistantToolCalls.length > 0) {
+      const reasoningParts = this._currentReasoningBlocks.length > 0
+        ? [...this._currentReasoningBlocks]
+        : undefined;
+      const assistantMsg: Message & { reasoningParts?: ReasoningPart[] } = {
+        id: this._currentAssistantMessage.id || uuidv4(),
+        role: 'assistant',
+        content: this._currentAssistantMessage.content || '',
+        toolCalls: [...this._currentAssistantToolCalls],
+        ...(reasoningParts ? { reasoningParts } : {}),
+      };
+      this._messages.push(assistantMsg);
+
+      // Existing client-side tool results (executed before the abort hit).
+      this._messages.push(...this._pendingToolResults);
+
+      const respondedIds = new Set(
+        this._pendingToolResults
+          .map(m => ('toolCallId' in m ? m.toolCallId : undefined))
+          .filter((id): id is string => typeof id === 'string')
+      );
+      for (const toolCall of this._currentAssistantToolCalls) {
+        if (!respondedIds.has(toolCall.id)) {
+          this._messages.push({
+            id: uuidv4(),
+            role: 'tool',
+            content: JSON.stringify({ aborted: true, reason: 'Cancelled by user before tool finished' }),
+            toolCallId: toolCall.id,
+          });
+        }
+      }
+
+      // Reset step state. We deliberately do NOT also push the partial text
+      // below in this branch — the text belongs to this same flushed step
+      // and is already on `assistantMsg.content`.
+      this._currentAssistantMessage = null;
+      this._currentAssistantToolCalls = [];
+      this._pendingToolResults = [];
+      this._currentReasoningBlocks = [];
+      this._currentReasoningBlockText = '';
+      this._currentMessageContent = '';
+      return;
+    }
+
+    // Case 2: Plain mid-text abort. Preserve the partial assistant text in
+    // the in-memory history so a follow-up sendPrompt in the same session
+    // includes it. extractTurnMessages skips text-only assistants, so this
+    // does not duplicate the message saved by saveAIResponse.
+    if (this._currentMessageContent) {
+      this._messages.push({
+        id: this._currentAssistantMessage?.id || uuidv4(),
+        role: 'assistant',
+        content: this._currentMessageContent,
+      });
+    }
+
+    this._currentAssistantMessage = null;
+    this._currentAssistantToolCalls = [];
+    this._pendingToolResults = [];
+    this._currentReasoningBlocks = [];
+    this._currentReasoningBlockText = '';
+    this._currentMessageContent = '';
   }
 
   /**
@@ -613,6 +725,13 @@ export class UseAIClient {
    */
   get currentMessageContent(): string {
     return this._currentMessageContent;
+  }
+
+  /**
+   * Gets the runId of the in-flight run, or null when no run is active.
+   */
+  get currentRunId(): string | null {
+    return this._currentRunId;
   }
 
   /**

@@ -187,9 +187,11 @@ describe('Error Handling', () => {
       data: { runId },
     });
 
-    // Verify: server emits RUN_ERROR after abort
+    // Verify: server emits RUN_ERROR with the ABORTED code so the client
+    // can distinguish a user-initiated stop from a real error.
     const errorEvent = await waitForEventType(socket, EventType.RUN_ERROR);
     expect(errorEvent.type).toBe(EventType.RUN_ERROR);
+    expect((errorEvent as any).message).toBe('ABORTED');
 
     socket.disconnect();
     abortServer.close();

@@ -90,6 +90,9 @@ export function useServerEvents({
 
   // Track message count at run start to extract turn messages at run end
   const messageCountAtRunStartRef = useRef<number>(0);
+  // Captured at RUN_STARTED so RUN_ERROR (which carries no runId in AG-UI) can
+  // still link saved partial responses back to the trace.
+  const runIdAtRunStartRef = useRef<string | undefined>(undefined);
 
   // Tracks whether prior steps in this run emitted text, so we can insert
   // a paragraph separator (\n\n) in streamingText between steps.
@@ -126,6 +129,7 @@ export function useServerEvents({
       // The user message was already pushed to client.messages by sendPrompt(),
       // so messages added after this point are from the AI turn.
       messageCountAtRunStartRef.current = client.messages.length;
+      runIdAtRunStartRef.current = client.currentRunId ?? undefined;
       hasTextFromPriorStepRef.current = false;
       setStreamingReasoning('');
     } else if (event.type === EventType.REASONING_MESSAGE_START) {
@@ -219,11 +223,37 @@ export function useServerEvents({
     } else if (event.type === EventType.RUN_ERROR) {
       const errorEvent = event as RunErrorEvent;
       const errorCode = errorEvent.message as ErrorCode;
-      console.error('[ServerEvents] Run error:', errorCode);
 
-      const userMessage = strs.errors[errorCode] || errorEvent.message || strs.errors[ErrorCode.UNKNOWN_ERROR];
+      if (errorCode === ErrorCode.ABORTED) {
+        // User stopped generation. Persist whatever was streamed so far so
+        // the chat history reflects the partial response and any tool_use
+        // blocks get matching synthetic tool_result entries (otherwise the
+        // next turn would be rejected by the model API).
+        client.flushPartialStateForAbort();
 
-      saveAIResponseRef.current(userMessage, 'error');
+        const partialContent = client.currentMessageContent;
+        const turnMessages = extractTurnMessages(client.messages, messageCountAtRunStartRef.current);
+        const reasoningParts = client.currentReasoningBlocks.length > 0
+          ? [...client.currentReasoningBlocks]
+          : undefined;
+
+        // Save even when partialContent is empty so the turnMessages (with
+        // synthetic tool_results) are persisted. The final bubble may render
+        // empty in that case, which is acceptable — the user explicitly
+        // stopped before any text was produced.
+        saveAIResponseRef.current(
+          partialContent,
+          undefined,
+          runIdAtRunStartRef.current,
+          turnMessages,
+          reasoningParts,
+        );
+      } else {
+        console.error('[ServerEvents] Run error:', errorCode);
+        const userMessage = strs.errors[errorCode] || errorEvent.message || strs.errors[ErrorCode.UNKNOWN_ERROR];
+        saveAIResponseRef.current(userMessage, 'error');
+      }
+
       setStreamingText('');
       setStreamingReasoning('');
       streamingChatIdRef.current = null;

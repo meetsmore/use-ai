@@ -749,7 +749,7 @@ export class AISDKAgent implements Agent {
         span.endWithError('Run aborted by user');
         events.emit<RunErrorEvent>({
           type: EventType.RUN_ERROR,
-          message: 'Run aborted by user',
+          message: ErrorCode.ABORTED,
           timestamp: Date.now(),
         });
         throw new AbortError();
@@ -1366,6 +1366,20 @@ export class AISDKAgent implements Agent {
   ): AgentResult {
     // Handle abort as a non-error early return
     if (error instanceof AbortError) {
+      return { success: false, error: 'Run aborted', conversationHistory: ctx.messages };
+    }
+
+    // If the session was aborted while another error was bubbling up
+    // (e.g. tool-wait promise rejected with "Run aborted"), classify this as
+    // an abort so the client can persist partial state instead of showing
+    // a generic error.
+    if (ctx.session.abortController?.signal.aborted) {
+      span.endWithError('Run aborted by user');
+      events.emit<RunErrorEvent>({
+        type: EventType.RUN_ERROR,
+        message: ErrorCode.ABORTED,
+        timestamp: Date.now(),
+      });
       return { success: false, error: 'Run aborted', conversationHistory: ctx.messages };
     }
 

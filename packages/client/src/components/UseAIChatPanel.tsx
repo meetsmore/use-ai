@@ -126,6 +126,13 @@ function hasFileContent(content: PersistedMessageContent): content is PersistedC
  */
 export interface UseAIChatPanelProps {
   onSendMessage: (message: string, attachments?: FileAttachment[]) => void;
+  /**
+   * Aborts the in-flight run. When provided and `loading` is true (and no
+   * tool is currently executing), the send button switches to a "stop"
+   * button that calls this. Without `onAbort` the button stays disabled
+   * during loading.
+   */
+  onAbort?: () => void;
   messages: Message[];
   loading: boolean;
   connected: boolean;
@@ -193,6 +200,7 @@ export interface UseAIChatPanelProps {
  */
 export function UseAIChatPanel({
   onSendMessage,
+  onAbort,
   messages,
   loading,
   connected,
@@ -1245,34 +1253,73 @@ export function UseAIChatPanel({
                 )}
               </div>
 
-              {/* Right side - send button */}
-              <button
-                data-testid="chat-send-button"
-                className="chat-send-button"
-                onClick={handleSend}
-                disabled={!connected || loading || pendingApprovals.length > 0 || (!input.trim() && attachments.length === 0)}
-                style={{
-                  padding: '6px',
-                  background: connected && !loading && pendingApprovals.length === 0 && (input.trim() || attachments.length > 0)
-                    ? theme.primaryGradient
-                    : theme.buttonDisabledBackground,
-                  color: connected && !loading && pendingApprovals.length === 0 && (input.trim() || attachments.length > 0) ? 'white' : theme.secondaryTextColor,
-                  border: 'none',
-                  borderRadius: '50%',
-                  cursor: connected && !loading && pendingApprovals.length === 0 && (input.trim() || attachments.length > 0) ? 'pointer' : 'not-allowed',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  width: '32px',
-                  height: '32px',
-                  transition: 'all 0.2s',
-                }}
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="12" y1="19" x2="12" y2="5" />
-                  <polyline points="5 12 12 5 19 12" />
-                </svg>
-              </button>
+              {/* Right side - send / stop button.
+                  While loading and a stop handler is wired up, swap in a stop
+                  button so the user can interrupt streaming. Disabled when a
+                  tool is currently executing — that branch can't be safely
+                  cancelled in Phase 1 because the tool's side effects have
+                  already run on the client. */}
+              {(() => {
+                const canAbort = loading && !!onAbort && !executingTool;
+                const canSend = connected && !loading && pendingApprovals.length === 0 && (input.trim() || attachments.length > 0);
+                if (loading && onAbort) {
+                  return (
+                    <button
+                      data-testid="chat-stop-button"
+                      className="chat-stop-button"
+                      onClick={onAbort}
+                      disabled={!canAbort}
+                      title={canAbort ? 'Stop generating' : 'Cannot stop while a tool is running'}
+                      aria-label="Stop generating"
+                      style={{
+                        padding: '6px',
+                        background: canAbort ? theme.primaryGradient : theme.buttonDisabledBackground,
+                        color: canAbort ? 'white' : theme.secondaryTextColor,
+                        border: 'none',
+                        borderRadius: '50%',
+                        cursor: canAbort ? 'pointer' : 'not-allowed',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: '32px',
+                        height: '32px',
+                        transition: 'all 0.2s',
+                      }}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                        <rect x="6" y="6" width="12" height="12" rx="2" />
+                      </svg>
+                    </button>
+                  );
+                }
+                return (
+                  <button
+                    data-testid="chat-send-button"
+                    className="chat-send-button"
+                    onClick={handleSend}
+                    disabled={!canSend}
+                    style={{
+                      padding: '6px',
+                      background: canSend ? theme.primaryGradient : theme.buttonDisabledBackground,
+                      color: canSend ? 'white' : theme.secondaryTextColor,
+                      border: 'none',
+                      borderRadius: '50%',
+                      cursor: canSend ? 'pointer' : 'not-allowed',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: '32px',
+                      height: '32px',
+                      transition: 'all 0.2s',
+                    }}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="12" y1="19" x2="12" y2="5" />
+                      <polyline points="5 12 12 5 19 12" />
+                    </svg>
+                  </button>
+                );
+              })()}
             </div>
           </div>
         )}

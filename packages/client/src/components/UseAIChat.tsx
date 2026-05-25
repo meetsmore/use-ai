@@ -19,6 +19,11 @@ export interface ChatUIContextValue {
   loading: boolean;
   /** Send a message with optional file attachments */
   sendMessage: (message: string, attachments?: FileAttachment[]) => Promise<void>;
+  /**
+   * Aborts the in-flight run, if any. Persists whatever was streamed so far
+   * so the chat history reflects the partial response.
+   */
+  abortRun: () => void;
   /** Current messages in the conversation */
   messages: PersistedMessage[];
   /** Currently streaming text from assistant (real-time updates) */
@@ -214,6 +219,7 @@ export function UseAIChat({ floating = false, submitMode }: UseAIChatProps) {
     pendingApprovals: ctx.tools.pending.tools,
     onApproveToolCall: ctx.tools.pending.tools.length > 0 ? ctx.tools.pending.approveAll : undefined,
     onRejectToolCall: ctx.tools.pending.tools.length > 0 ? ctx.tools.pending.rejectAll : undefined,
+    onAbort: ctx.abortRun,
   };
 
   if (floating) {
