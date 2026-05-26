@@ -1,0 +1,24 @@
+packages/client/src/hooks/useServerEvents.ts
+  s_a00a06bfd35301::t_9fbbdcebc0f222 129-140,142-161,164-165,167,169,172,174-187
+  s_a00a06bfd35301::t_f4bd952784f5f2 278-307
+packages/client/src/client.ts
+  s_a00a06bfd35301::t_8519ea9ef9f881 542-544,546-550,552-554,557-563,565,570,590-592,600-604
+packages/client/src/client.test.ts
+  s_a00a06bfd35301::t_016acf042593b1 625-671
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.1",
+  "base_commit_sha": "996ba5fe440f96d073262d288ba0eb4baec142ed",
+  "prompts": {},
+  "sessions": {
+    "s_a00a06bfd35301": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "79e587c8-b33a-4e54-ad2d-9b8351bbf2ec",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>"
+    }
+  }
+}
