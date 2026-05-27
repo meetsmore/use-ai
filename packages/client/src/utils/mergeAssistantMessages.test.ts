@@ -167,4 +167,31 @@ describe('mergeAssistantMessagesForDisplay', () => {
     ]);
     expect(result[1].reasoningParts).toBeUndefined();
   });
+
+  it('keeps an info notice standalone after a tool-call step (does not merge or leak displayMode)', () => {
+    const result = mergeAssistantMessagesForDisplay([
+      msg({ id: '1', role: 'user', content: 'Wait 5s' }),
+      msg({ id: '2', role: 'assistant', content: 'Let me run the wait tool.', toolCalls: [tc('tc1', 'wait')] }),
+      msg({ id: '3', role: 'tool', content: '{"aborted":true}', toolCallId: 'tc1' }),
+      msg({ id: '4', role: 'assistant', content: 'Generation stopped.', displayMode: 'info' }),
+    ]);
+    // user, merged partial (from the tool-call step), standalone info notice
+    expect(result).toHaveLength(3);
+    expect(result[1].content).toBe('Let me run the wait tool.');
+    expect(result[1].displayMode).toBeUndefined();
+    expect(result[2].content).toBe('Generation stopped.');
+    expect(result[2].displayMode).toBe('info');
+  });
+
+  it('keeps an info notice standalone after a plain text reply', () => {
+    const result = mergeAssistantMessagesForDisplay([
+      msg({ id: '1', role: 'user', content: 'Hi' }),
+      msg({ id: '2', role: 'assistant', content: 'Partial repl' }),
+      msg({ id: '3', role: 'assistant', content: 'Generation stopped.', displayMode: 'info' }),
+    ]);
+    expect(result).toHaveLength(3);
+    expect(result[1].content).toBe('Partial repl');
+    expect(result[1].displayMode).toBeUndefined();
+    expect(result[2].displayMode).toBe('info');
+  });
 });

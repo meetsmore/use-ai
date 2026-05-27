@@ -840,7 +840,38 @@ export function UseAIChatPanel({
           </div>
         )}
 
-        {displayMessages.map((message) => (
+        {displayMessages.map((message) => {
+          // Info notices (e.g. the abort "generation stopped" bubble) are
+          // display-only system messages. Render a compact, centered pill —
+          // no reasoning dropdown, markdown, feedback, or hover affordances.
+          if (message.displayMode === 'info') {
+            return (
+              <div
+                key={message.id}
+                data-testid="chat-message-info"
+                className="chat-message chat-message-info"
+                style={{ display: 'flex', justifyContent: 'center', padding: '2px 0' }}
+              >
+                <div
+                  style={{
+                    maxWidth: '80%',
+                    padding: '6px 12px',
+                    borderRadius: '12px',
+                    background: theme.assistantMessageBackground,
+                    color: theme.secondaryTextColor,
+                    fontSize: '12px',
+                    lineHeight: '1.4',
+                    textAlign: 'center',
+                    wordWrap: 'break-word',
+                  }}
+                >
+                  {getDisplayTextFromContent(message.content)}
+                </div>
+              </div>
+            );
+          }
+
+          return (
           <div
             key={message.id}
             data-testid={`chat-message-${message.role}`}
@@ -1008,7 +1039,8 @@ export function UseAIChatPanel({
               })}
             </div>
           </div>
-        ))}
+          );
+        })}
 
         {loading && (
           <div
@@ -1260,7 +1292,7 @@ export function UseAIChatPanel({
                   cancelled in Phase 1 because the tool's side effects have
                   already run on the client. */}
               {(() => {
-                const canAbort = loading && !!onAbort && !executingTool;
+                const canAbort = loading && !!onAbort
                 const canSend = connected && !loading && pendingApprovals.length === 0 && (input.trim() || attachments.length > 0);
                 if (loading && onAbort) {
                   return (
@@ -1273,8 +1305,8 @@ export function UseAIChatPanel({
                       aria-label="Stop generating"
                       style={{
                         padding: '6px',
-                        background: canAbort ? theme.primaryGradient : theme.buttonDisabledBackground,
-                        color: canAbort ? 'white' : theme.secondaryTextColor,
+                        background: canAbort ? theme.stopButtonBackground : theme.buttonDisabledBackground,
+                        color: theme.secondaryTextColor,
                         border: 'none',
                         borderRadius: '50%',
                         cursor: canAbort ? 'pointer' : 'not-allowed',

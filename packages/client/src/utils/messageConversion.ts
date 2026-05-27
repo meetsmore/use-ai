@@ -6,9 +6,14 @@ import { getTextFromContent } from './messageContent';
  * Transforms persisted messages to AG-UI message format for loading into client.
  * Preserves toolCalls on assistant messages and toolCallId on tool messages
  * so the server can reconstruct valid API messages.
+ *
+ * `info` messages (e.g. the "generation stopped" notice) are display-only and
+ * dropped here so they never re-enter the AI context on reload/reconnect.
  */
 export function transformMessagesToClientFormat(persistedMessages: PersistedMessage[]): AGUIMessage[] {
-  return persistedMessages.map((msg): AGUIMessage => {
+  return persistedMessages
+    .filter((msg) => msg.displayMode !== 'info')
+    .map((msg): AGUIMessage => {
     switch (msg.role) {
       case 'tool':
         return {

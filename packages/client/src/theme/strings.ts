@@ -101,10 +101,14 @@ export const defaultStrings = {
     RATE_LIMITED: 'Too many requests. Please wait a moment before trying again.',
     /** Error when the connection was lost while a response was being generated */
     CONNECTION_LOST: 'The connection was lost. Please send your message again.',
-    /** Shown when the user aborted generation before it completed */
-    ABORTED: 'Generation stopped.',
     /** Error for unknown/unexpected errors */
     UNKNOWN_ERROR: 'An unexpected error occurred. Please try again.',
+  },
+
+  // Non-error notices shown as system-style bubbles
+  notices: {
+    /** Shown as a separate bubble after the user aborts generation */
+    aborted: 'Generation stopped. You can continue the conversation.',
   },
 
   // Thinking/reasoning display

@@ -201,6 +201,12 @@ export class UseAIClient {
       this._pendingToolResults = [];
       this._currentReasoningBlocks = [];
       this._currentReasoningBlockText = '';
+      // Documented invariant (see finalizeRun): the persistence helper reads
+      // _currentMessageContent until the next run starts. A tool-only step
+      // never emits TEXT_MESSAGE_START (which is what otherwise resets this),
+      // so clear it here to stop a prior run's text from leaking into an
+      // aborted tool-call step's persisted output.
+      this._currentMessageContent = '';
     }
 
     // Handle text message streaming
@@ -323,50 +329,7 @@ export class UseAIClient {
 
     // Handle run completion - flush remaining assistant message
     else if (event.type === EventType.RUN_FINISHED) {
-      if (this._currentAssistantMessage) {
-        const reasoningParts = this._currentReasoningBlocks.length > 0 ? [...this._currentReasoningBlocks] : undefined;
-
-        if (this._currentAssistantToolCalls.length > 0) {
-          // Tool calls not yet flushed by STEP_FINISHED (backward compat:
-          // server didn't emit step events, or single-step with tool calls)
-          const toolCallMessage: Message & { reasoningParts?: ReasoningPart[] } = {
-            id: uuidv4(),
-            role: 'assistant',
-            content: '',
-            toolCalls: this._currentAssistantToolCalls,
-            ...(reasoningParts ? { reasoningParts } : {}),
-          };
-          this._messages.push(toolCallMessage);
-          this._messages.push(...this._pendingToolResults);
-
-          const textMessage: Message = {
-            id: this._currentAssistantMessage.id!,
-            role: 'assistant',
-            content: this._currentAssistantMessage.content || '',
-          };
-          this._messages.push(textMessage);
-        } else {
-          // No remaining tool calls - just the final text response
-          const assistantMessage: Message & { reasoningParts?: ReasoningPart[] } = {
-            id: this._currentAssistantMessage.id!,
-            role: 'assistant',
-            content: this._currentAssistantMessage.content || '',
-            ...(reasoningParts ? { reasoningParts } : {}),
-          };
-          this._messages.push(assistantMessage);
-        }
-
-        // Reset for next message
-        // Note: _currentReasoningBlocks is NOT cleared here — external event handlers
-        // (useServerEvents) read currentReasoningBlocks at RUN_FINISHED to persist
-        // reasoningParts to localStorage. Clearing happens at the next RUN_STARTED.
-        this._currentAssistantMessage = null;
-        this._currentAssistantToolCalls = [];
-        this._pendingToolResults = [];
-        // Mid-stream-truncated reasoning never gets REASONING_MESSAGE_END,
-        // so the partial buffer would otherwise leak into the next run.
-        this._currentReasoningBlockText = '';
-      }
+      this.finalizeRun({ aborted: false });
     }
 
     // Clear the in-flight run id once the run terminates (either way).
@@ -539,38 +502,87 @@ export class UseAIClient {
   }
 
   /**
-   * Flushes any unflushed mid-run state into `_messages` so conversation
-   * history stays valid after a user-initiated abort.
+   * Flushes the final in-progress step into `_messages` when a run terminates.
    *
-   * Specifically:
-   * - If the current step has completed tool_use blocks that never got a
-   *   matching tool_result (because the user aborted before client-side
-   *   execution finished), push the assistant message with those tool_use
-   *   blocks plus a synthetic "aborted" tool_result for each unanswered one.
-   *   Without this, the next sendPrompt would send a tool_use without its
-   *   pair and the Anthropic API would reject it.
-   * - If text was streaming when aborted (no TEXT_MESSAGE_END), push the
-   *   partial text as a final assistant message so the AI sees it next turn.
+   * Only two terminations reach here. Truncation (maxOutputTokens / finish
+   * reason 'length') and tool-execution errors never do — the server absorbs
+   * them: truncation continues via a fallback step and ends as a normal
+   * RUN_FINISHED, and tool errors come back as tool_results that keep the run
+   * going. So the dispatch is binary:
+   *  - `aborted: false` (RUN_FINISHED): every tool-call step was already flushed
+   *    at STEP_FINISHED, so the in-progress step is always text-only.
+   *  - `aborted: true` (RUN_ERROR / ABORTED): the run may have been cut
+   *    mid-tool-call or mid-reasoning, so extra repair is needed.
    *
-   * Idempotent: clears the per-run scratch buffers when done.
+   * After this returns, `currentMessageContent` and `currentReasoningBlocks`
+   * remain readable for the persistence helper. The next RUN_STARTED clears them.
    */
-  flushPartialStateForAbort(): void {
-    // Case 1: Mid-step with completed tool calls. We must close the tool_use
-    // blocks with matching tool_result entries to keep the API happy.
-    if (this._currentAssistantMessage && this._currentAssistantToolCalls.length > 0) {
-      const reasoningParts = this._currentReasoningBlocks.length > 0
+  finalizeRun(opts: { aborted: boolean }): void {
+    if (opts.aborted) {
+      this.finalizeAbortedRun();
+    } else {
+      this.finalizeCompletedRun();
+    }
+  }
+
+  /**
+   * Normal completion (RUN_FINISHED). The in-progress step is text-only —
+   * tool-call steps were already flushed at STEP_FINISHED — so just push the
+   * trailing assistant text with its reasoning.
+   */
+  private finalizeCompletedRun(): void {
+    // Mid-stream-truncated reasoning never gets REASONING_MESSAGE_END, so clear
+    // the partial buffer to keep it from leaking into the next run.
+    this._currentReasoningBlockText = '';
+
+    if (!this._currentAssistantMessage) return;
+
+    if (this._currentMessageContent) {
+      const stepReasoning = this._currentReasoningBlocks.length > 0
         ? [...this._currentReasoningBlocks]
         : undefined;
-      const assistantMsg: Message & { reasoningParts?: ReasoningPart[] } = {
+      this._messages.push({
         id: this._currentAssistantMessage.id || uuidv4(),
         role: 'assistant',
-        content: this._currentAssistantMessage.content || '',
-        toolCalls: [...this._currentAssistantToolCalls],
-        ...(reasoningParts ? { reasoningParts } : {}),
-      };
-      this._messages.push(assistantMsg);
+        content: this._currentMessageContent,
+        ...(stepReasoning ? { reasoningParts: stepReasoning } : {}),
+      });
+    }
 
-      // Existing client-side tool results (executed before the abort hit).
+    this._currentAssistantMessage = null;
+    this._currentAssistantToolCalls = [];
+    this._pendingToolResults = [];
+  }
+
+  /**
+   * User-initiated abort (RUN_ERROR / ABORTED).
+   *
+   * Drops the in-progress step's reasoning blocks. A block gets its encrypted
+   * signature on REASONING_ENCRYPTED_VALUE, which arrives after
+   * REASONING_MESSAGE_END — so a mid-stream abort can leave signature-less
+   * blocks. Persisting those would corrupt the next turn. Reasoning from
+   * already-completed prior steps lives on STEP_FINISHED-flushed assistant
+   * messages and is untouched. Aborted-step messages therefore never carry
+   * reasoningParts.
+   */
+  private finalizeAbortedRun(): void {
+    this._currentReasoningBlocks = [];
+    this._currentReasoningBlockText = '';
+
+    if (!this._currentAssistantMessage) return;
+
+    // Aborted mid-tool-call: emit a single assistant with partial text +
+    // toolCalls, flush received tool_results, and synthesize `{ aborted: true }`
+    // results for any tool_use blocks that never got a client response — else
+    // the next sendPrompt produces an invalid Anthropic API payload.
+    if (this._currentAssistantToolCalls.length > 0) {
+      this._messages.push({
+        id: this._currentAssistantMessage.id || uuidv4(),
+        role: 'assistant',
+        content: this._currentMessageContent || '',
+        toolCalls: [...this._currentAssistantToolCalls],
+      });
+
       this._messages.push(...this._pendingToolResults);
 
       const respondedIds = new Set(
@@ -578,36 +590,26 @@ export class UseAIClient {
           .map(m => ('toolCallId' in m ? m.toolCallId : undefined))
           .filter((id): id is string => typeof id === 'string')
       );
-      for (const toolCall of this._currentAssistantToolCalls) {
-        if (!respondedIds.has(toolCall.id)) {
+      for (const tc of this._currentAssistantToolCalls) {
+        if (!respondedIds.has(tc.id)) {
           this._messages.push({
             id: uuidv4(),
             role: 'tool',
             content: JSON.stringify({ aborted: true, reason: 'Cancelled by user before tool finished' }),
-            toolCallId: toolCall.id,
+            toolCallId: tc.id,
           });
         }
       }
 
-      // Reset step state. We deliberately do NOT also push the partial text
-      // below in this branch — the text belongs to this same flushed step
-      // and is already on `assistantMsg.content`.
-      this._currentAssistantMessage = null;
-      this._currentAssistantToolCalls = [];
-      this._pendingToolResults = [];
-      this._currentReasoningBlocks = [];
-      this._currentReasoningBlockText = '';
+      // The partial text now lives on the tool-call assistant above; clear it
+      // so the persistence helper falls back to the ABORTED string instead of
+      // saving the text twice.
       this._currentMessageContent = '';
-      return;
-    }
-
-    // Case 2: Plain mid-text abort. Preserve the partial assistant text in
-    // the in-memory history so a follow-up sendPrompt in the same session
-    // includes it. extractTurnMessages skips text-only assistants, so this
-    // does not duplicate the message saved by saveAIResponse.
-    if (this._currentMessageContent) {
+    } else if (this._currentMessageContent) {
+      // Aborted mid-text (no tools in flight): push the partial text. Leave
+      // `_currentMessageContent` populated so the persistence helper can read it.
       this._messages.push({
-        id: this._currentAssistantMessage?.id || uuidv4(),
+        id: this._currentAssistantMessage.id || uuidv4(),
         role: 'assistant',
         content: this._currentMessageContent,
       });
@@ -616,9 +618,6 @@ export class UseAIClient {
     this._currentAssistantMessage = null;
     this._currentAssistantToolCalls = [];
     this._pendingToolResults = [];
-    this._currentReasoningBlocks = [];
-    this._currentReasoningBlockText = '';
-    this._currentMessageContent = '';
   }
 
   /**

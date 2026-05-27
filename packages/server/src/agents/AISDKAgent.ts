@@ -731,6 +731,26 @@ export class AISDKAgent implements Agent {
         this.processStreamChunk(chunk, ctx, stepCtx, events);
       }
 
+      // Check if stream was aborted BEFORE emitting STEP_FINISHED.
+      // When abort lands mid-tool-call, the fullStream loop exits cleanly via
+      // an 'abort' chunk (not a throw), so control reaches here normally.
+      // Emitting STEP_FINISHED for an aborted step makes the client flush its
+      // assistant(toolCalls) message and clear its in-flight tool-call tracking
+      // while the client tool is still running — so the slow tool's result
+      // never lands and the client's abort finalizer can no longer synthesize
+      // the missing tool_result, leaving an orphaned tool_use that breaks the
+      // next request. An aborted step is not "finished": skip STEP_FINISHED and
+      // let finalizeAbortedRun synthesize the {aborted:true} results instead.
+      if (ctx.session.abortController?.signal.aborted) {
+        span.endWithError('Run aborted by user');
+        events.emit<RunErrorEvent>({
+          type: EventType.RUN_ERROR,
+          message: ErrorCode.ABORTED,
+          timestamp: Date.now(),
+        });
+        throw new AbortError();
+      }
+
       // AI SDK emits `finish-step` BEFORE `finish`, so stepFinishReason
       // is only set after the chunk loop exits. Closing the text stream
       // and emitting STEP_FINISHED must happen here — not in the
@@ -743,17 +763,6 @@ export class AISDKAgent implements Agent {
         stepName: `step-${ctx.currentStepNumber - 1}`,
         timestamp: Date.now(),
       });
-
-      // Check if stream was aborted
-      if (ctx.session.abortController?.signal.aborted) {
-        span.endWithError('Run aborted by user');
-        events.emit<RunErrorEvent>({
-          type: EventType.RUN_ERROR,
-          message: ErrorCode.ABORTED,
-          timestamp: Date.now(),
-        });
-        throw new AbortError();
-      }
 
       // Get the response for this step
       const response = await stream.response;
@@ -1369,10 +1378,10 @@ export class AISDKAgent implements Agent {
       return { success: false, error: 'Run aborted', conversationHistory: ctx.messages };
     }
 
-    // If the session was aborted while another error was bubbling up
-    // (e.g. tool-wait promise rejected with "Run aborted"), classify this as
-    // an abort so the client can persist partial state instead of showing
-    // a generic error.
+    // Normal aborts throw AbortError and are handled above. This is a guard for
+    // when a non-AbortError is thrown while the abort signal is set (e.g. a
+    // model/tool error racing with the abort): report it as ABORTED so the
+    // client persists partial state instead of seeing a generic error.
     if (ctx.session.abortController?.signal.aborted) {
       span.endWithError('Run aborted by user');
       events.emit<RunErrorEvent>({

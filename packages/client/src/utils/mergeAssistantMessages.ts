@@ -14,6 +14,9 @@ import { getTextFromContent } from './messageContent';
  *   into the final text-only assistant message of the same turn
  * - Reasoning parts from all steps are collected into the merged message
  * - A user message marks the boundary between turns
+ * - `info` notices (e.g. the abort bubble) are standalone system messages: they
+ *   are never merged into assistant turn content, and they flush any pending
+ *   text into its own message first so it doesn't fold into the notice.
  */
 export function mergeAssistantMessagesForDisplay(messages: PersistedMessage[]): PersistedMessage[] {
   const result: PersistedMessage[] = [];
@@ -21,8 +24,31 @@ export function mergeAssistantMessagesForDisplay(messages: PersistedMessage[]): 
   let pendingIds: string[] = [];
   let pendingReasoningParts: ReasoningPart[] = [];
 
+  const flushPending = () => {
+    if (pendingTexts.length > 0 || pendingReasoningParts.length > 0) {
+      result.push({
+        id: `merged-${pendingIds.join('-')}`,
+        role: 'assistant',
+        content: pendingTexts.join('\n\n'),
+        createdAt: new Date(),
+        ...(pendingReasoningParts.length > 0 ? { reasoningParts: pendingReasoningParts } : {}),
+      });
+      pendingTexts = [];
+      pendingIds = [];
+      pendingReasoningParts = [];
+    }
+  };
+
   for (const msg of messages) {
     if (msg.role === 'tool') {
+      continue;
+    }
+
+    if (msg.displayMode === 'info') {
+      // System notice — flush the in-progress assistant text as its own
+      // message, then keep the notice standalone (no merge, no displayMode leak).
+      flushPending();
+      result.push(msg);
       continue;
     }
 
@@ -58,32 +84,13 @@ export function mergeAssistantMessagesForDisplay(messages: PersistedMessage[]): 
       }
     } else {
       // User message — flush any pending text and reset for next turn
-      if (pendingTexts.length > 0 || pendingReasoningParts.length > 0) {
-        result.push({
-          id: `merged-${pendingIds.join('-')}`,
-          role: 'assistant',
-          content: pendingTexts.join('\n\n'),
-          createdAt: new Date(),
-          ...(pendingReasoningParts.length > 0 ? { reasoningParts: pendingReasoningParts } : {}),
-        });
-        pendingTexts = [];
-        pendingIds = [];
-        pendingReasoningParts = [];
-      }
+      flushPending();
       result.push(msg);
     }
   }
 
   // Handle trailing pending text (e.g., streaming step that hasn't finished)
-  if (pendingTexts.length > 0 || pendingReasoningParts.length > 0) {
-    result.push({
-      id: `merged-${pendingIds.join('-')}`,
-      role: 'assistant',
-      content: pendingTexts.join('\n\n'),
-      createdAt: new Date(),
-      ...(pendingReasoningParts.length > 0 ? { reasoningParts: pendingReasoningParts } : {}),
-    });
-  }
+  flushPending();
 
   return result;
 }

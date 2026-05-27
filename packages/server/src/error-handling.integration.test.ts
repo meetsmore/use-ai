@@ -123,7 +123,7 @@ describe('Error Handling', () => {
     socket.disconnect();
   });
 
-  test('Server supports aborting in-flight agent executions', async () => {
+  test('user stops generation while a tool call is pending → RUN_ERROR(ABORTED) with no STEP_FINISHED for the aborted step', async () => {
     // Create a custom server with slow tool execution
     const abortPort = 9302;
     const abortMockModel = createSequentialMockModel([
@@ -156,6 +156,10 @@ describe('Error Handling', () => {
     const runId = uuidv4();
     const threadId = uuidv4();
 
+    // Collect every event up to the terminal RUN_ERROR so we can assert both
+    // the outcome and that STEP_FINISHED was not emitted for the aborted step.
+    const eventsUntilError = collectEventsUntil(socket, EventType.RUN_ERROR);
+
     // Set up event listener before sending run_agent
     const toolCallPromise = new Promise<void>((resolve) => {
       socket.on('event', (event: any) => {
@@ -178,19 +182,104 @@ describe('Error Handling', () => {
       },
     });
 
-    // Wait for tool call to be pending on server
+    // Wait for the tool call to be pending, let it "execute", then stop without
+    // ever sending a tool result.
     await toolCallPromise;
-
-    // Send abort before sending tool result
+    await new Promise((r) => setTimeout(r, 1000));
     socket.emit('message', {
       type: 'abort_run',
       data: { runId },
     });
 
-    // Verify: server emits RUN_ERROR with the ABORTED code so the client
-    // can distinguish a user-initiated stop from a real error.
-    const errorEvent = await waitForEventType(socket, EventType.RUN_ERROR);
+    const events = await eventsUntilError;
+    const errorEvent = events[events.length - 1] as any;
     expect(errorEvent.type).toBe(EventType.RUN_ERROR);
+    expect(errorEvent.message).toBe('ABORTED');
+
+    // The aborted step must NOT emit STEP_FINISHED. If it did, the client would
+    // flush its assistant(toolCalls) message and clear its in-flight tool-call
+    // tracking before the tool returns, so its abort finalizer could no longer
+    // backfill the missing tool_result — leaving an orphaned tool_use that
+    // breaks the next request.
+    expect(events.some((e) => e.type === EventType.STEP_FINISHED)).toBe(false);
+
+    socket.disconnect();
+    abortServer.close();
+  });
+
+  test('user stops generation while the assistant is streaming text (no tool call) → server emits RUN_ERROR(ABORTED)', async () => {
+    // Exercises the OTHER abort path: the post-stream signal check in
+    // executeStepLoop. No tool call is pending, so the abort is detected after
+    // the text stream ends rather than via a rejected tool wait.
+    const abortPort = 9304;
+
+    // Streams a partial text answer, then holds the stream open until the run
+    // is aborted, mirroring a user pressing stop mid-reply.
+    const textStreamModel = createMockModel(async (params?: unknown) => {
+      const { abortSignal } = (params ?? {}) as { abortSignal?: AbortSignal };
+      const stream = new ReadableStream({
+        start(controller) {
+          controller.enqueue({ type: 'text-start', id: 'text-1' });
+          controller.enqueue({ type: 'text-delta', id: 'text-1', delta: 'Partial answer before stop' });
+          const finish = () => {
+            controller.enqueue({ type: 'text-end', id: 'text-1' });
+            controller.enqueue({
+              type: 'finish',
+              finishReason: 'stop',
+              usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
+            });
+            controller.close();
+          };
+          if (abortSignal?.aborted) finish();
+          else abortSignal?.addEventListener('abort', finish, { once: true });
+        },
+      });
+      return {
+        stream,
+        response: {
+          id: 'response-1',
+          timestamp: new Date(),
+          modelId: 'mock-model',
+          headers: {},
+          messages: [{ role: 'assistant', content: 'Partial answer before stop' }],
+        },
+      };
+    });
+
+    const abortServer = new UseAIServer({
+      port: abortPort,
+      agents: { test: new AISDKAgent({ model: textStreamModel }) },
+      defaultAgent: 'test',
+    });
+    cleanup.trackServer(abortServer);
+
+    const socket = await cleanup.createTestClient(abortPort);
+    const runId = uuidv4();
+
+    // Stop as soon as the first text delta reaches the client.
+    const streamingStarted = new Promise<void>((resolve) => {
+      socket.on('event', (event: any) => {
+        if (event.type === EventType.TEXT_MESSAGE_CONTENT) resolve();
+      });
+    });
+
+    socket.emit('message', {
+      type: 'run_agent',
+      data: {
+        threadId: uuidv4(),
+        runId,
+        messages: [{ id: uuidv4(), role: 'user', content: 'tell me a story' }],
+        tools: [],
+        state: null,
+        context: [],
+        forwardedProps: {},
+      },
+    });
+
+    await streamingStarted;
+    socket.emit('message', { type: 'abort_run', data: { runId } });
+
+    const errorEvent = await waitForEventType(socket, EventType.RUN_ERROR);
     expect((errorEvent as any).message).toBe('ABORTED');
 
     socket.disconnect();

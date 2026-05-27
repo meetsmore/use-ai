@@ -382,6 +382,10 @@ describe('UseAIClient', () => {
       // Client executes tool and sends result
       client.sendToolResponse('toolu_123', { success: true, message: 'Todo added' });
 
+      // Server emits STEP_FINISHED after the tool-call step (the real AISDKAgent
+      // emits one per step), which flushes assistant(toolCalls) + tool_result.
+      emitSocketEvent('event', { type: 'STEP_FINISHED' });
+
       // Server sends final text response
       emitSocketEvent('event', { type: 'TEXT_MESSAGE_START', messageId: 'msg-1' });
       emitSocketEvent('event', { type: 'TEXT_MESSAGE_CONTENT', messageId: 'msg-1', delta: "I've added the todo!" });
@@ -444,6 +448,9 @@ describe('UseAIClient', () => {
         role: 'tool',
       });
 
+      // STEP_FINISHED flushes the tool-call step (assistant(toolCalls) + result).
+      emitSocketEvent('event', { type: 'STEP_FINISHED' });
+
       // Server sends final text response
       emitSocketEvent('event', { type: 'TEXT_MESSAGE_START', messageId: 'msg-1' });
       emitSocketEvent('event', { type: 'TEXT_MESSAGE_CONTENT', messageId: 'msg-1', delta: 'It is 15°C and cloudy in Tokyo.' });
@@ -483,6 +490,9 @@ describe('UseAIClient', () => {
         content: '{"success":true}',
         role: 'tool',
       });
+
+      // STEP_FINISHED flushes the tool-call step (assistant(toolCalls) + result).
+      emitSocketEvent('event', { type: 'STEP_FINISHED' });
 
       emitSocketEvent('event', { type: 'TEXT_MESSAGE_START', messageId: 'msg-1' });
       emitSocketEvent('event', { type: 'TEXT_MESSAGE_CONTENT', messageId: 'msg-1', delta: 'Done!' });
@@ -561,7 +571,7 @@ describe('UseAIClient', () => {
       expect(client.currentRunId).toBeNull();
     });
 
-    test('flushPartialStateForAbort synthesizes tool_results for unanswered tool_use blocks', () => {
+    test('stopping while a tool is still running backfills results for the unanswered tool calls', () => {
       const client = new UseAIClient('http://localhost:8081');
       client.connect();
       mockSocket.connected = true;
@@ -582,7 +592,7 @@ describe('UseAIClient', () => {
       // Only the first tool got a result before abort.
       client.sendToolResponse('tc1', { ok: 1 });
 
-      client.flushPartialStateForAbort();
+      client.finalizeRun({ aborted: true });
 
       const msgs = client.messages;
       // user + assistant(toolCalls) + tool(tc1) + tool(tc2-synthetic)
@@ -601,7 +611,74 @@ describe('UseAIClient', () => {
       expect(JSON.parse(synthetic!.content)).toMatchObject({ aborted: true });
     });
 
-    test('flushPartialStateForAbort preserves mid-stream partial text in _messages', () => {
+    test('stopping mid-TOOL_CALL_ARGS (before TOOL_CALL_END) leaves no orphaned tool_use in history', () => {
+      const client = new UseAIClient('http://localhost:8081');
+      client.connect();
+      mockSocket.connected = true;
+      emitSocketEvent('connect');
+
+      client.sendPrompt('Add a todo');
+
+      emitSocketEvent('event', { type: 'RUN_STARTED', threadId: 't', runId: 'r' });
+      emitSocketEvent('event', { type: 'TOOL_CALL_START', toolCallId: 'tc1', toolCallName: 'addTodo' });
+      // Partial args delta — TOOL_CALL_END never arrives before abort.
+      emitSocketEvent('event', { type: 'TOOL_CALL_ARGS', toolCallId: 'tc1', delta: '{"text":"buy' });
+
+      client.finalizeRun({ aborted: true });
+
+      const msgs = client.messages;
+      // Only the user message: the half-streamed tool_use has no TOOL_CALL_END so
+      // it never moved to _currentAssistantToolCalls. No orphaned tool_use block,
+      // no assistant message without a matching tool_result.
+      expect(msgs).toHaveLength(1);
+      expect(msgs[0].role).toBe('user');
+
+      const assistantWithToolCalls = msgs.filter(
+        m => m.role === 'assistant' && (m as Record<string, unknown>).toolCalls,
+      );
+      expect(assistantWithToolCalls).toHaveLength(0);
+
+      // No partial text was streamed.
+      expect(client.currentMessageContent).toBe('');
+
+      // finalizeAbortedRun clears in-progress reasoning blocks.
+      expect(client.currentReasoningBlocks).toEqual([]);
+
+    });
+
+    test('a tool-only aborted run does not leak the previous run\'s text', () => {
+      const client = new UseAIClient('http://localhost:8081');
+      client.connect();
+      mockSocket.connected = true;
+      emitSocketEvent('connect');
+
+      // Run 1: ends with a final text answer.
+      client.sendPrompt('list the tools');
+      emitSocketEvent('event', { type: 'RUN_STARTED', threadId: 't', runId: 'r1' });
+      emitSocketEvent('event', { type: 'TEXT_MESSAGE_START', messageId: 'm1' });
+      emitSocketEvent('event', { type: 'TEXT_MESSAGE_CONTENT', messageId: 'm1', delta: 'Here are the tools' });
+      emitSocketEvent('event', { type: 'TEXT_MESSAGE_END', messageId: 'm1' });
+      emitSocketEvent('event', { type: 'RUN_FINISHED', threadId: 't', runId: 'r1' });
+
+      // Run 2: tool-only step (no TEXT_MESSAGE_START), aborted mid-execution.
+      // RUN_STARTED must reset the leftover text so it is not persisted again.
+      client.sendPrompt('wait 5 seconds');
+      emitSocketEvent('event', { type: 'RUN_STARTED', threadId: 't', runId: 'r2' });
+      expect(client.currentMessageContent).toBe('');
+
+      emitSocketEvent('event', { type: 'TOOL_CALL_START', toolCallId: 'tc1', toolCallName: 'wait' });
+      emitSocketEvent('event', { type: 'TOOL_CALL_ARGS', toolCallId: 'tc1', delta: '{"seconds":5}' });
+      emitSocketEvent('event', { type: 'TOOL_CALL_END', toolCallId: 'tc1' });
+      client.finalizeRun({ aborted: true });
+
+      // No assistant message carries the run-1 text after run 2's abort.
+      const leaked = client.messages.filter(
+        m => m.role === 'assistant' && m.content === 'Here are the tools' && !(m as Record<string, unknown>).toolCalls,
+      );
+      expect(leaked).toHaveLength(1); // only the legitimate run-1 message
+    });
+
+    test('stopping while the assistant is streaming text keeps the partial text', () => {
       const client = new UseAIClient('http://localhost:8081');
       client.connect();
       mockSocket.connected = true;
@@ -614,12 +691,59 @@ describe('UseAIClient', () => {
       emitSocketEvent('event', { type: 'TEXT_MESSAGE_CONTENT', messageId: 'm', delta: 'Once upon a' });
       // Note: no TEXT_MESSAGE_END — mid-stream abort.
 
-      client.flushPartialStateForAbort();
+      client.finalizeRun({ aborted: true });
 
       const msgs = client.messages;
       expect(msgs).toHaveLength(2);
       expect(msgs[1].role).toBe('assistant');
       expect(msgs[1].content).toBe('Once upon a');
+    });
+
+    test('stopping while the assistant is reasoning drops the unfinished thinking but keeps earlier steps\' reasoning', () => {
+      const client = new UseAIClient('http://localhost:8081');
+      client.connect();
+      mockSocket.connected = true;
+      emitSocketEvent('connect');
+
+      client.sendPrompt('Do two things');
+
+      emitSocketEvent('event', { type: 'RUN_STARTED', threadId: 't', runId: 'r' });
+
+      // Step 1: complete reasoning + tool_use + STEP_FINISHED. Reasoning gets
+      // attached to the step-1 assistant message and survives the abort.
+      emitSocketEvent('event', { type: 'REASONING_MESSAGE_START', messageId: 'rm1' });
+      emitSocketEvent('event', { type: 'REASONING_MESSAGE_CONTENT', messageId: 'rm1', delta: 'think 1' });
+      emitSocketEvent('event', { type: 'REASONING_MESSAGE_END', messageId: 'rm1' });
+      emitSocketEvent('event', { type: 'REASONING_ENCRYPTED_VALUE', subtype: 'message', encryptedValue: 'sig1' });
+      emitSocketEvent('event', { type: 'TOOL_CALL_START', toolCallId: 'tc1', toolCallName: 'doThing' });
+      emitSocketEvent('event', { type: 'TOOL_CALL_ARGS', toolCallId: 'tc1', delta: '{}' });
+      emitSocketEvent('event', { type: 'TOOL_CALL_END', toolCallId: 'tc1' });
+      client.sendToolResponse('tc1', { ok: 1 });
+      emitSocketEvent('event', { type: 'STEP_FINISHED' });
+
+      // Step 2: reasoning streamed but END/encrypted not received before abort.
+      emitSocketEvent('event', { type: 'REASONING_MESSAGE_START', messageId: 'rm2' });
+      emitSocketEvent('event', { type: 'REASONING_MESSAGE_CONTENT', messageId: 'rm2', delta: 'think 2 partial' });
+      emitSocketEvent('event', { type: 'TEXT_MESSAGE_START', messageId: 'm2' });
+      emitSocketEvent('event', { type: 'TEXT_MESSAGE_CONTENT', messageId: 'm2', delta: 'About to' });
+
+      client.finalizeRun({ aborted: true });
+
+      // Step 1's reasoning is preserved on its flushed assistant message.
+      const step1Assistant = client.messages[1] as Record<string, unknown>;
+      expect(step1Assistant.role).toBe('assistant');
+      expect(Array.isArray(step1Assistant.reasoningParts)).toBe(true);
+      expect((step1Assistant.reasoningParts as Array<{ text: string }>)[0].text).toBe('think 1');
+
+      // Aborted step (step 2): partial text saved as a plain assistant
+      // message with no reasoningParts attached.
+      const last = client.messages[client.messages.length - 1] as Record<string, unknown>;
+      expect(last.role).toBe('assistant');
+      expect(last.content).toBe('About to');
+      expect(last.reasoningParts).toBeUndefined();
+
+      // The in-progress reasoning buffer is dropped.
+      expect(client.currentReasoningBlocks).toEqual([]);
     });
 
     test('simple text response (no tool calls) still works', () => {

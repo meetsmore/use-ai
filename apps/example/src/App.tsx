@@ -27,6 +27,7 @@ import MultimodalPage from './pages/MultimodalPage';
 import MultiAgentPage from './pages/MultiAgentPage';
 import BeforeRunAgentPage from './pages/BeforeRunAgentPage';
 import SubmitModePage from './pages/SubmitModePage';
+import AbortPage from './pages/AbortPage';
 import { NavigationAIProvider } from './providers/NavigationAIProvider';
 
 interface NavCategory {
@@ -85,6 +86,7 @@ const NAV_CATEGORIES: NavCategory[] = [
       { path: '/multi-agent', label: 'Multi-Agent' },
       { path: '/before-run-agent', label: 'beforeRunAgent Hook' },
       { path: '/workflow-demo', label: 'Workflow Integration' },
+      { path: '/abort', label: 'Abort' },
     ],
   },
   {
@@ -187,6 +189,7 @@ function AppContent() {
         <Route path="/multi-agent"><MultiAgentPage /></Route>
         <Route path="/before-run-agent"><BeforeRunAgentPage /></Route>
         <Route path="/workflow-demo"><WorkflowDemoPage /></Route>
+        <Route path="/abort"><AbortPage /></Route>
         <Route path="/error-tracing-test"><ErrorTracingTestPage /></Route>
       </main>
     </div>

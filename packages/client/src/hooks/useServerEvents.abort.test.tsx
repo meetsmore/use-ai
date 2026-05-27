@@ -29,7 +29,7 @@ function makeToolSystem(): UseToolSystemReturn {
 
 /**
  * Minimal stub of UseAIClient — only the surface `useServerEvents` touches
- * is implemented. `flushPartialStateForAbort` is exercised via a mock spy.
+ * is implemented. `finalizeRun` is exercised via a mock spy.
  */
 function makeClient(overrides: Partial<{
   messages: unknown[];
@@ -37,21 +37,31 @@ function makeClient(overrides: Partial<{
   currentReasoningBlocks: unknown[];
   currentRunId: string | null;
 }> = {}) {
-  const flushPartialStateForAbort = mock(() => {});
+  const finalizeRun = mock(() => {});
   const client = {
     messages: overrides.messages ?? [],
     currentMessageContent: overrides.currentMessageContent ?? '',
     currentReasoningBlocks: overrides.currentReasoningBlocks ?? [],
     currentRunId: overrides.currentRunId ?? null,
-    flushPartialStateForAbort,
+    finalizeRun,
     currentToolCalls: new Map(),
   } as unknown as UseAIClient;
-  return { client, flushPartialStateForAbort };
+  return { client, finalizeRun };
 }
 
 describe('useServerEvents — abort handling', () => {
-  it('on RUN_ERROR with ABORTED, flushes partial state and saves a non-error response with partial text', async () => {
-    const saveAIResponse = mock(async () => {});
+  it('stopping mid text-stream saves the partial reply plus a separate info bubble', async () => {
+    // Stateful mock mimicking saveAIResponse's real load-modify-save of the
+    // whole chat. The async gap between read and write means that if the two
+    // abort-path saves are fired concurrently (not awaited), the second clobbers
+    // the first — dropping the partial reply and only persisting the notice.
+    // Asserting `store` keeps both entries guards against that regression.
+    let store: Array<{ content: string; displayMode?: string }> = [];
+    const saveAIResponse = mock(async (content: string, displayMode?: string) => {
+      const snapshot = store;
+      await new Promise((r) => setTimeout(r, 0));
+      store = [...snapshot, { content, displayMode }];
+    });
     const { result } = renderHook(() =>
       useServerEvents({
         toolSystem: makeToolSystem(),
@@ -60,7 +70,7 @@ describe('useServerEvents — abort handling', () => {
       }),
     );
 
-    const { client, flushPartialStateForAbort } = makeClient({
+    const { client, finalizeRun } = makeClient({
       currentMessageContent: 'Hello, this is a partial respo',
       currentRunId: 'run-abc',
     });
@@ -81,20 +91,33 @@ describe('useServerEvents — abort handling', () => {
       } as never);
     });
 
-    expect(flushPartialStateForAbort).toHaveBeenCalledTimes(1);
-    expect(saveAIResponse).toHaveBeenCalledTimes(1);
+    expect(finalizeRun).toHaveBeenCalledTimes(1);
+    expect(saveAIResponse).toHaveBeenCalledTimes(2);
 
+    // First bubble: the partial reply (normal, non-error, carries context).
     const [content, displayMode, traceId, turnMessages] = saveAIResponse.mock.calls[0];
     expect(content).toBe('Hello, this is a partial respo');
     expect(displayMode).toBeUndefined(); // NOT 'error'
     expect(traceId).toBe('run-abc');
     expect(turnMessages).toEqual([]);
 
+    // Second bubble: the display-only interruption notice.
+    const [noticeContent, noticeMode] = saveAIResponse.mock.calls[1];
+    expect(noticeContent).toBe(defaultStrings.notices.aborted);
+    expect(noticeMode).toBe('info');
+
+    // Both saves must land in storage. If they raced (un-awaited), the notice
+    // save would clobber the partial-reply save and `store` would hold only one.
+    expect(store).toEqual([
+      { content: 'Hello, this is a partial respo', displayMode: undefined },
+      { content: defaultStrings.notices.aborted, displayMode: 'info' },
+    ]);
+
     expect(result.current.loading).toBe(false);
     expect(result.current.streamingText).toBe('');
   });
 
-  it('on RUN_ERROR with ABORTED and no partial content, still saves so synthetic tool_results land in storage', async () => {
+  it('stopping mid tool-execution saves the tool_use/tool_result pair to history so the next turn stays valid', async () => {
     const saveAIResponse = mock(async () => {});
     const { result } = renderHook(() =>
       useServerEvents({
@@ -114,7 +137,7 @@ describe('useServerEvents — abort handling', () => {
       },
       { id: 't1', role: 'tool' as const, content: '{"ok":true}', toolCallId: 'tc1' },
     ];
-    const { client, flushPartialStateForAbort } = makeClient({
+    const { client, finalizeRun } = makeClient({
       messages: [],
       currentMessageContent: '',
       currentRunId: 'run-xyz',
@@ -140,12 +163,15 @@ describe('useServerEvents — abort handling', () => {
       } as never);
     });
 
-    expect(flushPartialStateForAbort).toHaveBeenCalledTimes(1);
+    expect(finalizeRun).toHaveBeenCalledTimes(1);
     expect(saveAIResponse).toHaveBeenCalledTimes(1);
 
-    const [content, displayMode, , turnMessages] = saveAIResponse.mock.calls[0];
-    expect(content).toBe('');
-    expect(displayMode).toBeUndefined();
+    const [content, displayMode, traceId, turnMessages] = saveAIResponse.mock.calls[0];
+    // No streamed text → no placeholder text bubble. The info notice carries
+    // the turnMessages so the tool_use/tool_result pair still persists.
+    expect(content).toBe(defaultStrings.notices.aborted);
+    expect(displayMode).toBe('info');
+    expect(traceId).toBe('run-xyz');
     // turnMessages should contain the flushed tool_use + tool_result pair so
     // the next sendPrompt still ships a valid Anthropic API payload.
     expect(Array.isArray(turnMessages)).toBe(true);
@@ -162,7 +188,7 @@ describe('useServerEvents — abort handling', () => {
       }),
     );
 
-    const { client, flushPartialStateForAbort } = makeClient();
+    const { client, finalizeRun } = makeClient();
 
     await act(async () => {
       await result.current.handleServerEvent(client, {
@@ -172,7 +198,7 @@ describe('useServerEvents — abort handling', () => {
       } as never);
     });
 
-    expect(flushPartialStateForAbort).not.toHaveBeenCalled();
+    expect(finalizeRun).not.toHaveBeenCalled();
     expect(saveAIResponse).toHaveBeenCalledTimes(1);
     const [content, displayMode] = saveAIResponse.mock.calls[0];
     expect(content).toBe(defaultStrings.errors[ErrorCode.API_OVERLOADED]);

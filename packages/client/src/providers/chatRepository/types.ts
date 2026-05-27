@@ -11,7 +11,7 @@ export type ChatMetadata = Record<string, unknown>;
  * Display mode for chat messages.
  * Determines the visual styling of the message bubble.
  */
-export type MessageDisplayMode = 'default' | 'error';
+export type MessageDisplayMode = 'default' | 'error' | 'info';
 
 /**
  * Text content part for persisted messages.
