@@ -1,0 +1,22 @@
+packages/client/src/components/UseAIChatPanel.tsx
+  s_e5017fff262178::t_87dfa3591e4579 1309
+  s_e5017fff262178::t_dcb79023f5fe1a 1308
+packages/client/src/theme/theme.ts
+  s_e5017fff262178::t_f868b5c6fd0217 27-28
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "dbfdf9af981dfe6ac8686c3052d76043d50c6218",
+  "prompts": {},
+  "sessions": {
+    "s_e5017fff262178": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c29a2acc-3240-483a-9577-5d0476d86df4",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>"
+    }
+  }
+}
