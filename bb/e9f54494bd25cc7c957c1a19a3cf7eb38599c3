@@ -1,0 +1,34 @@
+apps/use-ai-server-app/package.json
+  s_74babbc33aef9a::t_5e34d5072e0437 30
+bun.lock
+  ai_agent 8,27,49,67,86,106,144,482,630
+apps/example/package.json
+  s_74babbc33aef9a::t_1dda07758aac37 35
+apps/example-nest-mcp-server/package.json
+  s_74babbc33aef9a::t_005335bbae5402 33
+packages/core/package.json
+  s_74babbc33aef9a::t_4d41edc9655afb 34
+package.json
+  s_74babbc33aef9a::t_989fbd71ddf71a 14
+  s_74babbc33aef9a::t_abda6118cbef17 38
+packages/server/package.json
+  s_74babbc33aef9a::t_468a42c1c2b726 53
+packages/client/package.json
+  s_74babbc33aef9a::t_f0d3db5235ca09 47
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "bbe9f54494bd25cc7c957c1a19a3cf7eb38599c3",
+  "prompts": {},
+  "sessions": {
+    "s_74babbc33aef9a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e0f89ff1-132a-4105-9e9b-d0402d325115",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>"
+    }
+  }
+}

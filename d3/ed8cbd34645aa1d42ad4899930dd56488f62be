@@ -1,0 +1,33 @@
+packages/client/src/client.ts
+  s_73a9653b324c25::t_375e760afa09ba 363-364
+packages/server/src/agents/AISDKAgent.ts
+  s_73a9653b324c25::t_f4819f7827d976 734-739
+  s_73a9653b324c25::t_d24bcf16a3db57 817
+  s_73a9653b324c25::t_f906e393dc66e3 122,124
+  s_73a9653b324c25::t_4c16c83c6f4dee 879-880
+  s_73a9653b324c25::t_cfff7dfbe25a30 143,145
+  s_73a9653b324c25::t_92dd21fd3caf64 956-964
+  s_73a9653b324c25::t_4e4539cf96fe13 829-831,838-845
+  s_73a9653b324c25::t_77667aeb94e48c 832-836
+  s_73a9653b324c25::t_41f6cedc4be88e 955
+  s_73a9653b324c25::t_913b3830702d0d 1096
+  s_73a9653b324c25::t_6b09a3a1516ccb 797-800
+  s_73a9653b324c25::t_0b8e3e9263a2ed 1242-1244
+  s_73a9653b324c25::t_f33c479c3523dd 1472
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "d3ed8cbd34645aa1d42ad4899930dd56488f62be",
+  "prompts": {},
+  "sessions": {
+    "s_73a9653b324c25": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e3bcb92f-5a6f-49f7-9899-7881fce6830b",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>"
+    }
+  }
+}

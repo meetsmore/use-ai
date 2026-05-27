@@ -1,0 +1,32 @@
+packages/server/src/agents/AISDKAgent.ts
+  s_4a23fe2aa522b0::t_f26af3e0dc4cfe 876-889
+  s_4a23fe2aa522b0::t_04a18b5418fbdf 1277-1281
+  s_4a23fe2aa522b0::t_dce7f03b88e549 1340-1343
+  s_4a23fe2aa522b0::t_39f249caa4e270 855-875
+  s_4a23fe2aa522b0::t_bcc745d1365dfb 584
+  s_4a23fe2aa522b0::t_f0592719078d82 992-1015
+  s_4a23fe2aa522b0::t_14cd3c56826623 128-134
+  s_4a23fe2aa522b0::t_efe8c9b4a4f2d0 756-759
+  s_4a23fe2aa522b0::t_6e24d6a9279e39 908-910,914-917
+  s_4a23fe2aa522b0::t_ac751d489388af 918
+  s_4a23fe2aa522b0::t_7a0376285a8498 931
+packages/server/src/agents/AISDKAgent.test.ts
+  s_4a23fe2aa522b0::t_6acb7d8589d2da 3439-3452
+  s_4a23fe2aa522b0::t_aeafdce97b67d4 3612-3618
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.9",
+  "base_commit_sha": "cdc2fb5ccb8d1422bbe16dadf9595adebde8e09a",
+  "prompts": {},
+  "sessions": {
+    "s_4a23fe2aa522b0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "147b962b-3971-4b07-8b73-af055177e13f",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>"
+    }
+  }
+}

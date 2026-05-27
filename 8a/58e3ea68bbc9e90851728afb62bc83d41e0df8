@@ -1,0 +1,19 @@
+packages/server/src/agents/AISDKAgent.ts
+  s_13ad2054695fad::t_47b63e71febc54 386
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.9",
+  "base_commit_sha": "8a58e3ea68bbc9e90851728afb62bc83d41e0df8",
+  "prompts": {},
+  "sessions": {
+    "s_13ad2054695fad": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9e98f873-4759-482d-a1bb-e5e24c3660c8",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>"
+    }
+  }
+}
