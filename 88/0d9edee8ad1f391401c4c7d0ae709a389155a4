@@ -1,0 +1,23 @@
+apps/example/src/App.tsx
+  s_70902b5bd2e9d2::t_863e666bbd2866 192
+  s_70902b5bd2e9d2::t_0aa7576e27bfce 30
+  s_70902b5bd2e9d2::t_c06504ed5adfaf 89
+apps/example/src/pages/AbortPage.tsx
+  s_70902b5bd2e9d2::t_94661c2168ae08 1-144
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "880d9edee8ad1f391401c4c7d0ae709a389155a4",
+  "prompts": {},
+  "sessions": {
+    "s_70902b5bd2e9d2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f74972d6-f724-4776-bbf4-3195f997fa56",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>"
+    }
+  }
+}
