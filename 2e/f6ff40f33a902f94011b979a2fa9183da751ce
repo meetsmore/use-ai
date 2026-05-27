@@ -1,0 +1,22 @@
+packages/server/src/agents/AISDKAgent.ts
+  s_bb629c1d1f5000::t_9fd5697f23c438 269
+packages/server/src/agents/anthropicCache.ts
+  s_bb629c1d1f5000::t_6eb9362ff20a70 73
+  s_bb629c1d1f5000::t_9242ec7c96d56e 4,6
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "2ef6ff40f33a902f94011b979a2fa9183da751ce",
+  "prompts": {},
+  "sessions": {
+    "s_bb629c1d1f5000": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c8cb677e-7741-482d-aa11-d0b2e035939e",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "yuma.ito <yuma.ito@meetsmore.com>"
+    }
+  }
+}
