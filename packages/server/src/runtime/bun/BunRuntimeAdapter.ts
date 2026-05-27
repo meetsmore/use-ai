@@ -16,6 +16,7 @@ export class BunRuntimeAdapter implements RuntimeAdapter {
     // Create Bun-native engine
     this.engine = new BunEngine({
       path: '/socket.io/',
+      maxHttpBufferSize: config.maxHttpBufferSize,
     });
 
     // Capture client IP for polling transport at engine connection time
