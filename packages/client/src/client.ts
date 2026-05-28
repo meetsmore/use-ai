@@ -324,6 +324,8 @@ export class UseAIClient {
         this._currentAssistantToolCalls = [];
         this._pendingToolResults = [];
         this._currentReasoningBlocks = [];
+        // Clear so an abort before the next TEXT_MESSAGE_START doesn't duplicate this step's text.
+        this._currentMessageContent = '';
       }
     }
 
