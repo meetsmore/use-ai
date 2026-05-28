@@ -24,6 +24,8 @@ export const defaultTheme = {
   activeBackground: '#f0f0ff',
   /** Disabled button background */
   buttonDisabledBackground: '#e5e7eb',
+  /** Stop (abort) button background — neutral so it doesn't read as a primary action */
+  stopButtonBackground: '#e5e7eb',
 
   // Text colors
   /** Primary text color */

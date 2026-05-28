@@ -15,14 +15,14 @@ import { EventType, ErrorCode, TOOL_APPROVAL_REQUEST } from '../types';
 import type { UseAIClient } from '../client';
 import type { UseToolSystemReturn } from './useToolSystem';
 import type { UseAIStrings } from '../theme';
-import type { PersistedMessage } from '../providers/chatRepository/types';
+import type { PersistedMessage, MessageDisplayMode } from '../providers/chatRepository/types';
 import { extractTurnMessages } from '../utils/messageConversion';
 
 export interface UseServerEventsOptions {
   /** Tool system for executing tools and looking up tool metadata */
   toolSystem: UseToolSystemReturn;
   /** Saves an AI response to chat storage */
-  saveAIResponse: (content: string, displayMode?: 'default' | 'error', traceId?: string, turnMessages?: PersistedMessage[], reasoningParts?: ReasoningPart[]) => Promise<void>;
+  saveAIResponse: (content: string, displayMode?: MessageDisplayMode, traceId?: string, turnMessages?: PersistedMessage[], reasoningParts?: ReasoningPart[]) => Promise<void>;
   /** UI strings for error messages and tool execution fallbacks */
   strings: UseAIStrings;
 }
@@ -90,6 +90,9 @@ export function useServerEvents({
 
   // Track message count at run start to extract turn messages at run end
   const messageCountAtRunStartRef = useRef<number>(0);
+  // Captured at RUN_STARTED so RUN_ERROR (which carries no runId in AG-UI) can
+  // still link saved partial responses back to the trace.
+  const runIdAtRunStartRef = useRef<string | undefined>(undefined);
 
   // Tracks whether prior steps in this run emitted text, so we can insert
   // a paragraph separator (\n\n) in streamingText between steps.
@@ -117,6 +120,57 @@ export function useServerEvents({
   const stringsRef = useRef(strings);
   stringsRef.current = strings;
 
+  // Shared finalize-and-save path for both RUN_FINISHED and the user-initiated
+  // ABORTED run-error. Reads the post-finalizeRun client state — currentMessageContent
+  // for the final step's text (empty when an aborted tool-call step consumed it),
+  // currentReasoningBlocks for the final step's reasoning (empty on abort).
+  const persistFinalResponse = useCallback(async (client: UseAIClient, opts: { aborted: boolean; traceId?: string }) => {
+    const content = client.currentMessageContent;
+    const reasoningParts = client.currentReasoningBlocks.length > 0
+      ? [...client.currentReasoningBlocks]
+      : undefined;
+    const turnMessages = extractTurnMessages(client.messages, messageCountAtRunStartRef.current);
+
+    if (opts.aborted) {
+      // Abort keeps the partial response (and context) intact and adds a
+      // separate `info` bubble noting the interruption. The info bubble is
+      // display-only: transformMessagesToClientFormat drops `info` messages, so
+      // it never re-enters the context on reload.
+      const notice = stringsRef.current.notices.aborted;
+      if (content) {
+        // Streamed text exists: persist it (with turnMessages for context),
+        // then the info bubble below it. These must run sequentially: each call
+        // does a load-modify-save of the whole chat, so firing both concurrently
+        // races and the second save clobbers the first — dropping the turn's
+        // tool context (only surfaces after reload, since in-memory state uses a
+        // functional setMessages update that keeps both).
+        await saveAIResponseRef.current(content, undefined, opts.traceId, turnMessages, reasoningParts);
+        await saveAIResponseRef.current(notice, 'info');
+      } else {
+        // No trailing text: skip the empty placeholder bubble. Attach
+        // turnMessages to the info bubble so synthetic tool_results still
+        // persist for the next turn's context.
+        await saveAIResponseRef.current(notice, 'info', opts.traceId, turnMessages);
+      }
+      return;
+    }
+
+    // RUN_FINISHED: only persist when the AI produced a final text response.
+    if (content) {
+      await saveAIResponseRef.current(content, undefined, opts.traceId, turnMessages, reasoningParts);
+    }
+  }, []);
+
+  const resetRunUiState = useCallback(() => {
+    setStreamingText('');
+    setStreamingReasoning('');
+    streamingChatIdRef.current = null;
+    // Clear executingTool in case TOOL_CALL_END was never received
+    // (e.g., stream truncated by token limit, or aborted mid-tool).
+    setExecutingTool(null);
+    setLoading(false);
+  }, []);
+
   const handleServerEvent = useCallback(async (client: UseAIClient, event: AGUIEvent) => {
     const ts = toolSystemRef.current;
     const strs = stringsRef.current;
@@ -126,6 +180,7 @@ export function useServerEvents({
       // The user message was already pushed to client.messages by sendPrompt(),
       // so messages added after this point are from the AI turn.
       messageCountAtRunStartRef.current = client.messages.length;
+      runIdAtRunStartRef.current = client.currentRunId ?? undefined;
       hasTextFromPriorStepRef.current = false;
       setStreamingReasoning('');
     } else if (event.type === EventType.REASONING_MESSAGE_START) {
@@ -193,44 +248,28 @@ export function useServerEvents({
       // Don't clear streaming text here — wait for RUN_FINISHED so text
       // stays visible across multi-step runs (no flash between steps).
     } else if (event.type === EventType.RUN_FINISHED) {
-      // Use the last step's text for the final saved message.
-      // Intermediate steps' text is preserved in turnMessages (via extractTurnMessages).
-      const content = client.currentMessageContent;
-      if (content) {
-        const finishedEvent = event as RunFinishedEvent;
-        const traceId = finishedEvent.runId;
-
-        const turnMessages = extractTurnMessages(client.messages, messageCountAtRunStartRef.current);
-
-        // Collect reasoning parts from the final step (not flushed by STEP_FINISHED)
-        const reasoningParts = client.currentReasoningBlocks.length > 0
-          ? [...client.currentReasoningBlocks]
-          : undefined;
-
-        saveAIResponseRef.current(content, undefined, traceId, turnMessages, reasoningParts);
-      }
-      setStreamingText('');
-      setStreamingReasoning('');
-      streamingChatIdRef.current = null;
-      // Clear executingTool in case TOOL_CALL_END was never received
-      // (e.g., stream truncated by token limit)
-      setExecutingTool(null);
-      setLoading(false);
+      // client.ts handleEvent already called finalizeRun({ aborted: false })
+      // for RUN_FINISHED; this branch only persists the resulting state.
+      const finishedEvent = event as RunFinishedEvent;
+      await persistFinalResponse(client, { aborted: false, traceId: finishedEvent.runId });
+      resetRunUiState();
     } else if (event.type === EventType.RUN_ERROR) {
       const errorEvent = event as RunErrorEvent;
       const errorCode = errorEvent.message as ErrorCode;
-      console.error('[ServerEvents] Run error:', errorCode);
 
-      const userMessage = strs.errors[errorCode] || errorEvent.message || strs.errors[ErrorCode.UNKNOWN_ERROR];
+      if (errorCode === ErrorCode.ABORTED) {
+        // User stopped generation. Flush the aborted step into _messages
+        // (synthesizing tool_results for unanswered tool_use blocks, dropping
+        // signature-incomplete reasoning), then persist via the shared path.
+        client.finalizeRun({ aborted: true });
+        await persistFinalResponse(client, { aborted: true, traceId: runIdAtRunStartRef.current });
+      } else {
+        console.error('[ServerEvents] Run error:', errorCode);
+        const userMessage = strs.errors[errorCode] || errorEvent.message || strs.errors[ErrorCode.UNKNOWN_ERROR];
+        saveAIResponseRef.current(userMessage, 'error');
+      }
 
-      saveAIResponseRef.current(userMessage, 'error');
-      setStreamingText('');
-      setStreamingReasoning('');
-      streamingChatIdRef.current = null;
-
-      // Clear executingTool in case TOOL_CALL_END was never received
-      setExecutingTool(null);
-      setLoading(false);
+      resetRunUiState();
     }
   }, []);
 

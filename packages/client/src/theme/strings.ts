@@ -105,6 +105,12 @@ export const defaultStrings = {
     UNKNOWN_ERROR: 'An unexpected error occurred. Please try again.',
   },
 
+  // Non-error notices shown as system-style bubbles
+  notices: {
+    /** Shown as a separate bubble after the user aborts generation */
+    aborted: 'Generation stopped. You can continue the conversation.',
+  },
+
   // Thinking/reasoning display
   thinking: {
     /** Label shown while thinking is in progress */
