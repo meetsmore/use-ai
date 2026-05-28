@@ -646,6 +646,36 @@ describe('UseAIClient', () => {
 
     });
 
+    test('does not duplicate the step text in _messages after a STEP_FINISHED → ABORT sequence', () => {
+      // Regression: aborting between STEP_FINISHED and the next TEXT_MESSAGE_START used to save the step text twice.
+      const client = new UseAIClient('http://localhost:8081');
+      client.connect();
+      mockSocket.connected = true;
+      emitSocketEvent('connect');
+
+      client.sendPrompt('test prompt');
+
+      emitSocketEvent('event', { type: 'RUN_STARTED', threadId: 't', runId: 'r' });
+      emitSocketEvent('event', { type: 'STEP_STARTED', stepName: 'step-0' });
+      emitSocketEvent('event', { type: 'TEXT_MESSAGE_START', messageId: 'm1' });
+      emitSocketEvent('event', { type: 'TEXT_MESSAGE_CONTENT', messageId: 'm1', delta: 'step text' });
+      emitSocketEvent('event', { type: 'TEXT_MESSAGE_END', messageId: 'm1' });
+      emitSocketEvent('event', { type: 'TOOL_CALL_START', toolCallId: 'tc1', toolCallName: 'testTool' });
+      emitSocketEvent('event', { type: 'TOOL_CALL_ARGS', toolCallId: 'tc1', delta: '{}' });
+      emitSocketEvent('event', { type: 'TOOL_CALL_END', toolCallId: 'tc1' });
+      emitSocketEvent('event', { type: 'TOOL_CALL_RESULT', messageId: 'tr1', toolCallId: 'tc1', content: '[]', role: 'tool' });
+      emitSocketEvent('event', { type: 'STEP_FINISHED', stepName: 'step-0' });
+
+      client.finalizeRun({ aborted: true });
+
+      const textMatches = (client.messages as Array<Record<string, unknown>>).filter(
+        m => m.role === 'assistant' && m.content === 'step text',
+      );
+      expect(textMatches).toHaveLength(1);
+      expect(textMatches[0].toolCalls).toBeDefined();
+      expect((textMatches[0].toolCalls as Array<{ id: string }>)[0].id).toBe('tc1');
+    });
+
     test('a tool-only aborted run does not leak the previous run\'s text', () => {
       const client = new UseAIClient('http://localhost:8081');
       client.connect();
