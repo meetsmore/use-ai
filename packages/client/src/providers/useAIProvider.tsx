@@ -326,6 +326,14 @@ export interface UseAIProviderProps extends UseAIConfig {
    */
   commandRepository?: CommandRepository;
   /**
+   * Whether the chat UI exposes the "save as slash command" feature
+   * (hover save button + inline save UI). When false, the save button and
+   * its inline editor are hidden. Existing saved commands can still be used
+   * via the "/" autocomplete.
+   * @default true
+   */
+  enableSaveCommand?: boolean;
+  /**
    * Whether to render the built-in chat UI (floating button + panel).
    * Set to false when using the `<UseAIChat>` component to control chat placement.
    * @default true
@@ -461,6 +469,7 @@ export function UseAIProvider({
   forwardedPropsProvider,
   fileUploadConfig: fileUploadConfigProp,
   commandRepository,
+  enableSaveCommand = true,
   renderChat = true,
   theme: customTheme,
   strings: customStrings,
@@ -793,6 +802,7 @@ export function UseAIProvider({
       rename: renameCommand,
       delete: deleteCommand,
     },
+    enableSaveCommand,
     ui: {
       isOpen: isChatOpen,
       setOpen: handleSetChatOpen,
@@ -838,6 +848,7 @@ export function UseAIProvider({
     fileProcessing: fileProcessingState,
     commands,
     onSaveCommand: saveCommand,
+    enableSaveCommand,
     onRenameCommand: renameCommand,
     onDeleteCommand: deleteCommand,
     executingTool: serverEvents.executingTool,

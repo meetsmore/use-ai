@@ -157,6 +157,12 @@ export interface UseAIChatPanelProps {
   fileProcessing?: FileProcessingState | null;
   commands?: SavedCommand[];
   onSaveCommand?: (name: string, text: string) => Promise<string>;
+  /**
+   * Whether the "save as slash command" UI (hover save button + inline save
+   * editor) is shown. Saved-command autocomplete is unaffected.
+   * @default true
+   */
+  enableSaveCommand?: boolean;
   onRenameCommand?: (id: string, newName: string) => Promise<void>;
   onDeleteCommand?: (id: string) => Promise<void>;
   /** Optional close button to render in header (for floating mode) */
@@ -221,6 +227,7 @@ export function UseAIChatPanel({
   fileProcessing,
   commands = [],
   onSaveCommand,
+  enableSaveCommand = true,
   onRenameCommand,
   onDeleteCommand,
   closeButton,
@@ -891,7 +898,7 @@ export function UseAIChatPanel({
               }}
             >
               {/* Save as command button - appears on hover for user messages */}
-              {message.role === 'user' && hoveredMessageId === message.id && onSaveCommand && !slashCommands.isSavingCommand(message.id) && (
+              {message.role === 'user' && enableSaveCommand && hoveredMessageId === message.id && onSaveCommand && !slashCommands.isSavingCommand(message.id) && (
                 <button
                   data-testid="save-command-button"
                   onClick={(e) => {

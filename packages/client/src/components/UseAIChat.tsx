@@ -71,6 +71,11 @@ export interface ChatUIContextValue {
     /** Deletes a command by ID */
     delete: (id: string) => Promise<void>;
   };
+  /**
+   * Whether the "save as slash command" UI (hover save button + inline save
+   * editor) is shown. Defaults to true when omitted.
+   */
+  enableSaveCommand?: boolean;
   /** File processing state for send-time transformations (e.g., OCR) */
   fileProcessing: FileProcessingState | null;
   /** UI state for floating chat */
@@ -211,6 +216,7 @@ export function UseAIChat({ floating = false, submitMode }: UseAIChatProps) {
     fileProcessing: ctx.fileProcessing,
     commands: ctx.commands.list,
     onSaveCommand: ctx.commands.save,
+    enableSaveCommand: ctx.enableSaveCommand,
     onRenameCommand: ctx.commands.rename,
     onDeleteCommand: ctx.commands.delete,
     executingTool: ctx.tools.executing,
