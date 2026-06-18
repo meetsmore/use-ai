@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
-import type { UseAIConfig, AGUIEvent, AgentInfo, UseAIForwardedProps } from '../types';
+import type { UseAIConfig, AGUIEvent, AgentInfo, UseAIForwardedProps, EnabledFeatures } from '../types';
 import { UseAIFloatingButton } from '../components/UseAIFloatingButton';
 import { UseAIChatPanel } from '../components/UseAIChatPanel';
 import { UseAIFloatingChatWrapper, CloseButton } from '../components/UseAIFloatingChatWrapper';
@@ -326,6 +326,13 @@ export interface UseAIProviderProps extends UseAIConfig {
    */
   commandRepository?: CommandRepository;
   /**
+   * Opt-out toggles for optional chat UI features. Each feature defaults to
+   * enabled, so only set a flag to false to hide it. For example, set
+   * `{ slashCommands: false }` to hide the "save as slash command" UI while
+   * keeping "/" autocomplete for existing saved commands.
+   */
+  enabledFeatures?: EnabledFeatures;
+  /**
    * Whether to render the built-in chat UI (floating button + panel).
    * Set to false when using the `<UseAIChat>` component to control chat placement.
    * @default true
@@ -461,6 +468,7 @@ export function UseAIProvider({
   forwardedPropsProvider,
   fileUploadConfig: fileUploadConfigProp,
   commandRepository,
+  enabledFeatures,
   renderChat = true,
   theme: customTheme,
   strings: customStrings,
@@ -793,6 +801,7 @@ export function UseAIProvider({
       rename: renameCommand,
       delete: deleteCommand,
     },
+    enabledFeatures,
     ui: {
       isOpen: isChatOpen,
       setOpen: handleSetChatOpen,
@@ -838,6 +847,7 @@ export function UseAIProvider({
     fileProcessing: fileProcessingState,
     commands,
     onSaveCommand: saveCommand,
+    enabledFeatures,
     onRenameCommand: renameCommand,
     onDeleteCommand: deleteCommand,
     executingTool: serverEvents.executingTool,

@@ -1,7 +1,8 @@
 import React from 'react';
 import { describe, test, expect, mock } from 'bun:test';
-import { render } from '@testing-library/react';
+import { render, fireEvent } from '@testing-library/react';
 import { UseAIChat, __UseAIChatContext, type ChatUIContextValue } from './UseAIChat';
+import type { PersistedMessage } from '../providers/chatRepository/types';
 
 function createContextValue(overrides: Partial<ChatUIContextValue> = {}): ChatUIContextValue {
   return {
@@ -69,5 +70,50 @@ describe('UseAIChat', () => {
 
     expect(getByTestId('thinking-toggle')).toBeInTheDocument();
     expect(getByText('Thinking...')).toBeInTheDocument();
+  });
+
+  describe('save command feature toggle', () => {
+    const userMessage: PersistedMessage = {
+      id: 'msg-1',
+      role: 'user',
+      content: 'hello world',
+      createdAt: new Date(0),
+    };
+
+    test('shows save command button on hover when commands.save is provided', () => {
+      const ctx = createContextValue({ messages: [userMessage] });
+
+      const { container, queryByTestId } = render(
+        <__UseAIChatContext.Provider value={ctx}>
+          <UseAIChat />
+        </__UseAIChatContext.Provider>
+      );
+
+      const bubble = container.querySelector('.chat-message-user');
+      expect(bubble).not.toBeNull();
+      fireEvent.mouseEnter(bubble!);
+
+      expect(queryByTestId('save-command-button')).toBeInTheDocument();
+    });
+
+    test('hides save command button when slashCommands feature is disabled', () => {
+      const ctx = createContextValue({
+        messages: [userMessage],
+        enabledFeatures: { slashCommands: false },
+      });
+
+      const { container, queryByTestId } = render(
+        <__UseAIChatContext.Provider value={ctx}>
+          <UseAIChat />
+        </__UseAIChatContext.Provider>
+      );
+
+      const bubble = container.querySelector('.chat-message-user');
+      expect(bubble).not.toBeNull();
+      fireEvent.mouseEnter(bubble!);
+
+      expect(queryByTestId('save-command-button')).toBeNull();
+      expect(queryByTestId('inline-save-command')).toBeNull();
+    });
   });
 });

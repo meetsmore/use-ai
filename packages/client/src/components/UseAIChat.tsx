@@ -3,7 +3,7 @@ import { UseAIChatPanel } from './UseAIChatPanel';
 import { UseAIFloatingChatWrapper, CloseButton } from './UseAIFloatingChatWrapper';
 import type { SubmitMode } from '../utils/keyboard';
 import type { PersistedMessage } from '../providers/chatRepository/types';
-import type { AgentInfo, FeedbackValue, ToolAnnotations } from '../types';
+import type { AgentInfo, FeedbackValue, ToolAnnotations, EnabledFeatures } from '../types';
 import type { FileUploadConfig, FileAttachment, FileProcessingState } from '../fileUpload/types';
 import type { SavedCommand } from '../commands/types';
 import type { Chat } from '../providers/chatRepository/types';
@@ -71,6 +71,11 @@ export interface ChatUIContextValue {
     /** Deletes a command by ID */
     delete: (id: string) => Promise<void>;
   };
+  /**
+   * Opt-out toggles for optional chat UI features. Each feature defaults to
+   * enabled when omitted.
+   */
+  enabledFeatures?: EnabledFeatures;
   /** File processing state for send-time transformations (e.g., OCR) */
   fileProcessing: FileProcessingState | null;
   /** UI state for floating chat */
@@ -211,6 +216,7 @@ export function UseAIChat({ floating = false, submitMode }: UseAIChatProps) {
     fileProcessing: ctx.fileProcessing,
     commands: ctx.commands.list,
     onSaveCommand: ctx.commands.save,
+    enabledFeatures: ctx.enabledFeatures,
     onRenameCommand: ctx.commands.rename,
     onDeleteCommand: ctx.commands.delete,
     executingTool: ctx.tools.executing,
