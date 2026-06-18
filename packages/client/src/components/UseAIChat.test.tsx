@@ -96,10 +96,10 @@ describe('UseAIChat', () => {
       expect(queryByTestId('save-command-button')).toBeInTheDocument();
     });
 
-    test('hides save command button when enableSaveCommand is false', () => {
+    test('hides save command button when slashCommands feature is disabled', () => {
       const ctx = createContextValue({
         messages: [userMessage],
-        enableSaveCommand: false,
+        enabledFeatures: { slashCommands: false },
       });
 
       const { container, queryByTestId } = render(

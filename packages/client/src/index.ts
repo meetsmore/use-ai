@@ -31,7 +31,7 @@ export type { SubmitMode } from './utils/keyboard';
 
 export type { UseAIOptions, UseAIResult } from './useAI';
 export type { UseAIWorkflowResult, TriggerWorkflowOptions, WorkflowProgress } from './useAIWorkflow';
-export type { UseAIConfig, ToolDefinition, AgentInfo } from './types';
+export type { UseAIConfig, EnabledFeatures, ToolDefinition, AgentInfo } from './types';
 export type {
   UseAIContextValue,
   ChatContextValue,

@@ -6,6 +6,19 @@ export interface UseAIConfig {
   serverUrl: string;
 }
 
+/**
+ * Toggles for optional chat UI features. Each feature defaults to enabled
+ * when its flag is omitted, so set a flag to false to opt out of that feature.
+ */
+export interface EnabledFeatures {
+  /**
+   * The "save as slash command" UI (hover save button + inline save editor)
+   * on user messages. Saved-command autocomplete via "/" is unaffected.
+   * @default true
+   */
+  slashCommands?: boolean;
+}
+
 // Re-export all types from @meetsmore-oss/use-ai-core for convenience
 export type {
   ToolDefinition,

@@ -3,7 +3,7 @@ import type { Chat, PersistedMessage, PersistedMessageContent, PersistedContentP
 import { getTextFromContent, getDisplayTextFromContent } from '../utils/messageContent';
 import { mergeAssistantMessagesForDisplay } from '../utils/mergeAssistantMessages';
 import { shouldSubmitOnEnter, type SubmitMode } from '../utils/keyboard';
-import type { AgentInfo, FeedbackValue, ToolAnnotations } from '../types';
+import type { AgentInfo, FeedbackValue, ToolAnnotations, EnabledFeatures } from '../types';
 import type { FileAttachment, FileUploadConfig, FileProcessingState } from '../fileUpload/types';
 import { MarkdownContent } from './MarkdownContent';
 import { FileChip, FilePlaceholder } from './FileChip';
@@ -158,11 +158,12 @@ export interface UseAIChatPanelProps {
   commands?: SavedCommand[];
   onSaveCommand?: (name: string, text: string) => Promise<string>;
   /**
-   * Whether the "save as slash command" UI (hover save button + inline save
-   * editor) is shown. Saved-command autocomplete is unaffected.
-   * @default true
+   * Opt-out toggles for optional chat UI features. Each feature defaults to
+   * enabled when omitted. `slashCommands` controls the "save as slash command"
+   * UI (hover save button + inline editor); saved-command autocomplete is
+   * unaffected.
    */
-  enableSaveCommand?: boolean;
+  enabledFeatures?: EnabledFeatures;
   onRenameCommand?: (id: string, newName: string) => Promise<void>;
   onDeleteCommand?: (id: string) => Promise<void>;
   /** Optional close button to render in header (for floating mode) */
@@ -227,7 +228,7 @@ export function UseAIChatPanel({
   fileProcessing,
   commands = [],
   onSaveCommand,
-  enableSaveCommand = true,
+  enabledFeatures,
   onRenameCommand,
   onDeleteCommand,
   closeButton,
@@ -241,6 +242,9 @@ export function UseAIChatPanel({
 }: UseAIChatPanelProps) {
   const strings = useStrings();
   const theme = useTheme();
+
+  // Opt-out feature: the "save as slash command" UI defaults to enabled.
+  const slashCommandsEnabled = enabledFeatures?.slashCommands ?? true;
 
   // Merge consecutive assistant messages within each turn into a single
   // display message. Intermediate messages (with toolCalls) have their text
@@ -898,7 +902,7 @@ export function UseAIChatPanel({
               }}
             >
               {/* Save as command button - appears on hover for user messages */}
-              {message.role === 'user' && enableSaveCommand && hoveredMessageId === message.id && onSaveCommand && !slashCommands.isSavingCommand(message.id) && (
+              {message.role === 'user' && slashCommandsEnabled && hoveredMessageId === message.id && onSaveCommand && !slashCommands.isSavingCommand(message.id) && (
                 <button
                   data-testid="save-command-button"
                   onClick={(e) => {
