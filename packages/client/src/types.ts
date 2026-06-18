@@ -19,6 +19,15 @@ export interface EnabledFeatures {
   slashCommands?: boolean;
 }
 
+/**
+ * Default state for every opt-out feature. Merge user-supplied
+ * `enabledFeatures` over this to resolve effective flags. Extend this constant
+ * when adding a new feature toggle.
+ */
+export const DEFAULT_ENABLED_FEATURES: Required<EnabledFeatures> = {
+  slashCommands: true,
+};
+
 // Re-export all types from @meetsmore-oss/use-ai-core for convenience
 export type {
   ToolDefinition,

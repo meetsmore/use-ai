@@ -4,6 +4,7 @@ import { getTextFromContent, getDisplayTextFromContent } from '../utils/messageC
 import { mergeAssistantMessagesForDisplay } from '../utils/mergeAssistantMessages';
 import { shouldSubmitOnEnter, type SubmitMode } from '../utils/keyboard';
 import type { AgentInfo, FeedbackValue, ToolAnnotations, EnabledFeatures } from '../types';
+import { DEFAULT_ENABLED_FEATURES } from '../types';
 import type { FileAttachment, FileUploadConfig, FileProcessingState } from '../fileUpload/types';
 import { MarkdownContent } from './MarkdownContent';
 import { FileChip, FilePlaceholder } from './FileChip';
@@ -243,8 +244,9 @@ export function UseAIChatPanel({
   const strings = useStrings();
   const theme = useTheme();
 
-  // Opt-out feature: the "save as slash command" UI defaults to enabled.
-  const slashCommandsEnabled = enabledFeatures?.slashCommands ?? true;
+  // Opt-out features: each defaults to enabled via DEFAULT_ENABLED_FEATURES.
+  const features = { ...DEFAULT_ENABLED_FEATURES, ...enabledFeatures };
+  const slashCommandsEnabled = features.slashCommands;
 
   // Merge consecutive assistant messages within each turn into a single
   // display message. Intermediate messages (with toolCalls) have their text
