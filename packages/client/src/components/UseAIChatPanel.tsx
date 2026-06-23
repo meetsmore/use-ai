@@ -115,10 +115,25 @@ function FeedbackButton({ type, isSelected, onClick, selectedColor, unselectedCo
 }
 
 /**
- * Helper to check if content has file attachments.
+ * Helper to check if content has file attachments (metadata-only `file` or
+ * ref-backed `stored_file`), both of which render as a name/size FilePlaceholder.
  */
 function hasFileContent(content: PersistedMessageContent): content is PersistedContentPart[] {
-  return Array.isArray(content) && content.some(part => part.type === 'file');
+  return (
+    Array.isArray(content) &&
+    content.some(part => part.type === 'file' || part.type === 'stored_file')
+  );
+}
+
+/** Name + size for a file-like persisted part, for the reload FilePlaceholder. */
+function fileChipInfo(part: PersistedContentPart): { name: string; size: number } | null {
+  if (part.type === 'file') {
+    return { name: part.file.name, size: part.file.size };
+  }
+  if (part.type === 'stored_file') {
+    return { name: part.name, size: part.size };
+  }
+  return null;
 }
 
 /**
@@ -919,15 +934,12 @@ export function UseAIChatPanel({
               {/* Render file placeholders for user messages with files */}
               {message.role === 'user' && hasFileContent(message.content) && (
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px' }}>
-                  {message.content
-                    .filter((part: PersistedContentPart): part is { type: 'file'; file: { name: string; size: number; mimeType: string } } => part.type === 'file')
-                    .map((part: { type: 'file'; file: { name: string; size: number; mimeType: string } }, idx: number) => (
-                      <FilePlaceholder
-                        key={idx}
-                        name={part.file.name}
-                        size={part.file.size}
-                      />
-                    ))}
+                  {message.content.flatMap((part: PersistedContentPart, idx: number) => {
+                    const info = fileChipInfo(part);
+                    return info
+                      ? [<FilePlaceholder key={idx} name={info.name} size={info.size} />]
+                      : [];
+                  })}
                 </div>
               )}
               {message.role === 'assistant' ? (

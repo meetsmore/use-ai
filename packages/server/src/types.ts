@@ -160,6 +160,22 @@ export interface UseAIServerConfig<TAgents extends Record<string, import('./agen
    * ```
    */
   spanProcessors?: import('./instrumentation').SpanProcessor[];
+  /**
+   * Optional host seam for resolving attachment refs to model-readable content.
+   *
+   * Called once at the start of each run with every ref-bearing content part
+   * collected across the message history. The host turns each ref into a part
+   * use-ai already understands (typically `{ type:'image', url }`,
+   * `{ type:'file', url, mimeType, name }`, or a `{ type:'text', text }`
+   * fallback for missing/unavailable files) and returns them in the same order
+   * and count. use-ai splices the returned parts back before the AI SDK conversion.
+   *
+   * When omitted, ref-bearing parts are passed through unresolved (and silently
+   * dropped during conversion, so the attachment simply does not reach the model).
+   *
+   * @see ResolveAttachments
+   */
+  resolveAttachments?: import('@meetsmore-oss/use-ai-core').ResolveAttachments;
 }
 
 // Re-export all types from @meetsmore-oss/use-ai-core
@@ -216,6 +232,10 @@ export type {
   ReasoningEndEvent,
   ReasoningEncryptedValueEvent,
   ReasoningPart,
+  // Multimodal content + attachment ref resolution
+  MultimodalContent,
+  ResolveAttachments,
+  ResolveAttachmentsContext,
 } from '@meetsmore-oss/use-ai-core';
 
 export { EventType, ErrorCode, TOOL_APPROVAL_REQUEST } from '@meetsmore-oss/use-ai-core';

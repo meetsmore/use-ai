@@ -38,24 +38,37 @@ export interface FileAttachment {
 }
 
 /**
+ * Result of preparing a file for sending.
+ *
+ * Exactly one variant is returned:
+ * - `{ url }`: a directly-usable URL (base64 data URL for embed, or a remote URL).
+ *   The bytes travel with the message. Legacy embed path.
+ * - `{ ref }`: a persistent storage pointer (e.g. an S3 key). The bytes stay in
+ *   storage; only the ref travels with the message and persists in history. The
+ *   server resolves the ref to a short-lived signed URL just-in-time on each run.
+ *
+ * A backend may also return a bare `string`, which is treated as `{ url: string }`
+ * for backward compatibility with backends written against the old signature.
+ */
+export type FileUploadResult = { url: string } | { ref: string };
+
+/**
  * Abstract file upload backend interface.
- * Converts File objects to URLs at send time.
+ * Converts File objects to a sendable reference at send time.
  *
  * Implementations:
  * - EmbedFileUploadBackend: Converts to base64 data URL (built-in)
- * - S3FileUploadBackend: Uploads to S3 and returns public URL (future)
+ * - A host S3 backend: uploads to storage and returns a persistent `ref`
  */
 export interface FileUploadBackend {
   /**
-   * Prepare file for sending to AI.
-   * Called at send time - converts File to URL.
+   * Prepare file for sending to AI. Called at send time.
    *
    * @param file - The File object to prepare
-   * @returns Promise resolving to a URL string
-   *          - For embed: base64 data URL
-   *          - For S3: public URL after upload
+   * @returns Either a {@link FileUploadResult} (`{ url }` or `{ ref }`) or, for
+   *          backward compatibility, a bare URL string (treated as `{ url }`).
    */
-  prepareForSend(file: File): Promise<string>;
+  prepareForSend(file: File): Promise<string | FileUploadResult>;
 }
 
 /**
@@ -153,4 +166,12 @@ export interface FileUploadConfig {
    * before being sent to the AI.
    */
   transformers?: FileTransformerMap;
+  /**
+   * Maximum number of attachments allowed per message.
+   * Enforced at attach time — files beyond the limit are rejected with an error.
+   * The value is a host policy (e.g. set below the AI provider's per-message cap);
+   * use-ai only exposes the knob and does not assume a default. If undefined,
+   * the number of attachments is not limited.
+   */
+  maxAttachments?: number;
 }

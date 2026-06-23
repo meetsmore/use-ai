@@ -16,8 +16,18 @@ type TransformedPart = Extract<MultimodalContent, { type: 'transformed_file' }>;
  * Output order follows `attachments`, not `fileContent`, so the persisted
  * order matches what the user attached.
  *
- * Attachments without a transformed_file counterpart (pure image / file URL
- * parts) are persisted as metadata-only, preserving pre-fix behavior.
+ * Ref-bearing attachments (uploaded to storage via a backend that returns a `ref`)
+ * are persisted as `stored_file`, carrying the ref so the attachment can be re-sent
+ * after a reload. Attachments with a url-bearing part (legacy embed/base64) have no
+ * ref and are persisted as metadata-only `file`, preserving pre-fix behavior.
+ *
+ * Non-transformed attachments are paired with their content part positionally:
+ * `processAttachments` emits one image/file part per non-transformed attachment, in
+ * attachment order (every such part flows through one order-preserving group), and
+ * those attachments are visited here in the same order. Each attachment then reads
+ * the `ref` off its own part (so a mix of ref- and url-bearing parts cannot steal
+ * each other's ref). The attachment's own mimeType — not the part — decides
+ * image-vs-file when the stored_file is later restored.
  */
 export function buildPersistedParts(
   message: string,
@@ -30,6 +40,9 @@ export function buildPersistedParts(
   }
 
   const transformedByKey = new Map<string, TransformedPart[]>();
+  // Non-transformed content parts (image/file, ref- or url-bearing) in attachment
+  // order, consumed one per non-transformed attachment below.
+  const nonTransformedParts: MultimodalContent[] = [];
   for (const part of fileContent) {
     if (part.type === 'transformed_file') {
       const key = `${part.originalFile.name}:${part.originalFile.size}:${part.originalFile.mimeType}`;
@@ -39,6 +52,8 @@ export function buildPersistedParts(
       } else {
         transformedByKey.set(key, [part]);
       }
+    } else {
+      nonTransformedParts.push(part);
     }
   }
 
@@ -51,7 +66,22 @@ export function buildPersistedParts(
         text: transformed.text,
         originalFile: transformed.originalFile,
       });
+      continue;
+    }
+
+    const part = nonTransformedParts.shift();
+    const ref = part && (part.type === 'image' || part.type === 'file') ? part.ref : undefined;
+    if (ref) {
+      // Ref-backed: persist enough to display a placeholder and to re-send by ref.
+      parts.push({
+        type: 'stored_file',
+        ref,
+        name: attachment.file.name,
+        mimeType: attachment.file.type,
+        size: attachment.file.size,
+      });
     } else {
+      // Legacy url-bearing / unresolvable — metadata only, dropped on reload.
       parts.push({
         type: 'file',
         file: {

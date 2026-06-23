@@ -66,6 +66,9 @@ export type {
   TransformedFileContent,
   MultimodalContent,
   UserMessageContent,
+  // Attachment ref resolution seam
+  ResolveAttachments,
+  ResolveAttachmentsContext,
 } from './types';
 
 export type {

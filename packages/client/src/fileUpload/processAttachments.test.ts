@@ -71,6 +71,44 @@ describe('processAttachments', () => {
     });
   });
 
+  describe('with a ref-returning backend', () => {
+    // Backend that uploads to storage and returns a persistent ref.
+    const refBackend: FileUploadBackend = {
+      async prepareForSend(file: File) {
+        return { ref: `tenant/ai/user/${file.name}` };
+      },
+    };
+
+    it('emits a ref-bearing image part (no url)', async () => {
+      const attachment = createAttachment('1', 'photo.png', 'image/png');
+      const [part] = await processAttachments([attachment], { getCurrentChat: testGetCurrentChat, backend: refBackend });
+      expect(part).toEqual({ type: 'image', ref: 'tenant/ai/user/photo.png' });
+      expect((part as { url?: string }).url).toBeUndefined();
+    });
+
+    it('emits a ref-bearing file part with mimeType and name', async () => {
+      const attachment = createAttachment('1', 'doc.pdf', 'application/pdf');
+      const [part] = await processAttachments([attachment], { getCurrentChat: testGetCurrentChat, backend: refBackend });
+      expect(part).toEqual({
+        type: 'file',
+        ref: 'tenant/ai/user/doc.pdf',
+        mimeType: 'application/pdf',
+        name: 'doc.pdf',
+      });
+    });
+
+    it('treats a bare string return as a url (backward compatibility)', async () => {
+      const stringBackend: FileUploadBackend = {
+        async prepareForSend() {
+          return 'data:image/png;base64,AAAA';
+        },
+      };
+      const attachment = createAttachment('1', 'photo.png', 'image/png');
+      const [part] = await processAttachments([attachment], { getCurrentChat: testGetCurrentChat, backend: stringBackend });
+      expect(part).toEqual({ type: 'image', url: 'data:image/png;base64,AAAA' });
+    });
+  });
+
   describe('with pre-transformed content', () => {
     it('uses pre-transformed content when available', async () => {
       const attachment: FileAttachment = {

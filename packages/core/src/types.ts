@@ -476,22 +476,34 @@ export interface TextContent {
 
 /**
  * Image content part for multimodal messages.
- * URL can be a data URL (base64) or a remote URL.
+ *
+ * Exactly one of `url` or `ref` is set:
+ * - `url`: a directly-usable URL (data URL / base64 or a remote URL). Legacy embed path.
+ * - `ref`: a persistent storage pointer (e.g. an S3 key) that never expires. The server
+ *   resolves it to a short-lived signed URL just-in-time before each run (see
+ *   {@link ResolveAttachments}). Storing `ref` instead of `url` lets attachments survive
+ *   history persistence and multi-turn re-sends without the URL going stale.
  */
 export interface ImageContent {
   type: 'image';
-  /** Image URL (data URL or remote URL) */
-  url: string;
+  /** Image URL (data URL or remote URL). Mutually exclusive with `ref`. */
+  url?: string;
+  /** Persistent storage ref, resolved to a signed URL server-side. Mutually exclusive with `url`. */
+  ref?: string;
 }
 
 /**
  * File content part for multimodal messages.
  * Used for non-image files like PDFs, documents, etc.
+ *
+ * Exactly one of `url` or `ref` is set (see {@link ImageContent} for the distinction).
  */
 export interface FileContent {
   type: 'file';
-  /** File URL (data URL or remote URL) */
-  url: string;
+  /** File URL (data URL or remote URL). Mutually exclusive with `ref`. */
+  url?: string;
+  /** Persistent storage ref, resolved to a signed URL server-side. Mutually exclusive with `url`. */
+  ref?: string;
   /** MIME type of the file */
   mimeType: string;
   /** Original file name */
@@ -533,6 +545,39 @@ export type MultimodalContent =
  * When multimodal, the array can contain text, images, and files.
  */
 export type UserMessageContent = string | MultimodalContent[];
+
+/**
+ * Context handed to a {@link ResolveAttachments} function when the server
+ * resolves storage refs before a run.
+ */
+export interface ResolveAttachmentsContext {
+  /** Forwarded props for this run (e.g. the host's auth token for ref resolution). */
+  forwardedProps?: UseAIForwardedProps;
+}
+
+/**
+ * Host-provided seam for turning attachment refs into something the model can read.
+ *
+ * Called once at the start of a run (never per-step) with every ref-bearing content
+ * part collected across the whole message history. The host returns a replacement for
+ * each input part, in the same order and count. use-ai does not interpret the parts —
+ * it simply splices the returned parts back in before converting to AI SDK format.
+ *
+ * The host is responsible for everything app-specific: resolving the ref to a signed
+ * URL, choosing a TTL that outlives the run, and substituting a `{ type: 'text' }`
+ * part when a file is missing or temporarily unavailable (so a broken URL is never
+ * handed to the model). Returned parts must be ones use-ai already understands —
+ * typically `{ type: 'image', url }`, `{ type: 'file', url, mimeType, name }`, or
+ * `{ type: 'text', text }`.
+ *
+ * @param parts - Ref-bearing parts gathered from the run's full history.
+ * @param context - Run context, including forwarded props (auth token, etc.).
+ * @returns The replacement parts, same length and order as `parts`.
+ */
+export type ResolveAttachments = (
+  parts: MultimodalContent[],
+  context: ResolveAttachmentsContext,
+) => Promise<MultimodalContent[]>;
 
 /**
  * Reasoning part for persisted messages.

@@ -411,18 +411,21 @@ export class UseAIClient {
     let messageContent: MessageContent = prompt;
 
     if (multimodalContent && multimodalContent.length > 0) {
-      // Convert our MultimodalContent to AG-UI ContentPart format
+      // Convert our MultimodalContent to AG-UI ContentPart format.
+      // Ref-bearing parts (storage-backed) send the `ref`; legacy parts send `url`.
       messageContent = multimodalContent.map(part => {
         if (part.type === 'text') {
           return { type: 'text', text: part.text };
         } else if (part.type === 'image') {
-          return { type: 'image', url: part.url };
+          return part.ref
+            ? { type: 'image', ref: part.ref }
+            : { type: 'image', url: part.url };
         } else if (part.type === 'file') {
-          return {
-            type: 'file',
-            url: part.url,
-            mimeType: part.mimeType,
-          };
+          // §4.1 wire: the ref form carries name (for reload/persist parity); the
+          // legacy url form is { type:'file', url, mimeType } (no name), as before.
+          return part.ref
+            ? { type: 'file', ref: part.ref, mimeType: part.mimeType, name: part.name }
+            : { type: 'file', url: part.url, mimeType: part.mimeType };
         } else {
           // transformed_file - pass through as-is, server will convert to text
           return {
