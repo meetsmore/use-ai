@@ -1,0 +1,27 @@
+packages/client/src/client.ts
+  s_6f9d2201448efb::t_e9ea5b872be9e0 204-209
+packages/client/src/client.test.ts
+  s_6f9d2201448efb::t_ab6bfe8bb867db 614-645
+packages/server/src/agents/AISDKAgent.ts
+  s_6f9d2201448efb::t_3ab67a0b76e1df 734-753
+  s_6f9d2201448efb::t_f9204431f42df3 1381-1384
+packages/server/src/error-handling.integration.test.ts
+  s_6f9d2201448efb::t_dfedfd2323e8b5 126,159-162,185-186,188,194-195,197-199,201-203
+  s_6f9d2201448efb::t_d15a5735a784bb 200,204
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "f4288b52b9e0e897f0465659a0d7a489a6efc4f3",
+  "prompts": {},
+  "sessions": {
+    "s_6f9d2201448efb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2651ed1e-739c-41ba-845a-0b052b8003cd",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>"
+    }
+  }
+}

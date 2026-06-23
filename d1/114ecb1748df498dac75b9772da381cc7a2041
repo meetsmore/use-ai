@@ -1,0 +1,38 @@
+packages/client/src/utils/messageConversion.ts
+  s_facb036d0e9eb0::t_fd47505c5f8e27 9-11,14-16
+packages/client/src/components/UseAIChatPanel.tsx
+  s_facb036d0e9eb0::t_80f5abd39a7d16 851-853
+  s_facb036d0e9eb0::t_cc31d2d7cab26f 918-919,925-926,928-929
+packages/client/src/providers/chatRepository/types.ts
+  s_facb036d0e9eb0::t_25a1920b797cd4 14
+packages/client/src/theme/strings.ts
+  s_facb036d0e9eb0::t_6e8b644be01540 110-115
+packages/client/src/hooks/useServerEvents.abort.test.tsx
+  s_facb036d0e9eb0::t_d09dd31116495a 85,87,94-97
+  s_facb036d0e9eb0::t_6dce41da12bbd4 53
+  s_facb036d0e9eb0::t_de117b0d7fb753 152-157
+packages/client/src/hooks/useServerEvents.ts
+  s_facb036d0e9eb0::t_60a074ce68ade7 18
+  s_facb036d0e9eb0::t_297cd63de8636e 25
+  s_facb036d0e9eb0::t_6713494bf2ed0b 135-150
+packages/client/src/hooks/useChatManagement.ts
+  s_facb036d0e9eb0::t_344422a88b69c0 2
+  s_facb036d0e9eb0::t_3c6e16bec0e639 324
+  s_facb036d0e9eb0::t_8d109ed768232d 69
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "d1114ecb1748df498dac75b9772da381cc7a2041",
+  "prompts": {},
+  "sessions": {
+    "s_facb036d0e9eb0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ad647753-73bd-4bdf-8267-cdbc129b7a91",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "masudahiroto <96814344+masudahiroto@users.noreply.github.com>"
+    }
+  }
+}
