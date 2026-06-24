@@ -1,0 +1,27 @@
+packages/server/src/attachmentResolution.test.ts
+  s_9fa765da1ece7b::t_a9ea9043f0f9ba 2
+  s_9fa765da1ece7b::t_e0ff6ba9517b6c 109-139
+packages/client/src/hooks/useFileUpload.test.tsx
+  s_9fa765da1ece7b::t_af0cfbfe31d70f 233-252
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.11",
+  "base_commit_sha": "f426e39ad4c5f4d1f7b5b26c096c9e5f7076b23b",
+  "prompts": {},
+  "humans": {
+    "h_51e7b7c10a76e4": {
+      "author": "yuma.ito <yuma.ito@meetsmore.com>"
+    }
+  },
+  "sessions": {
+    "s_9fa765da1ece7b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d5edb21c-360f-4256-b0e2-e1e84043ae33",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "yuma.ito <yuma.ito@meetsmore.com>"
+    }
+  }
+}
