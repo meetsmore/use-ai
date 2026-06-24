@@ -230,6 +230,26 @@ describe('useFileUpload', () => {
       expect(result.current.fileError).toContain('at most 1');
     });
 
+    it('does not cap attachments when maxAttachments is undefined', async () => {
+      // The undefined side of the `maxAttachments !== undefined` check: no cap. Adds 4
+      // (above the other tests' caps) and expects all kept with no error.
+      const { result } = renderHook(() => useFileUpload({ getCurrentChat: mockGetCurrentChat, config }));
+
+      const files = [
+        new File(['a'], 'a.pdf', { type: 'application/pdf' }),
+        new File(['b'], 'b.pdf', { type: 'application/pdf' }),
+        new File(['c'], 'c.pdf', { type: 'application/pdf' }),
+        new File(['d'], 'd.pdf', { type: 'application/pdf' }),
+      ];
+
+      await act(async () => {
+        await result.current.handleFiles(files);
+      });
+
+      expect(result.current.attachments).toHaveLength(4);
+      expect(result.current.fileError).toBeNull();
+    });
+
     it('removes attachment by id', async () => {
       const { result } = renderHook(() => useFileUpload({ getCurrentChat: mockGetCurrentChat, config }));
 

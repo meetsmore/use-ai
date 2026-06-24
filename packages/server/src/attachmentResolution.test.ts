@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'bun:test';
-import { resolveAttachmentParts } from './attachmentResolution';
+import { resolveAttachmentParts, countRefParts } from './attachmentResolution';
 import type { Message, MultimodalContent, ResolveAttachmentsContext } from '@meetsmore-oss/use-ai-core';
 
 const ctx: ResolveAttachmentsContext = { forwardedProps: { token: 'jwt-123' } };
@@ -104,5 +104,36 @@ describe('resolveAttachmentParts', () => {
     };
     const result = await resolveAttachmentParts(messages, resolve, ctx);
     expect(result).toBe(messages);
+  });
+});
+
+describe('countRefParts', () => {
+  it('counts surviving ref parts across all messages', () => {
+    const messages = [
+      msg('user', [{ type: 'text', text: 'a' }, { type: 'image', ref: 'R1' }]),
+      msg('assistant', 'ok'),
+      msg('user', [{ type: 'file', ref: 'R2', mimeType: 'application/pdf', name: 'd.pdf' }]),
+    ];
+    expect(countRefParts(messages)).toBe(2);
+  });
+
+  it('returns 0 once refs are resolved (url/text/string parts have no ref)', () => {
+    const messages = [
+      msg('user', [{ type: 'image', url: 'https://signed/x' }]),
+      msg('user', [{ type: 'text', text: 'unavailable' }]),
+      msg('user', 'plain string'),
+    ];
+    expect(countRefParts(messages)).toBe(0);
+  });
+
+  it('does not count a part that carries both url and ref (reaches the model via url)', () => {
+    // A host that spreads the input and forgets to drop `ref` produces {url, ref}.
+    // convertToAISDKContent uses the url, so the attachment still reaches the model.
+    // We must not warn about such a part.
+    const messages = [
+      msg('user', [{ type: 'image', url: 'https://signed/x', ref: 'R1' }]),
+      msg('user', [{ type: 'file', url: 'https://signed/y', ref: 'R2', mimeType: 'application/pdf', name: 'd.pdf' }]),
+    ];
+    expect(countRefParts(messages)).toBe(0);
   });
 });
