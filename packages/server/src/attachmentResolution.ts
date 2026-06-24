@@ -6,8 +6,8 @@ import type {
 } from '@meetsmore-oss/use-ai-core';
 
 /**
- * Whether a part is a ref-bearing attachment wire part: an `image`/`file` part
- * carrying a non-empty string `ref`, awaiting just-in-time resolution.
+ * Whether `part` is an attachment wire part carrying a `ref`: an `image`/`file`
+ * part with a non-empty `ref` string, awaiting resolution when needed.
  */
 function hasRef(part: unknown): part is MultimodalContent {
   if (typeof part !== 'object' || part === null) {
@@ -22,24 +22,35 @@ function hasRef(part: unknown): part is MultimodalContent {
 }
 
 /**
- * Resolve every ref-bearing attachment part across a run's message history,
- * once, before the messages are converted to AI SDK format.
+ * Counts only ref parts without a `url` (the ones actually dropped during
+ * conversion), for observability. Parts carrying both `url` and `ref` are not
+ * counted, since they reach the model via the `url`.
+ */
+export function countRefParts(messages: Message[]): number {
+  let count = 0;
+  for (const msg of messages) {
+    const content = (msg as { content?: unknown }).content;
+    if (Array.isArray(content)) {
+      for (const part of content) {
+        if (hasRef(part) && !('url' in (part as { url?: unknown }))) count++;
+      }
+    }
+  }
+  return count;
+}
+
+/**
+ * Collects ref-bearing attachment parts across the run's whole message history,
+ * calls the host's `resolve` once, and puts the returned parts back in place.
+ * The input is not mutated. See core's {@link ResolveAttachments} for the
+ * details of the resolve contract.
  *
- * Gathers all ref parts from the history, calls the host's `resolve` seam a
- * single time (batched), and splices the returned parts back into their original
- * positions. The host is responsible for turning each ref into something the
- * model can read (a signed-URL `image`/`file` part, or a `text` fallback when a
- * file is missing/unavailable) — see {@link ResolveAttachments}.
+ * Returns the original `messages` reference as-is when there are no refs. When
+ * there are, it returns a new array but clones only the messages and content
+ * arrays it actually touches, so the caller's input is left unchanged.
  *
- * `resolve` is the host's `resolveAttachments` seam (type {@link ResolveAttachments},
- * configured on `UseAIServerConfig`); this helper just drives it over a whole history.
- *
- * Returns the original `messages` reference unchanged when there are no refs.
- * Otherwise returns a new array; only the messages and content arrays that are
- * actually touched are cloned, so this function never mutates the caller's input.
- *
- * @throws If `resolve` returns a different number of parts than it was given
- *   (a contract violation — the host must return one replacement per input).
+ * @throws When `resolve` returns a different number of parts than it was given
+ *   (a contract violation; the host must return one replacement per input).
  */
 export async function resolveAttachmentParts(
   messages: Message[],
@@ -67,14 +78,14 @@ export async function resolveAttachmentParts(
 
   const resolved = await resolve(refParts, context);
 
-  // One replacement per input is the seam contract. A mismatch would splice
-  // `undefined` into the content and crash the AI SDK conversion downstream with
-  // an opaque error, so fail fast here with a clear one instead.
+  // One replacement per input is the seam's contract. A count mismatch leaves
+  // `undefined` in content, making the downstream AI SDK conversion fail with
+  // an opaque error.
   if (!Array.isArray(resolved) || resolved.length !== refParts.length) {
     throw new Error(`resolveAttachments must return one part per input ref (expected ${refParts.length})`);
   }
 
-  // Immutable splice: clone only the messages / content arrays we touch.
+  // Immutable splice-in: clone only the messages / content arrays we touch.
   const out = messages.slice();
   const clonedContent = new Map<number, unknown[]>();
   locations.forEach((loc, i) => {

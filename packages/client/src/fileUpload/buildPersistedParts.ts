@@ -16,18 +16,15 @@ type TransformedPart = Extract<MultimodalContent, { type: 'transformed_file' }>;
  * Output order follows `attachments`, not `fileContent`, so the persisted
  * order matches what the user attached.
  *
- * Ref-bearing attachments (uploaded to storage via a backend that returns a `ref`)
- * are persisted as `stored_file`, carrying the ref so the attachment can be re-sent
- * after a reload. Attachments with a url-bearing part (legacy embed/base64) have no
- * ref and are persisted as metadata-only `file`, preserving pre-fix behavior.
+ * Attachments that carry a ref (uploaded to storage by a backend that returns
+ * a ref) are persisted as `stored_file`; carrying the ref lets them be re-sent
+ * after a reload. Attachments whose part is url-bearing (inline base64 embed)
+ * have no ref, so they are persisted as metadata-only `file`.
  *
- * Non-transformed attachments are paired with their content part positionally:
- * `processAttachments` emits one image/file part per non-transformed attachment, in
- * attachment order (every such part flows through one order-preserving group), and
- * those attachments are visited here in the same order. Each attachment then reads
- * the `ref` off its own part (so a mix of ref- and url-bearing parts cannot steal
- * each other's ref). The attachment's own mimeType — not the part — decides
- * image-vs-file when the stored_file is later restored.
+ * Non-transformed attachments map one-to-one with content parts by position and
+ * follow the order of `attachments`. Each attachment reads the ref from its own
+ * part, so ref and url parts never get mixed up. Whether a stored_file restores
+ * later as image or file is decided by the attachment's own mimeType, not the part.
  */
 export function buildPersistedParts(
   message: string,
@@ -39,10 +36,10 @@ export function buildPersistedParts(
     parts.push({ type: 'text', text: message });
   }
 
-  const transformedByKey = new Map<string, TransformedPart[]>();
-  // Non-transformed content parts (image/file, ref- or url-bearing) in attachment
-  // order, consumed one per non-transformed attachment below.
+    const transformedByKey = new Map<string, TransformedPart[]>();
+  // Hold non-transformed content parts (image/file, carrying ref or url) in attachment order; consumed one per non-transformed attachment below.
   const nonTransformedParts: MultimodalContent[] = [];
+
   for (const part of fileContent) {
     if (part.type === 'transformed_file') {
       const key = `${part.originalFile.name}:${part.originalFile.size}:${part.originalFile.mimeType}`;
@@ -70,9 +67,10 @@ export function buildPersistedParts(
     }
 
     const part = nonTransformedParts.shift();
+
     const ref = part && (part.type === 'image' || part.type === 'file') ? part.ref : undefined;
     if (ref) {
-      // Ref-backed: persist enough to display a placeholder and to re-send by ref.
+      // Has ref: persist enough to show a placeholder and re-send via ref.
       parts.push({
         type: 'stored_file',
         ref,
@@ -81,7 +79,7 @@ export function buildPersistedParts(
         size: attachment.file.size,
       });
     } else {
-      // Legacy url-bearing / unresolvable — metadata only, dropped on reload.
+      // url-bearing / unresolvable — metadata only, discarded on reload.
       parts.push({
         type: 'file',
         file: {

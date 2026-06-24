@@ -115,8 +115,9 @@ function FeedbackButton({ type, isSelected, onClick, selectedColor, unselectedCo
 }
 
 /**
- * Helper to check if content has file attachments (metadata-only `file` or
- * ref-backed `stored_file`), both of which render as a name/size FilePlaceholder.
+ * Helper that checks whether `content` includes a file attachment. Covers both
+ * the metadata-only `file` and the ref-based `stored_file`; both are rendered as
+ * a name/size FilePlaceholder.
  */
 function hasFileContent(content: PersistedMessageContent): content is PersistedContentPart[] {
   return (
@@ -125,7 +126,7 @@ function hasFileContent(content: PersistedMessageContent): content is PersistedC
   );
 }
 
-/** Name + size for a file-like persisted part, for the reload FilePlaceholder. */
+/** Extracts name + size from a file-bearing persisted part for the FilePlaceholder shown on reload. */
 function fileChipInfo(part: PersistedContentPart): { name: string; size: number } | null {
   if (part.type === 'file') {
     return { name: part.file.name, size: part.file.size };

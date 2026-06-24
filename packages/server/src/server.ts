@@ -2,7 +2,7 @@ import { Server as SocketIOServer, Socket } from 'socket.io';
 import { ModelMessage, ToolModelMessage } from 'ai';
 import { createHash } from 'crypto';
 import { EventType, type McpHeadersMap, type UseAIForwardedProps, type ResolveAttachments } from '@meetsmore-oss/use-ai-core';
-import { resolveAttachmentParts } from './attachmentResolution';
+import { resolveAttachmentParts, countRefParts } from './attachmentResolution';
 import type {
   UseAIServerConfig,
   McpEndpointConfig,
@@ -107,7 +107,7 @@ export class UseAIServer {
   private messageHandlers: Map<string, MessageHandler> = new Map();
   private mcpEndpoints: RemoteMcpToolsProvider[] = [];
   private serverTools: ServerToolDefinition[] = [];
-  // Optional host seam: resolves attachment refs to model-readable parts at run start.
+  // Optional host seam. Resolves attachment refs into model-readable parts at run start.
   private resolveAttachments?: ResolveAttachments;
   // Tracks client IP addresses for both WebSocket and polling transports
   private clientIpTracker: ClientIpTracker;
@@ -183,7 +183,6 @@ export class UseAIServer {
       });
     }
 
-    // Optional attachment ref resolver (host-provided seam, called at run start)
     this.resolveAttachments = config.resolveAttachments;
 
     // Initialize plugins
@@ -601,15 +600,38 @@ export class UseAIServer {
       return '';
     };
 
-    // Resolve attachment refs once, at run start, before converting to AI SDK
-    // format. The host seam turns each ref into a model-readable part (signed-URL
-    // image/file, or a text fallback); convertToAISDKContent then handles the
-    // returned parts like any url/text part. A long-lived TTL (host's contract)
-    // keeps the resolved URLs valid for the whole run, so per-step resolution
-    // is unnecessary.
-    const resolvedMessages = this.resolveAttachments
-      ? await resolveAttachmentParts(messages, this.resolveAttachments, { forwardedProps })
-      : messages;
+    // Resolve refs once at run start, before AI SDK conversion (not per step; see ResolveAttachments for the contract).
+    let resolvedMessages = messages;
+    let resolveErrored = false;
+    if (this.resolveAttachments) {
+      try {
+        resolvedMessages = await resolveAttachmentParts(messages, this.resolveAttachments, { forwardedProps });
+      } catch (error) {
+        // A resolver failure must not bring down the whole run. Degrade and continue unresolved
+        // (respond with text only), dropping the attachment; the WARN below records it.
+        resolveErrored = true;
+        logger.error('resolveAttachments failed; proceeding without resolved attachments', {
+          runId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        resolvedMessages = messages;
+      }
+    }
+
+    // Unresolved ref parts are silently dropped during conversion: the run "succeeds" but the
+    // attachment never reaches the model. Record this silent failure.
+    const unresolvedRefs = countRefParts(resolvedMessages);
+    if (unresolvedRefs > 0) {
+      logger.warn('Attachment refs left unresolved; attachments will not reach the model', {
+        runId,
+        unresolvedRefs,
+        reason: resolveErrored
+          ? 'resolver-errored'
+          : this.resolveAttachments
+            ? 'resolver-returned-ref'
+            : 'no-resolver-wired',
+      });
+    }
 
     // Convert AG-UI messages to AI SDK ModelMessage format
     const incomingMessages: ModelMessage[] = resolvedMessages.map((msg, msgIndex) => {

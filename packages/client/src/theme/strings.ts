@@ -59,7 +59,7 @@ export const defaultStrings = {
     fileSizeError: 'File "{filename}" exceeds {maxSize}MB limit',
     /** File type error (use {type} placeholder) */
     fileTypeError: 'File type "{type}" is not accepted',
-    /** Too many attachments error (use {max} placeholder) */
+    /** Error when too many files are attached (use {max} placeholder) */
     maxAttachmentsError: 'You can attach at most {max} files per message',
   },
 

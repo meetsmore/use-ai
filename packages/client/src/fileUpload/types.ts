@@ -38,35 +38,35 @@ export interface FileAttachment {
 }
 
 /**
- * Result of preparing a file for sending.
+ * Result of preparing a file for send.
  *
- * Exactly one variant is returned:
- * - `{ url }`: a directly-usable URL (base64 data URL for embed, or a remote URL).
- *   The bytes travel with the message. Legacy embed path.
- * - `{ ref }`: a persistent storage pointer (e.g. an S3 key). The bytes stay in
- *   storage; only the ref travels with the message and persists in history. The
- *   server resolves the ref to a short-lived signed URL just-in-time on each run.
+ * Only one of the two is returned:
+ * - `{ url }`: a directly usable url (an inline base64 data URL, or a remote url).
+ *   The bytes travel along with the message.
+ * - `{ ref }`: a pointer into persistent storage (e.g. an S3 key). The bytes stay in
+ *   storage; only the ref travels with the message and is kept in history. It is
+ *   resolved on the server before being passed to the model.
  *
  * A backend may also return a bare `string`, which is treated as `{ url: string }`
- * for backward compatibility with backends written against the old signature.
+ * (for backward compatibility with backends written against the older signature).
  */
 export type FileUploadResult = { url: string } | { ref: string };
 
 /**
- * Abstract file upload backend interface.
- * Converts File objects to a sendable reference at send time.
+ * Interface for an abstract file upload backend.
+ * Converts a File object into a sendable reference at send time.
  *
  * Implementations:
- * - EmbedFileUploadBackend: Converts to base64 data URL (built-in)
- * - A host S3 backend: uploads to storage and returns a persistent `ref`
+ * - EmbedFileUploadBackend: converts to a base64 data URL (built-in)
+ * - host S3 backend: uploads to storage and returns a persistent `ref`
  */
 export interface FileUploadBackend {
   /**
-   * Prepare file for sending to AI. Called at send time.
+   * Prepare a file to send to the AI. Called at send time.
    *
    * @param file - The File object to prepare
-   * @returns Either a {@link FileUploadResult} (`{ url }` or `{ ref }`) or, for
-   *          backward compatibility, a bare URL string (treated as `{ url }`).
+   * @returns A {@link FileUploadResult} (`{ url }` or `{ ref }`), or a bare url string
+   *          for backward compatibility (treated as `{ url }`).
    */
   prepareForSend(file: File): Promise<string | FileUploadResult>;
 }
@@ -168,10 +168,10 @@ export interface FileUploadConfig {
   transformers?: FileTransformerMap;
   /**
    * Maximum number of attachments allowed per message.
-   * Enforced at attach time — files beyond the limit are rejected with an error.
-   * The value is a host policy (e.g. set below the AI provider's per-message cap);
-   * use-ai only exposes the knob and does not assume a default. If undefined,
-   * the number of attachments is not limited.
+   * Enforced at attach time; files beyond the limit are rejected with an error.
+   * The value is the host's policy (e.g. set it below the AI provider's per-message
+   * limit). use-ai only exposes the knob and assumes no default. When undefined, the
+   * number of attachments is not limited.
    */
   maxAttachments?: number;
 }

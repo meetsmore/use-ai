@@ -29,17 +29,15 @@ export function transformMessagesToClientFormat(persistedMessages: PersistedMess
         if (typeof msg.content === 'string') {
           return { id: msg.id, role: 'user', content: msg.content };
         }
-        // Preserve multipart structure so the LLM sees the full original
-        // input (including transformed file text) after rehydration.
-        // transformed_file parts are wrapped in the same format the server
-        // emits on fresh sends (see packages/server/src/server.ts).
+        // Preserve the multipart structure so that, after reconstruction, the
+        // LLM can still see the full original input (including transformed_file
+        // text). transformed_file parts are wrapped in the same shape the server
+        // emits on a fresh send (see packages/server/src/server.ts).
         //
         // The wire parts below intentionally use use-ai's content shape
-        // ({ type:'image'|'file', ref }) — the canonical MultimodalContent — rather
-        // than AG-UI's `source`-based content, matching what client.sendPrompt emits.
-        // AG-UI's Message['content'] is structurally a different (source-based) shape,
-        // so the boundary cast below is required (a tighter cast would only compile by
-        // accident); client.sendPrompt casts the same way for the same reason.
+        // ({ type:'image'|'file', ref }, the canonical MultimodalContent) to
+        // match what client.sendPrompt emits. AG-UI content is a different,
+        // source-based shape, so this boundary cast is required.
         const parts = msg.content.flatMap((p): MultimodalContent[] => {
           if (p.type === 'text') {
             return [{ type: 'text', text: p.text }];
@@ -51,16 +49,16 @@ export function transformMessagesToClientFormat(persistedMessages: PersistedMess
             }];
           }
           if (p.type === 'stored_file') {
-            // Re-sendable: restore the ref wire part so the run-start resolver
-            // turns it back into a signed URL. Image vs file decided by mimeType.
+            // Resendable: restore the ref wire part so the resolver at run start
+            // can turn it back into a signed URL. image vs file is decided by mimeType.
             return [
               p.mimeType.startsWith('image/')
                 ? { type: 'image', ref: p.ref }
                 : { type: 'file', ref: p.ref, mimeType: p.mimeType, name: p.name },
             ];
           }
-          // Legacy metadata-only 'file' parts cannot be reconstructed —
-          // drop them so the rest of the history still loads.
+          // Metadata-only 'file' parts (the existing url path without a direct url)
+          // cannot be reconstructed, so drop them and let the rest of the history load.
           return [];
         });
         return {

@@ -162,8 +162,8 @@ export function useFileUpload({
   const maxAttachments = config?.maxAttachments;
   const transformers = config?.transformers;
 
-  // Mirror of `attachments` for synchronous reads inside handleFiles (which does
-  // not depend on `attachments`, so the closured value would otherwise be stale).
+  // Mirror of `attachments` for synchronous reads inside handleFiles.
+  // handleFiles does not depend on `attachments`, so without this its closure value would go stale.
   const attachmentsRef = useRef<FileAttachment[]>(attachments);
   useEffect(() => {
     attachmentsRef.current = attachments;
@@ -232,12 +232,12 @@ export function useFileUpload({
   const handleFiles = useCallback(async (files: FileList | File[]) => {
     const fileArray = Array.from(files);
 
-    // Running count of attachments (existing + accepted in this batch) to enforce
-    // the per-message cap. Only successfully-added files count toward the limit.
+    // Running attachment count to enforce the per-message limit (existing + accepted in this batch).
+    // Only successfully added files count toward the limit.
     let currentCount = attachmentsRef.current.length;
 
     for (const file of fileArray) {
-      // Check attachment count limit (host policy via config.maxAttachments)
+      // Enforce the attachment count limit (host policy via config.maxAttachments)
       if (maxAttachments !== undefined && currentCount >= maxAttachments) {
         const errorMsg = strings.fileUpload.maxAttachmentsError.replace('{max}', String(maxAttachments));
         setFileError(errorMsg);
@@ -290,8 +290,8 @@ export function useFileUpload({
    */
   const removeAttachment = useCallback((id: string) => {
     setAttachments(prev => prev.filter(a => a.id !== id));
-    // Keep the synchronous mirror in step so the maxAttachments count in handleFiles
-    // reflects the removal immediately, not only after the effect re-syncs.
+    // Keep the synchronous mirror in sync so the removal is reflected immediately in
+    // handleFiles' maxAttachments counting (without waiting for the effect to re-sync).
     attachmentsRef.current = attachmentsRef.current.filter(a => a.id !== id);
     setProcessingState(prev => {
       const next = new Map(prev);

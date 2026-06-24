@@ -411,8 +411,8 @@ export class UseAIClient {
     let messageContent: MessageContent = prompt;
 
     if (multimodalContent && multimodalContent.length > 0) {
-      // Convert our MultimodalContent to AG-UI ContentPart format.
-      // Ref-bearing parts (storage-backed) send the `ref`; legacy parts send `url`.
+      // Convert MultimodalContent into the AG-UI ContentPart shape.
+      // A part with a ref (via a storage backend) sends `ref`; a url-bearing part sends `url`.
       messageContent = multimodalContent.map(part => {
         if (part.type === 'text') {
           return { type: 'text', text: part.text };
@@ -421,8 +421,8 @@ export class UseAIClient {
             ? { type: 'image', ref: part.ref }
             : { type: 'image', url: part.url };
         } else if (part.type === 'file') {
-          // §4.1 wire: the ref form carries name (for reload/persist parity); the
-          // legacy url form is { type:'file', url, mimeType } (no name), as before.
+          // The ref form carries name (to keep reloads and persistence consistent). The
+          // url-bearing form stays { type:'file', url, mimeType } (no name).
           return part.ref
             ? { type: 'file', ref: part.ref, mimeType: part.mimeType, name: part.name }
             : { type: 'file', url: part.url, mimeType: part.mimeType };

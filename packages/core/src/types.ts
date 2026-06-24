@@ -477,32 +477,33 @@ export interface TextContent {
 /**
  * Image content part for multimodal messages.
  *
- * Exactly one of `url` or `ref` is set:
- * - `url`: a directly-usable URL (data URL / base64 or a remote URL). Legacy embed path.
- * - `ref`: a persistent storage pointer (e.g. an S3 key) that never expires. The server
- *   resolves it to a short-lived signed URL just-in-time before each run (see
- *   {@link ResolveAttachments}). Storing `ref` instead of `url` lets attachments survive
- *   history persistence and multi-turn re-sends without the URL going stale.
+ * - `url`: A directly usable URL (a data URL / base64, or a remote URL).
+ * - `ref`: An opaque, durable pointer into storage (e.g., an S3 key). It is not
+ *   usable as-is; before a run, the host's {@link ResolveAttachments} resolves it
+ *   into a model-readable part such as a url. Unlike a url it does not go stale,
+ *   so it survives history persistence and multi-turn resends.
+ *
+ * Normally only one of the two is set.
  */
 export interface ImageContent {
   type: 'image';
-  /** Image URL (data URL or remote URL). Mutually exclusive with `ref`. */
+  /** The image URL (a data URL or a remote URL). */
   url?: string;
-  /** Persistent storage ref, resolved to a signed URL server-side. Mutually exclusive with `url`. */
+  /** A durable ref into storage. Resolved by the host's {@link ResolveAttachments}. */
   ref?: string;
 }
 
 /**
  * File content part for multimodal messages.
- * Used for non-image files like PDFs, documents, etc.
+ * Used for non-image files such as PDFs and documents.
  *
- * Exactly one of `url` or `ref` is set (see {@link ImageContent} for the distinction).
+ * For the `url`/`ref` distinction, see {@link ImageContent}. Normally only one of the two is set.
  */
 export interface FileContent {
   type: 'file';
-  /** File URL (data URL or remote URL). Mutually exclusive with `ref`. */
+  /** The file URL (a data URL or a remote URL). */
   url?: string;
-  /** Persistent storage ref, resolved to a signed URL server-side. Mutually exclusive with `url`. */
+  /** A durable ref into storage. Resolved by the host's {@link ResolveAttachments}. */
   ref?: string;
   /** MIME type of the file */
   mimeType: string;
@@ -547,32 +548,31 @@ export type MultimodalContent =
 export type UserMessageContent = string | MultimodalContent[];
 
 /**
- * Context handed to a {@link ResolveAttachments} function when the server
+ * Context passed to the {@link ResolveAttachments} function when the server
  * resolves storage refs before a run.
  */
 export interface ResolveAttachmentsContext {
-  /** Forwarded props for this run (e.g. the host's auth token for ref resolution). */
+  /** The props forwarded to this run ({@link UseAIForwardedProps}). */
   forwardedProps?: UseAIForwardedProps;
 }
 
 /**
- * Host-provided seam for turning attachment refs into something the model can read.
+ * A host-provided seam for converting attachment refs into a model-readable form.
  *
- * Called once at the start of a run (never per-step) with every ref-bearing content
- * part collected across the whole message history. The host returns a replacement for
- * each input part, in the same order and count. use-ai does not interpret the parts —
- * it simply splices the returned parts back in before converting to AI SDK format.
+ * Called once at the start of a run (not per step), with all ref-bearing parts
+ * collected from the entire message history passed together. The host returns a
+ * replacement for each part in the same order and the same count. use-ai does not
+ * interpret the parts; it passes them straight back before converting to AI SDK format.
  *
- * The host is responsible for everything app-specific: resolving the ref to a signed
- * URL, choosing a TTL that outlives the run, and substituting a `{ type: 'text' }`
- * part when a file is missing or temporarily unavailable (so a broken URL is never
- * handed to the model). Returned parts must be ones use-ai already understands —
- * typically `{ type: 'image', url }`, `{ type: 'file', url, mimeType, name }`, or
- * `{ type: 'text', text }`.
+ * How refs are resolved, authorization, and handling of missing files are all the
+ * host's responsibility. The returned parts must be in a form use-ai understands —
+ * `{ type: 'image', url }` / `{ type: 'file', url, mimeType, name }` / `{ type: 'text', text }`.
+ * Since resolution happens only once at the start of a run, the returned urls must
+ * stay valid for the entire run.
  *
- * @param parts - Ref-bearing parts gathered from the run's full history.
- * @param context - Run context, including forwarded props (auth token, etc.).
- * @returns The replacement parts, same length and order as `parts`.
+ * @param parts - The ref-bearing parts collected from the run's full history.
+ * @param context - The run context, including the forwarded props.
+ * @returns The replacement parts, in the same length and order as `parts`.
  */
 export type ResolveAttachments = (
   parts: MultimodalContent[],

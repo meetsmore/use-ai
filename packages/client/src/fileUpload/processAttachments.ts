@@ -111,19 +111,15 @@ export async function getTransformedContent(
 /**
  * Normalize a backend result into a {@link FileUploadResult}.
  *
- * A bare string is treated as `{ url }` for backward compatibility; a structured
- * result (`{ url }` or `{ ref }`) is passed through. The `FileUploadResult` union
- * already constrains the shape at compile time, so no runtime validation is needed.
+ * A bare string is treated as `{ url }` for backward compatibility. A structured
+ * result (`{ url }` or `{ ref }`) is passed through as-is.
  */
 function normalizeUploadResult(result: string | FileUploadResult): FileUploadResult {
   return typeof result === 'string' ? { url: result } : result;
 }
 
 /**
- * Convert a single attachment to a multimodal content part.
- *
- * Backends that return a `ref` produce ref-bearing wire parts (the bytes stay in
- * storage); backends that return a `url` produce legacy url-bearing parts.
+ * Convert a single attachment into a multimodal content part.
  */
 async function toContentPart(
   attachment: FileAttachment,
@@ -142,8 +138,9 @@ async function toContentPart(
     };
   }
 
-  // No transformer — prepare via the backend (fast, no progress needed)
+  // No transformer — prepare via backend (fast, no progress needed)
   const result = normalizeUploadResult(await backend.prepareForSend(attachment.file));
+
   const isImage = attachment.file.type.startsWith('image/');
 
   if ('ref' in result) {
