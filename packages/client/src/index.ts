@@ -59,7 +59,7 @@ export type {
   PersistedTextContent,
   PersistedFileContent,
   PersistedTransformedFileContent,
-  PersistedStoredFileContent,
+  PersistedAttachmentRefContent,
   CreateChatOptions,
   ListChatsOptions,
 } from './providers/chatRepository/types';

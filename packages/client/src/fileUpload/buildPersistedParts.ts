@@ -17,13 +17,13 @@ type TransformedPart = Extract<MultimodalContent, { type: 'transformed_file' }>;
  * order matches what the user attached.
  *
  * Attachments that carry a ref (uploaded to storage by a backend that returns
- * a ref) are persisted as `stored_file`; carrying the ref lets them be re-sent
+ * a ref) are persisted as `attachment_ref`; carrying the ref lets them be re-sent
  * after a reload. Attachments whose part is url-bearing (inline base64 embed)
  * have no ref, so they are persisted as metadata-only `file`.
  *
  * Non-transformed attachments map one-to-one with content parts by position and
  * follow the order of `attachments`. Each attachment reads the ref from its own
- * part, so ref and url parts never get mixed up. Whether a stored_file restores
+ * part, so ref and url parts never get mixed up. Whether an attachment_ref restores
  * later as image or file is decided by the attachment's own mimeType, not the part.
  */
 export function buildPersistedParts(
@@ -72,7 +72,7 @@ export function buildPersistedParts(
     if (ref) {
       // Has ref: persist enough to show a placeholder and re-send via ref.
       parts.push({
-        type: 'stored_file',
+        type: 'attachment_ref',
         ref,
         name: attachment.file.name,
         mimeType: attachment.file.type,

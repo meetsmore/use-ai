@@ -48,7 +48,7 @@ export function transformMessagesToClientFormat(persistedMessages: PersistedMess
               text: `[Content of file "${p.originalFile.name}" (${p.originalFile.mimeType})]:\n\n${p.text}`,
             }];
           }
-          if (p.type === 'stored_file') {
+          if (p.type === 'attachment_ref') {
             // Resendable: restore the ref wire part so the resolver at run start
             // can turn it back into a signed URL. image vs file is decided by mimeType.
             return [

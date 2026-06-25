@@ -58,14 +58,14 @@ describe('transformMessagesToClientFormat', () => {
       expect(parts[0]).toEqual({ type: 'text', text: 'hi' });
     });
 
-    it('restores a stored_file image as a ref-bearing image wire part', () => {
+    it('restores an attachment_ref image as a ref-bearing image wire part', () => {
       const persisted: PersistedMessage[] = [
         {
           id: 'u1',
           role: 'user',
           content: [
             { type: 'text', text: 'look' },
-            { type: 'stored_file', ref: 'tenant/ai/user/pic.png', name: 'pic.png', mimeType: 'image/png', size: 3 },
+            { type: 'attachment_ref', ref: 'tenant/ai/user/pic.png', name: 'pic.png', mimeType: 'image/png', size: 3 },
           ],
           createdAt: new Date(),
         },
@@ -77,13 +77,13 @@ describe('transformMessagesToClientFormat', () => {
       expect(parts[1]).toEqual({ type: 'image_ref', ref: 'tenant/ai/user/pic.png' });
     });
 
-    it('restores a stored_file PDF as a ref-bearing file wire part with mimeType and name', () => {
+    it('restores an attachment_ref PDF as a ref-bearing file wire part with mimeType and name', () => {
       const persisted: PersistedMessage[] = [
         {
           id: 'u1',
           role: 'user',
           content: [
-            { type: 'stored_file', ref: 'tenant/ai/user/doc.pdf', name: 'doc.pdf', mimeType: 'application/pdf', size: 9 },
+            { type: 'attachment_ref', ref: 'tenant/ai/user/doc.pdf', name: 'doc.pdf', mimeType: 'application/pdf', size: 9 },
           ],
           createdAt: new Date(),
         },

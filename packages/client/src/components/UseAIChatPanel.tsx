@@ -116,13 +116,13 @@ function FeedbackButton({ type, isSelected, onClick, selectedColor, unselectedCo
 
 /**
  * Helper that checks whether `content` includes a file attachment. Covers both
- * the metadata-only `file` and the ref-based `stored_file`; both are rendered as
+ * the metadata-only `file` and the ref-based `attachment_ref`; both are rendered as
  * a name/size FilePlaceholder.
  */
 function hasFileContent(content: PersistedMessageContent): content is PersistedContentPart[] {
   return (
     Array.isArray(content) &&
-    content.some(part => part.type === 'file' || part.type === 'stored_file')
+    content.some(part => part.type === 'file' || part.type === 'attachment_ref')
   );
 }
 
@@ -131,7 +131,7 @@ function fileChipInfo(part: PersistedContentPart): { name: string; size: number 
   if (part.type === 'file') {
     return { name: part.file.name, size: part.file.size };
   }
-  if (part.type === 'stored_file') {
+  if (part.type === 'attachment_ref') {
     return { name: part.name, size: part.size };
   }
   return null;
