@@ -511,8 +511,8 @@ export class UseAIServer {
 
     // Types for AG-UI content blocks
     type TextBlock = { type: 'text'; text: string };
-    type ImageBlock = { type: 'image'; url: string };
-    type FileBlock = { type: 'file'; url: string; mimeType: string; name?: string };
+    type ImageBlock = { type: 'image_url'; url: string };
+    type FileBlock = { type: 'file_url'; url: string; mimeType: string; name?: string };
     type ContentBlock = TextBlock | ImageBlock | FileBlock | { type: string; [key: string]: unknown };
     type MessageContent = string | ContentBlock[] | Record<string, unknown> | undefined;
 
@@ -563,10 +563,10 @@ export class UseAIServer {
         for (const block of content) {
           if (block.type === 'text' && 'text' in block) {
             parts.push({ type: 'text', text: block.text as string });
-          } else if (block.type === 'image' && 'url' in block) {
+          } else if (block.type === 'image_url' && 'url' in block) {
             // AG-UI uses 'url', AI SDK uses 'image'
             parts.push({ type: 'image', image: block.url as string });
-          } else if (block.type === 'file' && 'url' in block) {
+          } else if (block.type === 'file_url' && 'url' in block) {
             // AG-UI uses 'url' and 'mimeType', AI SDK uses 'data' and 'mediaType'
             parts.push({
               type: 'file',

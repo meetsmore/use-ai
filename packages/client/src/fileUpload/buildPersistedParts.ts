@@ -68,7 +68,7 @@ export function buildPersistedParts(
 
     const part = nonTransformedParts.shift();
 
-    const ref = part && (part.type === 'image' || part.type === 'file') ? part.ref : undefined;
+    const ref = part && (part.type === 'image_ref' || part.type === 'file_ref') ? part.ref : undefined;
     if (ref) {
       // Has ref: persist enough to show a placeholder and re-send via ref.
       parts.push({

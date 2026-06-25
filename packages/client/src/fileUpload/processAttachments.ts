@@ -145,13 +145,13 @@ async function toContentPart(
 
   if ('ref' in result) {
     return isImage
-      ? { type: 'image', ref: result.ref }
-      : { type: 'file', ref: result.ref, mimeType: attachment.file.type, name: attachment.file.name };
+      ? { type: 'image_ref', ref: result.ref }
+      : { type: 'file_ref', ref: result.ref, mimeType: attachment.file.type, name: attachment.file.name };
   }
 
   return isImage
-    ? { type: 'image', url: result.url }
-    : { type: 'file', url: result.url, mimeType: attachment.file.type, name: attachment.file.name };
+    ? { type: 'image_url', url: result.url }
+    : { type: 'file_url', url: result.url, mimeType: attachment.file.type, name: attachment.file.name };
 }
 
 /**

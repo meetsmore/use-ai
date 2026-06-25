@@ -51,7 +51,7 @@ export interface PersistedTransformedFileContent {
  * than localStorage, and the ref is resolved on the host before the next run.
  *
  * On reload it is read two ways: as a name/size chip for display, and as a re-sendable
- * `{ type: 'image' | 'file', ref }` wire part (see `messageConversion.ts`).
+ * `{ type: 'image_ref' | 'file_ref', ref }` wire part (see `messageConversion.ts`).
  */
 export interface PersistedStoredFileContent {
   type: 'stored_file';

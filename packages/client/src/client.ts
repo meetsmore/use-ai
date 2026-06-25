@@ -411,30 +411,9 @@ export class UseAIClient {
     let messageContent: MessageContent = prompt;
 
     if (multimodalContent && multimodalContent.length > 0) {
-      // Convert MultimodalContent into the AG-UI ContentPart shape.
-      // A part with a ref (via a storage backend) sends `ref`; a url-bearing part sends `url`.
-      messageContent = multimodalContent.map(part => {
-        if (part.type === 'text') {
-          return { type: 'text', text: part.text };
-        } else if (part.type === 'image') {
-          return part.ref
-            ? { type: 'image', ref: part.ref }
-            : { type: 'image', url: part.url };
-        } else if (part.type === 'file') {
-          // The ref form carries name (to keep reloads and persistence consistent). The
-          // url-bearing form stays { type:'file', url, mimeType } (no name).
-          return part.ref
-            ? { type: 'file', ref: part.ref, mimeType: part.mimeType, name: part.name }
-            : { type: 'file', url: part.url, mimeType: part.mimeType };
-        } else {
-          // transformed_file - pass through as-is, server will convert to text
-          return {
-            type: 'transformed_file',
-            text: part.text,
-            originalFile: part.originalFile,
-          };
-        }
-      });
+      // Each MultimodalContent variant is already in the wire shape the server reads
+      // (see messageConversion.ts), so the parts go on the wire unchanged.
+      messageContent = multimodalContent as unknown as MessageContent;
     }
 
     // Add user message to conversation

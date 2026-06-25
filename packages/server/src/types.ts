@@ -163,8 +163,8 @@ export interface UseAIServerConfig<TAgents extends Record<string, import('./agen
   /**
    * Optional host seam that resolves attachment refs into content the model can read.
    *
-   * The host converts each ref into a part use-ai understands (`{ type:'image', url }` /
-   * `{ type:'file', url, mimeType, name }` / a `{ type:'text', text }` fallback when
+   * The host converts each ref into a part use-ai understands (`{ type:'image_url', url }` /
+   * `{ type:'file_url', url, mimeType, name }` / a `{ type:'text', text }` fallback when
    * the attachment is missing or unfetchable) and returns it.
    * When omitted, ref-bearing parts pass through unresolved and are silently dropped
    * during conversion (the attachment never reaches the model). See @see ResolveAttachments

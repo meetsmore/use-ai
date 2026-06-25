@@ -58,7 +58,7 @@ export type FileUploadResult = { url: string } | { ref: string };
  *
  * Implementations:
  * - EmbedFileUploadBackend: converts to a base64 data URL (built-in)
- * - host S3 backend: uploads to storage and returns a persistent `ref`
+ * - S3FileUploadBackend: uploads to storage and returns a `ref` (future)
  */
 export interface FileUploadBackend {
   /**

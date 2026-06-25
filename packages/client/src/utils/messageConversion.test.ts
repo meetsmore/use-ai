@@ -74,7 +74,7 @@ describe('transformMessagesToClientFormat', () => {
       const parts = result[0].content as Array<Record<string, unknown>>;
       expect(parts).toHaveLength(2);
       expect(parts[0]).toEqual({ type: 'text', text: 'look' });
-      expect(parts[1]).toEqual({ type: 'image', ref: 'tenant/ai/user/pic.png' });
+      expect(parts[1]).toEqual({ type: 'image_ref', ref: 'tenant/ai/user/pic.png' });
     });
 
     it('restores a stored_file PDF as a ref-bearing file wire part with mimeType and name', () => {
@@ -92,7 +92,7 @@ describe('transformMessagesToClientFormat', () => {
       const parts = result[0].content as Array<Record<string, unknown>>;
       expect(parts).toHaveLength(1);
       expect(parts[0]).toEqual({
-        type: 'file',
+        type: 'file_ref',
         ref: 'tenant/ai/user/doc.pdf',
         mimeType: 'application/pdf',
         name: 'doc.pdf',

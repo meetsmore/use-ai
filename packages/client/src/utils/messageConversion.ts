@@ -35,7 +35,7 @@ export function transformMessagesToClientFormat(persistedMessages: PersistedMess
         // emits on a fresh send (see packages/server/src/server.ts).
         //
         // The wire parts below intentionally use use-ai's content shape
-        // ({ type:'image'|'file', ref }, the canonical MultimodalContent) to
+        // ({ type:'image_ref'|'file_ref', ref }, the canonical MultimodalContent) to
         // match what client.sendPrompt emits. AG-UI content is a different,
         // source-based shape, so this boundary cast is required.
         const parts = msg.content.flatMap((p): MultimodalContent[] => {
@@ -53,8 +53,8 @@ export function transformMessagesToClientFormat(persistedMessages: PersistedMess
             // can turn it back into a signed URL. image vs file is decided by mimeType.
             return [
               p.mimeType.startsWith('image/')
-                ? { type: 'image', ref: p.ref }
-                : { type: 'file', ref: p.ref, mimeType: p.mimeType, name: p.name },
+                ? { type: 'image_ref', ref: p.ref }
+                : { type: 'file_ref', ref: p.ref, mimeType: p.mimeType, name: p.name },
             ];
           }
           // Metadata-only 'file' parts (the existing url path without a direct url)

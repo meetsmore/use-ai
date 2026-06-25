@@ -41,7 +41,7 @@ describe('buildPersistedParts', () => {
 
   it('falls back to metadata-only when the attachment has no transformed output', () => {
     const attachment = makeAttachment('a1', 'pic.png', 3, 'image/png');
-    const fileContent: MultimodalContent[] = [{ type: 'image', url: 'data:...' }];
+    const fileContent: MultimodalContent[] = [{ type: 'image_url', url: 'data:...' }];
     const parts = buildPersistedParts('', [attachment], fileContent);
     expect(parts).toEqual([
       {
@@ -78,7 +78,7 @@ describe('buildPersistedParts', () => {
 
   it('persists a ref-bearing image attachment as stored_file', () => {
     const attachment = makeAttachment('a1', 'pic.png', 3, 'image/png');
-    const fileContent: MultimodalContent[] = [{ type: 'image', ref: 'tenant/ai/user/abc.png' }];
+    const fileContent: MultimodalContent[] = [{ type: 'image_ref', ref: 'tenant/ai/user/abc.png' }];
     const parts = buildPersistedParts('', [attachment], fileContent);
     expect(parts).toEqual([
       {
@@ -94,7 +94,7 @@ describe('buildPersistedParts', () => {
   it('persists a ref-bearing file (PDF) attachment as stored_file', () => {
     const attachment = makeAttachment('a1', 'doc.pdf', 8, 'application/pdf');
     const fileContent: MultimodalContent[] = [
-      { type: 'file', ref: 'tenant/ai/user/doc.pdf', mimeType: 'application/pdf', name: 'doc.pdf' },
+      { type: 'file_ref', ref: 'tenant/ai/user/doc.pdf', mimeType: 'application/pdf', name: 'doc.pdf' },
     ];
     const parts = buildPersistedParts('', [attachment], fileContent);
     expect(parts).toEqual([
@@ -115,8 +115,8 @@ describe('buildPersistedParts', () => {
     const img = makeAttachment('i1', 'a.png', 1, 'image/png');
     const pdf = makeAttachment('p1', 'b.pdf', 2, 'application/pdf');
     const fileContent: MultimodalContent[] = [
-      { type: 'image', ref: 'IMG-REF' },
-      { type: 'file', ref: 'PDF-REF', mimeType: 'application/pdf', name: 'b.pdf' },
+      { type: 'image_ref', ref: 'IMG-REF' },
+      { type: 'file_ref', ref: 'PDF-REF', mimeType: 'application/pdf', name: 'b.pdf' },
     ];
     const parts = buildPersistedParts('', [img, pdf], fileContent);
     expect(parts).toEqual([
@@ -136,8 +136,8 @@ describe('buildPersistedParts', () => {
       // transformer group emitted first
       { type: 'transformed_file', text: 'MID', originalFile: { name: 'mid.pdf', mimeType: 'application/pdf', size: 2 } },
       // null group: the two image refs, in attachment order
-      { type: 'image', ref: 'REF-A' },
-      { type: 'image', ref: 'REF-C' },
+      { type: 'image_ref', ref: 'REF-A' },
+      { type: 'image_ref', ref: 'REF-C' },
     ];
     const parts = buildPersistedParts('', [imgA, pdfMid, imgC], fileContent);
     expect(parts).toEqual([
@@ -153,8 +153,8 @@ describe('buildPersistedParts', () => {
     const urlImg = makeAttachment('u', 'u.png', 1, 'image/png');
     const refImg = makeAttachment('r', 'r.png', 2, 'image/png');
     const fileContent: MultimodalContent[] = [
-      { type: 'image', url: 'data:image/png;base64,AAAA' },
-      { type: 'image', ref: 'R' },
+      { type: 'image_url', url: 'data:image/png;base64,AAAA' },
+      { type: 'image_ref', ref: 'R' },
     ];
     const parts = buildPersistedParts('', [urlImg, refImg], fileContent);
     expect(parts).toEqual([
@@ -167,8 +167,8 @@ describe('buildPersistedParts', () => {
     const a1 = makeAttachment('a1', 'dup.png', 1, 'image/png');
     const a2 = makeAttachment('a2', 'dup.png', 1, 'image/png');
     const fileContent: MultimodalContent[] = [
-      { type: 'image', ref: 'REF-ONE' },
-      { type: 'image', ref: 'REF-TWO' },
+      { type: 'image_ref', ref: 'REF-ONE' },
+      { type: 'image_ref', ref: 'REF-TWO' },
     ];
     const parts = buildPersistedParts('', [a1, a2], fileContent);
     expect(parts.map((p) => (p as { ref?: string }).ref)).toEqual(['REF-ONE', 'REF-TWO']);
@@ -186,7 +186,7 @@ describe('buildPersistedParts', () => {
       { type: 'transformed_file', text: 'P1', originalFile: { name: 'first.pdf', mimeType: 'application/pdf', size: 1 } },
       { type: 'transformed_file', text: 'P2', originalFile: { name: 'second.pdf', mimeType: 'application/pdf', size: 1 } },
       // null (no-transformer) group emitted second
-      { type: 'image', url: 'data:img' },
+      { type: 'image_url', url: 'data:img' },
     ];
     const parts = buildPersistedParts('', [pdf1, img, pdf2], fileContent);
     expect(parts).toHaveLength(3);

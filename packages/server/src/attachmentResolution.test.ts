@@ -23,32 +23,32 @@ describe('resolveAttachmentParts', () => {
     const messages = [
       msg('user', [
         { type: 'text', text: 'a' },
-        { type: 'image', ref: 'REF-1' },
+        { type: 'image_ref', ref: 'REF-1' },
       ]),
       msg('assistant', 'ok'),
-      msg('user', [{ type: 'file', ref: 'REF-2', mimeType: 'application/pdf', name: 'd.pdf' }]),
+      msg('user', [{ type: 'file_ref', ref: 'REF-2', mimeType: 'application/pdf', name: 'd.pdf' }]),
     ];
     let calls = 0;
     let received: MultimodalContent[] = [];
     const resolve = async (parts: MultimodalContent[]) => {
       calls++;
       received = parts;
-      return parts.map((p) => ({ type: 'image' as const, url: `https://signed/${(p as { ref: string }).ref}` }));
+      return parts.map((p) => ({ type: 'image_url' as const, url: `https://signed/${(p as { ref: string }).ref}` }));
     };
     const result = await resolveAttachmentParts(messages, resolve, ctx);
 
     expect(calls).toBe(1);
     expect(received.map((p) => (p as { ref: string }).ref)).toEqual(['REF-1', 'REF-2']);
     // Replacements spliced back into their original positions.
-    expect((result[0].content as unknown[])[1]).toEqual({ type: 'image', url: 'https://signed/REF-1' });
-    expect((result[2].content as unknown[])[0]).toEqual({ type: 'image', url: 'https://signed/REF-2' });
+    expect((result[0].content as unknown[])[1]).toEqual({ type: 'image_url', url: 'https://signed/REF-1' });
+    expect((result[2].content as unknown[])[0]).toEqual({ type: 'image_url', url: 'https://signed/REF-2' });
     // Non-ref parts untouched.
     expect((result[0].content as unknown[])[0]).toEqual({ type: 'text', text: 'a' });
     expect(result[1].content).toBe('ok');
   });
 
   it('does not mutate the input messages', async () => {
-    const original = msg('user', [{ type: 'image', ref: 'REF-1' }]);
+    const original = msg('user', [{ type: 'image_ref', ref: 'REF-1' }]);
     const messages = [original];
     const snapshot = JSON.parse(JSON.stringify(original));
     const resolve = async (parts: MultimodalContent[]) =>
@@ -66,9 +66,9 @@ describe('resolveAttachmentParts', () => {
   it('preserves order when a single message has multiple refs', async () => {
     const messages = [
       msg('user', [
-        { type: 'image', ref: 'A' },
+        { type: 'image_ref', ref: 'A' },
         { type: 'text', text: 'between' },
-        { type: 'image', ref: 'B' },
+        { type: 'image_ref', ref: 'B' },
       ]),
     ];
     const resolve = async (parts: MultimodalContent[]) =>
@@ -81,7 +81,7 @@ describe('resolveAttachmentParts', () => {
   });
 
   it('passes the context through to resolve', async () => {
-    const messages = [msg('user', [{ type: 'image', ref: 'REF' }])];
+    const messages = [msg('user', [{ type: 'image_ref', ref: 'REF' }])];
     let seen: ResolveAttachmentsContext | undefined;
     const resolve = async (parts: MultimodalContent[], context: ResolveAttachmentsContext) => {
       seen = context;
@@ -92,13 +92,13 @@ describe('resolveAttachmentParts', () => {
   });
 
   it('throws when resolve returns a different count than it was given', async () => {
-    const messages = [msg('user', [{ type: 'image', ref: 'A' }, { type: 'image', ref: 'B' }])];
+    const messages = [msg('user', [{ type: 'image_ref', ref: 'A' }, { type: 'image_ref', ref: 'B' }])];
     const resolve = async () => [{ type: 'text' as const, text: 'only-one' }];
     await expect(resolveAttachmentParts(messages, resolve, ctx)).rejects.toThrow(/one part per input ref/);
   });
 
   it('ignores empty-string refs', async () => {
-    const messages = [msg('user', [{ type: 'image', ref: '' }])];
+    const messages = [msg('user', [{ type: 'image_ref', ref: '' }])];
     const resolve = async () => {
       throw new Error('should not be called for empty ref');
     };
@@ -110,29 +110,18 @@ describe('resolveAttachmentParts', () => {
 describe('countRefParts', () => {
   it('counts surviving ref parts across all messages', () => {
     const messages = [
-      msg('user', [{ type: 'text', text: 'a' }, { type: 'image', ref: 'R1' }]),
+      msg('user', [{ type: 'text', text: 'a' }, { type: 'image_ref', ref: 'R1' }]),
       msg('assistant', 'ok'),
-      msg('user', [{ type: 'file', ref: 'R2', mimeType: 'application/pdf', name: 'd.pdf' }]),
+      msg('user', [{ type: 'file_ref', ref: 'R2', mimeType: 'application/pdf', name: 'd.pdf' }]),
     ];
     expect(countRefParts(messages)).toBe(2);
   });
 
   it('returns 0 once refs are resolved (url/text/string parts have no ref)', () => {
     const messages = [
-      msg('user', [{ type: 'image', url: 'https://signed/x' }]),
+      msg('user', [{ type: 'image_url', url: 'https://signed/x' }]),
       msg('user', [{ type: 'text', text: 'unavailable' }]),
       msg('user', 'plain string'),
-    ];
-    expect(countRefParts(messages)).toBe(0);
-  });
-
-  it('does not count a part that carries both url and ref (reaches the model via url)', () => {
-    // A host that spreads the input and forgets to drop `ref` produces {url, ref}.
-    // convertToAISDKContent uses the url, so the attachment still reaches the model.
-    // We must not warn about such a part.
-    const messages = [
-      msg('user', [{ type: 'image', url: 'https://signed/x', ref: 'R1' }]),
-      msg('user', [{ type: 'file', url: 'https://signed/y', ref: 'R2', mimeType: 'application/pdf', name: 'd.pdf' }]),
     ];
     expect(countRefParts(messages)).toBe(0);
   });

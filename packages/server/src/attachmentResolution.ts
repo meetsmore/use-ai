@@ -6,8 +6,8 @@ import type {
 } from '@meetsmore-oss/use-ai-core';
 
 /**
- * Whether `part` is an attachment wire part carrying a `ref`: an `image`/`file`
- * part with a non-empty `ref` string, awaiting resolution when needed.
+ * Whether `part` is an attachment wire part carrying a `ref`: an `image_ref` /
+ * `file_ref` part with a non-empty `ref` string, awaiting resolution.
  */
 function hasRef(part: unknown): part is MultimodalContent {
   if (typeof part !== 'object' || part === null) {
@@ -15,16 +15,16 @@ function hasRef(part: unknown): part is MultimodalContent {
   }
   const p = part as { type?: unknown; ref?: unknown };
   return (
-    (p.type === 'image' || p.type === 'file') &&
+    (p.type === 'image_ref' || p.type === 'file_ref') &&
     typeof p.ref === 'string' &&
     p.ref.length > 0
   );
 }
 
 /**
- * Counts only ref parts without a `url` (the ones actually dropped during
- * conversion), for observability. Parts carrying both `url` and `ref` are not
- * counted, since they reach the model via the `url`.
+ * Counts the `image_ref` / `file_ref` parts left in the history, for observability.
+ * After resolution these become `image_url` / `file_url`; any that remain were not
+ * resolved and are dropped during conversion (the attachment never reaches the model).
  */
 export function countRefParts(messages: Message[]): number {
   let count = 0;
@@ -32,7 +32,7 @@ export function countRefParts(messages: Message[]): number {
     const content = (msg as { content?: unknown }).content;
     if (Array.isArray(content)) {
       for (const part of content) {
-        if (hasRef(part) && !('url' in (part as { url?: unknown }))) count++;
+        if (hasRef(part)) count++;
       }
     }
   }

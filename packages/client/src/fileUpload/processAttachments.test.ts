@@ -41,8 +41,8 @@ describe('processAttachments', () => {
       const result = await processAttachments([attachment], { getCurrentChat: testGetCurrentChat, backend: mockBackend });
 
       expect(result).toHaveLength(1);
-      expect(result[0].type).toBe('image');
-      expect((result[0] as { type: 'image'; url: string }).url).toContain('data:image/png;base64,');
+      expect(result[0].type).toBe('image_url');
+      expect((result[0] as { type: 'image_url'; url: string }).url).toContain('data:image/png;base64,');
     });
 
     it('processes non-images as file content', async () => {
@@ -50,8 +50,8 @@ describe('processAttachments', () => {
       const result = await processAttachments([attachment], { getCurrentChat: testGetCurrentChat, backend: mockBackend });
 
       expect(result).toHaveLength(1);
-      expect(result[0].type).toBe('file');
-      const fileContent = result[0] as { type: 'file'; url: string; mimeType: string; name: string };
+      expect(result[0].type).toBe('file_url');
+      const fileContent = result[0] as { type: 'file_url'; url: string; mimeType: string; name: string };
       expect(fileContent.mimeType).toBe('application/pdf');
       expect(fileContent.name).toBe('document.pdf');
       expect(fileContent.url).toContain('data:application/pdf;base64,');
@@ -66,8 +66,8 @@ describe('processAttachments', () => {
       const result = await processAttachments(attachments, { getCurrentChat: testGetCurrentChat, backend: mockBackend });
 
       expect(result).toHaveLength(2);
-      expect(result[0].type).toBe('image');
-      expect(result[1].type).toBe('file');
+      expect(result[0].type).toBe('image_url');
+      expect(result[1].type).toBe('file_url');
     });
   });
 
@@ -82,7 +82,7 @@ describe('processAttachments', () => {
     it('emits a ref-bearing image part (no url)', async () => {
       const attachment = createAttachment('1', 'photo.png', 'image/png');
       const [part] = await processAttachments([attachment], { getCurrentChat: testGetCurrentChat, backend: refBackend });
-      expect(part).toEqual({ type: 'image', ref: 'tenant/ai/user/photo.png' });
+      expect(part).toEqual({ type: 'image_ref', ref: 'tenant/ai/user/photo.png' });
       expect((part as { url?: string }).url).toBeUndefined();
     });
 
@@ -90,7 +90,7 @@ describe('processAttachments', () => {
       const attachment = createAttachment('1', 'doc.pdf', 'application/pdf');
       const [part] = await processAttachments([attachment], { getCurrentChat: testGetCurrentChat, backend: refBackend });
       expect(part).toEqual({
-        type: 'file',
+        type: 'file_ref',
         ref: 'tenant/ai/user/doc.pdf',
         mimeType: 'application/pdf',
         name: 'doc.pdf',
@@ -105,7 +105,7 @@ describe('processAttachments', () => {
       };
       const attachment = createAttachment('1', 'photo.png', 'image/png');
       const [part] = await processAttachments([attachment], { getCurrentChat: testGetCurrentChat, backend: stringBackend });
-      expect(part).toEqual({ type: 'image', url: 'data:image/png;base64,AAAA' });
+      expect(part).toEqual({ type: 'image_url', url: 'data:image/png;base64,AAAA' });
     });
   });
 
@@ -227,7 +227,7 @@ describe('processAttachments', () => {
       });
 
       expect(result).toHaveLength(1);
-      expect(result[0].type).toBe('image'); // Not transformed_file
+      expect(result[0].type).toBe('image_url'); // Not transformed_file
     });
 
     it('matches wildcard patterns', async () => {

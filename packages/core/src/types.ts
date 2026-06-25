@@ -475,41 +475,27 @@ export interface TextContent {
 }
 
 /**
- * Image content part for multimodal messages.
+ * Image content part for multimodal messages. One of two variants, since a part
+ * carries either a usable URL or a storage ref, never both:
  *
- * - `url`: A directly usable URL (a data URL / base64, or a remote URL).
- * - `ref`: An opaque, durable pointer into storage (e.g., an S3 key). It is not
+ * - `image_url`: a directly usable `url` (a data URL / base64, or a remote URL).
+ * - `image_ref`: an opaque, durable storage `ref` (e.g. an S3 key). It is not
  *   usable as-is; before a run, the host's {@link ResolveAttachments} resolves it
- *   into a model-readable part such as a url. Unlike a url it does not go stale,
- *   so it survives history persistence and multi-turn resends.
- *
- * Normally only one of the two is set.
+ *   into an `image_url`. Unlike a url it does not go stale, so it survives history
+ *   persistence and multi-turn resends.
  */
-export interface ImageContent {
-  type: 'image';
-  /** The image URL (a data URL or a remote URL). */
-  url?: string;
-  /** A durable ref into storage. Resolved by the host's {@link ResolveAttachments}. */
-  ref?: string;
-}
+export type ImageContent =
+  | { type: 'image_url'; url: string }
+  | { type: 'image_ref'; ref: string };
 
 /**
- * File content part for multimodal messages.
- * Used for non-image files such as PDFs and documents.
- *
- * For the `url`/`ref` distinction, see {@link ImageContent}. Normally only one of the two is set.
+ * File content part for multimodal messages (non-image files such as PDFs and
+ * documents). One of two variants; see {@link ImageContent} for the `url`/`ref`
+ * distinction.
  */
-export interface FileContent {
-  type: 'file';
-  /** The file URL (a data URL or a remote URL). */
-  url?: string;
-  /** A durable ref into storage. Resolved by the host's {@link ResolveAttachments}. */
-  ref?: string;
-  /** MIME type of the file */
-  mimeType: string;
-  /** Original file name */
-  name: string;
-}
+export type FileContent =
+  | { type: 'file_url'; url: string; mimeType: string; name: string }
+  | { type: 'file_ref'; ref: string; mimeType: string; name: string };
 
 /**
  * Transformed file content part for multimodal messages.
@@ -566,7 +552,9 @@ export interface ResolveAttachmentsContext {
  *
  * How refs are resolved, authorization, and handling of missing files are all the
  * host's responsibility. The returned parts must be in a form use-ai understands —
- * `{ type: 'image', url }` / `{ type: 'file', url, mimeType, name }` / `{ type: 'text', text }`.
+ * `{ type: 'image_url', url }` / `{ type: 'file_url', url, mimeType, name }` / `{ type: 'text', text }`.
+ * The tag is authoritative: a part left tagged `image_ref`/`file_ref` is treated as
+ * unresolved and dropped (with a warning), even if it also carries a `url`.
  * Since resolution happens only once at the start of a run, the returned urls must
  * stay valid for the entire run.
  *
