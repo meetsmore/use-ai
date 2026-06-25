@@ -1,0 +1,67 @@
+packages/client/src/client.ts
+  s_9fa765da1ece7b::t_faf4d21f693fd0 414-416
+packages/core/src/types.ts
+  s_9fa765da1ece7b::t_cb4a706273a364 478-479,481-482,484-485,487-489,492-494,496-498
+  s_9fa765da1ece7b::t_6e8310d4724bb5 555
+  s_9fa765da1ece7b::t_5c51e4d3fc83b9 556-557
+packages/client/src/fileUpload/buildPersistedParts.ts
+  s_9fa765da1ece7b::t_8b0710ba62b2bb 71
+packages/server/src/attachmentResolution.ts
+  s_9fa765da1ece7b::t_b1d3edd6dd490a 9-10,18,25-27,35
+packages/client/src/fileUpload/types.ts
+  s_9fa765da1ece7b::t_8c3a17f93703f6 61
+packages/server/src/server.ts
+  s_9fa765da1ece7b::t_cb0d87c0770851 569
+  s_9fa765da1ece7b::t_da043d837a364f 514-515
+  s_9fa765da1ece7b::t_196f950a05519f 566
+packages/server/src/attachmentResolution.test.ts
+  s_9fa765da1ece7b::t_1009a4104aa2e0 43-44,122
+  s_9fa765da1ece7b::t_2bf13330edbc88 36
+  s_9fa765da1ece7b::t_851277cfbe5160 26,51,69,71,84,95,101,113
+  s_9fa765da1ece7b::t_82a62bd9d0b5f0 29,115
+packages/client/src/fileUpload/processAttachments.test.ts
+  s_9fa765da1ece7b::t_6d0fd30d1ab809 44,69,230
+  s_9fa765da1ece7b::t_123d68303e9aec 54
+  s_9fa765da1ece7b::t_c4683e9e61b022 85
+  s_9fa765da1ece7b::t_d10b9ca0a4148e 45
+  s_9fa765da1ece7b::t_487378694b27a1 53,70
+  s_9fa765da1ece7b::t_cffbf8c8dc7203 93
+  s_9fa765da1ece7b::t_2accc5fa5ac7b5 108
+packages/server/src/types.ts
+  s_9fa765da1ece7b::t_eefd67e4ac97b2 166-167
+packages/client/src/utils/messageConversion.ts
+  s_9fa765da1ece7b::t_ef0c7175aa8951 56-57
+  s_9fa765da1ece7b::t_1d7ff796acd18e 38
+packages/client/src/fileUpload/processAttachments.ts
+  s_9fa765da1ece7b::t_ba4919d2359f2c 148-149,153-154
+packages/client/src/utils/messageConversion.test.ts
+  s_9fa765da1ece7b::t_f8b91c93bd54cc 95
+  s_9fa765da1ece7b::t_47e8167bd9bb6a 77
+packages/client/src/providers/chatRepository/types.ts
+  s_9fa765da1ece7b::t_23836ab6f89f20 54
+packages/client/src/fileUpload/buildPersistedParts.test.ts
+  s_9fa765da1ece7b::t_b36086787fa57c 81,118,139-140,157,170-171
+  s_9fa765da1ece7b::t_8a145e2e4de261 44,156,189
+  s_9fa765da1ece7b::t_c45ddba63aabc7 97,119
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.13",
+  "base_commit_sha": "9797575242b3348fb068de60a19c3b8ff2e5f830",
+  "prompts": {},
+  "humans": {
+    "h_51e7b7c10a76e4": {
+      "author": "yuma.ito <yuma.ito@meetsmore.com>"
+    }
+  },
+  "sessions": {
+    "s_9fa765da1ece7b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d5edb21c-360f-4256-b0e2-e1e84043ae33",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "yuma.ito <yuma.ito@meetsmore.com>"
+    }
+  }
+}
