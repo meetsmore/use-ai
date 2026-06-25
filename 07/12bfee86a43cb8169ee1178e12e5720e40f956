@@ -1,0 +1,45 @@
+packages/client/src/fileUpload/buildPersistedParts.ts
+  s_9fa765da1ece7b::t_4436e99f297527 20,26
+  s_9fa765da1ece7b::t_5dacc70ee39cca 75
+packages/client/src/index.ts
+  s_9fa765da1ece7b::t_1f19a1a5da22d3 62
+packages/client/src/components/FileChip.tsx
+  s_9fa765da1ece7b::t_91f4de5b72b904 220
+packages/client/src/components/UseAIChatPanel.tsx
+  s_9fa765da1ece7b::t_c50190b67a12b0 134
+  s_9fa765da1ece7b::t_d16b0252b6f8a0 119,125
+packages/client/src/utils/messageConversion.ts
+  s_9fa765da1ece7b::t_aab05c1353937b 51
+packages/client/src/utils/messageConversion.test.ts
+  s_9fa765da1ece7b::t_ca71e3f4aae5b2 68,86
+  s_9fa765da1ece7b::t_52fb1b0a000bc8 80
+  s_9fa765da1ece7b::t_b7bc9e3d9f2e8e 61
+packages/client/src/providers/chatRepository/types.ts
+  s_9fa765da1ece7b::t_58de933996818f 72,78
+  s_9fa765da1ece7b::t_f36dde72852ae5 46,53-56,58-59
+packages/client/src/fileUpload/buildPersistedParts.test.ts
+  s_9fa765da1ece7b::t_6e8c880333fbfc 85,102,123-124,144,146,162
+  s_9fa765da1ece7b::t_9c16129fa2e956 79
+  s_9fa765da1ece7b::t_87337c16db1876 94
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.13",
+  "base_commit_sha": "0712bfee86a43cb8169ee1178e12e5720e40f956",
+  "prompts": {},
+  "humans": {
+    "h_51e7b7c10a76e4": {
+      "author": "yuma.ito <yuma.ito@meetsmore.com>"
+    }
+  },
+  "sessions": {
+    "s_9fa765da1ece7b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d5edb21c-360f-4256-b0e2-e1e84043ae33",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "yuma.ito <yuma.ito@meetsmore.com>"
+    }
+  }
+}
