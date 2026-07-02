@@ -6,7 +6,8 @@ import type { ToolDefinition } from '../types';
 import type { RemoteToolDefinition } from '../mcp';
 import type { ServerToolDefinition } from '../tools/types';
 import { v4 as uuidv4 } from 'uuid';
-import { MockLanguageModelV3, simulateReadableStream } from 'ai/test';
+import { MockLanguageModelV3 } from 'ai/test';
+import { simulateReadableStream } from 'ai';
 import {
   isRemoteTool,
   createGlobFilter,

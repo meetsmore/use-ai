@@ -4,7 +4,8 @@ import type { AgentInput, EventEmitter, AGUIEventExtended } from './types';
 import { EventType } from '../types';
 import type { ToolDefinition } from '../types';
 import { v4 as uuidv4 } from 'uuid';
-import { MockLanguageModelV3, simulateReadableStream } from 'ai/test';
+import { MockLanguageModelV3 } from 'ai/test';
+import { simulateReadableStream } from 'ai';
 
 /**
  * Server-side tests: AISDKAgent emits TEXT_MESSAGE_START/END per step.

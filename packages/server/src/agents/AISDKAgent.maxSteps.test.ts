@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import { MockLanguageModelV3, simulateReadableStream } from 'ai/test';
+import { MockLanguageModelV3 } from 'ai/test';
+import { simulateReadableStream } from 'ai';
 import { v4 as uuidv4 } from 'uuid';
 import { AISDKAgent } from './AISDKAgent';
 import type { AgentInput, EventEmitter, AGUIEventExtended } from './types';

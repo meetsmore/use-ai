@@ -3,7 +3,8 @@ import { AISDKAgent } from './AISDKAgent';
 import type { AgentInput, EventEmitter, AGUIEventExtended } from './types';
 import { EventType } from '../types';
 import { v4 as uuidv4 } from 'uuid';
-import { MockLanguageModelV3, simulateReadableStream } from 'ai/test';
+import { MockLanguageModelV3 } from 'ai/test';
+import { simulateReadableStream } from 'ai';
 import type { JSONValue } from 'ai';
 
 function createTestInput(overrides: Partial<AgentInput> = {}): AgentInput {
