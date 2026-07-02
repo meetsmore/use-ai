@@ -1,0 +1,53 @@
+packages/server/src/agents/AISDKAgent.ts
+  s_159f68ccd6fc21::t_05e1920c5e2551 804,806
+  s_159f68ccd6fc21::t_81a6c08b5244ba 414-418
+  s_159f68ccd6fc21::t_630204a48ad246 401-413,419-435,1518
+  s_159f68ccd6fc21::t_41bc1ef596564c 1519-1529,1531-1537
+  s_159f68ccd6fc21::t_00c7a935800d49 1530
+  s_159f68ccd6fc21::t_2753b7de9de280 732-733
+  s_159f68ccd6fc21::t_d138fcf7174d48 1022
+  s_159f68ccd6fc21::t_35ef8b1fedc9b5 555,568
+  s_159f68ccd6fc21::t_50f76a64e9c4b2 181-186,191-198
+  s_159f68ccd6fc21::t_728f5af39d6519 97-112,127-128,199
+  s_159f68ccd6fc21::t_de98868b56184c 617-623,637-643
+  s_159f68ccd6fc21::t_d8167c1d07aca9 790,796,798
+  s_159f68ccd6fc21::t_af15c4725c1589 187-190
+  s_159f68ccd6fc21::t_b1256af757616b 795,999
+  s_159f68ccd6fc21::t_e7eed87e3191ba 96,180,1538
+packages/server/src/agents/index.ts
+  s_159f68ccd6fc21::t_8add7b5d3aebec 7
+packages/server/src/agents/AISDKAgent.test.ts
+  s_159f68ccd6fc21::t_dc5da8ba54f7d8 3981-4067,4133
+  s_159f68ccd6fc21::t_6c95f1acd9c4bd 3820-3823
+  s_159f68ccd6fc21::t_f60ec8dfc08787 3714,3727-3756
+  s_159f68ccd6fc21::t_bf96e2b7f08fd9 4068-4072,4074-4093,4095,4097-4100,4102,4110-4132
+  s_159f68ccd6fc21::t_9a5d91737c5993 1-3
+  s_159f68ccd6fc21::t_a6fd0ecb823122 3650-3713,3715-3726,3757-3819,3824-3980,4073,4094,4096,4101,4103-4109
+  s_159f68ccd6fc21::t_f0c1f422725a37 4134
+packages/server/src/index.ts
+  s_159f68ccd6fc21::t_e8594e8d09c3ec 7
+packages/server/src/agents/AISDKAgent.maxSteps.test.ts
+  s_159f68ccd6fc21::t_af09ac1ed60a92 211-223
+  s_159f68ccd6fc21::t_debe56d6e51e74 205-210
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.8",
+  "base_commit_sha": "d28b9fdb5fecc9dff23d21d9d1a93f67d7ea9d71",
+  "prompts": {},
+  "humans": {
+    "h_51e7b7c10a76e4": {
+      "author": "yuma.ito <yuma.ito@meetsmore.com>"
+    }
+  },
+  "sessions": {
+    "s_159f68ccd6fc21": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4d332bbf-9e6d-491e-9b72-e32beac08ddd",
+        "model": "claude-fable-5"
+      },
+      "human_author": "yuma.ito <yuma.ito@meetsmore.com>"
+    }
+  }
+}
