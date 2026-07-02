@@ -1,5 +1,6 @@
-import { describe, expect, test, mock } from 'bun:test';
-import { AISDKAgent } from './AISDKAgent';
+import { describe, expect, test, mock, spyOn } from 'bun:test';
+import { AISDKAgent, type AISDKRuntimeConfig } from './AISDKAgent';
+import { logger } from '../logger';
 import type { AgentInput, EventEmitter, AGUIEventExtended } from './types';
 import { EventType, ErrorCode } from '../types';
 import type { ToolDefinition } from '../types';
@@ -3644,6 +3645,491 @@ describe('AISDKAgent', () => {
       // Run should finish (RUN_FINISHED), not error.
       const runFinished = emittedEvents.find(e => e.type === EventType.RUN_FINISHED);
       expect(runFinished).toBeDefined();
+    });
+  });
+
+  describe('runtimeConfig (per-run dynamic configuration)', () => {
+    test('overrides the model for the run; static model is not called', async () => {
+      const staticModel = createStreamingTextMockModel('from static');
+      const overrideModel = createStreamingTextMockModel('from override');
+      const agent = new AISDKAgent({
+        model: staticModel,
+        runtimeConfig: () => ({ model: overrideModel }),
+      });
+
+      const emittedEvents: AGUIEventExtended[] = [];
+      const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
+
+      const result = await agent.run(createTestInput(), eventEmitter);
+
+      expect(result.success).toBe(true);
+      expect(overrideModel.doStreamCalls.length).toBe(1);
+      expect(staticModel.doStreamCalls.length).toBe(0);
+      const textContent = emittedEvents.find(e => e.type === EventType.TEXT_MESSAGE_CONTENT);
+      expect((textContent as { delta: string }).delta).toBe('from override');
+    });
+
+    test('overrides generation parameters for the run', async () => {
+      const mockModel = createStreamingTextMockModel('Hello');
+      const agent = new AISDKAgent({
+        model: mockModel,
+        temperature: 0.9,
+        maxOutputTokens: 4096,
+        providerOptions: { gateway: { only: ['anthropic'] } },
+        runtimeConfig: async () => ({
+          temperature: 0.2,
+          maxOutputTokens: 1234,
+          providerOptions: { gateway: { only: ['bedrock'] } },
+        }),
+      });
+
+      const eventEmitter: EventEmitter = { emit: () => {} };
+      await agent.run(createTestInput(), eventEmitter);
+
+      expect(mockModel.doStreamCalls.length).toBe(1);
+      const call = mockModel.doStreamCalls[0];
+      expect(call.temperature).toBe(0.2);
+      expect(call.maxOutputTokens).toBe(1234);
+      expect(call.providerOptions).toEqual({ gateway: { only: ['bedrock'] } });
+    });
+
+    test('partial overrides keep static values for omitted fields', async () => {
+      const mockModel = createStreamingTextMockModel('Hello');
+      const agent = new AISDKAgent({
+        model: mockModel,
+        temperature: 0.9,
+        providerOptions: { gateway: { only: ['anthropic'] } },
+        runtimeConfig: () => ({ maxOutputTokens: 512 }),
+      });
+
+      const eventEmitter: EventEmitter = { emit: () => {} };
+      await agent.run(createTestInput(), eventEmitter);
+
+      const call = mockModel.doStreamCalls[0];
+      expect(call.maxOutputTokens).toBe(512);
+      expect(call.temperature).toBe(0.9);
+      expect(call.providerOptions).toEqual({ gateway: { only: ['anthropic'] } });
+    });
+
+    test('resolver failure logs a warning, falls back to the full static config, and the run continues', async () => {
+      const mockModel = createStreamingTextMockModel('Hello');
+      const agent = new AISDKAgent({
+        model: mockModel,
+        temperature: 0.7,
+        runtimeConfig: async () => {
+          throw new Error('Langfuse unavailable');
+        },
+      });
+
+      const emittedEvents: AGUIEventExtended[] = [];
+      const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
+
+      const warnSpy = spyOn(logger, 'warn');
+      try {
+        const result = await agent.run(createTestInput(), eventEmitter);
+
+        expect(result.success).toBe(true);
+        expect(mockModel.doStreamCalls.length).toBe(1);
+        expect(mockModel.doStreamCalls[0].temperature).toBe(0.7);
+        const runFinished = emittedEvents.find(e => e.type === EventType.RUN_FINISHED);
+        expect(runFinished).toBeDefined();
+
+        const resolverWarn = warnSpy.mock.calls.find(
+          ([message]) => String(message).includes('runtimeConfig resolver failed'),
+        );
+        expect(resolverWarn).toBeDefined();
+        expect((resolverWarn![1] as { error: string }).error).toBe('Langfuse unavailable');
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
+
+    test('nullish resolver return falls back to the static config', async () => {
+      const mockModel = createStreamingTextMockModel('Hello');
+      const agent = new AISDKAgent({
+        model: mockModel,
+        temperature: 0.7,
+        // A plain-JS consumer can return undefined despite the TS signature
+        runtimeConfig: (() => undefined) as unknown as () => AISDKRuntimeConfig,
+      });
+
+      const eventEmitter: EventEmitter = { emit: () => {} };
+      const result = await agent.run(createTestInput(), eventEmitter);
+
+      expect(result.success).toBe(true);
+      expect(mockModel.doStreamCalls[0].temperature).toBe(0.7);
+    });
+
+    test('runtimeConfig systemPrompt takes precedence and the static hook is not called', async () => {
+      const mockModel = createStreamingTextMockModel('Hello');
+      let hookCalled = false;
+      const agent = new AISDKAgent({
+        model: mockModel,
+        systemPrompt: () => {
+          hookCalled = true;
+          return 'static prompt';
+        },
+        runtimeConfig: () => ({ systemPrompt: 'dynamic prompt' }),
+      });
+
+      const eventEmitter: EventEmitter = { emit: () => {} };
+      await agent.run(createTestInput(), eventEmitter);
+
+      const systemMessages = (mockModel.doStreamCalls[0].prompt as Array<{ role: string; content: unknown }>)
+        .filter(m => m.role === 'system');
+      expect(systemMessages.map(m => m.content)).toEqual(['dynamic prompt']);
+      expect(hookCalled).toBe(false);
+    });
+
+    test('falls back to the systemPrompt config when the resolver omits systemPrompt', async () => {
+      const mockModel = createStreamingTextMockModel('Hello');
+      const agent = new AISDKAgent({
+        model: mockModel,
+        systemPrompt: 'static prompt',
+        runtimeConfig: () => ({ temperature: 0 }),
+      });
+
+      const eventEmitter: EventEmitter = { emit: () => {} };
+      await agent.run(createTestInput(), eventEmitter);
+
+      const systemMessages = (mockModel.doStreamCalls[0].prompt as Array<{ role: string; content: unknown }>)
+        .filter(m => m.role === 'system');
+      expect(systemMessages.map(m => m.content)).toEqual(['static prompt']);
+    });
+
+    test('resolved per run: updated values take effect on the next run without restart', async () => {
+      const mockModel = createStreamingTextMockModel('Hello');
+      let currentTemperature = 0.1;
+      const agent = new AISDKAgent({
+        model: mockModel,
+        runtimeConfig: () => ({ temperature: currentTemperature }),
+      });
+
+      const eventEmitter: EventEmitter = { emit: () => {} };
+
+      await agent.run(createTestInput(), eventEmitter);
+      expect(mockModel.doStreamCalls[0].temperature).toBe(0.1);
+
+      // Simulate a config change in the external source (e.g., Langfuse)
+      currentTemperature = 0.8;
+
+      await agent.run(createTestInput(), eventEmitter);
+      expect(mockModel.doStreamCalls[1].temperature).toBe(0.8);
+    });
+
+    // The complete-tool-call loop bound (`stepIteration <= ctx.resolved.maxSteps`)
+    // is covered in AISDKAgent.maxSteps.test.ts; this pins the graceful-summary
+    // check on the truncation-retry path.
+    test('maxSteps override stops the incomplete-tool-call retry loop', async () => {
+      let callCount = 0;
+
+      // Always truncates mid-tool-input so the loop only stops at maxSteps
+      const mockModel = new MockLanguageModelV3({
+        doStream: async () => {
+          callCount++;
+          return {
+            stream: simulateReadableStream({
+              chunks: [
+                { type: 'tool-input-start', id: `tool-call-${callCount}`, toolName: 'addRows' },
+                { type: 'tool-input-delta', id: `tool-call-${callCount}`, delta: '{"rows": [' },
+                {
+                  type: 'finish',
+                  finishReason: 'length' as const,
+                  usage: { inputTokens: 100, outputTokens: 4096, totalTokens: 4196 },
+                },
+              ],
+            }),
+            response: {
+              id: `response-${callCount}`,
+              timestamp: new Date(),
+              modelId: 'mock-model',
+              headers: {},
+              messages: [],
+            },
+          };
+        },
+      });
+
+      const agent = new AISDKAgent({
+        model: mockModel,
+        runtimeConfig: () => ({ maxSteps: 2 }),
+      });
+
+      const eventEmitter: EventEmitter = { emit: () => {} };
+      const input = createTestInput({
+        tools: [
+          {
+            name: 'addRows',
+            description: 'Add rows to a table',
+            parameters: {
+              type: 'object',
+              properties: { rows: { type: 'array', items: { type: 'object' } } },
+              required: ['rows'],
+            },
+          },
+        ],
+      });
+
+      await agent.run(input, eventEmitter);
+
+      // Static default is 10; the override must bound the loop instead
+      expect(callCount).toBe(2);
+    });
+
+    test('token-limit recovery reports the resolved maxOutputTokens, not the static one', async () => {
+      const toolCallId = 'tool-call-truncated';
+      let callCount = 0;
+      let secondCallMessages: unknown[] = [];
+
+      const mockModel = new MockLanguageModelV3({
+        doStream: async ({ prompt }) => {
+          callCount++;
+
+          if (callCount === 1) {
+            // Truncated mid-tool-input by the (overridden) output token limit
+            return {
+              stream: simulateReadableStream({
+                chunks: [
+                  { type: 'tool-input-start', id: toolCallId, toolName: 'addRows' },
+                  { type: 'tool-input-delta', id: toolCallId, delta: '{"rows": [{"name": "Al' },
+                  {
+                    type: 'finish',
+                    finishReason: 'length' as const,
+                    usage: { inputTokens: 100, outputTokens: 2048, totalTokens: 2148 },
+                  },
+                ],
+              }),
+              response: {
+                id: 'response-1',
+                timestamp: new Date(),
+                modelId: 'mock-model',
+                headers: {},
+                messages: [],
+              },
+            };
+          }
+
+          secondCallMessages = prompt as unknown[];
+          return {
+            stream: simulateReadableStream({
+              chunks: [
+                { type: 'text-start', id: 'text-1' },
+                { type: 'text-delta', id: 'text-1', delta: 'Recovered' },
+                { type: 'text-end', id: 'text-1' },
+                {
+                  type: 'finish',
+                  finishReason: 'stop' as const,
+                  usage: { inputTokens: 200, outputTokens: 10, totalTokens: 210 },
+                },
+              ],
+            }),
+            response: {
+              id: 'response-2',
+              timestamp: new Date(),
+              modelId: 'mock-model',
+              headers: {},
+              messages: [{ role: 'assistant', content: 'Recovered' }],
+            },
+          };
+        },
+      });
+
+      const agent = new AISDKAgent({
+        model: mockModel,
+        // Static default maxOutputTokens is 4096; the run must use 2048 everywhere
+        runtimeConfig: () => ({ maxOutputTokens: 2048 }),
+      });
+
+      const eventEmitter: EventEmitter = { emit: () => {} };
+      const input = createTestInput({
+        tools: [
+          {
+            name: 'addRows',
+            description: 'Add rows to a table',
+            parameters: {
+              type: 'object',
+              properties: { rows: { type: 'array', items: { type: 'object' } } },
+              required: ['rows'],
+            },
+          },
+        ],
+      });
+
+      const result = await agent.run(input, eventEmitter);
+
+      expect(result.success).toBe(true);
+      expect(callCount).toBe(2);
+      expect(mockModel.doStreamCalls[0].maxOutputTokens).toBe(2048);
+
+      // The synthetic recovery tool_result must quote the value the run
+      // actually applied, not the static config
+      const toolResultValues: string[] = [];
+      for (const msg of secondCallMessages as Array<{ role: string; content: unknown }>) {
+        if (msg.role === 'tool' && Array.isArray(msg.content)) {
+          for (const part of msg.content) {
+            if ((part as { type: string }).type === 'tool-result') {
+              toolResultValues.push((part as { output: { value: string } }).output.value);
+            }
+          }
+        }
+      }
+      expect(toolResultValues.length).toBe(1);
+      expect(toolResultValues[0]).toContain('maxOutputTokens: 2048');
+      expect(toolResultValues[0]).not.toContain('4096');
+    });
+
+    test('truncation fallback step clamps to the resolved maxOutputTokens and logs it', async () => {
+      // Override below TRUNCATION_FALLBACK_MAX_TOKENS (256) so the fallback
+      // cap distinguishes resolved from static: min(100, 256) = 100, whereas
+      // the static default would give min(4096, 256) = 256.
+      let callCount = 0;
+
+      const mockModel = new MockLanguageModelV3({
+        doStream: async () => {
+          callCount++;
+
+          if (callCount === 1) {
+            // Truncated mid-text: finish 'length' with no incomplete tool calls
+            return {
+              stream: simulateReadableStream({
+                chunks: [
+                  { type: 'text-start', id: 'text-1' },
+                  { type: 'text-delta', id: 'text-1', delta: 'long output...' },
+                  {
+                    type: 'finish',
+                    finishReason: 'length' as const,
+                    usage: { inputTokens: 100, outputTokens: 100, totalTokens: 200 },
+                  },
+                ],
+              }),
+              response: {
+                id: 'response-1',
+                timestamp: new Date(),
+                modelId: 'mock-model',
+                headers: {},
+                messages: [{ role: 'assistant', content: 'long output...' }],
+              },
+            };
+          }
+
+          // Fallback acknowledgment step
+          return {
+            stream: simulateReadableStream({
+              chunks: [
+                { type: 'text-start', id: 'text-2' },
+                { type: 'text-delta', id: 'text-2', delta: 'Stopping here.' },
+                { type: 'text-end', id: 'text-2' },
+                {
+                  type: 'finish',
+                  finishReason: 'stop' as const,
+                  usage: { inputTokens: 100, outputTokens: 10, totalTokens: 110 },
+                },
+              ],
+            }),
+            response: {
+              id: 'response-2',
+              timestamp: new Date(),
+              modelId: 'mock-model',
+              headers: {},
+              messages: [{ role: 'assistant', content: 'Stopping here.' }],
+            },
+          };
+        },
+      });
+
+      const agent = new AISDKAgent({
+        model: mockModel,
+        // Static default maxOutputTokens is 4096
+        runtimeConfig: () => ({ maxOutputTokens: 100 }),
+      });
+
+      const eventEmitter: EventEmitter = { emit: () => {} };
+      const warnSpy = spyOn(logger, 'warn');
+      try {
+        const result = await agent.run(createTestInput(), eventEmitter);
+
+        expect(result.success).toBe(true);
+        expect(callCount).toBe(2);
+        expect(mockModel.doStreamCalls[0].maxOutputTokens).toBe(100);
+        // Fallback step: min(resolved 100, 256) = 100, not min(static 4096, 256) = 256
+        expect(mockModel.doStreamCalls[1].maxOutputTokens).toBe(100);
+
+        // The truncation warn log must report the resolved value
+        const truncationWarn = warnSpy.mock.calls.find(
+          ([message]) => String(message).includes('Output truncated mid-text/reasoning'),
+        );
+        expect(truncationWarn).toBeDefined();
+        expect((truncationWarn![1] as { maxOutputTokens: number }).maxOutputTokens).toBe(100);
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
+
+    test('cache breakpoints follow the resolved model in both directions', async () => {
+      const capturedMessages = { messages: [] as unknown[] };
+      const aiModule = await import('ai');
+      const originalStreamText = aiModule.streamText;
+
+      /** Same capture pattern as the "Prompt caching" describe above */
+      const mockStreamText = (options: { messages: unknown[] }) => {
+        capturedMessages.messages = options.messages;
+        return {
+          fullStream: (async function* () {
+            yield { type: 'text-start', id: 'text-1' };
+            yield { type: 'text-delta', id: 'text-1', text: 'Response' };
+            yield { type: 'text-end', id: 'text-1' };
+            yield {
+              type: 'finish',
+              finishReason: 'stop',
+              usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
+            };
+          })(),
+          response: Promise.resolve({
+            id: 'response-1',
+            timestamp: new Date(),
+            modelId: 'mock-model',
+            headers: {},
+            messages: [{ role: 'assistant', content: 'Response' }],
+          }),
+        };
+      };
+
+      mock.module('ai', () => ({
+        ...aiModule,
+        streamText: mockStreamText,
+      }));
+
+      const runWithModels = async (staticModel: MockLanguageModelV3, overrideModel: MockLanguageModelV3) => {
+        const agent = new AISDKAgent({
+          model: staticModel,
+          cacheBreakpoint: (msg) => msg.role === 'system' || msg.isLast,
+          runtimeConfig: () => ({ model: overrideModel }),
+        });
+        const eventEmitter: EventEmitter = { emit: () => {} };
+        await agent.run(createTestInput({ systemPrompt: 'You are a helpful assistant.' }), eventEmitter);
+      };
+      const anthropicModel = () => new MockLanguageModelV3({ provider: 'anthropic', modelId: 'claude-3-5-sonnet-20241022' });
+      const openaiModel = () => new MockLanguageModelV3({ provider: 'openai', modelId: 'gpt-4-turbo' });
+
+      // Static non-Anthropic, override Anthropic: breakpoints applied (system + last message)
+      await runWithModels(openaiModel(), anthropicModel());
+      const messagesWithCache = capturedMessages.messages.filter(
+        (msg: unknown) => (msg as { providerOptions?: { anthropic?: { cacheControl?: unknown } } })
+          .providerOptions?.anthropic?.cacheControl
+      );
+      expect(messagesWithCache.length).toBe(2);
+
+      // Static Anthropic, override non-Anthropic: breakpoints skipped
+      await runWithModels(anthropicModel(), openaiModel());
+      const hasProviderOptions = capturedMessages.messages.some(
+        (msg: unknown) => (msg as { providerOptions?: unknown }).providerOptions
+      );
+      expect(hasProviderOptions).toBe(false);
+
+      mock.module('ai', () => ({
+        ...aiModule,
+        streamText: originalStreamText,
+      }));
     });
   });
 });

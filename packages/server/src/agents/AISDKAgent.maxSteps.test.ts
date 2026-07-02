@@ -208,6 +208,25 @@ describe('AISDKAgent maxSteps', () => {
     expect(calls.count).toBe(3);
   });
 
+  test('uses maxSteps from runtimeConfig override', async () => {
+    const calls = { count: 0 };
+    const mockModel = createToolLoopMockModel(loopToolName, calls);
+    // Static default is 10; the resolved override must bound the loop instead
+    const agent = new AISDKAgent({
+      model: mockModel,
+      runtimeConfig: () => ({ maxSteps: 2 }),
+    });
+
+    const emittedEvents: AGUIEventExtended[] = [];
+    const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
+
+    const result = await agent.run(createTestInput([loopTool]), eventEmitter);
+
+    expect(result.success).toBe(true);
+    // 2 main iterations + 1 graceful summary call = 3 total
+    expect(calls.count).toBe(3);
+  });
+
   test('emits text message after maxSteps when last step had tool calls', async () => {
     const calls = { count: 0 };
     const mockModel = createToolThenTextMockModel(loopToolName, 2, calls);

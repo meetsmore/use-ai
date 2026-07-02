@@ -94,6 +94,23 @@ class AbortError extends Error {
 }
 
 /**
+ * Effective configuration for a single run: the static agent config with any
+ * runtimeConfig overrides applied (see {@link AISDKAgentConfig.runtimeConfig}).
+ *
+ * Invariant: every read of these values during a run MUST go through this
+ * object, never `this.*` — otherwise a run mixes dynamically-resolved values
+ * with stale static ones (e.g. error-recovery messages reporting a
+ * maxOutputTokens that was not actually applied).
+ */
+interface ResolvedRunConfig {
+  model: LanguageModel;
+  temperature: number | undefined;
+  maxOutputTokens: number;
+  maxSteps: number;
+  providerOptions: Record<string, Record<string, JSONValue>> | undefined;
+}
+
+/**
  * Mutable state for a single run() invocation.
  * All fields are local to one call — no cross-request sharing.
  */
@@ -107,6 +124,8 @@ interface RunContext {
   readonly state: unknown;
   readonly originalInput: AgentInput['originalInput'];
   readonly staticSystemMessages: SystemModelMessage[] | undefined;
+  /** Effective config for this run (static config + runtimeConfig overrides) */
+  readonly resolved: ResolvedRunConfig;
 
   // Streaming state (mutated during run)
   streamTextStarted: boolean;
@@ -157,6 +176,26 @@ interface StepContext {
    */
   toolCallSignatures: Map<string, Record<string, Record<string, unknown>>>;
   stepFinishReason: string | undefined;
+}
+/**
+ * Per-run configuration overrides returned by {@link AISDKAgentConfig.runtimeConfig}.
+ *
+ * Every field is optional: a returned field replaces the corresponding static
+ * config value for that run only; an omitted field keeps the static value.
+ */
+export interface AISDKRuntimeConfig {
+  /**
+   * Overrides the `systemPrompt` config for this run (the static hook is not
+   * called). An empty string is treated as absent: the static config applies.
+   */
+  systemPrompt?: string;
+  /** Model for this run. Accepts a model instance or a gateway model ID string. */
+  model?: LanguageModel;
+  temperature?: number;
+  maxOutputTokens?: number;
+  maxSteps?: number;
+  /** Passed to `streamText` as-is; replaces (not merges with) the static providerOptions. */
+  providerOptions?: Record<string, Record<string, JSONValue>>;
 }
 
 /**
@@ -359,6 +398,41 @@ export interface AISDKAgentConfig {
    * @default 10
    */
   maxSteps?: number;
+
+  /**
+   * Optional resolver for per-run configuration overrides.
+   *
+   * Called once at the start of every run() — the same lifecycle point where
+   * function-form `systemPrompt` is resolved — so values fetched from external
+   * sources (e.g., Langfuse prompt config) take effect on the next request
+   * without server restart. The agent itself does not cache the result.
+   *
+   * Fields returned override the static config for that run only; omitted
+   * fields keep their static values. If the resolver throws, a warning is
+   * logged and the run falls back to the full static config.
+   *
+   * When the result includes a non-empty `systemPrompt`, it takes precedence
+   * and the `systemPrompt` config (including its function form) is not
+   * consulted for that run — one fetch can supply both prompt and model
+   * settings. An empty string is treated as absent, matching how the
+   * `systemPrompt` config itself is resolved.
+   *
+   * @example
+   * ```typescript
+   * {
+   *   model: 'anthropic/claude-3-5-sonnet-20241022', // static fallback
+   *   runtimeConfig: async () => {
+   *     const prompt = await langfuse.prompt.get('my-prompt', { type: 'text' });
+   *     return {
+   *       systemPrompt: prompt.prompt,
+   *       model: prompt.config?.model,
+   *       temperature: prompt.config?.temperature,
+   *     };
+   *   },
+   * }
+   * ```
+   */
+  runtimeConfig?: () => AISDKRuntimeConfig | Promise<AISDKRuntimeConfig>;
 }
 
 const DEFAULT_MAX_OUTPUT_TOKENS = 4096;
@@ -478,6 +552,7 @@ export class AISDKAgent implements Agent {
   private maxOutputTokens: number;
   private temperature?: number;
   private maxSteps: number;
+  private runtimeConfig?: () => AISDKRuntimeConfig | Promise<AISDKRuntimeConfig>;
 
   constructor(config: AISDKAgentConfig) {
     this.model = config.model;
@@ -490,6 +565,7 @@ export class AISDKAgent implements Agent {
     this.maxOutputTokens = config.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS;
     this.temperature = config.temperature;
     this.maxSteps = config.maxSteps ?? DEFAULT_MAX_STEPS;
+    this.runtimeConfig = config.runtimeConfig;
   }
 
   getName(): string {
@@ -538,8 +614,13 @@ export class AISDKAgent implements Agent {
       session.tools = tools;
     }
 
-    // Resolve config system prompt (may be async, e.g., fetched from Langfuse)
-    const configSystemPrompt = await this.resolveSystemPrompt();
+    // Resolve per-run config overrides (may be async, e.g., fetched from Langfuse)
+    const overrides = await this.resolveRuntimeConfig();
+
+    // Resolve config system prompt. An override wins and short-circuits the
+    // static hook (avoids a second fetch when both come from the same source);
+    // `||` mirrors resolveSystemPrompt's treatment of empty strings as absent.
+    const configSystemPrompt = overrides.systemPrompt || await this.resolveSystemPrompt();
     const staticSystemMessages = this.buildStaticSystemMessages(configSystemPrompt, runtimeSystemPrompt);
 
     // Sanitize messages before sending to ensure no provider-specific fields leak through
@@ -553,6 +634,13 @@ export class AISDKAgent implements Agent {
       state,
       originalInput,
       staticSystemMessages,
+      resolved: {
+        model: overrides.model ?? this.model,
+        temperature: overrides.temperature ?? this.temperature,
+        maxOutputTokens: overrides.maxOutputTokens ?? this.maxOutputTokens,
+        maxSteps: overrides.maxSteps ?? this.maxSteps,
+        providerOptions: overrides.providerOptions ?? this.providerOptions,
+      },
 
       streamTextStarted: false,
       finalText: '',
@@ -641,8 +729,8 @@ export class AISDKAgent implements Agent {
     events: EventEmitter,
     span: ReturnType<typeof startRunSpan>,
   ): Promise<void> {
-    for (let stepIteration = 0; stepIteration <= this.maxSteps; stepIteration++) {
-      const isGracefulSummaryStep = stepIteration === this.maxSteps;
+    for (let stepIteration = 0; stepIteration <= ctx.resolved.maxSteps; stepIteration++) {
+      const isGracefulSummaryStep = stepIteration === ctx.resolved.maxSteps;
       if (isGracefulSummaryStep && !ctx.lastStepHadToolCalls) break;
 
       const isTruncationFallbackStep = ctx.truncationFallbackPending;
@@ -699,23 +787,23 @@ export class AISDKAgent implements Agent {
       const messagesWithCache = applyCacheBreakpoints(
         stepConfig.messages,
         this.cacheBreakpoint,
-        this.model
+        ctx.resolved.model
       );
 
       ctx.streamTextStarted = true;
       const stepMaxOutputTokens = isTruncationFallbackStep
-        ? Math.min(this.maxOutputTokens, TRUNCATION_FALLBACK_MAX_TOKENS)
-        : this.maxOutputTokens;
+        ? Math.min(ctx.resolved.maxOutputTokens, TRUNCATION_FALLBACK_MAX_TOKENS)
+        : ctx.resolved.maxOutputTokens;
       const createStream = () => streamText({
-        model: this.model,
+        model: ctx.resolved.model,
         messages: messagesWithCache,
         tools: stepConfig.tools,
         // Run ONE step at a time to allow tool refresh between steps
         stopWhen: stepCountIs(1),
         maxOutputTokens: stepMaxOutputTokens,
-        temperature: this.temperature,
+        temperature: ctx.resolved.temperature,
         abortSignal: ctx.session.abortController?.signal,
-        providerOptions: this.providerOptions,
+        providerOptions: ctx.resolved.providerOptions,
         experimental_telemetry: span.active
           ? { isEnabled: true, functionId: 'use-ai', metadata: stepConfig.metadata }
           : undefined,
@@ -908,7 +996,7 @@ export class AISDKAgent implements Agent {
     ctx.currentMessages = [...ctx.currentMessages, fallbackMessage];
     ctx.truncationFallbackPending = true;
     logger.warn('Output truncated mid-text/reasoning by maxOutputTokens; running fallback iteration', {
-      maxOutputTokens: this.maxOutputTokens,
+      maxOutputTokens: ctx.resolved.maxOutputTokens,
       appendingToMessageId: ctx.pendingTextMessageId ?? undefined,
     });
     return true;
@@ -931,7 +1019,7 @@ export class AISDKAgent implements Agent {
       .filter(([id]) => !stepCtx.completedToolCalls.has(id))
       .map(([id, call]) => ({ id, ...call }));
     const recoveryMessages = buildRecoveryToolResults(
-      incompleteToolCalls, stepCtx.stepFinishReason, this.maxOutputTokens,
+      incompleteToolCalls, stepCtx.stepFinishReason, ctx.resolved.maxOutputTokens,
     );
     if (recoveryMessages.length === 0) {
       return false;
@@ -1426,6 +1514,27 @@ export class AISDKAgent implements Agent {
       error: errorMessage,
       conversationHistory: ctx.messages,
     };
+  }
+  /**
+   * Resolves the runtimeConfig hook into per-run overrides.
+   *
+   * Returns an empty object when no hook is configured, when the hook returns
+   * a nullish value, or when it throws — so createRunContext always has a safe
+   * overrides object and the run falls back to the static config.
+   */
+  private async resolveRuntimeConfig(): Promise<AISDKRuntimeConfig> {
+    if (!this.runtimeConfig) {
+      return {};
+    }
+    try {
+      return (await this.runtimeConfig()) ?? {};
+    } catch (error) {
+      logger.warn('runtimeConfig resolver failed; falling back to static config', {
+        agentName: this.name,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return {};
+    }
   }
 
   /**
