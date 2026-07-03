@@ -16,6 +16,7 @@ import type {
   ToolApprovalResponseMessage,
   AgentInfo,
   MultimodalContent,
+  UserMessageContent,
   FeedbackValue,
   UseAIForwardedProps,
   ReasoningMessageContentEvent,
@@ -405,22 +406,20 @@ export class UseAIClient {
    */
   async sendPrompt(prompt: string, multimodalContent?: MultimodalContent[], forwardedProps?: UseAIForwardedProps) {
     // Build message content - use multimodal if provided, otherwise just the text
-    // AG-UI Message type expects content to be string | ContentPart[]
-    // For multimodal content, we pass the array; for text-only, we pass the string
-    type MessageContent = string | Array<{ type: string; [key: string]: unknown }>;
-    let messageContent: MessageContent = prompt;
+    let messageContent: UserMessageContent = prompt;
 
     if (multimodalContent && multimodalContent.length > 0) {
       // Each MultimodalContent variant is already in the wire shape the server reads
       // (see messageConversion.ts), so the parts go on the wire unchanged.
-      messageContent = multimodalContent as unknown as MessageContent;
+      messageContent = multimodalContent;
     }
 
     // Add user message to conversation
     const userMessage: Message = {
       id: uuidv4(),
       role: 'user',
-      content: messageContent as string, // Type cast needed for Message type compatibility
+      // @ag-ui/core declares Message.content as `string`; the wire also carries MultimodalContent[].
+      content: messageContent as string,
     };
     this._messages.push(userMessage);
 
