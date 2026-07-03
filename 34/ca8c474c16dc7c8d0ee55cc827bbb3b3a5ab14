@@ -1,0 +1,26 @@
+packages/client/src/client.ts
+  s_159f68ccd6fc21::t_733698f446ff70 421
+  s_159f68ccd6fc21::t_a1f1b961e5465e 409,414,422
+  s_159f68ccd6fc21::t_5a13d8eca4991c 19
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "34ca8c474c16dc7c8d0ee55cc827bbb3b3a5ab14",
+  "prompts": {},
+  "humans": {
+    "h_51e7b7c10a76e4": {
+      "author": "yuma.ito <yuma.ito@meetsmore.com>"
+    }
+  },
+  "sessions": {
+    "s_159f68ccd6fc21": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4d332bbf-9e6d-491e-9b72-e32beac08ddd",
+        "model": "claude-fable-5"
+      },
+      "human_author": null
+    }
+  }
+}
