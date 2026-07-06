@@ -3,6 +3,7 @@ export {
   type PersistedFileMetadata,
   type FileAttachment,
   type FileUploadBackend,
+  type FileUploadResult,
   type FileUploadConfig,
   type FileTransformer,
   type FileTransformerMap,

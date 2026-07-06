@@ -58,6 +58,8 @@ export type {
   PersistedContentPart,
   PersistedTextContent,
   PersistedFileContent,
+  PersistedTransformedFileContent,
+  PersistedAttachmentRefContent,
   CreateChatOptions,
   ListChatsOptions,
 } from './providers/chatRepository/types';
@@ -70,6 +72,7 @@ export { matchesMimeType, findTransformerPattern } from './fileUpload/mimeTypeMa
 export { processAttachments, clearTransformationCache } from './fileUpload/processAttachments';
 export type {
   FileUploadBackend,
+  FileUploadResult,
   FileUploadConfig,
   FileAttachment,
   PersistedFileMetadata,

@@ -1,7 +1,8 @@
 import { Server as SocketIOServer, Socket } from 'socket.io';
 import { ModelMessage, ToolModelMessage } from 'ai';
 import { createHash } from 'crypto';
-import { EventType, type McpHeadersMap, type UseAIForwardedProps } from '@meetsmore-oss/use-ai-core';
+import { EventType, type McpHeadersMap, type UseAIForwardedProps, type ResolveAttachments } from '@meetsmore-oss/use-ai-core';
+import { resolveAttachmentParts, countRefParts } from './attachmentResolution';
 import type {
   UseAIServerConfig,
   McpEndpointConfig,
@@ -94,7 +95,7 @@ export class UseAIServer {
   private defaultAgentId: string; // ID of the default agent
   private agents: Record<string, Agent>; // Registry of all agents
   private clients: Map<string, ClientSession> = new Map();
-  private config: Required<Omit<UseAIServerConfig, 'defaultAgent' | 'agents' | 'plugins' | 'tools' | 'mcpEndpoints' | 'maxHttpBufferSize' | 'cors' | 'idleTimeout' | 'runtime' | 'spanProcessors'>> & {
+  private config: Required<Omit<UseAIServerConfig, 'defaultAgent' | 'agents' | 'plugins' | 'tools' | 'mcpEndpoints' | 'maxHttpBufferSize' | 'cors' | 'idleTimeout' | 'runtime' | 'spanProcessors' | 'resolveAttachments'>> & {
     maxHttpBufferSize: number;
     cors?: CorsOptions;
     idleTimeout: number;
@@ -106,6 +107,8 @@ export class UseAIServer {
   private messageHandlers: Map<string, MessageHandler> = new Map();
   private mcpEndpoints: RemoteMcpToolsProvider[] = [];
   private serverTools: ServerToolDefinition[] = [];
+  // Optional host seam. Resolves attachment refs into model-readable parts at run start.
+  private resolveAttachments?: ResolveAttachments;
   // Tracks client IP addresses for both WebSocket and polling transports
   private clientIpTracker: ClientIpTracker;
 
@@ -179,6 +182,8 @@ export class UseAIServer {
         names: this.serverTools.map(t => t.name),
       });
     }
+
+    this.resolveAttachments = config.resolveAttachments;
 
     // Initialize plugins
     this.plugins = config.plugins ?? [];
@@ -506,8 +511,8 @@ export class UseAIServer {
 
     // Types for AG-UI content blocks
     type TextBlock = { type: 'text'; text: string };
-    type ImageBlock = { type: 'image'; url: string };
-    type FileBlock = { type: 'file'; url: string; mimeType: string; name?: string };
+    type ImageBlock = { type: 'image_url'; url: string };
+    type FileBlock = { type: 'file_url'; url: string; mimeType: string; name?: string };
     type ContentBlock = TextBlock | ImageBlock | FileBlock | { type: string; [key: string]: unknown };
     type MessageContent = string | ContentBlock[] | Record<string, unknown> | undefined;
 
@@ -558,10 +563,10 @@ export class UseAIServer {
         for (const block of content) {
           if (block.type === 'text' && 'text' in block) {
             parts.push({ type: 'text', text: block.text as string });
-          } else if (block.type === 'image' && 'url' in block) {
+          } else if (block.type === 'image_url' && 'url' in block) {
             // AG-UI uses 'url', AI SDK uses 'image'
             parts.push({ type: 'image', image: block.url as string });
-          } else if (block.type === 'file' && 'url' in block) {
+          } else if (block.type === 'file_url' && 'url' in block) {
             // AG-UI uses 'url' and 'mimeType', AI SDK uses 'data' and 'mediaType'
             parts.push({
               type: 'file',
@@ -595,8 +600,41 @@ export class UseAIServer {
       return '';
     };
 
+    // Resolve refs once at run start, before AI SDK conversion (not per step; see ResolveAttachments for the contract).
+    let resolvedMessages = messages;
+    let resolveErrored = false;
+    if (this.resolveAttachments) {
+      try {
+        resolvedMessages = await resolveAttachmentParts(messages, this.resolveAttachments, { forwardedProps });
+      } catch (error) {
+        // A resolver failure must not bring down the whole run. Degrade and continue unresolved
+        // (respond with text only), dropping the attachment; the WARN below records it.
+        resolveErrored = true;
+        logger.error('resolveAttachments failed; proceeding without resolved attachments', {
+          runId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        resolvedMessages = messages;
+      }
+    }
+
+    // Unresolved ref parts are silently dropped during conversion: the run "succeeds" but the
+    // attachment never reaches the model. Record this silent failure.
+    const unresolvedRefs = countRefParts(resolvedMessages);
+    if (unresolvedRefs > 0) {
+      logger.warn('Attachment refs left unresolved; attachments will not reach the model', {
+        runId,
+        unresolvedRefs,
+        reason: resolveErrored
+          ? 'resolver-errored'
+          : this.resolveAttachments
+            ? 'resolver-returned-ref'
+            : 'no-resolver-wired',
+      });
+    }
+
     // Convert AG-UI messages to AI SDK ModelMessage format
-    const incomingMessages: ModelMessage[] = messages.map((msg, msgIndex) => {
+    const incomingMessages: ModelMessage[] = resolvedMessages.map((msg, msgIndex) => {
       if (msg.role === 'user') {
         return {
           role: 'user' as const,
@@ -713,7 +751,7 @@ export class UseAIServer {
         let toolName: string | undefined;
         let toolEncryptedValue: string | undefined;
         for (let i = msgIndex - 1; i >= 0; i--) {
-          const prevToolCalls = (messages[i] as { toolCalls?: Array<{
+          const prevToolCalls = (resolvedMessages[i] as { toolCalls?: Array<{
             id: string;
             function: { name: string };
             encryptedValue?: string;

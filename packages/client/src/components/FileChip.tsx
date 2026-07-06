@@ -216,8 +216,8 @@ export interface FilePlaceholderProps {
 }
 
 /**
- * A placeholder component shown for files that are no longer available
- * (e.g., when loading a persisted message with file references).
+ * A name/size placeholder for rendering a persisted file attachment after reload.
+ * Used for either a metadata-only `file` that cannot be resent, or a ref-backed `attachment_ref` (resent by ref on the next run).
  */
 export function FilePlaceholder({ name, size }: FilePlaceholderProps) {
   const theme = useTheme();

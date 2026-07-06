@@ -16,6 +16,7 @@ import type {
   ToolApprovalResponseMessage,
   AgentInfo,
   MultimodalContent,
+  UserMessageContent,
   FeedbackValue,
   UseAIForwardedProps,
   ReasoningMessageContentEvent,
@@ -379,40 +380,20 @@ export class UseAIClient {
    */
   async sendPrompt(prompt: string, multimodalContent?: MultimodalContent[], forwardedProps?: UseAIForwardedProps) {
     // Build message content - use multimodal if provided, otherwise just the text
-    // AG-UI Message type expects content to be string | ContentPart[]
-    // For multimodal content, we pass the array; for text-only, we pass the string
-    type MessageContent = string | Array<{ type: string; [key: string]: unknown }>;
-    let messageContent: MessageContent = prompt;
+    let messageContent: UserMessageContent = prompt;
 
     if (multimodalContent && multimodalContent.length > 0) {
-      // Convert our MultimodalContent to AG-UI ContentPart format
-      messageContent = multimodalContent.map(part => {
-        if (part.type === 'text') {
-          return { type: 'text', text: part.text };
-        } else if (part.type === 'image') {
-          return { type: 'image', url: part.url };
-        } else if (part.type === 'file') {
-          return {
-            type: 'file',
-            url: part.url,
-            mimeType: part.mimeType,
-          };
-        } else {
-          // transformed_file - pass through as-is, server will convert to text
-          return {
-            type: 'transformed_file',
-            text: part.text,
-            originalFile: part.originalFile,
-          };
-        }
-      });
+      // Each MultimodalContent variant is already in the wire shape the server reads
+      // (see messageConversion.ts), so the parts go on the wire unchanged.
+      messageContent = multimodalContent;
     }
 
     // Add user message to conversation
     const userMessage: Message = {
       id: uuidv4(),
       role: 'user',
-      content: messageContent as string, // Type cast needed for Message type compatibility
+      // @ag-ui/core declares Message.content as `string`; the wire also carries MultimodalContent[].
+      content: messageContent as string,
     };
     this._messages.push(userMessage);
 

@@ -1,5 +1,5 @@
 import type { PersistedMessage } from '../providers/chatRepository/types';
-import type { Message as AGUIMessage, Message, ReasoningPart } from '../types';
+import type { Message as AGUIMessage, Message, MultimodalContent, ReasoningPart } from '../types';
 import { getTextFromContent } from './messageContent';
 
 /**
@@ -34,25 +34,43 @@ export function transformMessagesToClientFormat(persistedMessages: PersistedMess
         if (typeof msg.content === 'string') {
           return { id: msg.id, role: 'user', content: msg.content };
         }
-        // Preserve multipart structure so the LLM sees the full original
-        // input (including transformed file text) after rehydration.
-        // transformed_file parts are wrapped in the same format the server
-        // emits on fresh sends (see packages/server/src/server.ts).
-        const parts = msg.content.flatMap((p) => {
+        // Preserve the multipart structure so that, after reconstruction, the
+        // LLM can still see the full original input (including transformed_file
+        // text). transformed_file parts are wrapped in the same shape the server
+        // emits on a fresh send (see packages/server/src/server.ts).
+        //
+        // The wire parts below intentionally use use-ai's content shape
+        // ({ type:'image_ref'|'file_ref', ref }, the canonical MultimodalContent) to
+        // match what client.sendPrompt emits. AG-UI content is a different,
+        // source-based shape, so this boundary cast is required.
+        const parts = msg.content.flatMap((p): MultimodalContent[] => {
           if (p.type === 'text') {
-            return [{ type: 'text' as const, text: p.text }];
+            return [{ type: 'text', text: p.text }];
           }
           if (p.type === 'transformed_file') {
             return [{
-              type: 'text' as const,
+              type: 'text',
               text: `[Content of file "${p.originalFile.name}" (${p.originalFile.mimeType})]:\n\n${p.text}`,
             }];
           }
-          // Legacy metadata-only 'file' parts cannot be reconstructed —
-          // drop them so the rest of the history still loads.
+          if (p.type === 'attachment_ref') {
+            // Resendable: restore the ref wire part so the resolver at run start
+            // can turn it back into a signed URL. image vs file is decided by mimeType.
+            return [
+              p.mimeType.startsWith('image/')
+                ? { type: 'image_ref', ref: p.ref }
+                : { type: 'file_ref', ref: p.ref, mimeType: p.mimeType, name: p.name },
+            ];
+          }
+          // Metadata-only 'file' parts (the existing url path without a direct url)
+          // cannot be reconstructed, so drop them and let the rest of the history load.
           return [];
         });
-        return { id: msg.id, role: 'user', content: parts };
+        return {
+          id: msg.id,
+          role: 'user',
+          content: parts as unknown as Extract<AGUIMessage, { role: 'user' }>['content'],
+        };
       }
     }
   });

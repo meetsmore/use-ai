@@ -43,13 +43,39 @@ export interface PersistedTransformedFileContent {
 }
 
 /**
+ * Ref-backed attachment content part for persisted messages.
+ *
+ * Unlike {@link PersistedFileContent} (metadata only, discarded on reload), this part
+ * holds a `ref` into persistent storage (e.g. an S3 key). This lets attachments be
+ * re-sent to the AI even after a page reload. The actual bytes live in storage rather
+ * than localStorage, and the ref is resolved on the host before the next run.
+ *
+ * Covers both image and non-image attachments in a single type (the persistence layer
+ * does not split them: display is identical, and the re-send tag is derived from
+ * `mimeType`). On reload it is read two ways: as a name/size chip for display, and as a
+ * re-sendable `{ type: 'image_ref' | 'file_ref', ref }` wire part (see `messageConversion.ts`).
+ */
+export interface PersistedAttachmentRefContent {
+  type: 'attachment_ref';
+  /** Ref into persistent storage (e.g. an S3 key). Never expires. */
+  ref: string;
+  /** Original file name (for display). */
+  name: string;
+  /** MIME type, e.g. 'image/jpeg' | 'application/pdf'. Decides whether to re-send as image or file. */
+  mimeType: string;
+  /** Byte size after client-side resize (for display). */
+  size: number;
+}
+
+/**
  * Content part for persisted messages.
- * Can be text, file metadata, or transformed file content.
+ * One of: text, file metadata, transformed file content, or a ref-backed attachment.
  */
 export type PersistedContentPart =
   | PersistedTextContent
   | PersistedFileContent
-  | PersistedTransformedFileContent;
+  | PersistedTransformedFileContent
+  | PersistedAttachmentRefContent;
 
 /**
  * Content that can be persisted.

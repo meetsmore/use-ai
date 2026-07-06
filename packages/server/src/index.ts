@@ -2,6 +2,10 @@ export { UseAIServer } from './server';
 export type { UseAIServerConfig, McpEndpointConfig, ToolDefinition, CorsOptions } from './types';
 export type { ClientSession } from './server';
 
+// Attachment ref resolution (host seam + helper)
+export { resolveAttachmentParts } from './attachmentResolution';
+export type { ResolveAttachments, ResolveAttachmentsContext, MultimodalContent } from './types';
+
 // Export agents for advanced usage
 export type { Agent, AgentInput, EventEmitter, AgentResult } from './agents';
 export { AISDKAgent, type AISDKAgentConfig, type MessageWithCacheContext, type CacheTtl, type CacheBreakpointResult, type CacheBreakpointFn, createMockReasoningModel } from './agents';

@@ -41,7 +41,7 @@ describe('buildPersistedParts', () => {
 
   it('falls back to metadata-only when the attachment has no transformed output', () => {
     const attachment = makeAttachment('a1', 'pic.png', 3, 'image/png');
-    const fileContent: MultimodalContent[] = [{ type: 'image', url: 'data:...' }];
+    const fileContent: MultimodalContent[] = [{ type: 'image_url', url: 'data:...' }];
     const parts = buildPersistedParts('', [attachment], fileContent);
     expect(parts).toEqual([
       {
@@ -76,6 +76,93 @@ describe('buildPersistedParts', () => {
     expect((transformed[1] as { text: string }).text).toBe('TEXT-TWO');
   });
 
+  it('persists a ref-bearing image attachment as an attachment_ref', () => {
+    const attachment = makeAttachment('a1', 'pic.png', 3, 'image/png');
+    const fileContent: MultimodalContent[] = [{ type: 'image_ref', ref: 'tenant/ai/user/abc.png' }];
+    const parts = buildPersistedParts('', [attachment], fileContent);
+    expect(parts).toEqual([
+      {
+        type: 'attachment_ref',
+        ref: 'tenant/ai/user/abc.png',
+        name: 'pic.png',
+        mimeType: 'image/png',
+        size: 3,
+      },
+    ]);
+  });
+
+  it('persists a ref-bearing file (PDF) attachment as an attachment_ref', () => {
+    const attachment = makeAttachment('a1', 'doc.pdf', 8, 'application/pdf');
+    const fileContent: MultimodalContent[] = [
+      { type: 'file_ref', ref: 'tenant/ai/user/doc.pdf', mimeType: 'application/pdf', name: 'doc.pdf' },
+    ];
+    const parts = buildPersistedParts('', [attachment], fileContent);
+    expect(parts).toEqual([
+      {
+        type: 'attachment_ref',
+        ref: 'tenant/ai/user/doc.pdf',
+        name: 'doc.pdf',
+        mimeType: 'application/pdf',
+        size: 8,
+      },
+    ]);
+  });
+
+  it('pairs interleaved image and file refs with attachments in order', () => {
+    // Interleaved image + file attachments. Refs are emitted in attachment order,
+    // so a single FIFO pairs each attachment with its own ref; the persisted kind
+    // (image vs file) is carried by the attachment's mimeType, not the ref position.
+    const img = makeAttachment('i1', 'a.png', 1, 'image/png');
+    const pdf = makeAttachment('p1', 'b.pdf', 2, 'application/pdf');
+    const fileContent: MultimodalContent[] = [
+      { type: 'image_ref', ref: 'IMG-REF' },
+      { type: 'file_ref', ref: 'PDF-REF', mimeType: 'application/pdf', name: 'b.pdf' },
+    ];
+    const parts = buildPersistedParts('', [img, pdf], fileContent);
+    expect(parts).toEqual([
+      { type: 'attachment_ref', ref: 'IMG-REF', name: 'a.png', mimeType: 'image/png', size: 1 },
+      { type: 'attachment_ref', ref: 'PDF-REF', name: 'b.pdf', mimeType: 'application/pdf', size: 2 },
+    ]);
+  });
+
+  it('keeps the ref pairing aligned when a transformed attachment sits between two refs', () => {
+    // processAttachments emits the transformer group separately, so fileContent can
+    // be reordered relative to attachments. The transformed attachment must consume
+    // its transformed_file (by key) and NOT a ref slot, keeping refs aligned.
+    const imgA = makeAttachment('a', 'a.png', 1, 'image/png');
+    const pdfMid = makeAttachment('m', 'mid.pdf', 2, 'application/pdf');
+    const imgC = makeAttachment('c', 'c.png', 3, 'image/png');
+    const fileContent: MultimodalContent[] = [
+      // transformer group emitted first
+      { type: 'transformed_file', text: 'MID', originalFile: { name: 'mid.pdf', mimeType: 'application/pdf', size: 2 } },
+      // null group: the two image refs, in attachment order
+      { type: 'image_ref', ref: 'REF-A' },
+      { type: 'image_ref', ref: 'REF-C' },
+    ];
+    const parts = buildPersistedParts('', [imgA, pdfMid, imgC], fileContent);
+    expect(parts).toEqual([
+      { type: 'attachment_ref', ref: 'REF-A', name: 'a.png', mimeType: 'image/png', size: 1 },
+      { type: 'transformed_file', text: 'MID', originalFile: { name: 'mid.pdf', mimeType: 'application/pdf', size: 2 } },
+      { type: 'attachment_ref', ref: 'REF-C', name: 'c.png', mimeType: 'image/png', size: 3 },
+    ]);
+  });
+
+  it('does not let a url-bearing attachment steal a later attachment ref', () => {
+    // A mixed (url then ref) batch: each attachment must read the ref off its OWN
+    // part, so the url attachment stays metadata-only and the ref attachment keeps R.
+    const urlImg = makeAttachment('u', 'u.png', 1, 'image/png');
+    const refImg = makeAttachment('r', 'r.png', 2, 'image/png');
+    const fileContent: MultimodalContent[] = [
+      { type: 'image_url', url: 'data:image/png;base64,AAAA' },
+      { type: 'image_ref', ref: 'R' },
+    ];
+    const parts = buildPersistedParts('', [urlImg, refImg], fileContent);
+    expect(parts).toEqual([
+      { type: 'file', file: { name: 'u.png', size: 1, mimeType: 'image/png' } },
+      { type: 'attachment_ref', ref: 'R', name: 'r.png', mimeType: 'image/png', size: 2 },
+    ]);
+  });
+
   it('preserves attachment input order in the output', () => {
     // processAttachments groups by transformer, so fileContent may be
     // reordered relative to attachments. buildPersistedParts must emit
@@ -88,7 +175,7 @@ describe('buildPersistedParts', () => {
       { type: 'transformed_file', text: 'P1', originalFile: { name: 'first.pdf', mimeType: 'application/pdf', size: 1 } },
       { type: 'transformed_file', text: 'P2', originalFile: { name: 'second.pdf', mimeType: 'application/pdf', size: 1 } },
       // null (no-transformer) group emitted second
-      { type: 'image', url: 'data:img' },
+      { type: 'image_url', url: 'data:img' },
     ];
     const parts = buildPersistedParts('', [pdf1, img, pdf2], fileContent);
     expect(parts).toHaveLength(3);

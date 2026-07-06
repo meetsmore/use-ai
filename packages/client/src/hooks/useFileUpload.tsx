@@ -159,7 +159,15 @@ export function useFileUpload({
   const enabled = config !== undefined;
   const maxFileSize = config?.maxFileSize ?? DEFAULT_MAX_FILE_SIZE;
   const acceptedTypes = config?.acceptedTypes;
+  const maxAttachments = config?.maxAttachments;
   const transformers = config?.transformers;
+
+  // Mirror of `attachments` for synchronous reads inside handleFiles.
+  // handleFiles does not depend on `attachments`, so without this its closure value would go stale.
+  const attachmentsRef = useRef<FileAttachment[]>(attachments);
+  useEffect(() => {
+    attachmentsRef.current = attachments;
+  }, [attachments]);
 
   // Clear file error after 3 seconds
   useEffect(() => {
@@ -224,7 +232,18 @@ export function useFileUpload({
   const handleFiles = useCallback(async (files: FileList | File[]) => {
     const fileArray = Array.from(files);
 
+    // Running attachment count to enforce the per-message limit (existing + accepted in this batch).
+    // Only successfully added files count toward the limit.
+    let currentCount = attachmentsRef.current.length;
+
     for (const file of fileArray) {
+      // Enforce the attachment count limit (host policy via config.maxAttachments)
+      if (maxAttachments !== undefined && currentCount >= maxAttachments) {
+        const errorMsg = strings.fileUpload.maxAttachmentsError.replace('{max}', String(maxAttachments));
+        setFileError(errorMsg);
+        break;
+      }
+
       // Check file size
       if (file.size > maxFileSize) {
         const errorMsg = strings.fileUpload.fileSizeError
@@ -254,6 +273,8 @@ export function useFileUpload({
 
       // Add to attachments
       setAttachments(prev => [...prev, attachment]);
+      attachmentsRef.current = [...attachmentsRef.current, attachment];
+      currentCount++;
 
       // Check for transformer and start transformation immediately
       const transformerKey = findTransformerPattern(file.type, transformers);
@@ -262,13 +283,16 @@ export function useFileUpload({
         runTransformer(attachmentId, file, transformerKey);
       }
     }
-  }, [maxFileSize, acceptedTypes, strings, transformers, runTransformer]);
+  }, [maxFileSize, acceptedTypes, maxAttachments, strings, transformers, runTransformer]);
 
   /**
    * Removes a file attachment by ID.
    */
   const removeAttachment = useCallback((id: string) => {
     setAttachments(prev => prev.filter(a => a.id !== id));
+    // Keep the synchronous mirror in sync so the removal is reflected immediately in
+    // handleFiles' maxAttachments counting (without waiting for the effect to re-sync).
+    attachmentsRef.current = attachmentsRef.current.filter(a => a.id !== id);
     setProcessingState(prev => {
       const next = new Map(prev);
       next.delete(id);
@@ -281,6 +305,7 @@ export function useFileUpload({
    */
   const clearAttachments = useCallback(() => {
     setAttachments([]);
+    attachmentsRef.current = [];
     setProcessingState(new Map());
   }, []);
 
