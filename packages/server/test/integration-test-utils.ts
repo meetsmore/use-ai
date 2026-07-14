@@ -67,7 +67,7 @@ export function createTestAgent(name: string = 'test-agent'): AISDKAgent {
       },
     }),
   });
-  return new AISDKAgent({ model: mockModel });
+  return new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
 }
 
 /**
@@ -122,7 +122,7 @@ export function createAgentWithMockModel(
   }>
 ): AISDKAgent {
   const mockModel = createMockModel(doStream);
-  return new AISDKAgent({ model: mockModel });
+  return new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
 }
 
 /**

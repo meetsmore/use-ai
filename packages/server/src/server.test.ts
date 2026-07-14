@@ -38,7 +38,7 @@ describe.each(RUNTIMES)('Connection Management [%s runtime]', (runtime) => {
 
   test('client can connect to the server', async () => {
     const mockModel = createSequentialMockModel([{ text: 'Hello' }]);
-    const agent = new AISDKAgent({ model: mockModel });
+    const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
     const server = new UseAIServer({
       port: testPort,
       agents: { test: agent },
@@ -54,7 +54,7 @@ describe.each(RUNTIMES)('Connection Management [%s runtime]', (runtime) => {
 
   test('server supports multiple clients', async () => {
     const mockModel = createSequentialMockModel([{ text: 'Hello' }]);
-    const agent = new AISDKAgent({ model: mockModel });
+    const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
     const server = new UseAIServer({
       port: testPort + 1,
       agents: { test: agent },
@@ -86,7 +86,7 @@ describe.each(RUNTIMES)('Tool Use [%s runtime]', (runtime) => {
       },
     ]);
 
-    const toolAgent = new AISDKAgent({ model: toolMockModel });
+    const toolAgent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: toolMockModel }) } });
     const toolServer = new UseAIServer({
       port: toolPort,
       agents: { test: toolAgent },
@@ -150,7 +150,7 @@ describe.each(RUNTIMES)('Tool Use [%s runtime]', (runtime) => {
       },
     ]);
 
-    const tool2Agent = new AISDKAgent({ model: tool2MockModel });
+    const tool2Agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: tool2MockModel }) } });
     const tool2Server = new UseAIServer({
       port: tool2Port,
       agents: { test: tool2Agent },
@@ -209,7 +209,7 @@ describe.each(RUNTIMES)('Tool Use [%s runtime]', (runtime) => {
     const seqPort = getPort(8184, runtime);
     const seqMockModel = createSequentialMockModel([{ text: 'Hello world' }]);
 
-    const seqAgent = new AISDKAgent({ model: seqMockModel });
+    const seqAgent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: seqMockModel }) } });
     const seqServer = new UseAIServer({
       port: seqPort,
       agents: { test: seqAgent },
@@ -263,7 +263,7 @@ describe.each(RUNTIMES)('Multiple Tool Use [%s runtime]', (runtime) => {
       },
     ]);
 
-    const multiAgent = new AISDKAgent({ model: multiMockModel });
+    const multiAgent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: multiMockModel }) } });
     const multiServer = new UseAIServer({
       port: multiPort,
       agents: { test: multiAgent },
@@ -343,7 +343,7 @@ describe.each(RUNTIMES)('Error Handling [%s runtime]', (runtime) => {
     const errorPort = getPort(8186, runtime);
     const errorMockModel = createErrorMockModel('API Error');
 
-    const errorAgent = new AISDKAgent({ model: errorMockModel });
+    const errorAgent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: errorMockModel }) } });
     const errorServer = new UseAIServer({
       port: errorPort,
       agents: { test: errorAgent },
@@ -373,7 +373,7 @@ describe.each(RUNTIMES)('State Management [%s runtime]', (runtime) => {
     const statePort = getPort(8187, runtime);
     const stateMockModel = createSequentialMockModel([{ text: 'OK' }]);
 
-    const stateAgent = new AISDKAgent({ model: stateMockModel });
+    const stateAgent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: stateMockModel }) } });
     const stateServer = new UseAIServer({
       port: statePort,
       agents: { test: stateAgent },
@@ -410,7 +410,7 @@ describe.each(RUNTIMES)('Rate Limiting [%s runtime]', (runtime) => {
       { text: 'OK' },
     ]);
 
-    const rateAgent = new AISDKAgent({ model: rateMockModel });
+    const rateAgent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: rateMockModel }) } });
     const rateServer = new UseAIServer({
       port: ratePort,
       agents: { test: rateAgent },
@@ -451,7 +451,7 @@ describe.each(RUNTIMES)('Rate Limiting [%s runtime]', (runtime) => {
       { text: 'OK' },
     ]);
 
-    const blockAgent = new AISDKAgent({ model: blockMockModel });
+    const blockAgent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: blockMockModel }) } });
     const blockServer = new UseAIServer({
       port: blockPort,
       agents: { test: blockAgent },
@@ -489,7 +489,7 @@ describe.each(RUNTIMES)('Rate Limiting [%s runtime]', (runtime) => {
       { text: 'OK' },
     ]);
 
-    const resetAgent = new AISDKAgent({ model: resetMockModel });
+    const resetAgent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: resetMockModel }) } });
     const resetServer = new UseAIServer({
       port: resetPort,
       agents: { test: resetAgent },
@@ -532,7 +532,7 @@ describe.each(RUNTIMES)('Rate Limiting [%s runtime]', (runtime) => {
       { text: 'OK' },
     ]);
 
-    const indepAgent = new AISDKAgent({ model: indepMockModel });
+    const indepAgent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: indepMockModel }) } });
     const indepServer = new UseAIServer({
       port: indepPort,
       agents: { test: indepAgent },
@@ -570,7 +570,7 @@ describe('handleToolResult - MCP tool preservation', () => {
     // forwardedProps, dropping MCP tools. Fix: merge client tools with existing MCP tools.
 
     const mockModel = createSequentialMockModel([{ text: 'OK' }]);
-    const agent = new AISDKAgent({ model: mockModel });
+    const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
     const server = new UseAIServer({
       port: 19001,
       agents: { test: agent },
@@ -648,7 +648,7 @@ describe('handleToolResult - MCP tool preservation', () => {
 
   test('handleToolResult without forwardedProps.tools should not modify session.tools', () => {
     const mockModel = createSequentialMockModel([{ text: 'OK' }]);
-    const agent = new AISDKAgent({ model: mockModel });
+    const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
     const server = new UseAIServer({
       port: 19002,
       agents: { test: agent },

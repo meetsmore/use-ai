@@ -968,9 +968,9 @@ const server = new UseAIServer({
   port: 8081,
   agents: {
     'claude': new AISDKAgent({
-      model: anthropic('claude-sonnet-4-20250514'),
       name: 'Claude',
       annotation: 'Powered by Anthropic', // shown in agent selector UI
+      hooks: { loadConfig: () => ({ model: anthropic('claude-sonnet-4-20250514') }) },
     })
   },
   defaultAgent: 'claude',

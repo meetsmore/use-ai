@@ -181,7 +181,7 @@ describe('AISDKAgent maxSteps', () => {
   test('defaults to 10 step iterations', async () => {
     const calls = { count: 0 };
     const mockModel = createToolLoopMockModel(loopToolName, calls);
-    const agent = new AISDKAgent({ model: mockModel });
+    const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
 
     const emittedEvents: AGUIEventExtended[] = [];
     const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
@@ -193,28 +193,12 @@ describe('AISDKAgent maxSteps', () => {
     expect(calls.count).toBe(11);
   });
 
-  test('uses configured maxSteps from constructor', async () => {
+  test('uses maxSteps from loadConfig', async () => {
     const calls = { count: 0 };
     const mockModel = createToolLoopMockModel(loopToolName, calls);
-    const agent = new AISDKAgent({ model: mockModel, maxSteps: 2 });
-
-    const emittedEvents: AGUIEventExtended[] = [];
-    const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
-
-    const result = await agent.run(createTestInput([loopTool]), eventEmitter);
-
-    expect(result.success).toBe(true);
-    // 2 main iterations + 1 graceful summary call = 3 total
-    expect(calls.count).toBe(3);
-  });
-
-  test('uses maxSteps from runtimeConfig override', async () => {
-    const calls = { count: 0 };
-    const mockModel = createToolLoopMockModel(loopToolName, calls);
-    // Static default is 10; the resolved override must bound the loop instead
+    // Library default is 10; the maxSteps from loadConfig must bound the loop
     const agent = new AISDKAgent({
-      model: mockModel,
-      runtimeConfig: () => ({ maxSteps: 2 }),
+      hooks: { loadConfig: () => ({ model: mockModel, maxSteps: 2 }) },
     });
 
     const emittedEvents: AGUIEventExtended[] = [];
@@ -230,7 +214,7 @@ describe('AISDKAgent maxSteps', () => {
   test('emits text message after maxSteps when last step had tool calls', async () => {
     const calls = { count: 0 };
     const mockModel = createToolThenTextMockModel(loopToolName, 2, calls);
-    const agent = new AISDKAgent({ model: mockModel, maxSteps: 2 });
+    const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel, maxSteps: 2 }) } });
 
     const emittedEvents: AGUIEventExtended[] = [];
     const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
@@ -287,7 +271,7 @@ describe('AISDKAgent maxSteps', () => {
       },
     });
 
-    const agent = new AISDKAgent({ model: textModel, maxSteps: 5 });
+    const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: textModel, maxSteps: 5 }) } });
     const emittedEvents: AGUIEventExtended[] = [];
     const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
 

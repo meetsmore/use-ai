@@ -1,5 +1,5 @@
 import { describe, expect, test, mock, spyOn } from 'bun:test';
-import { AISDKAgent, type AISDKRuntimeConfig } from './AISDKAgent';
+import { AISDKAgent } from './AISDKAgent';
 import { logger } from '../logger';
 import type { AgentInput, EventEmitter, AGUIEventExtended } from './types';
 import { EventType, ErrorCode } from '../types';
@@ -122,7 +122,7 @@ function createTestInput(overrides: Partial<AgentInput> = {}): AgentInput {
 describe('AISDKAgent', () => {
   test('implements Agent interface', () => {
     const mockModel = createStreamingTextMockModel('Default response');
-    const agent = new AISDKAgent({ model: mockModel });
+    const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
 
     expect(agent.getName()).toBe('ai-sdk');
     expect(typeof agent.run).toBe('function');
@@ -130,14 +130,14 @@ describe('AISDKAgent', () => {
 
   test('getName returns custom name when provided', () => {
     const mockModel = createStreamingTextMockModel('Default response');
-    const agent = new AISDKAgent({ model: mockModel, name: 'claude' });
+    const agent = new AISDKAgent({ name: 'claude', hooks: { loadConfig: () => ({ model: mockModel }) } });
 
     expect(agent.getName()).toBe('claude');
   });
 
   test('run emits RUN_STARTED event', async () => {
     const mockModel = createStreamingTextMockModel('Hello');
-    const agent = new AISDKAgent({ model: mockModel });
+    const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
 
     const emittedEvents: AGUIEventExtended[] = [];
     const eventEmitter: EventEmitter = {
@@ -154,7 +154,7 @@ describe('AISDKAgent', () => {
 
   test('run emits TEXT_MESSAGE events for text response', async () => {
     const mockModel = createStreamingTextMockModel('Hello world');
-    const agent = new AISDKAgent({ model: mockModel });
+    const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
 
     const emittedEvents: AGUIEventExtended[] = [];
     const eventEmitter: EventEmitter = {
@@ -176,7 +176,7 @@ describe('AISDKAgent', () => {
 
   test('run emits multiple TEXT_MESSAGE_CONTENT events for streaming deltas', async () => {
     const mockModel = createMultiDeltaStreamingMockModel(['Hello ', 'world', '!']);
-    const agent = new AISDKAgent({ model: mockModel });
+    const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
 
     const emittedEvents: AGUIEventExtended[] = [];
     const eventEmitter: EventEmitter = {
@@ -196,7 +196,7 @@ describe('AISDKAgent', () => {
 
   test('run emits RUN_FINISHED event on success', async () => {
     const mockModel = createStreamingTextMockModel('Done');
-    const agent = new AISDKAgent({ model: mockModel });
+    const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
 
     const emittedEvents: AGUIEventExtended[] = [];
     const eventEmitter: EventEmitter = {
@@ -218,7 +218,7 @@ describe('AISDKAgent', () => {
       },
     });
 
-    const agent = new AISDKAgent({ model: mockModel });
+    const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
 
     const emittedEvents: AGUIEventExtended[] = [];
     const eventEmitter: EventEmitter = {
@@ -306,7 +306,7 @@ describe('AISDKAgent', () => {
       },
     });
 
-    const agent = new AISDKAgent({ model: mockModel });
+    const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
 
     const emittedEvents: AGUIEventExtended[] = [];
     const eventEmitter: EventEmitter = {
@@ -450,7 +450,7 @@ describe('AISDKAgent', () => {
       },
     });
 
-    const agent = new AISDKAgent({ model: mockModel });
+    const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
 
     const emittedEvents: AGUIEventExtended[] = [];
     const eventEmitter: EventEmitter = {
@@ -521,7 +521,7 @@ describe('AISDKAgent', () => {
 
   test('agent updates conversation history', async () => {
     const mockModel = createStreamingTextMockModel('Response text');
-    const agent = new AISDKAgent({ model: mockModel });
+    const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
 
     const emittedEvents: AGUIEventExtended[] = [];
     const eventEmitter: EventEmitter = {
@@ -613,7 +613,7 @@ describe('AISDKAgent', () => {
       }));
 
       const mockModel = createStreamingTextMockModel('Final response after tool execution');
-      const agent = new AISDKAgent({ model: mockModel });
+      const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
 
       const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = {
@@ -722,7 +722,7 @@ describe('AISDKAgent', () => {
       }));
 
       const mockModel = createStreamingTextMockModel('Final response after tool execution');
-      const agent = new AISDKAgent({ model: mockModel });
+      const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
 
       const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = {
@@ -802,7 +802,7 @@ describe('AISDKAgent', () => {
       }));
 
       const mockModel = createStreamingTextMockModel('Response');
-      const agent = new AISDKAgent({ model: mockModel });
+      const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
 
       const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = {
@@ -937,7 +937,7 @@ describe('AISDKAgent', () => {
       }));
 
       const mockModel = createStreamingTextMockModel('unused');
-      const agent = new AISDKAgent({ model: mockModel });
+      const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
 
       const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = {
@@ -1014,7 +1014,7 @@ describe('AISDKAgent', () => {
         }),
       });
 
-      const agent = new AISDKAgent({ model: mockModel });
+      const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
 
       const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = {
@@ -1054,7 +1054,7 @@ describe('AISDKAgent', () => {
         }),
       });
 
-      const agent = new AISDKAgent({ model: mockModel });
+      const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
 
       const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = {
@@ -1094,7 +1094,7 @@ describe('AISDKAgent', () => {
         }),
       });
 
-      const agent = new AISDKAgent({ model: mockModel });
+      const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
 
       const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = {
@@ -1153,10 +1153,7 @@ describe('AISDKAgent', () => {
       const capturedMessages = { values: [] as Array<{ role: string; content: string }> };
       const mockModel = createSystemMessageCapturingMockModel(capturedMessages);
 
-      const agent = new AISDKAgent({
-        model: mockModel,
-        systemPrompt: 'You are a helpful assistant.',
-      });
+      const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel, systemPrompt: 'You are a helpful assistant.' }) } });
 
       const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
@@ -1173,10 +1170,7 @@ describe('AISDKAgent', () => {
       const capturedMessages = { values: [] as Array<{ role: string; content: string }> };
       const mockModel = createSystemMessageCapturingMockModel(capturedMessages);
 
-      const agent = new AISDKAgent({
-        model: mockModel,
-        systemPrompt: 'You are a helpful assistant.',
-      });
+      const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel, systemPrompt: 'You are a helpful assistant.' }) } });
 
       const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
@@ -1205,10 +1199,8 @@ describe('AISDKAgent', () => {
       const capturedMessages = { values: [] as Array<{ role: string; content: string }> };
       const mockModel = createSystemMessageCapturingMockModel(capturedMessages);
 
-      const agent = new AISDKAgent({
-        model: mockModel,
-        // No systemPrompt in config
-      });
+      // No systemPrompt in the run config
+      const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
 
       const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
@@ -1232,9 +1224,7 @@ describe('AISDKAgent', () => {
       const capturedMessages = { values: [] as Array<{ role: string; content: string }> };
       const mockModel = createSystemMessageCapturingMockModel(capturedMessages);
 
-      const agent = new AISDKAgent({
-        model: mockModel,
-      });
+      const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
 
       const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
@@ -1246,139 +1236,9 @@ describe('AISDKAgent', () => {
       expect(capturedMessages.values.length).toBe(0);
     });
 
-    test('supports function-based systemPrompt for dynamic resolution', async () => {
-      const capturedMessages = { values: [] as Array<{ role: string; content: string }> };
-      const mockModel = createSystemMessageCapturingMockModel(capturedMessages);
-
-      // Simulate a dynamic prompt that could be fetched from Langfuse or other sources
-      let dynamicPromptValue = 'Initial prompt';
-      const agent = new AISDKAgent({
-        model: mockModel,
-        systemPrompt: () => dynamicPromptValue,
-      });
-
-      const emittedEvents: AGUIEventExtended[] = [];
-      const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
-
-      // First run with initial prompt
-      const input1 = createTestInput();
-      await agent.run(input1, eventEmitter);
-
-      expect(capturedMessages.values.length).toBe(1);
-      expect(capturedMessages.values[0].content).toBe('Initial prompt');
-
-      // Update the dynamic prompt value (simulating Langfuse update)
-      dynamicPromptValue = 'Updated prompt from Langfuse';
-
-      // Second run should use the updated prompt without server restart
-      const input2 = createTestInput();
-      await agent.run(input2, eventEmitter);
-
-      expect(capturedMessages.values.length).toBe(1);
-      expect(capturedMessages.values[0].content).toBe('Updated prompt from Langfuse');
-    });
-
-    test('function-based systemPrompt returning empty string is skipped', async () => {
-      const capturedMessages = { values: [] as Array<{ role: string; content: string }> };
-      const mockModel = createSystemMessageCapturingMockModel(capturedMessages);
-
-      const agent = new AISDKAgent({
-        model: mockModel,
-        systemPrompt: () => '',
-      });
-
-      const emittedEvents: AGUIEventExtended[] = [];
-      const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
-
-      const input = createTestInput({
-        systemPrompt: 'Runtime prompt only',
-      });
-      const result = await agent.run(input, eventEmitter);
-
-      expect(result.success).toBe(true);
-      // Only runtime prompt should be present since function returned empty string
-      expect(capturedMessages.values.length).toBe(1);
-      expect(capturedMessages.values[0].content).toBe('Runtime prompt only');
-    });
-
-    test('supports async function-based systemPrompt', async () => {
-      const capturedMessages = { values: [] as Array<{ role: string; content: string }> };
-      const mockModel = createSystemMessageCapturingMockModel(capturedMessages);
-
-      // Simulate fetching from Langfuse or other async source
-      const agent = new AISDKAgent({
-        model: mockModel,
-        systemPrompt: async () => {
-          // Simulate async operation (e.g., Langfuse API call)
-          await new Promise((resolve) => setTimeout(resolve, 10));
-          return 'Async prompt from Langfuse';
-        },
-      });
-
-      const emittedEvents: AGUIEventExtended[] = [];
-      const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
-
-      const input = createTestInput();
-      const result = await agent.run(input, eventEmitter);
-
-      expect(result.success).toBe(true);
-      expect(capturedMessages.values.length).toBe(1);
-      expect(capturedMessages.values[0].content).toBe('Async prompt from Langfuse');
-    });
-
-    test('async systemPrompt is resolved fresh on each run', async () => {
-      const capturedMessages = { values: [] as Array<{ role: string; content: string }> };
-      const mockModel = createSystemMessageCapturingMockModel(capturedMessages);
-
-      // Simulate a prompt that changes over time (like Langfuse updates)
-      let promptVersion = 1;
-      const agent = new AISDKAgent({
-        model: mockModel,
-        systemPrompt: async () => {
-          await new Promise((resolve) => setTimeout(resolve, 5));
-          return `Prompt version ${promptVersion}`;
-        },
-      });
-
-      const emittedEvents: AGUIEventExtended[] = [];
-      const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
-
-      // First run
-      await agent.run(createTestInput(), eventEmitter);
-      expect(capturedMessages.values[0].content).toBe('Prompt version 1');
-
-      // Update the prompt (simulating Langfuse update)
-      promptVersion = 2;
-
-      // Second run should get the updated prompt
-      await agent.run(createTestInput(), eventEmitter);
-      expect(capturedMessages.values[0].content).toBe('Prompt version 2');
-    });
-
-    test('async systemPrompt returning empty string is skipped', async () => {
-      const capturedMessages = { values: [] as Array<{ role: string; content: string }> };
-      const mockModel = createSystemMessageCapturingMockModel(capturedMessages);
-
-      const agent = new AISDKAgent({
-        model: mockModel,
-        systemPrompt: async () => {
-          await new Promise((resolve) => setTimeout(resolve, 5));
-          return '';
-        },
-      });
-
-      const emittedEvents: AGUIEventExtended[] = [];
-      const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
-
-      const input = createTestInput({
-        systemPrompt: 'Runtime prompt only',
-      });
-      const result = await agent.run(input, eventEmitter);
-
-      expect(result.success).toBe(true);
-      expect(capturedMessages.values.length).toBe(1);
-      expect(capturedMessages.values[0].content).toBe('Runtime prompt only');
-    });
+    // Dynamic / async systemPrompt resolution (previously the function-form
+    // `systemPrompt` config) is now covered by the "loadConfig" describe below,
+    // since the run config — including systemPrompt — is supplied by loadConfig.
 
     test('state message is rebuilt from session.state between steps', async () => {
       // Track all system messages sent in each step call
@@ -1453,7 +1313,7 @@ describe('AISDKAgent', () => {
         },
       });
 
-      const agent = new AISDKAgent({ model: mockModel });
+      const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
 
       const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = {
@@ -1597,7 +1457,7 @@ describe('AISDKAgent', () => {
       const mockModel = createToolCapturingMockModel(capturedTools);
 
       // No toolFilter specified
-      const agent = new AISDKAgent({ model: mockModel });
+      const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
 
       const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
@@ -1619,11 +1479,8 @@ describe('AISDKAgent', () => {
       const capturedTools = { names: [] as string[] };
       const mockModel = createToolCapturingMockModel(capturedTools);
 
-      const agent = new AISDKAgent({
-        model: mockModel,
-        // Filter to only allow tools matching 'db_*' pattern
-        toolFilter: createGlobFilter(['db_*']),
-      });
+      const agent = new AISDKAgent({ // Filter to only allow tools matching 'db_*' pattern
+        toolFilter: createGlobFilter(['db_*']), hooks: { loadConfig: () => ({ model: mockModel }) } });
 
       const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
@@ -1648,14 +1505,11 @@ describe('AISDKAgent', () => {
       const capturedTools = { names: [] as string[] };
       const mockModel = createToolCapturingMockModel(capturedTools);
 
-      const agent = new AISDKAgent({
-        model: mockModel,
-        // Tools matching 'db_*' AND is MCP tool (exclude client tools)
+      const agent = new AISDKAgent({ // Tools matching 'db_*' AND is MCP tool (exclude client tools)
         toolFilter: and(
           createGlobFilter(['db_*']),
           isRemoteTool
-        ),
-      });
+        ), hooks: { loadConfig: () => ({ model: mockModel }) } });
 
       const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
@@ -1680,14 +1534,11 @@ describe('AISDKAgent', () => {
       const capturedTools = { names: [] as string[] };
       const mockModel = createToolCapturingMockModel(capturedTools);
 
-      const agent = new AISDKAgent({
-        model: mockModel,
-        // Tools matching either 'db_*' OR 'file_*'
+      const agent = new AISDKAgent({ // Tools matching either 'db_*' OR 'file_*'
         toolFilter: or(
           createGlobFilter(['db_*']),
           createGlobFilter(['file_*'])
-        ),
-      });
+        ), hooks: { loadConfig: () => ({ model: mockModel }) } });
 
       const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
@@ -1712,16 +1563,13 @@ describe('AISDKAgent', () => {
       const capturedTools = { names: [] as string[] };
       const mockModel = createToolCapturingMockModel(capturedTools);
 
-      const agent = new AISDKAgent({
-        model: mockModel,
-        // Exclude tools matching 'admin_*' or 'delete_*'
+      const agent = new AISDKAgent({ // Exclude tools matching 'admin_*' or 'delete_*'
         toolFilter: not(
           or(
             createGlobFilter(['admin_*']),
             createGlobFilter(['*_delete'])
           )
-        ),
-      });
+        ), hooks: { loadConfig: () => ({ model: mockModel }) } });
 
       const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
@@ -1803,7 +1651,7 @@ describe('AISDKAgent', () => {
       }));
 
       const mockModel = createAnthropicMockModel();
-      const agent = new AISDKAgent({ model: mockModel });
+      const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
 
       const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
@@ -1837,10 +1685,7 @@ describe('AISDKAgent', () => {
       }));
 
       const mockModel = createAnthropicMockModel();
-      const agent = new AISDKAgent({
-        model: mockModel,
-        cacheBreakpoint: (msg) => msg.role === 'system' || msg.isLast,
-      });
+      const agent = new AISDKAgent({ cacheBreakpoint: (msg) => msg.role === 'system' || msg.isLast, hooks: { loadConfig: () => ({ model: mockModel }) } });
 
       const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
@@ -1891,9 +1736,7 @@ describe('AISDKAgent', () => {
         isLast: boolean;
       }> = [];
 
-      const agent = new AISDKAgent({
-        model: mockModel,
-        cacheBreakpoint: (msg) => {
+      const agent = new AISDKAgent({ cacheBreakpoint: (msg) => {
           receivedContexts.push({
             role: msg.role,
             index: msg.index,
@@ -1902,8 +1745,7 @@ describe('AISDKAgent', () => {
             isLast: msg.isLast,
           });
           return false;
-        },
-      });
+        }, hooks: { loadConfig: () => ({ model: mockModel }) } });
 
       const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
@@ -1961,9 +1803,9 @@ describe('AISDKAgent', () => {
 
       const mockModel = createNonAnthropicMockModel();
       const agent = new AISDKAgent({
-        model: mockModel,
         // This would add cache control for Anthropic, but should be ignored for other models
         cacheBreakpoint: (msg) => msg.isLast,
+        hooks: { loadConfig: () => ({ model: mockModel }) },
       });
 
       const emittedEvents: AGUIEventExtended[] = [];
@@ -1998,11 +1840,8 @@ describe('AISDKAgent', () => {
       }));
 
       const mockModel = createAnthropicMockModel();
-      const agent = new AISDKAgent({
-        model: mockModel,
-        // Return '1h' TTL for system prompt
-        cacheBreakpoint: (msg) => msg.role === 'system' ? '1h' : false,
-      });
+      const agent = new AISDKAgent({ // Return '1h' TTL for system prompt
+        cacheBreakpoint: (msg) => msg.role === 'system' ? '1h' : false, hooks: { loadConfig: () => ({ model: mockModel }) } });
 
       const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
@@ -2039,11 +1878,8 @@ describe('AISDKAgent', () => {
       }));
 
       const mockModel = createAnthropicMockModel();
-      const agent = new AISDKAgent({
-        model: mockModel,
-        // Return true (not TTL string) - should not include ttl field
-        cacheBreakpoint: (msg) => msg.role === 'system',
-      });
+      const agent = new AISDKAgent({ // Return true (not TTL string) - should not include ttl field
+        cacheBreakpoint: (msg) => msg.role === 'system', hooks: { loadConfig: () => ({ model: mockModel }) } });
 
       const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
@@ -2183,7 +2019,7 @@ describe('AISDKAgent', () => {
         },
       });
 
-      const agent = new AISDKAgent({ model: mockModel });
+      const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
       const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
 
@@ -2281,7 +2117,7 @@ describe('AISDKAgent', () => {
         },
       });
 
-      const agent = new AISDKAgent({ model: mockModel });
+      const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
       const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
 
@@ -2369,7 +2205,7 @@ describe('AISDKAgent', () => {
         },
       });
 
-      const agent = new AISDKAgent({ model: mockModel });
+      const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
       const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
 
@@ -2459,7 +2295,7 @@ describe('AISDKAgent', () => {
         },
       });
 
-      const agent = new AISDKAgent({ model: mockModel });
+      const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
       const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
 
@@ -2546,7 +2382,7 @@ describe('AISDKAgent', () => {
         },
       });
 
-      const agent = new AISDKAgent({ model: mockModel });
+      const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
       const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
 
@@ -2637,7 +2473,7 @@ describe('AISDKAgent', () => {
         },
       });
 
-      const agent = new AISDKAgent({ model: mockModel });
+      const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
       const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
 
@@ -2678,7 +2514,7 @@ describe('AISDKAgent', () => {
         },
       });
 
-      const agent = new AISDKAgent({ model: mockModel });
+      const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
 
       const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = {
@@ -2736,11 +2572,8 @@ describe('AISDKAgent', () => {
       // Re-import to pick up the mock (dynamic import after mock.module)
       const { AISDKAgent: MockedAISDKAgent } = await import('./AISDKAgent');
 
-      const agent = new MockedAISDKAgent({
-        model: mockModel,
-        // cacheBreakpoint throws before streamText is called
-        cacheBreakpoint: () => { throw new Error('Cache breakpoint error'); },
-      });
+      const agent = new MockedAISDKAgent({ // cacheBreakpoint throws before streamText is called
+        cacheBreakpoint: () => { throw new Error('Cache breakpoint error'); }, hooks: { loadConfig: () => ({ model: mockModel }) } });
 
       const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = {
@@ -2772,14 +2605,11 @@ describe('AISDKAgent', () => {
   describe('providerOptions', () => {
     test('passes providerOptions to streamText', async () => {
       const mockModel = createStreamingTextMockModel('Hello');
-      const agent = new AISDKAgent({
-        model: mockModel,
-        providerOptions: {
+      const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel, providerOptions: {
           gateway: {
             models: ['anthropic/claude-opus-4.6', 'google/gemini-3.1-pro-preview'],
           },
-        },
-      });
+        } }) } });
 
       const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = {
@@ -2798,7 +2628,7 @@ describe('AISDKAgent', () => {
 
     test('does not set providerOptions when not configured', async () => {
       const mockModel = createStreamingTextMockModel('Hello');
-      const agent = new AISDKAgent({ model: mockModel });
+      const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
 
       const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = {
@@ -2877,7 +2707,7 @@ describe('AISDKAgent', () => {
         },
       });
 
-      const agent = new AISDKAgent({ model: mockModel });
+      const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
 
       const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = {
@@ -2948,7 +2778,7 @@ describe('AISDKAgent', () => {
         },
       });
 
-      const agent = new AISDKAgent({ model: mockModel, maxSteps });
+      const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel, maxSteps }) } });
 
       const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = {
@@ -3037,7 +2867,7 @@ describe('AISDKAgent', () => {
         },
       });
 
-      const agent = new AISDKAgent({ model: mockModel });
+      const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
 
       const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = {
@@ -3151,7 +2981,7 @@ describe('AISDKAgent', () => {
         },
       });
 
-      const agent = new AISDKAgent({ model: mockModel });
+      const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
 
       const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = {
@@ -3284,7 +3114,7 @@ describe('AISDKAgent', () => {
         },
       });
 
-      const agent = new AISDKAgent({ model: mockModel });
+      const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
 
       const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = {
@@ -3425,7 +3255,7 @@ describe('AISDKAgent', () => {
         },
       });
 
-      const agent = new AISDKAgent({ model: mockModel });
+      const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
 
       const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = {
@@ -3544,10 +3374,7 @@ describe('AISDKAgent', () => {
         },
       });
 
-      const agent = new AISDKAgent({
-        model: mockModel,
-        providerOptions: { anthropic: { thinking: { type: 'enabled', budgetTokens: 10000 } } },
-      });
+      const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel, providerOptions: { anthropic: { thinking: { type: 'enabled', budgetTokens: 10000 } } } }) } });
 
       const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = {
@@ -3620,7 +3447,7 @@ describe('AISDKAgent', () => {
         },
       });
 
-      const agent = new AISDKAgent({ model: mockModel });
+      const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
 
       const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = {
@@ -3648,13 +3475,11 @@ describe('AISDKAgent', () => {
     });
   });
 
-  describe('runtimeConfig (per-run dynamic configuration)', () => {
-    test('overrides the model for the run; static model is not called', async () => {
-      const staticModel = createStreamingTextMockModel('from static');
-      const overrideModel = createStreamingTextMockModel('from override');
+  describe('loadConfig (per-run run configuration)', () => {
+    test('uses the model returned by loadConfig', async () => {
+      const mockModel = createStreamingTextMockModel('from loadConfig');
       const agent = new AISDKAgent({
-        model: staticModel,
-        runtimeConfig: () => ({ model: overrideModel }),
+        hooks: { loadConfig: () => ({ model: mockModel }) },
       });
 
       const emittedEvents: AGUIEventExtended[] = [];
@@ -3663,24 +3488,22 @@ describe('AISDKAgent', () => {
       const result = await agent.run(createTestInput(), eventEmitter);
 
       expect(result.success).toBe(true);
-      expect(overrideModel.doStreamCalls.length).toBe(1);
-      expect(staticModel.doStreamCalls.length).toBe(0);
+      expect(mockModel.doStreamCalls.length).toBe(1);
       const textContent = emittedEvents.find(e => e.type === EventType.TEXT_MESSAGE_CONTENT);
-      expect((textContent as { delta: string }).delta).toBe('from override');
+      expect((textContent as { delta: string }).delta).toBe('from loadConfig');
     });
 
-    test('overrides generation parameters for the run', async () => {
+    test('passes the generation parameters from loadConfig to streamText', async () => {
       const mockModel = createStreamingTextMockModel('Hello');
       const agent = new AISDKAgent({
-        model: mockModel,
-        temperature: 0.9,
-        maxOutputTokens: 4096,
-        providerOptions: { gateway: { only: ['anthropic'] } },
-        runtimeConfig: async () => ({
-          temperature: 0.2,
-          maxOutputTokens: 1234,
-          providerOptions: { gateway: { only: ['bedrock'] } },
-        }),
+        hooks: {
+          loadConfig: async () => ({
+            model: mockModel,
+            temperature: 0.2,
+            maxOutputTokens: 1234,
+            providerOptions: { gateway: { only: ['bedrock'] } },
+          }),
+        },
       });
 
       const eventEmitter: EventEmitter = { emit: () => {} };
@@ -3693,116 +3516,27 @@ describe('AISDKAgent', () => {
       expect(call.providerOptions).toEqual({ gateway: { only: ['bedrock'] } });
     });
 
-    test('partial overrides keep static values for omitted fields', async () => {
+    test('applies library defaults for omitted optional fields', async () => {
       const mockModel = createStreamingTextMockModel('Hello');
       const agent = new AISDKAgent({
-        model: mockModel,
-        temperature: 0.9,
-        providerOptions: { gateway: { only: ['anthropic'] } },
-        runtimeConfig: () => ({ maxOutputTokens: 512 }),
+        hooks: { loadConfig: () => ({ model: mockModel }) },
       });
 
       const eventEmitter: EventEmitter = { emit: () => {} };
       await agent.run(createTestInput(), eventEmitter);
 
       const call = mockModel.doStreamCalls[0];
-      expect(call.maxOutputTokens).toBe(512);
-      expect(call.temperature).toBe(0.9);
-      expect(call.providerOptions).toEqual({ gateway: { only: ['anthropic'] } });
-    });
-
-    test('resolver failure logs a warning, falls back to the full static config, and the run continues', async () => {
-      const mockModel = createStreamingTextMockModel('Hello');
-      const agent = new AISDKAgent({
-        model: mockModel,
-        temperature: 0.7,
-        runtimeConfig: async () => {
-          throw new Error('Langfuse unavailable');
-        },
-      });
-
-      const emittedEvents: AGUIEventExtended[] = [];
-      const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
-
-      const warnSpy = spyOn(logger, 'warn');
-      try {
-        const result = await agent.run(createTestInput(), eventEmitter);
-
-        expect(result.success).toBe(true);
-        expect(mockModel.doStreamCalls.length).toBe(1);
-        expect(mockModel.doStreamCalls[0].temperature).toBe(0.7);
-        const runFinished = emittedEvents.find(e => e.type === EventType.RUN_FINISHED);
-        expect(runFinished).toBeDefined();
-
-        const resolverWarn = warnSpy.mock.calls.find(
-          ([message]) => String(message).includes('runtimeConfig resolver failed'),
-        );
-        expect(resolverWarn).toBeDefined();
-        expect((resolverWarn![1] as { error: string }).error).toBe('Langfuse unavailable');
-      } finally {
-        warnSpy.mockRestore();
-      }
-    });
-
-    test('nullish resolver return falls back to the static config', async () => {
-      const mockModel = createStreamingTextMockModel('Hello');
-      const agent = new AISDKAgent({
-        model: mockModel,
-        temperature: 0.7,
-        // A plain-JS consumer can return undefined despite the TS signature
-        runtimeConfig: (() => undefined) as unknown as () => AISDKRuntimeConfig,
-      });
-
-      const eventEmitter: EventEmitter = { emit: () => {} };
-      const result = await agent.run(createTestInput(), eventEmitter);
-
-      expect(result.success).toBe(true);
-      expect(mockModel.doStreamCalls[0].temperature).toBe(0.7);
-    });
-
-    test('runtimeConfig systemPrompt takes precedence and the static hook is not called', async () => {
-      const mockModel = createStreamingTextMockModel('Hello');
-      let hookCalled = false;
-      const agent = new AISDKAgent({
-        model: mockModel,
-        systemPrompt: () => {
-          hookCalled = true;
-          return 'static prompt';
-        },
-        runtimeConfig: () => ({ systemPrompt: 'dynamic prompt' }),
-      });
-
-      const eventEmitter: EventEmitter = { emit: () => {} };
-      await agent.run(createTestInput(), eventEmitter);
-
-      const systemMessages = (mockModel.doStreamCalls[0].prompt as Array<{ role: string; content: unknown }>)
-        .filter(m => m.role === 'system');
-      expect(systemMessages.map(m => m.content)).toEqual(['dynamic prompt']);
-      expect(hookCalled).toBe(false);
-    });
-
-    test('falls back to the systemPrompt config when the resolver omits systemPrompt', async () => {
-      const mockModel = createStreamingTextMockModel('Hello');
-      const agent = new AISDKAgent({
-        model: mockModel,
-        systemPrompt: 'static prompt',
-        runtimeConfig: () => ({ temperature: 0 }),
-      });
-
-      const eventEmitter: EventEmitter = { emit: () => {} };
-      await agent.run(createTestInput(), eventEmitter);
-
-      const systemMessages = (mockModel.doStreamCalls[0].prompt as Array<{ role: string; content: unknown }>)
-        .filter(m => m.role === 'system');
-      expect(systemMessages.map(m => m.content)).toEqual(['static prompt']);
+      // DEFAULT_MAX_OUTPUT_TOKENS = 4096; temperature defaults to undefined
+      expect(call.maxOutputTokens).toBe(4096);
+      expect(call.temperature).toBeUndefined();
+      expect(call.providerOptions).toBeUndefined();
     });
 
     test('resolved per run: updated values take effect on the next run without restart', async () => {
       const mockModel = createStreamingTextMockModel('Hello');
       let currentTemperature = 0.1;
       const agent = new AISDKAgent({
-        model: mockModel,
-        runtimeConfig: () => ({ temperature: currentTemperature }),
+        hooks: { loadConfig: () => ({ model: mockModel, temperature: currentTemperature }) },
       });
 
       const eventEmitter: EventEmitter = { emit: () => {} };
@@ -3817,66 +3551,57 @@ describe('AISDKAgent', () => {
       expect(mockModel.doStreamCalls[1].temperature).toBe(0.8);
     });
 
-    // The complete-tool-call loop bound (`stepIteration <= ctx.resolved.maxSteps`)
-    // is covered in AISDKAgent.maxSteps.test.ts; this pins the graceful-summary
-    // check on the truncation-retry path.
-    test('maxSteps override stops the incomplete-tool-call retry loop', async () => {
-      let callCount = 0;
-
-      // Always truncates mid-tool-input so the loop only stops at maxSteps
-      const mockModel = new MockLanguageModelV3({
-        doStream: async () => {
-          callCount++;
-          return {
-            stream: simulateReadableStream({
-              chunks: [
-                { type: 'tool-input-start', id: `tool-call-${callCount}`, toolName: 'addRows' },
-                { type: 'tool-input-delta', id: `tool-call-${callCount}`, delta: '{"rows": [' },
-                {
-                  type: 'finish',
-                  finishReason: 'length' as const,
-                  usage: { inputTokens: 100, outputTokens: 4096, totalTokens: 4196 },
-                },
-              ],
-            }),
-            response: {
-              id: `response-${callCount}`,
-              timestamp: new Date(),
-              modelId: 'mock-model',
-              headers: {},
-              messages: [],
-            },
-          };
-        },
-      });
-
+    test('uses the systemPrompt returned by loadConfig', async () => {
+      const mockModel = createStreamingTextMockModel('Hello');
       const agent = new AISDKAgent({
-        model: mockModel,
-        runtimeConfig: () => ({ maxSteps: 2 }),
+        hooks: { loadConfig: () => ({ model: mockModel, systemPrompt: 'dynamic prompt' }) },
       });
 
       const eventEmitter: EventEmitter = { emit: () => {} };
-      const input = createTestInput({
-        tools: [
-          {
-            name: 'addRows',
-            description: 'Add rows to a table',
-            parameters: {
-              type: 'object',
-              properties: { rows: { type: 'array', items: { type: 'object' } } },
-              required: ['rows'],
-            },
-          },
-        ],
-      });
+      await agent.run(createTestInput(), eventEmitter);
 
-      await agent.run(input, eventEmitter);
-
-      // Static default is 10; the override must bound the loop instead
-      expect(callCount).toBe(2);
+      const systemMessages = (mockModel.doStreamCalls[0].prompt as Array<{ role: string; content: unknown }>)
+        .filter(m => m.role === 'system');
+      expect(systemMessages.map(m => m.content)).toEqual(['dynamic prompt']);
     });
 
-    test('token-limit recovery reports the resolved maxOutputTokens, not the static one', async () => {
+    test('treats an empty-string systemPrompt from loadConfig as absent', async () => {
+      const mockModel = createStreamingTextMockModel('Hello');
+      const agent = new AISDKAgent({
+        hooks: { loadConfig: () => ({ model: mockModel, systemPrompt: '' }) },
+      });
+
+      const eventEmitter: EventEmitter = { emit: () => {} };
+      // Only the per-request system prompt should remain (config prompt is empty).
+      await agent.run(createTestInput({ systemPrompt: 'Runtime prompt only' }), eventEmitter);
+
+      const systemMessages = (mockModel.doStreamCalls[0].prompt as Array<{ role: string; content: unknown }>)
+        .filter(m => m.role === 'system');
+      expect(systemMessages.map(m => m.content)).toEqual(['Runtime prompt only']);
+    });
+
+    test('a throwing loadConfig fails the run with RUN_ERROR and does not crash', async () => {
+      const agent = new AISDKAgent({
+        hooks: {
+          loadConfig: async () => {
+            throw new Error('Langfuse unavailable');
+          },
+        },
+      });
+
+      const emittedEvents: AGUIEventExtended[] = [];
+      const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
+
+      const result = await agent.run(createTestInput(), eventEmitter);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Langfuse unavailable');
+      // The client still sees a well-formed lifecycle: RUN_STARTED then RUN_ERROR.
+      expect(emittedEvents.find(e => e.type === EventType.RUN_STARTED)).toBeDefined();
+      expect(emittedEvents.find(e => e.type === EventType.RUN_ERROR)).toBeDefined();
+    });
+
+    test('token-limit recovery reports the loaded maxOutputTokens', async () => {
       const toolCallId = 'tool-call-truncated';
       let callCount = 0;
       let secondCallMessages: unknown[] = [];
@@ -3886,7 +3611,7 @@ describe('AISDKAgent', () => {
           callCount++;
 
           if (callCount === 1) {
-            // Truncated mid-tool-input by the (overridden) output token limit
+            // Truncated mid-tool-input by the output token limit
             return {
               stream: simulateReadableStream({
                 chunks: [
@@ -3935,9 +3660,8 @@ describe('AISDKAgent', () => {
       });
 
       const agent = new AISDKAgent({
-        model: mockModel,
-        // Static default maxOutputTokens is 4096; the run must use 2048 everywhere
-        runtimeConfig: () => ({ maxOutputTokens: 2048 }),
+        // Library default maxOutputTokens is 4096; the run must use 2048 everywhere
+        hooks: { loadConfig: () => ({ model: mockModel, maxOutputTokens: 2048 }) },
       });
 
       const eventEmitter: EventEmitter = { emit: () => {} };
@@ -3962,7 +3686,7 @@ describe('AISDKAgent', () => {
       expect(mockModel.doStreamCalls[0].maxOutputTokens).toBe(2048);
 
       // The synthetic recovery tool_result must quote the value the run
-      // actually applied, not the static config
+      // actually applied, not the library default
       const toolResultValues: string[] = [];
       for (const msg of secondCallMessages as Array<{ role: string; content: unknown }>) {
         if (msg.role === 'tool' && Array.isArray(msg.content)) {
@@ -3978,10 +3702,10 @@ describe('AISDKAgent', () => {
       expect(toolResultValues[0]).not.toContain('4096');
     });
 
-    test('truncation fallback step clamps to the resolved maxOutputTokens and logs it', async () => {
-      // Override below TRUNCATION_FALLBACK_MAX_TOKENS (256) so the fallback
-      // cap distinguishes resolved from static: min(100, 256) = 100, whereas
-      // the static default would give min(4096, 256) = 256.
+    test('truncation fallback step clamps to the loaded maxOutputTokens and logs it', async () => {
+      // Load a value below TRUNCATION_FALLBACK_MAX_TOKENS (256) so the fallback
+      // cap distinguishes the loaded value from the default: min(100, 256) = 100,
+      // whereas the library default would give min(4096, 256) = 256.
       let callCount = 0;
 
       const mockModel = new MockLanguageModelV3({
@@ -4038,9 +3762,8 @@ describe('AISDKAgent', () => {
       });
 
       const agent = new AISDKAgent({
-        model: mockModel,
-        // Static default maxOutputTokens is 4096
-        runtimeConfig: () => ({ maxOutputTokens: 100 }),
+        // Library default maxOutputTokens is 4096
+        hooks: { loadConfig: () => ({ model: mockModel, maxOutputTokens: 100 }) },
       });
 
       const eventEmitter: EventEmitter = { emit: () => {} };
@@ -4051,10 +3774,10 @@ describe('AISDKAgent', () => {
         expect(result.success).toBe(true);
         expect(callCount).toBe(2);
         expect(mockModel.doStreamCalls[0].maxOutputTokens).toBe(100);
-        // Fallback step: min(resolved 100, 256) = 100, not min(static 4096, 256) = 256
+        // Fallback step: min(loaded 100, 256) = 100, not min(default 4096, 256) = 256
         expect(mockModel.doStreamCalls[1].maxOutputTokens).toBe(100);
 
-        // The truncation warn log must report the resolved value
+        // The truncation warn log must report the loaded value
         const truncationWarn = warnSpy.mock.calls.find(
           ([message]) => String(message).includes('Output truncated mid-text/reasoning'),
         );
@@ -4065,7 +3788,7 @@ describe('AISDKAgent', () => {
       }
     });
 
-    test('cache breakpoints follow the resolved model in both directions', async () => {
+    test('cache breakpoints follow the loaded model in both directions', async () => {
       const capturedMessages = { messages: [] as unknown[] };
       const aiModule = await import('ai');
       const originalStreamText = aiModule.streamText;
@@ -4099,11 +3822,10 @@ describe('AISDKAgent', () => {
         streamText: mockStreamText,
       }));
 
-      const runWithModels = async (staticModel: MockLanguageModelV3, overrideModel: MockLanguageModelV3) => {
+      const runWithModel = async (model: MockLanguageModelV3) => {
         const agent = new AISDKAgent({
-          model: staticModel,
           cacheBreakpoint: (msg) => msg.role === 'system' || msg.isLast,
-          runtimeConfig: () => ({ model: overrideModel }),
+          hooks: { loadConfig: () => ({ model }) },
         });
         const eventEmitter: EventEmitter = { emit: () => {} };
         await agent.run(createTestInput({ systemPrompt: 'You are a helpful assistant.' }), eventEmitter);
@@ -4111,16 +3833,16 @@ describe('AISDKAgent', () => {
       const anthropicModel = () => new MockLanguageModelV3({ provider: 'anthropic', modelId: 'claude-3-5-sonnet-20241022' });
       const openaiModel = () => new MockLanguageModelV3({ provider: 'openai', modelId: 'gpt-4-turbo' });
 
-      // Static non-Anthropic, override Anthropic: breakpoints applied (system + last message)
-      await runWithModels(openaiModel(), anthropicModel());
+      // Anthropic model: breakpoints applied (system + last message)
+      await runWithModel(anthropicModel());
       const messagesWithCache = capturedMessages.messages.filter(
         (msg: unknown) => (msg as { providerOptions?: { anthropic?: { cacheControl?: unknown } } })
           .providerOptions?.anthropic?.cacheControl
       );
       expect(messagesWithCache.length).toBe(2);
 
-      // Static Anthropic, override non-Anthropic: breakpoints skipped
-      await runWithModels(anthropicModel(), openaiModel());
+      // Non-Anthropic model: breakpoints skipped
+      await runWithModel(openaiModel());
       const hasProviderOptions = capturedMessages.messages.some(
         (msg: unknown) => (msg as { providerOptions?: unknown }).providerOptions
       );

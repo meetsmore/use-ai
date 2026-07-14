@@ -64,7 +64,7 @@ export type { ClientSession } from './agents/types';
  *   apiKey: process.env.ANTHROPIC_API_KEY,
  * });
  * const claudeAgent = new AISDKAgent({
- *   model: anthropic('claude-sonnet-4-20250514'),
+ *   hooks: { loadConfig: () => ({ model: anthropic('claude-sonnet-4-20250514') }) },
  * });
  * const server = new UseAIServer({
  *   port: 8081,
@@ -74,7 +74,7 @@ export type { ClientSession } from './agents/types';
  *
  * // Multiple agents (Claude + OpenAI)
  * const gptAgent = new AISDKAgent({
- *   model: openai('gpt-4-turbo'),
+ *   hooks: { loadConfig: () => ({ model: openai('gpt-4-turbo') }) },
  * });
  * const multiServer = new UseAIServer({
  *   port: 8081,

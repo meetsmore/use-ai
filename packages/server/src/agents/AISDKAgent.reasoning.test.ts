@@ -68,10 +68,7 @@ describe('AISDKAgent reasoning events', () => {
       }),
     });
 
-    const agent = new AISDKAgent({
-      model: mockModel,
-      providerOptions: { anthropic: { thinking: { type: 'enabled', budgetTokens: 10000 } } },
-    });
+    const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel, providerOptions: { anthropic: { thinking: { type: 'enabled', budgetTokens: 10000 } } } }) } });
 
     const emittedEvents: AGUIEventExtended[] = [];
     const eventEmitter: EventEmitter = {
@@ -153,10 +150,7 @@ describe('AISDKAgent reasoning events', () => {
       }),
     });
 
-    const agent = new AISDKAgent({
-      model: mockModel,
-      providerOptions: { anthropic: { thinking: { type: 'enabled', budgetTokens: 10000 } } },
-    });
+    const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel, providerOptions: { anthropic: { thinking: { type: 'enabled', budgetTokens: 10000 } } } }) } });
 
     const emittedEvents: AGUIEventExtended[] = [];
     const eventEmitter: EventEmitter = {
@@ -200,10 +194,7 @@ describe('AISDKAgent reasoning events', () => {
       }),
     });
 
-    const agent = new AISDKAgent({
-      model: mockModel,
-      providerOptions: { anthropic: { thinking: { type: 'enabled', budgetTokens: 10000 } } },
-    });
+    const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel, providerOptions: { anthropic: { thinking: { type: 'enabled', budgetTokens: 10000 } } } }) } });
 
     const emittedEvents: AGUIEventExtended[] = [];
     const eventEmitter: EventEmitter = {
@@ -252,7 +243,7 @@ describe('AISDKAgent reasoning events', () => {
       }),
     });
 
-    const agent = new AISDKAgent({ model: mockModel });
+    const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
     const emittedEvents: AGUIEventExtended[] = [];
     const eventEmitter: EventEmitter = {
       emit: (event) => emittedEvents.push(event),
@@ -329,7 +320,7 @@ describe('AISDKAgent reasoning events (OpenAI)', () => {
 
   test('emits REASONING_* events in correct order for OpenAI reasoning model', async () => {
     const mockModel = createOpenAIMockModel(openaiChunks(), '2 + 2 = 4.');
-    const agent = new AISDKAgent({ model: mockModel, providerOptions: openaiProviderOptions });
+    const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel, providerOptions: openaiProviderOptions }) } });
 
     const emittedEvents: AGUIEventExtended[] = [];
     const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
@@ -369,7 +360,7 @@ describe('AISDKAgent reasoning events (OpenAI)', () => {
       openaiChunks({ initialEncrypted: 'gAAAAA_INITIAL', finalEncrypted: 'gAAAAA_FINAL' }),
       'Answer.',
     );
-    const agent = new AISDKAgent({ model: mockModel, providerOptions: openaiProviderOptions });
+    const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel, providerOptions: openaiProviderOptions }) } });
 
     const emittedEvents: AGUIEventExtended[] = [];
     const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
@@ -479,7 +470,7 @@ describe('AISDKAgent reasoning events (Google/Gemini)', () => {
 
   test('captures thoughtSignature from tool call chunks and emits REASONING_ENCRYPTED_VALUE with subtype tool-call', async () => {
     const mockModel = createGeminiMockModel(geminiToolCallChunks());
-    const agent = new AISDKAgent({ model: mockModel, maxSteps: 1 });
+    const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel, maxSteps: 1 }) } });
 
     const emittedEvents: AGUIEventExtended[] = [];
     const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
@@ -502,7 +493,7 @@ describe('AISDKAgent reasoning events (Google/Gemini)', () => {
 
   test('does not emit reasoning block events (no reasoning-start/delta/end) for Gemini', async () => {
     const mockModel = createGeminiMockModel(geminiToolCallChunks());
-    const agent = new AISDKAgent({ model: mockModel, maxSteps: 1 });
+    const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel, maxSteps: 1 }) } });
 
     const emittedEvents: AGUIEventExtended[] = [];
     const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
@@ -523,7 +514,7 @@ describe('AISDKAgent reasoning events (Google/Gemini)', () => {
 
   test('emits REASONING_ENCRYPTED_VALUE after TOOL_CALL_END', async () => {
     const mockModel = createGeminiMockModel(geminiToolCallChunks());
-    const agent = new AISDKAgent({ model: mockModel, maxSteps: 1 });
+    const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel, maxSteps: 1 }) } });
 
     const emittedEvents: AGUIEventExtended[] = [];
     const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
@@ -566,7 +557,7 @@ describe('AISDKAgent reasoning events (Google/Gemini)', () => {
         },
       })) as never,
     });
-    const agent = new AISDKAgent({ model: mockModel, maxSteps: 1 });
+    const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel, maxSteps: 1 }) } });
 
     const emittedEvents: AGUIEventExtended[] = [];
     const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };

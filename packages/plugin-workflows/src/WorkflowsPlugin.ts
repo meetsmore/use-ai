@@ -44,7 +44,7 @@ export interface WorkflowsPluginConfig {
  *
  * const server = new UseAIServer({
  *   agents: {
- *     claude: new AISDKAgent({ model }),
+ *     claude: new AISDKAgent({ hooks: { loadConfig: () => ({ model }) } }),
  *   },
  *   defaultAgent: 'claude',
  *   plugins: [

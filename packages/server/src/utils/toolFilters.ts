@@ -49,7 +49,7 @@ export function isServerTool(tool: ToolDefinition): tool is ServerToolDefinition
  * @example
  * ```typescript
  * const agent = new AISDKAgent({
- *   model: anthropic('claude-3-5-sonnet-20241022'),
+ *   hooks: { loadConfig: () => ({ model: anthropic('claude-3-5-sonnet-20241022') }) },
  *   toolFilter: and(
  *     createMcpGlobAllowFilter(['db_*']),
  *     (tool) => tool.description.includes('read-only')
@@ -71,7 +71,7 @@ export function and(...filters: Array<(tool: ToolDefinition) => boolean>): (tool
  * @example
  * ```typescript
  * const agent = new AISDKAgent({
- *   model: anthropic('claude-3-5-sonnet-20241022'),
+ *   hooks: { loadConfig: () => ({ model: anthropic('claude-3-5-sonnet-20241022') }) },
  *   toolFilter: or(
  *     createMcpGlobAllowFilter(['db_*']),
  *     createMcpGlobAllowFilter(['file_*'])
@@ -93,7 +93,7 @@ export function or(...filters: Array<(tool: ToolDefinition) => boolean>): (tool:
  * ```typescript
  * // Block MCP tools matching delete patterns (equivalent to disallow filter)
  * const agent = new AISDKAgent({
- *   model: anthropic('claude-3-5-sonnet-20241022'),
+ *   hooks: { loadConfig: () => ({ model: anthropic('claude-3-5-sonnet-20241022') }) },
  *   toolFilter: and(
  *     or(not(isRemoteTool), createMcpGlobAllowFilter(['db_*'])),
  *     not(createMcpGlobAllowFilter(['*_delete']))
@@ -116,13 +116,13 @@ export function not(filter: (tool: ToolDefinition) => boolean): (tool: ToolDefin
  * ```typescript
  * // Only allow database MCP tools (client tools always pass)
  * const agent = new AISDKAgent({
- *   model: anthropic('claude-3-5-sonnet-20241022'),
+ *   hooks: { loadConfig: () => ({ model: anthropic('claude-3-5-sonnet-20241022') }) },
  *   toolFilter: or(not(isRemoteTool), createGlobFilter(['db_*']))
  * });
  *
  * // Allow db_* but exclude *_delete
  * const agent = new AISDKAgent({
- *   model: anthropic('claude-3-5-sonnet-20241022'),
+ *   hooks: { loadConfig: () => ({ model: anthropic('claude-3-5-sonnet-20241022') }) },
  *   toolFilter: and(
  *     or(not(isRemoteTool), createGlobFilter(['db_*'])),
  *     not(createGlobFilter(['*_delete']))

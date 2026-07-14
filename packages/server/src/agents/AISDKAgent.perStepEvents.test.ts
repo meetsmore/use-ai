@@ -186,7 +186,7 @@ describe('AISDKAgent per-step TEXT_MESSAGE events', () => {
   test('2-step run emits 2 TEXT_MESSAGE_START/END pairs with distinct messageIds', async () => {
     const { restore } = createTwoStepMock();
     try {
-      const agent = new AISDKAgent({ model: new MockLanguageModelV3({ doStream: async () => { throw new Error('unused'); } }) });
+      const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: new MockLanguageModelV3({ doStream: async () => { throw new Error('unused'); } }) }) } });
       const events: AGUIEventExtended[] = [];
       const emitter: EventEmitter = { emit: (e) => events.push(e) };
 
@@ -211,7 +211,7 @@ describe('AISDKAgent per-step TEXT_MESSAGE events', () => {
   test('tool-only step emits no TEXT_MESSAGE events', async () => {
     const { restore } = createToolOnlyThenTextMock();
     try {
-      const agent = new AISDKAgent({ model: new MockLanguageModelV3({ doStream: async () => { throw new Error('unused'); } }) });
+      const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: new MockLanguageModelV3({ doStream: async () => { throw new Error('unused'); } }) }) } });
       const events: AGUIEventExtended[] = [];
       const emitter: EventEmitter = { emit: (e) => events.push(e) };
 
@@ -231,7 +231,7 @@ describe('AISDKAgent per-step TEXT_MESSAGE events', () => {
   test('TEXT_MESSAGE_END comes before TOOL_CALL_START in same step', async () => {
     const { restore } = createTwoStepMock();
     try {
-      const agent = new AISDKAgent({ model: new MockLanguageModelV3({ doStream: async () => { throw new Error('unused'); } }) });
+      const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: new MockLanguageModelV3({ doStream: async () => { throw new Error('unused'); } }) }) } });
       const events: AGUIEventExtended[] = [];
       const emitter: EventEmitter = { emit: (e) => events.push(e) };
 

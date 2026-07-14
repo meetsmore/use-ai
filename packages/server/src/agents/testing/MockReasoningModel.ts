@@ -14,8 +14,8 @@
  *   import { createMockReasoningModel, AISDKAgent } from '@meetsmore-oss/use-ai-server';
  *
  *   const agent = new AISDKAgent({
- *     model: createMockReasoningModel(),
  *     name: 'Mock (Reasoning)',
+ *     hooks: { loadConfig: () => ({ model: createMockReasoningModel() }) },
  *   });
  *
  * Enable in server-app with: USE_AI_ENABLE_MOCK_AGENT=true

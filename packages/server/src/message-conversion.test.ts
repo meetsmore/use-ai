@@ -115,7 +115,7 @@ describe('Bug 2: Server message conversion preserves tool calls on reconnection'
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any);
 
-    const agent = new AISDKAgent({ model: mockModel });
+    const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
     const server = new UseAIServer({
       port,
       agents: { test: agent },
@@ -248,7 +248,7 @@ describe('Bug 2: Server message conversion preserves tool calls on reconnection'
       { text: 'Second follow-up' },
     ]);
 
-    const agent = new AISDKAgent({ model: mockModel });
+    const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
     const server = new UseAIServer({
       port,
       agents: { test: agent },
@@ -381,7 +381,7 @@ describe('Reasoning parts roundtrip through message conversion', () => {
       },
     });
 
-    const agent = new AISDKAgent({ model: mockModel });
+    const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
     const server = new UseAIServer({
       agents: { test: agent },
       defaultAgent: 'test',
@@ -468,7 +468,7 @@ describe('Reasoning parts roundtrip through message conversion', () => {
       },
     });
 
-    const agent = new AISDKAgent({ model: mockModel });
+    const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
     const server = new UseAIServer({
       agents: { test: agent },
       defaultAgent: 'test',
@@ -567,7 +567,7 @@ describe('Reasoning parts roundtrip through message conversion', () => {
       },
     });
 
-    const agent = new AISDKAgent({ model: mockModel });
+    const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
     const server = new UseAIServer({
       agents: { test: agent },
       defaultAgent: 'test',

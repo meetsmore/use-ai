@@ -100,7 +100,7 @@ describe('Agent System', () => {
       },
     ]);
 
-    const multiStepAgent = new AISDKAgent({ model: multiStepMockModel });
+    const multiStepAgent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: multiStepMockModel }) } });
     const multiStepServer = new UseAIServer({
       port: multiStepPort,
       agents: { test: multiStepAgent },
@@ -233,7 +233,7 @@ describe('Agent System', () => {
       expect(systemMessage).toBeDefined();
     });
 
-    const stateAgent = new AISDKAgent({ model: stateMockModel });
+    const stateAgent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: stateMockModel }) } });
     const stateServer = new UseAIServer({
       port: statePort,
       agents: { test: stateAgent },
