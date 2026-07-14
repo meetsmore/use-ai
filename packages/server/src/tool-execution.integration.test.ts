@@ -51,7 +51,7 @@ describe('Tool Execution Coordination', () => {
       },
     ]);
 
-    const toolAgent = new AISDKAgent({ model: toolMockModel });
+    const toolAgent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: toolMockModel }) } });
     const toolServer = new UseAIServer({
       port: toolPort,
       agents: { test: toolAgent },
@@ -118,7 +118,7 @@ describe('Tool Execution Coordination', () => {
       },
     ]);
 
-    const coordAgent = new AISDKAgent({ model: coordMockModel });
+    const coordAgent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: coordMockModel }) } });
     const coordServer = new UseAIServer({
       port: coordPort,
       agents: { test: coordAgent },
@@ -184,7 +184,7 @@ describe('Tool Execution Coordination', () => {
       },
     ]);
 
-    const waitAgent = new AISDKAgent({ model: waitMockModel });
+    const waitAgent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: waitMockModel }) } });
     const waitServer = new UseAIServer({
       port: waitPort,
       agents: { test: waitAgent },
@@ -249,7 +249,7 @@ describe('Tool Execution Coordination', () => {
       },
     ]);
 
-    const multiAgent = new AISDKAgent({ model: multiMockModel });
+    const multiAgent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: multiMockModel }) } });
     const multiServer = new UseAIServer({
       port: multiPort,
       agents: { test: multiAgent },
@@ -310,7 +310,7 @@ describe('Tool Execution Coordination', () => {
       expect(Object.keys(tools as object).length).toBeGreaterThan(0);
     });
 
-    const convAgent = new AISDKAgent({ model: convMockModel });
+    const convAgent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: convMockModel }) } });
     const convServer = new UseAIServer({
       port: convPort,
       agents: { test: convAgent },

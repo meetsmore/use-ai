@@ -14,13 +14,14 @@
  *   import { createMockReasoningModel, AISDKAgent } from '@meetsmore-oss/use-ai-server';
  *
  *   const agent = new AISDKAgent({
- *     model: createMockReasoningModel(),
  *     name: 'Mock (Reasoning)',
+ *     hooks: { loadConfig: () => ({ model: createMockReasoningModel() }) },
  *   });
  *
  * Enable in server-app with: USE_AI_ENABLE_MOCK_AGENT=true
  */
-import { MockLanguageModelV3, simulateReadableStream } from 'ai/test';
+import { MockLanguageModelV3 } from 'ai/test';
+import { simulateReadableStream } from 'ai';
 
 /** Delay between chunks in ms — slow enough to observe streaming UI */
 const CHUNK_DELAY_MS = 100;

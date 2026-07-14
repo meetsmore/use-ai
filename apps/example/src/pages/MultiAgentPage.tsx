@@ -90,12 +90,12 @@ import { openai } from '@ai-sdk/openai';
 new UseAIServer({
   agents: {
     claude: new AISDKAgent({
-      model: anthropic('claude-sonnet-4-20250514'),
       name: 'Claude',
+      hooks: { loadConfig: () => ({ model: anthropic('claude-sonnet-4-20250514') }) },
     }),
     gpt: new AISDKAgent({
-      model: openai('gpt-4o'),
       name: 'GPT-4o',
+      hooks: { loadConfig: () => ({ model: openai('gpt-4o') }) },
     }),
   },
   defaultAgent: 'claude',

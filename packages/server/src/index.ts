@@ -8,7 +8,7 @@ export type { ResolveAttachments, ResolveAttachmentsContext, MultimodalContent }
 
 // Export agents for advanced usage
 export type { Agent, AgentInput, EventEmitter, AgentResult } from './agents';
-export { AISDKAgent, type AISDKAgentConfig, type MessageWithCacheContext, type CacheTtl, type CacheBreakpointResult, type CacheBreakpointFn, createMockReasoningModel } from './agents';
+export { AISDKAgent, type AISDKAgentConfig, type AISDKAgentHooks, type AISDKRunConfig, type MessageWithCacheContext, type CacheTtl, type CacheBreakpointResult, type CacheBreakpointFn, createMockReasoningModel } from './agents';
 
 // Export plugin types and built-in plugins
 export type { UseAIServerPlugin, MessageHandler, BeforeRunAgentResult } from './plugins';

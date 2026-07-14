@@ -94,6 +94,22 @@ class AbortError extends Error {
 }
 
 /**
+ * Effective configuration for a single run: the {@link AISDKRunConfig} returned
+ * by `hooks.loadConfig`, with library defaults filled in for omitted fields.
+ *
+ * Invariant: every read of these values during a run MUST go through this
+ * object — otherwise a run could report a value it did not actually apply
+ * (e.g. error-recovery messages reporting a maxOutputTokens that was not used).
+ */
+interface ResolvedRunConfig {
+  model: LanguageModel;
+  temperature: number | undefined;
+  maxOutputTokens: number;
+  maxSteps: number;
+  providerOptions: Record<string, Record<string, JSONValue>> | undefined;
+}
+
+/**
  * Mutable state for a single run() invocation.
  * All fields are local to one call — no cross-request sharing.
  */
@@ -107,6 +123,8 @@ interface RunContext {
   readonly state: unknown;
   readonly originalInput: AgentInput['originalInput'];
   readonly staticSystemMessages: SystemModelMessage[] | undefined;
+  /** Effective config for this run (from hooks.loadConfig, defaults applied) */
+  readonly resolved: ResolvedRunConfig;
 
   // Streaming state (mutated during run)
   streamTextStarted: boolean;
@@ -160,29 +178,132 @@ interface StepContext {
 }
 
 /**
- * Configuration for AISDKAgent.
+ * The generation configuration for a single run(), returned by
+ * {@link AISDKAgentHooks.loadConfig}.
+ *
+ * Because `loadConfig` is called once per run, returning different values here
+ * changes the model / parameters for the next run without a server restart
+ * (e.g. values fetched from Langfuse prompt config).
+ *
+ * Only `model` is required. Omitted optional fields use library defaults.
  */
-export interface AISDKAgentConfig {
+export interface AISDKRunConfig {
   /**
-   * AI SDK Language Model (works with any provider).
+   * AI SDK Language Model (works with any provider). Accepts a model instance
+   * or a gateway model ID string.
+   *
+   * Required: use-ai is provider-agnostic and cannot pick a default model.
    *
    * @example
    * ```typescript
    * import { anthropic } from '@ai-sdk/anthropic';
-   * import { openai } from '@ai-sdk/openai';
-   * import { google } from '@ai-sdk/google';
-   *
-   * // With Anthropic Claude
-   * { model: anthropic('claude-3-5-sonnet-20241022') }
-   *
-   * // With OpenAI GPT
-   * { model: openai('gpt-4-turbo') }
-   *
-   * // With Google Gemini
-   * { model: google('gemini-pro') }
+   * { model: anthropic('claude-3-5-sonnet-20241022') }   // model instance
+   * { model: 'anthropic/claude-3-5-sonnet-20241022' }    // gateway model ID
    * ```
    */
   model: LanguageModel;
+
+  /**
+   * System prompt for this run, set on the backend and not exposed to the
+   * frontend (suitable for sensitive instructions). An empty string is treated
+   * as absent. When the request also carries a system prompt (AgentInput), the
+   * two are sent as separate system messages with this one first.
+   */
+  systemPrompt?: string;
+
+  /**
+   * Temperature for model responses. Lower (e.g. 0) is more deterministic.
+   * @default undefined (uses the model's default)
+   */
+  temperature?: number;
+
+  /**
+   * Maximum number of tokens the model can output per response.
+   * @default 4096
+   */
+  maxOutputTokens?: number;
+
+  /**
+   * Maximum number of model step iterations per run. Each iteration performs
+   * one model invocation and may include tool calls.
+   * @default 10
+   */
+  maxSteps?: number;
+
+  /**
+   * Provider-specific options passed directly to `streamText`.
+   * Used for AI Gateway features like model fallbacks and provider routing.
+   *
+   * @example
+   * ```typescript
+   * {
+   *   providerOptions: {
+   *     gateway: {
+   *       models: ['anthropic/claude-opus-4.6', 'google/gemini-3.1-pro-preview'],
+   *       order: ['azure', 'openai'],
+   *     },
+   *   },
+   * }
+   * ```
+   */
+  providerOptions?: Record<string, Record<string, JSONValue>>;
+}
+
+/**
+ * Function-valued configuration points for {@link AISDKAgent}.
+ *
+ * Anything that can change at runtime is supplied through a hook rather than a
+ * static config field, so there is a single source of truth and no "static
+ * value vs. override" ambiguity.
+ */
+export interface AISDKAgentHooks {
+  /**
+   * Loads the generation config for a run.
+   *
+   * Called once at the start of every run(), so a value fetched from an external
+   * source (e.g. Langfuse prompt config) takes effect on the next request
+   * without a server restart. The agent does not cache the result.
+   *
+   * Required, because it is the only source of the model. For a static setup,
+   * return a constant object.
+   *
+   * If it throws, the run fails with RUN_ERROR — there is no static fallback.
+   * Implement resilience (e.g. return a default on a Langfuse outage) inside the
+   * hook itself.
+   *
+   * @example
+   * ```typescript
+   * // Static
+   * { loadConfig: () => ({ model: anthropic('claude-3-5-sonnet-20241022') }) }
+   *
+   * // Dynamic, fetched from Langfuse (with a fallback owned by the host)
+   * {
+   *   loadConfig: async () => {
+   *     try {
+   *       const prompt = await langfuse.prompt.get('my-prompt', { type: 'text' });
+   *       return { model: prompt.config.model, systemPrompt: prompt.prompt };
+   *     } catch {
+   *       return { model: 'anthropic/claude-3-5-sonnet-20241022' };
+   *     }
+   *   },
+   * }
+   * ```
+   */
+  loadConfig: () => AISDKRunConfig | Promise<AISDKRunConfig>;
+}
+
+/**
+ * Configuration for AISDKAgent.
+ *
+ * Structural settings (name, tool filtering, cache breakpoints) live here;
+ * everything that can vary per run is supplied via {@link AISDKAgentHooks}.
+ */
+export interface AISDKAgentConfig {
+  /**
+   * Function-valued configuration. `hooks.loadConfig` (required) supplies the
+   * model and generation parameters for each run.
+   */
+  hooks: AISDKAgentHooks;
 
   /**
    * Agent name for identification (defaults to 'ai-sdk').
@@ -198,46 +319,9 @@ export interface AISDKAgentConfig {
    * @example
    * ```typescript
    * { annotation: 'Fast responses for simple tasks' }
-   * { annotation: 'Deep thinking mode for complex reasoning' }
    * ```
    */
   annotation?: string;
-
-  /**
-   * Optional system prompt to configure the agent's behavior.
-   * This prompt is set on the backend and not exposed to the frontend,
-   * making it suitable for sensitive instructions.
-   *
-   * Can be a string, a function returning a string, or an async function
-   * returning a Promise<string>. Use a function when the prompt needs to
-   * be dynamically resolved (e.g., fetched from Langfuse or other external
-   * sources) so updates take effect immediately without server restart.
-   *
-   * When both this and the runtime systemPrompt (from AgentInput) are provided,
-   * they are combined with this config prompt coming first.
-   *
-   * @example
-   * ```typescript
-   * // Static prompt
-   * {
-   *   systemPrompt: 'You are a helpful assistant.'
-   * }
-   *
-   * // Sync function (e.g., reading from cache)
-   * {
-   *   systemPrompt: () => promptCache.get('my-prompt')
-   * }
-   *
-   * // Async function (e.g., fetching from Langfuse)
-   * {
-   *   systemPrompt: async () => {
-   *     const prompt = await langfuse.getPrompt('my-prompt');
-   *     return prompt.compile();
-   *   }
-   * }
-   * ```
-   */
-  systemPrompt?: string | (() => string | Promise<string>);
 
   /**
    * Optional filter function for tools.
@@ -247,17 +331,7 @@ export interface AISDKAgentConfig {
    * @example
    * ```typescript
    * // Only allow MCP tools starting with 'db_'
-   * {
-   *   toolFilter: (tool) =>
-   *     !tool._remote || tool.name.startsWith('db_')
-   * }
-   *
-   * // Block dangerous MCP tools
-   * {
-   *   toolFilter: (tool) =>
-   *     !tool._remote ||
-   *     (!tool.name.includes('delete') && !tool.name.includes('drop'))
-   * }
+   * { toolFilter: (tool) => !tool._remote || tool.name.startsWith('db_') }
    * ```
    */
   toolFilter?: (tool: ToolDefinition) => boolean;
@@ -267,36 +341,16 @@ export interface AISDKAgentConfig {
    * Only applies when using Anthropic models (Claude).
    *
    * Prompt caching reduces costs and latency by caching message prefixes.
-   * Cache breakpoints mark where the cacheable prefix ends.
-   *
    * The function receives each message with positional context and returns
-   * true to add a cache breakpoint after that message.
-   *
-   * System prompt is included as role: 'system' at index 0 when present.
+   * true to add a cache breakpoint after that message. System prompt is
+   * included as role: 'system' at index 0 when present.
    *
    * @see https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching
    *
    * @example
    * ```typescript
    * // Cache system prompt + last message (most common pattern)
-   * {
-   *   cacheBreakpoint: (msg) => msg.role === 'system' || msg.isLast
-   * }
-   *
-   * // Cache only the last message
-   * {
-   *   cacheBreakpoint: (msg) => msg.isLast
-   * }
-   *
-   * // Cache system prompt only
-   * {
-   *   cacheBreakpoint: (msg) => msg.role === 'system'
-   * }
-   *
-   * // Cache first 3 messages + last
-   * {
-   *   cacheBreakpoint: (msg) => msg.index < 3 || msg.isLast
-   * }
+   * { cacheBreakpoint: (msg) => msg.role === 'system' || msg.isLast }
    *
    * // System prompt with 1h TTL, last message with 5m TTL
    * {
@@ -309,56 +363,6 @@ export interface AISDKAgentConfig {
    * ```
    */
   cacheBreakpoint?: CacheBreakpointFn;
-
-  /**
-   * Provider-specific options passed directly to `streamText`.
-   * Can be used for AI Gateway features like model fallbacks, provider routing, etc.
-   *
-   * @example
-   * ```typescript
-   * // Model fallbacks via AI Gateway
-   * {
-   *   providerOptions: {
-   *     gateway: {
-   *       models: ['anthropic/claude-opus-4.6', 'google/gemini-3.1-pro-preview'],
-   *     },
-   *   },
-   * }
-   *
-   * // Model fallbacks + provider routing
-   * {
-   *   providerOptions: {
-   *     gateway: {
-   *       models: ['openai/gpt-5-nano', 'anthropic/claude-opus-4.6'],
-   *       order: ['azure', 'openai'],
-   *     },
-   *   },
-   * }
-   * ```
-   */
-  providerOptions?: Record<string, Record<string, JSONValue>>;
-
-  /**
-   * Maximum number of tokens the model can output per response.
-   * @default 4096
-   */
-  maxOutputTokens?: number;
-
-  /**
-   * Temperature for model responses.
-   * Lower values (e.g., 0) make responses more deterministic.
-   * Higher values (e.g., 1) make responses more creative/random.
-   * Useful for testing where deterministic behavior is desired.
-   * @default undefined (uses model's default)
-   */
-  temperature?: number;
-
-  /**
-   * Maximum number of model step iterations per run.
-   * Each iteration performs one model invocation and may include tool calls.
-   * @default 10
-   */
-  maxSteps?: number;
 }
 
 const DEFAULT_MAX_OUTPUT_TOKENS = 4096;
@@ -449,12 +453,12 @@ function extractReasoningSignature(
  * // With Claude
  * const anthropic = createAnthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
  * const claudeAgent = new AISDKAgent({
- *   model: anthropic('claude-3-5-sonnet-20241022'),
+ *   hooks: { loadConfig: () => ({ model: anthropic('claude-3-5-sonnet-20241022') }) },
  * });
  *
  * // With GPT-4
  * const gptAgent = new AISDKAgent({
- *   model: openai('gpt-4-turbo'),
+ *   hooks: { loadConfig: () => ({ model: openai('gpt-4-turbo') }) },
  * });
  *
  * // Agent names come from agents object keys, not from agent config
@@ -468,28 +472,18 @@ function extractReasoningSignature(
  * ```
  */
 export class AISDKAgent implements Agent {
-  private model: LanguageModel;
-  private providerOptions?: Record<string, Record<string, JSONValue>>;
   private name: string;
   private annotation?: string;
   private toolFilter?: (tool: ToolDefinition) => boolean;
-  private systemPrompt?: string | (() => string | Promise<string>);
   private cacheBreakpoint?: CacheBreakpointFn;
-  private maxOutputTokens: number;
-  private temperature?: number;
-  private maxSteps: number;
+  private loadConfig: () => AISDKRunConfig | Promise<AISDKRunConfig>;
 
   constructor(config: AISDKAgentConfig) {
-    this.model = config.model;
-    this.providerOptions = config.providerOptions;
     this.name = config.name || 'ai-sdk';
     this.annotation = config.annotation;
     this.toolFilter = config.toolFilter;
-    this.systemPrompt = config.systemPrompt;
     this.cacheBreakpoint = config.cacheBreakpoint;
-    this.maxOutputTokens = config.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS;
-    this.temperature = config.temperature;
-    this.maxSteps = config.maxSteps ?? DEFAULT_MAX_STEPS;
+    this.loadConfig = config.hooks.loadConfig;
   }
 
   getName(): string {
@@ -509,7 +503,17 @@ export class AISDKAgent implements Agent {
   }
 
   async run(input: AgentInput, events: EventEmitter): Promise<AgentResult> {
-    const ctx = await this.createRunContext(input);
+    // Load the run config via the hook first. This is the only fallible step
+    // before the run context exists, and it has no static fallback, so a failure
+    // here is surfaced as a clean RUN_ERROR (see handleConfigLoadError).
+    let runConfig: AISDKRunConfig;
+    try {
+      runConfig = await this.loadConfig();
+    } catch (error) {
+      return this.handleConfigLoadError(error, input, events);
+    }
+
+    const ctx = this.createRunContext(input, runConfig);
 
     this.emitRunStartEvents(ctx, events);
 
@@ -525,10 +529,10 @@ export class AISDKAgent implements Agent {
   }
 
   /**
-   * Creates the RunContext for a single run() invocation.
-   * Resolves system prompt and initializes all mutable state.
+   * Creates the RunContext for a single run() invocation from the loaded run
+   * config. Builds the system messages and initializes all mutable state.
    */
-  private async createRunContext(input: AgentInput): Promise<RunContext> {
+  private createRunContext(input: AgentInput, runConfig: AISDKRunConfig): RunContext {
     const { session, runId, messages, tools, state, systemPrompt: runtimeSystemPrompt, originalInput } = input;
 
     // Sync session.tools with input.tools if not already set
@@ -538,8 +542,9 @@ export class AISDKAgent implements Agent {
       session.tools = tools;
     }
 
-    // Resolve config system prompt (may be async, e.g., fetched from Langfuse)
-    const configSystemPrompt = await this.resolveSystemPrompt();
+    // Config system prompt from the hook (empty string treated as absent),
+    // combined with any per-request system prompt from AgentInput.
+    const configSystemPrompt = runConfig.systemPrompt || undefined;
     const staticSystemMessages = this.buildStaticSystemMessages(configSystemPrompt, runtimeSystemPrompt);
 
     // Sanitize messages before sending to ensure no provider-specific fields leak through
@@ -553,6 +558,13 @@ export class AISDKAgent implements Agent {
       state,
       originalInput,
       staticSystemMessages,
+      resolved: {
+        model: runConfig.model,
+        temperature: runConfig.temperature,
+        maxOutputTokens: runConfig.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS,
+        maxSteps: runConfig.maxSteps ?? DEFAULT_MAX_STEPS,
+        providerOptions: runConfig.providerOptions,
+      },
 
       streamTextStarted: false,
       finalText: '',
@@ -564,6 +576,43 @@ export class AISDKAgent implements Agent {
       lastStepHadToolCalls: false,
       truncationFallbackPending: false,
       pendingTextMessageId: null,
+    };
+  }
+
+  /**
+   * Handles a failure of the `hooks.loadConfig` hook, which runs before the
+   * RunContext exists. Emits a well-formed lifecycle (RUN_STARTED then
+   * RUN_ERROR) built from the input so the client is not left hanging, and
+   * returns a failed AgentResult.
+   */
+  private handleConfigLoadError(
+    error: unknown,
+    input: AgentInput,
+    events: EventEmitter,
+  ): AgentResult {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.error('hooks.loadConfig failed; aborting run', {
+      clientId: input.session.clientId,
+      error: errorMessage,
+    });
+
+    events.emit<RunStartedEvent>({
+      type: EventType.RUN_STARTED,
+      threadId: input.session.threadId,
+      runId: input.runId,
+      input: input.originalInput,
+      timestamp: Date.now(),
+    });
+    events.emit<RunErrorEvent>({
+      type: EventType.RUN_ERROR,
+      message: ErrorCode.UNKNOWN_ERROR,
+      timestamp: Date.now(),
+    });
+
+    return {
+      success: false,
+      error: errorMessage,
+      conversationHistory: input.messages,
     };
   }
 
@@ -641,8 +690,8 @@ export class AISDKAgent implements Agent {
     events: EventEmitter,
     span: ReturnType<typeof startRunSpan>,
   ): Promise<void> {
-    for (let stepIteration = 0; stepIteration <= this.maxSteps; stepIteration++) {
-      const isGracefulSummaryStep = stepIteration === this.maxSteps;
+    for (let stepIteration = 0; stepIteration <= ctx.resolved.maxSteps; stepIteration++) {
+      const isGracefulSummaryStep = stepIteration === ctx.resolved.maxSteps;
       if (isGracefulSummaryStep && !ctx.lastStepHadToolCalls) break;
 
       const isTruncationFallbackStep = ctx.truncationFallbackPending;
@@ -699,23 +748,23 @@ export class AISDKAgent implements Agent {
       const messagesWithCache = applyCacheBreakpoints(
         stepConfig.messages,
         this.cacheBreakpoint,
-        this.model
+        ctx.resolved.model
       );
 
       ctx.streamTextStarted = true;
       const stepMaxOutputTokens = isTruncationFallbackStep
-        ? Math.min(this.maxOutputTokens, TRUNCATION_FALLBACK_MAX_TOKENS)
-        : this.maxOutputTokens;
+        ? Math.min(ctx.resolved.maxOutputTokens, TRUNCATION_FALLBACK_MAX_TOKENS)
+        : ctx.resolved.maxOutputTokens;
       const createStream = () => streamText({
-        model: this.model,
+        model: ctx.resolved.model,
         messages: messagesWithCache,
         tools: stepConfig.tools,
         // Run ONE step at a time to allow tool refresh between steps
         stopWhen: stepCountIs(1),
         maxOutputTokens: stepMaxOutputTokens,
-        temperature: this.temperature,
+        temperature: ctx.resolved.temperature,
         abortSignal: ctx.session.abortController?.signal,
-        providerOptions: this.providerOptions,
+        providerOptions: ctx.resolved.providerOptions,
         experimental_telemetry: span.active
           ? { isEnabled: true, functionId: 'use-ai', metadata: stepConfig.metadata }
           : undefined,
@@ -908,7 +957,7 @@ export class AISDKAgent implements Agent {
     ctx.currentMessages = [...ctx.currentMessages, fallbackMessage];
     ctx.truncationFallbackPending = true;
     logger.warn('Output truncated mid-text/reasoning by maxOutputTokens; running fallback iteration', {
-      maxOutputTokens: this.maxOutputTokens,
+      maxOutputTokens: ctx.resolved.maxOutputTokens,
       appendingToMessageId: ctx.pendingTextMessageId ?? undefined,
     });
     return true;
@@ -931,7 +980,7 @@ export class AISDKAgent implements Agent {
       .filter(([id]) => !stepCtx.completedToolCalls.has(id))
       .map(([id, call]) => ({ id, ...call }));
     const recoveryMessages = buildRecoveryToolResults(
-      incompleteToolCalls, stepCtx.stepFinishReason, this.maxOutputTokens,
+      incompleteToolCalls, stepCtx.stepFinishReason, ctx.resolved.maxOutputTokens,
     );
     if (recoveryMessages.length === 0) {
       return false;
@@ -1429,30 +1478,10 @@ export class AISDKAgent implements Agent {
   }
 
   /**
-   * Resolves the systemPrompt configuration value.
-   * Handles string, sync function, and async function cases.
-   *
-   * @returns The resolved system prompt string, or undefined if not configured or empty
-   */
-  private async resolveSystemPrompt(): Promise<string | undefined> {
-    if (!this.systemPrompt) {
-      return undefined;
-    }
-
-    if (typeof this.systemPrompt === 'string') {
-      return this.systemPrompt;
-    }
-
-    // It's a function - call it and await the result (works for both sync and async)
-    const result = await this.systemPrompt();
-    return result || undefined;
-  }
-
-  /**
    * Builds an array of static system messages from config and runtime prompts.
    * These are built once per run and remain constant across steps (cacheable prefix).
    *
-   * @param configPrompt - Resolved system prompt from agent config (already resolved via resolveSystemPrompt)
+   * @param configPrompt - Resolved system prompt from the run config (empty string already normalized to undefined)
    * @param runtimePrompt - System prompt from AgentInput (static instructions from server)
    * @returns Array of SystemModelMessage objects, or undefined if both are empty
    */

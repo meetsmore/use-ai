@@ -5,7 +5,8 @@
  */
 
 import type { Socket } from 'socket.io-client';
-import { MockLanguageModelV3, simulateReadableStream } from 'ai/test';
+import { MockLanguageModelV3 } from 'ai/test';
+import { simulateReadableStream } from 'ai';
 import { AISDKAgent } from '../src/agents/AISDKAgent';
 import type { UseAIServerConfig } from '../src/types';
 import { UseAIServer } from '../src/server';
@@ -66,7 +67,7 @@ export function createTestAgent(name: string = 'test-agent'): AISDKAgent {
       },
     }),
   });
-  return new AISDKAgent({ model: mockModel });
+  return new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
 }
 
 /**
@@ -121,7 +122,7 @@ export function createAgentWithMockModel(
   }>
 ): AISDKAgent {
   const mockModel = createMockModel(doStream);
-  return new AISDKAgent({ model: mockModel });
+  return new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
 }
 
 /**

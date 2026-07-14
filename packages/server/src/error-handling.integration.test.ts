@@ -44,7 +44,7 @@ describe('Error Handling', () => {
     const errorPort = 9300;
     const errorMockModel = createErrorMockModel('Agent execution failed');
 
-    const errorAgent = new AISDKAgent({ model: errorMockModel });
+    const errorAgent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: errorMockModel }) } });
     const errorServer = new UseAIServer({
       port: errorPort,
       agents: { test: errorAgent },
@@ -72,7 +72,7 @@ describe('Error Handling', () => {
     const apiErrorPort = 9301;
     const apiErrorMockModel = createErrorMockModel('Model error');
 
-    const apiErrorAgent = new AISDKAgent({ model: apiErrorMockModel });
+    const apiErrorAgent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: apiErrorMockModel }) } });
     const apiErrorServer = new UseAIServer({
       port: apiErrorPort,
       agents: { test: apiErrorAgent },
@@ -135,7 +135,7 @@ describe('Error Handling', () => {
       },
     ]);
 
-    const abortAgent = new AISDKAgent({ model: abortMockModel });
+    const abortAgent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: abortMockModel }) } });
     const abortServer = new UseAIServer({
       port: abortPort,
       agents: { test: abortAgent },
@@ -248,7 +248,7 @@ describe('Error Handling', () => {
 
     const abortServer = new UseAIServer({
       port: abortPort,
-      agents: { test: new AISDKAgent({ model: textStreamModel }) },
+      agents: { test: new AISDKAgent({ hooks: { loadConfig: () => ({ model: textStreamModel }) } }) },
       defaultAgent: 'test',
     });
     cleanup.trackServer(abortServer);
@@ -301,7 +301,7 @@ describe('Error Handling', () => {
       },
     ]);
 
-    const disconnectAgent = new AISDKAgent({ model: disconnectMockModel });
+    const disconnectAgent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: disconnectMockModel }) } });
 
     // Spy on agent.run() to track whether it completes and what it returns
     let runCompleted = false;
@@ -409,10 +409,7 @@ describe('Error recording and abort handling', () => {
       });
       (model as any).provider = 'anthropic';
 
-      const agent = new AISDKAgent({
-        model,
-        cacheBreakpoint: () => { throw new Error('Cache breakpoint error'); },
-      });
+      const agent = new AISDKAgent({ cacheBreakpoint: () => { throw new Error('Cache breakpoint error'); }, hooks: { loadConfig: () => ({ model }) } });
       const server = new UseAIServer({
         port,
         agents: { test: agent },
@@ -454,7 +451,7 @@ describe('Error recording and abort handling', () => {
         { toolCalls: [{ toolCallId: 'tc-abort-1', toolName: 'test_tool', input: {} }] },
         { text: 'Done' },
       ]);
-      const agent = new AISDKAgent({ model });
+      const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model }) } });
 
       // Spy on agent.run() to track whether it completes and what it returns
       let runCompleted = false;
@@ -542,7 +539,7 @@ describe('Error recording and abort handling', () => {
         { toolCalls: [{ toolCallId: 'tc-approval-1', toolName: 'destructive_tool', input: {} }] },
         { text: 'Done' },
       ]);
-      const agent = new AISDKAgent({ model });
+      const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model }) } });
 
       // Spy on agent.run() to track whether it completes and what it returns
       let runCompleted = false;

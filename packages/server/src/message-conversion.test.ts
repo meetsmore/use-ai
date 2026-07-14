@@ -73,9 +73,8 @@ describe('Bug 2: Server message conversion preserves tool calls on reconnection'
     // Track what messages the AI SDK model receives
     let capturedPrompt: unknown[] = [];
 
-    const { MockLanguageModelV3, simulateReadableStream } = await import(
-      'ai/test'
-    );
+    const { MockLanguageModelV3 } = await import('ai/test');
+    const { simulateReadableStream } = await import('ai');
 
     const mockModel = new MockLanguageModelV3({
       doStream: async (params?: unknown) => {
@@ -116,7 +115,7 @@ describe('Bug 2: Server message conversion preserves tool calls on reconnection'
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any);
 
-    const agent = new AISDKAgent({ model: mockModel });
+    const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
     const server = new UseAIServer({
       port,
       agents: { test: agent },
@@ -249,7 +248,7 @@ describe('Bug 2: Server message conversion preserves tool calls on reconnection'
       { text: 'Second follow-up' },
     ]);
 
-    const agent = new AISDKAgent({ model: mockModel });
+    const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
     const server = new UseAIServer({
       port,
       agents: { test: agent },
@@ -356,7 +355,8 @@ describe('Reasoning parts roundtrip through message conversion', () => {
     // Track what messages the AI SDK model receives
     let capturedMessages: unknown[] = [];
 
-    const { MockLanguageModelV3, simulateReadableStream } = await import('ai/test');
+    const { MockLanguageModelV3 } = await import('ai/test');
+    const { simulateReadableStream } = await import('ai');
 
     const mockModel = new MockLanguageModelV3({
       doStream: async ({ prompt }) => {
@@ -381,7 +381,7 @@ describe('Reasoning parts roundtrip through message conversion', () => {
       },
     });
 
-    const agent = new AISDKAgent({ model: mockModel });
+    const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
     const server = new UseAIServer({
       agents: { test: agent },
       defaultAgent: 'test',
@@ -442,7 +442,8 @@ describe('Reasoning parts roundtrip through message conversion', () => {
 
     let capturedMessages: unknown[] = [];
 
-    const { MockLanguageModelV3, simulateReadableStream } = await import('ai/test');
+    const { MockLanguageModelV3 } = await import('ai/test');
+    const { simulateReadableStream } = await import('ai');
 
     const mockModel = new MockLanguageModelV3({
       doStream: async ({ prompt }) => {
@@ -467,7 +468,7 @@ describe('Reasoning parts roundtrip through message conversion', () => {
       },
     });
 
-    const agent = new AISDKAgent({ model: mockModel });
+    const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
     const server = new UseAIServer({
       agents: { test: agent },
       defaultAgent: 'test',
@@ -540,7 +541,8 @@ describe('Reasoning parts roundtrip through message conversion', () => {
 
     let capturedMessages: unknown[] = [];
 
-    const { MockLanguageModelV3, simulateReadableStream } = await import('ai/test');
+    const { MockLanguageModelV3 } = await import('ai/test');
+    const { simulateReadableStream } = await import('ai');
 
     const mockModel = new MockLanguageModelV3({
       doStream: async ({ prompt }) => {
@@ -565,7 +567,7 @@ describe('Reasoning parts roundtrip through message conversion', () => {
       },
     });
 
-    const agent = new AISDKAgent({ model: mockModel });
+    const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
     const server = new UseAIServer({
       agents: { test: agent },
       defaultAgent: 'test',

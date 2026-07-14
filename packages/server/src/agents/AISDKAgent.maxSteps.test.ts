@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import { MockLanguageModelV3, simulateReadableStream } from 'ai/test';
+import { MockLanguageModelV3 } from 'ai/test';
+import { simulateReadableStream } from 'ai';
 import { v4 as uuidv4 } from 'uuid';
 import { AISDKAgent } from './AISDKAgent';
 import type { AgentInput, EventEmitter, AGUIEventExtended } from './types';
@@ -180,7 +181,7 @@ describe('AISDKAgent maxSteps', () => {
   test('defaults to 10 step iterations', async () => {
     const calls = { count: 0 };
     const mockModel = createToolLoopMockModel(loopToolName, calls);
-    const agent = new AISDKAgent({ model: mockModel });
+    const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
 
     const emittedEvents: AGUIEventExtended[] = [];
     const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
@@ -192,10 +193,13 @@ describe('AISDKAgent maxSteps', () => {
     expect(calls.count).toBe(11);
   });
 
-  test('uses configured maxSteps from constructor', async () => {
+  test('uses maxSteps from loadConfig', async () => {
     const calls = { count: 0 };
     const mockModel = createToolLoopMockModel(loopToolName, calls);
-    const agent = new AISDKAgent({ model: mockModel, maxSteps: 2 });
+    // Library default is 10; the maxSteps from loadConfig must bound the loop
+    const agent = new AISDKAgent({
+      hooks: { loadConfig: () => ({ model: mockModel, maxSteps: 2 }) },
+    });
 
     const emittedEvents: AGUIEventExtended[] = [];
     const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
@@ -210,7 +214,7 @@ describe('AISDKAgent maxSteps', () => {
   test('emits text message after maxSteps when last step had tool calls', async () => {
     const calls = { count: 0 };
     const mockModel = createToolThenTextMockModel(loopToolName, 2, calls);
-    const agent = new AISDKAgent({ model: mockModel, maxSteps: 2 });
+    const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel, maxSteps: 2 }) } });
 
     const emittedEvents: AGUIEventExtended[] = [];
     const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
@@ -267,7 +271,7 @@ describe('AISDKAgent maxSteps', () => {
       },
     });
 
-    const agent = new AISDKAgent({ model: textModel, maxSteps: 5 });
+    const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: textModel, maxSteps: 5 }) } });
     const emittedEvents: AGUIEventExtended[] = [];
     const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
 

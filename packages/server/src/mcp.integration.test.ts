@@ -12,7 +12,7 @@ function createTestAgent(name: string = 'test-agent'): AISDKAgent {
     modelId: 'test-model',
     defaultObjectGenerationMode: undefined,
   } as any;
-  return new AISDKAgent({ model: mockModel });
+  return new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
 }
 
 describe('MCP Integration', () => {

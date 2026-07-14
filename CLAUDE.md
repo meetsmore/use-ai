@@ -147,7 +147,7 @@ import { WorkflowsPlugin, DifyWorkflowRunner } from '@meetsmore-oss/use-ai-plugi
 import { anthropic } from '@ai-sdk/anthropic';
 
 const server = new UseAIServer({
-  agents: { claude: new AISDKAgent({ model: anthropic('claude-3-5-sonnet-20241022') }) },
+  agents: { claude: new AISDKAgent({ hooks: { loadConfig: () => ({ model: anthropic('claude-3-5-sonnet-20241022') }) } }) },
   defaultAgent: 'claude',
   plugins: [
     new WorkflowsPlugin({

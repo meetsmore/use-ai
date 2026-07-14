@@ -91,11 +91,11 @@ function createAgents(): { agents: Record<string, Agent>; defaultAgent: string }
     providerOptions?: Record<string, Record<string, JSONValue>>
   ): void => {
     agents[key] = new AISDKAgent({
-      model,
       name,
-      temperature,
       annotation: viaGateway ? 'Routed via Vercel AI Gateway' : undefined,
-      providerOptions,
+      hooks: {
+        loadConfig: () => ({ model, temperature, providerOptions }),
+      },
     });
     const hasThinking = !!providerOptions?.anthropic && typeof providerOptions.anthropic === 'object' && 'thinking' in providerOptions.anthropic;
     const hasOpenaiReasoning = !!providerOptions?.openai && typeof providerOptions.openai === 'object' && 'reasoningEffort' in providerOptions.openai;
@@ -141,9 +141,11 @@ function createAgents(): { agents: Record<string, Agent>; defaultAgent: string }
   // Mock agent for UI development (no API key needed)
   if (process.env.USE_AI_ENABLE_MOCK_AGENT) {
     agents.mock = new AISDKAgent({
-      model: createMockReasoningModel(),
       name: 'Mock (Reasoning)',
       annotation: 'Mock model with reasoning, tool calls, and multi-step flows for UI testing',
+      hooks: {
+        loadConfig: () => ({ model: createMockReasoningModel() }),
+      },
     });
     enabledAgents.push('mock (reasoning UI testing)');
   }

@@ -4,7 +4,7 @@
  */
 
 export type { Agent, AgentInput, EventEmitter, AgentResult, ClientSession } from './types';
-export { AISDKAgent, type AISDKAgentConfig } from './AISDKAgent';
+export { AISDKAgent, type AISDKAgentConfig, type AISDKAgentHooks, type AISDKRunConfig } from './AISDKAgent';
 export { createMockReasoningModel } from './testing/MockReasoningModel';
 export {
   applyCacheBreakpoints,

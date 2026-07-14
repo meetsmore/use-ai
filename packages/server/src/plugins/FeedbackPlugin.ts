@@ -21,7 +21,7 @@ import { langfuse } from '../instrumentation';
  * import { FeedbackPlugin } from '@meetsmore-oss/use-ai-server';
  *
  * const server = new UseAIServer({
- *   agents: { claude: new AISDKAgent({ model }) },
+ *   agents: { claude: new AISDKAgent({ hooks: { loadConfig: () => ({ model }) } }) },
  *   defaultAgent: 'claude',
  *   plugins: [
  *     new FeedbackPlugin(),
