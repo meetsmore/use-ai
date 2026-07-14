@@ -1,0 +1,85 @@
+packages/server/src/agents/testing/MockReasoningModel.ts
+  s_159f68ccd6fc21::t_7c1193f41c296b 18
+packages/server/src/agents/AISDKAgent.maxSteps.test.ts
+  s_159f68ccd6fc21::t_1b49a2afb5d339 184,217,274
+  s_159f68ccd6fc21::t_8ef84a589d1816 196,199,201
+packages/server/src/agents/AISDKAgent.test.ts
+  s_159f68ccd6fc21::t_3f026ff99ccf80 1482-1483,1508,1512,1537,1541,1566,1572,1843-1844,1881-1882,2575-2576
+  s_159f68ccd6fc21::t_7de2f4d1750c4b 1808
+  s_159f68ccd6fc21::t_5fea8340f2e806 2
+  s_159f68ccd6fc21::t_b8328b39e0aea4 3478-3480,3482,3491,3493,3496,3499-3506,3519,3522,3529-3532,3535,3537,3539,3542,3544-3545,3547-3548,3550-3551,3554,3557,3568,3571,3575-3576,3580,3583,3585-3588,3592-3593,3595,3597-3601,3604,3614,3663-3664,3689,3705-3708,3765-3766,3777,3780,3791,3825,3828,3836-3837,3844-3845
+  s_159f68ccd6fc21::t_b643aca9e47113 1202-1203
+  s_159f68ccd6fc21::t_1b49a2afb5d339 125,133,140,157,179,199,221,309,453,524,616,725,805,940,1017,1057,1097,1156,1173,1227,1316,1460,1654,1688,1739,1748,2022,2120,2208,2298,2385,2476,2517,2608,2612,2631,2710,2781,2870,2984,3117,3258,3377,3450
+  s_159f68ccd6fc21::t_ee0b1f6fdc1668 1239-1241
+packages/server/src/agents/AISDKAgent.reasoning.test.ts
+  s_159f68ccd6fc21::t_1b49a2afb5d339 71,153,197,246,323,363,473,496,517,560
+packages/server/src/server.test.ts
+  s_159f68ccd6fc21::t_1b49a2afb5d339 41,57,89,153,212,266,346,376,413,454,492,535,573,651
+packages/server/src/tool-execution.integration.test.ts
+  s_159f68ccd6fc21::t_1b49a2afb5d339 54,121,187,252,313
+packages/server/src/index.ts
+  s_159f68ccd6fc21::t_4239ce1d07efef 7
+packages/server/src/server.ts
+  s_159f68ccd6fc21::t_11607198cf8db4 77
+  s_159f68ccd6fc21::t_38bb3f1a1403b2 67
+packages/server/src/agents/index.ts
+  s_159f68ccd6fc21::t_e18116f3b8fdd3 7
+packages/server/src/utils/toolFilters.ts
+  s_159f68ccd6fc21::t_11c4d5ceb7f072 52,74,96,119,125
+README.md
+  s_159f68ccd6fc21::t_f345de7b420705 973
+packages/server/test/integration-test-utils.ts
+  s_159f68ccd6fc21::t_1b49a2afb5d339 70,125
+packages/server/src/message-conversion.test.ts
+  s_159f68ccd6fc21::t_1b49a2afb5d339 118,251,384,471,570
+apps/use-ai-server-app/src/index.ts
+  s_159f68ccd6fc21::t_d5dbadf6421bac 96-98
+  s_159f68ccd6fc21::t_eb0938221a2a6a 146-148
+packages/server/src/agents/AISDKAgent.ts
+  s_159f68ccd6fc21::t_2c08d252464532 479,486
+  s_159f68ccd6fc21::t_de0649921f7370 456,461
+  s_159f68ccd6fc21::t_0d67782ffccf3d 506-516,532-533,535,545-547,562-566,582-615
+  s_159f68ccd6fc21::t_127ee85136d0ae 97-98,101-102
+  s_159f68ccd6fc21::t_e968eb7b9916e3 181-186,188,190,192-210,213-217,219-223,225-230,232-248,253-257,259,261,263-265,267-268,270-277,279-289,292-306,334,345-346,353
+  s_159f68ccd6fc21::t_99733946d7dc42 1484
+  s_159f68ccd6fc21::t_421e8629679347 179
+  s_159f68ccd6fc21::t_3b9c07c662a0e2 126
+  s_159f68ccd6fc21::t_d4a231bdd58279 616-618
+packages/server/src/error-handling.integration.test.ts
+  s_159f68ccd6fc21::t_1b49a2afb5d339 47,75,138,251,304,412,454,542
+packages/server/src/mcp.integration.test.ts
+  s_159f68ccd6fc21::t_1b49a2afb5d339 15
+packages/server/src/plugins/FeedbackPlugin.ts
+  s_159f68ccd6fc21::t_5bf575b8114c41 24
+packages/server/src/agents/AISDKAgent.perStepEvents.test.ts
+  s_159f68ccd6fc21::t_1b49a2afb5d339 189,214,234
+packages/server/src/agents.integration.test.ts
+  s_159f68ccd6fc21::t_1b49a2afb5d339 103,236
+packages/plugin-workflows/src/WorkflowsPlugin.ts
+  s_159f68ccd6fc21::t_2b28da523ac4e9 47
+CLAUDE.md
+  s_159f68ccd6fc21::t_5c9e9df5df6f64 150
+apps/example/src/pages/MultiAgentPage.tsx
+  s_159f68ccd6fc21::t_d8dd5cc6f9370f 94,98
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.13",
+  "base_commit_sha": "c55150bcfea6bf0203cf77d6d42fb2b14835faa0",
+  "prompts": {},
+  "humans": {
+    "h_51e7b7c10a76e4": {
+      "author": "yuma.ito <yuma.ito@meetsmore.com>"
+    }
+  },
+  "sessions": {
+    "s_159f68ccd6fc21": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4d332bbf-9e6d-491e-9b72-e32beac08ddd",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "yuma.ito <yuma.ito@meetsmore.com>"
+    }
+  }
+}
