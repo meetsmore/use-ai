@@ -1,0 +1,53 @@
+packages/server/src/agents/toolApproval.ts
+  s_830b186c7e07db::t_484ccd2d021ddd 10
+  s_830b186c7e07db::t_9f853049ba0ad1 53,55-56,63,65
+packages/server/src/agents/toolApproval.test.ts
+  s_830b186c7e07db::t_7efa39a7bd0d7e 87-109
+  s_830b186c7e07db::t_95142b0d6b906a 3
+packages/server/src/utils/abortReason.ts
+  s_830b186c7e07db::t_3e485c1fb8bc51 47-48,57
+  s_830b186c7e07db::t_a35ae603df5cc2 1-46,52-56,58-61,69,87
+  s_830b186c7e07db::t_5a39d9a8aa545f 49-51,62-68,70-86
+packages/server/src/utils/toolConverter.ts
+  s_830b186c7e07db::t_8159806856a367 2
+  s_830b186c7e07db::t_f8310154d82cb3 28,30-31,38,40
+packages/server/src/utils/toolConverter.test.ts
+  s_830b186c7e07db::t_7d7e0b423c03f6 3
+  s_830b186c7e07db::t_499fa65755d28f 76-100
+packages/server/src/error-handling.integration.test.ts
+  s_830b186c7e07db::t_85b981edf637fa 380-463
+packages/server/src/agents/AISDKAgent.ts
+  s_830b186c7e07db::t_bd72775e2e5c7e 795
+  s_830b186c7e07db::t_682664b2fefc05 1436
+  s_830b186c7e07db::t_9d28ff746e5a69 5
+packages/server/src/utils/abortReason.test.ts
+  s_830b186c7e07db::t_bcb5de86eb32e2 36,40,42-43,47,51,56-74
+  s_830b186c7e07db::t_81c3f71d6355a1 2
+  s_830b186c7e07db::t_0f3ed17c53e55f 24
+  s_830b186c7e07db::t_25e7dfaa43c7a8 1,3-23,25-35,37-39,41,44-46,48-50,52-55,75-76
+packages/server/src/server.ts
+  s_830b186c7e07db::t_5b65d97b4ab732 924
+  s_830b186c7e07db::t_266ce8e333e3b4 29
+  s_830b186c7e07db::t_64de499cdee738 369
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "f3da875ed5c6ae4a14874e1eac8e5d3c00f93cc4",
+  "prompts": {},
+  "humans": {
+    "h_51e7b7c10a76e4": {
+      "author": "yuma.ito <yuma.ito@meetsmore.com>"
+    }
+  },
+  "sessions": {
+    "s_830b186c7e07db": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cecd9c62-f843-437c-89d7-0aa9fe889430",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "yuma.ito <yuma.ito@meetsmore.com>"
+    }
+  }
+}
