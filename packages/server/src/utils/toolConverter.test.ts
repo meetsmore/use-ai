@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { createClientToolExecutor } from './toolConverter';
+import { abortRun } from './abortReason';
 import type { ClientSession } from '../agents/types';
 
 /**
@@ -70,6 +71,31 @@ describe('createClientToolExecutor', () => {
 
     // Should not have registered a pending tool call
     expect(session.pendingToolCalls.has('tool-1')).toBe(false);
+  });
+
+  test('surfaces the abort cause in the rejection message (user stop)', async () => {
+    const abortController = new AbortController();
+    const session = createTestSession({ abortController });
+    const executor = createClientToolExecutor(session);
+
+    const resultPromise = executor({ value: 'test' }, { toolCallId: 'tool-1' });
+    expect(session.pendingToolCalls.has('tool-1')).toBe(true);
+
+    abortRun(abortController, 'user_stop');
+
+    await expect(resultPromise).rejects.toThrow('Run aborted by user');
+  });
+
+  test('surfaces the abort cause in the rejection message (client disconnect)', async () => {
+    const abortController = new AbortController();
+    abortRun(abortController, 'client_disconnect'); // Pre-abort with cause
+
+    const session = createTestSession({ abortController });
+    const executor = createClientToolExecutor(session);
+
+    await expect(
+      executor({ value: 'test' }, { toolCallId: 'tool-1' })
+    ).rejects.toThrow('Run aborted by client disconnect');
   });
 
   test('abort listener does not interfere with normal resolution', async () => {

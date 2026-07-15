@@ -377,6 +377,90 @@ describe('Error Handling', () => {
   });
 });
 
+describe('Abort cause labelling', () => {
+  // White-box: the two server abort sites (handleAbortRun / socket disconnect)
+  // are the ONLY place the cause is chosen, and that choice is the whole point
+  // of the feature. Assert each site tags signal.reason so swapping the two
+  // literals ('user_stop' <-> 'client_disconnect') can no longer pass green.
+  // We capture the session ref before triggering because the disconnect handler
+  // removes it from the server's client map.
+  async function startPendingToolRun(port: number) {
+    const model = createSequentialMockModel([
+      { toolCalls: [{ toolCallId: 'tool-cause-1', toolName: 'pending_tool', input: {} }] },
+      { text: 'unreachable' },
+    ]);
+    const server = new UseAIServer({
+      port,
+      agents: { test: new AISDKAgent({ hooks: { loadConfig: () => ({ model }) } }) },
+      defaultAgent: 'test',
+    });
+    cleanup.trackServer(server);
+
+    const socket = await cleanup.createTestClient(port);
+    const toolPending = new Promise<void>((resolve) => {
+      socket.on('event', (event: any) => {
+        if (event.type === EventType.TOOL_CALL_END) resolve();
+      });
+    });
+
+    const runId = uuidv4();
+    socket.emit('message', {
+      type: 'run_agent',
+      data: {
+        threadId: uuidv4(),
+        runId,
+        messages: [{ id: uuidv4(), role: 'user', content: 'go' }],
+        tools: [{
+          name: 'pending_tool',
+          description: 'never resolves',
+          parameters: { type: 'object', properties: {} },
+        }] as Tool[],
+        state: null,
+        context: [],
+        forwardedProps: {},
+      },
+    });
+
+    await toolPending;
+    // Keyed by the shared socket id; grabbed now since disconnect deletes it.
+    const session = (server as any).clients.get(socket.id);
+    expect(session).toBeDefined();
+    return { server, socket, session, runId };
+  }
+
+  async function waitForAborted(session: any) {
+    const deadline = Date.now() + 3000;
+    while (!session.abortController?.signal.aborted && Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 25));
+    }
+  }
+
+  test('handleAbortRun tags the signal as user_stop', async () => {
+    const { server, socket, session, runId } = await startPendingToolRun(9330);
+
+    socket.emit('message', { type: 'abort_run', data: { runId } });
+    await waitForAborted(session);
+
+    expect(session.abortController.signal.reason.reason).toBe('user_stop');
+    expect(session.abortController.signal.reason.message).toBe('Run aborted by user');
+
+    socket.disconnect();
+    server.close();
+  });
+
+  test('client disconnect tags the signal as client_disconnect', async () => {
+    const { server, socket, session } = await startPendingToolRun(9331);
+
+    socket.disconnect();
+    await waitForAborted(session);
+
+    expect(session.abortController.signal.reason.reason).toBe('client_disconnect');
+    expect(session.abortController.signal.reason.message).toBe('Run aborted by client disconnect');
+
+    server.close();
+  });
+});
+
 describe('Error recording and abort handling', () => {
   // Langfuse mock setup/teardown helpers
   function enableMockLangfuse() {

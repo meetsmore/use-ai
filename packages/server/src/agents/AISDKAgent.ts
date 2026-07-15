@@ -2,6 +2,7 @@ import { streamText, jsonSchema, LanguageModel, stepCountIs, type ModelMessage, 
 import type { AttributeValue } from '@opentelemetry/api';
 import type { JSONSchema7 } from 'json-schema';
 import { startRunSpan, flushTelemetry as flushAllTelemetry } from '../telemetry';
+import { abortReasonMessage } from '../utils/abortReason';
 import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
 import type { Agent, AgentInput, EventEmitter, AgentResult, ClientSession } from './types';
@@ -791,7 +792,7 @@ export class AISDKAgent implements Agent {
       // next request. An aborted step is not "finished": skip STEP_FINISHED and
       // let finalizeAbortedRun synthesize the {aborted:true} results instead.
       if (ctx.session.abortController?.signal.aborted) {
-        span.endWithError('Run aborted by user');
+        span.endWithError(abortReasonMessage(ctx.session.abortController?.signal));
         events.emit<RunErrorEvent>({
           type: EventType.RUN_ERROR,
           message: ErrorCode.ABORTED,
@@ -1432,7 +1433,7 @@ export class AISDKAgent implements Agent {
     // model/tool error racing with the abort): report it as ABORTED so the
     // client persists partial state instead of seeing a generic error.
     if (ctx.session.abortController?.signal.aborted) {
-      span.endWithError('Run aborted by user');
+      span.endWithError(abortReasonMessage(ctx.session.abortController?.signal));
       events.emit<RunErrorEvent>({
         type: EventType.RUN_ERROR,
         message: ErrorCode.ABORTED,

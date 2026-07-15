@@ -26,6 +26,7 @@ import type { ClientSession } from './agents/types';
 import type { UseAIServerPlugin, MessageHandler } from './plugins/types';
 import { FeedbackPlugin } from './plugins/FeedbackPlugin';
 import { isRemoteTool, isServerTool } from './utils/toolFilters';
+import { abortRun } from './utils/abortReason';
 import { RemoteMcpToolsProvider, type RemoteToolDefinition } from './mcp';
 import type { ServerToolDefinition } from './tools/types';
 import { findMatch } from './utils/patternMatcher';
@@ -365,7 +366,7 @@ export class UseAIServer {
         logger.info('Client disconnected', { clientId, ipAddress });
 
         // Abort any pending tool calls/approvals for this session
-        session.abortController?.abort();
+        abortRun(session.abortController, 'client_disconnect');
 
         // Clean up polling IP entry
         this.clientIpTracker.removePollingConnection(conn.id);
@@ -920,7 +921,7 @@ export class UseAIServer {
   private handleAbortRun(session: ClientSession, message: AbortRunMessage) {
     const { runId } = message.data;
     // Abort pending tool calls/approvals via AbortController (rejects their promises)
-    session.abortController?.abort();
+    abortRun(session.abortController, 'user_stop');
     // Clear pending tool calls and approvals for this run
     session.pendingToolCalls.clear();
     session.pendingToolApprovals.clear();
