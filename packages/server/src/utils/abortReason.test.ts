@@ -1,47 +1,65 @@
 import { describe, expect, test } from 'bun:test';
-import { RunAbortedError, abortRun, createAbortError, abortReasonMessage } from './abortReason';
+import {
+  RunAbortedError,
+  RunAbortedByUser,
+  RunAbortedByClientDisconnect,
+  abortRun,
+  createAbortError,
+  abortReasonMessage,
+} from './abortReason';
 
-describe('abortReason', () => {
-  test('abortRun tags the signal with a RunAbortedError carrying the cause', () => {
-    const controller = new AbortController();
-    abortRun(controller, 'user_stop');
-
-    expect(controller.signal.aborted).toBe(true);
-    expect(controller.signal.reason).toBeInstanceOf(RunAbortedError);
-    expect((controller.signal.reason as RunAbortedError).reason).toBe('user_stop');
-    expect((controller.signal.reason as RunAbortedError).message).toBe('Run aborted by user');
+describe('RunAbortedError concrete types', () => {
+  test('class name is the stable identifier (RunAbortedByUser)', () => {
+    const err = new RunAbortedByUser();
+    expect(err).toBeInstanceOf(RunAbortedError);
+    expect(err.name).toBe('RunAbortedByUser');
+    expect(err.message).toBe('Run aborted by user');
   });
 
-  test('abortRun uses a distinct message per cause', () => {
-    const controller = new AbortController();
-    abortRun(controller, 'client_disconnect');
+  test('class name is the stable identifier (RunAbortedByClientDisconnect)', () => {
+    const err = new RunAbortedByClientDisconnect();
+    expect(err).toBeInstanceOf(RunAbortedError);
+    expect(err.name).toBe('RunAbortedByClientDisconnect');
+    expect(err.message).toBe('Run aborted by client disconnect');
+  });
 
-    expect((controller.signal.reason as RunAbortedError).message).toBe(
-      'Run aborted by client disconnect',
-    );
+  test('name is an own property that survives JSON serialization', () => {
+    const err = new RunAbortedByUser();
+    expect(Object.keys(err)).toContain('name');
+    expect(JSON.parse(JSON.stringify(err)).name).toBe('RunAbortedByUser');
+  });
+});
+
+describe('abortReason helpers', () => {
+  test('abortRun tags the signal with the given cause', () => {
+    const controller = new AbortController();
+    abortRun(controller, new RunAbortedByUser());
+
+    expect(controller.signal.aborted).toBe(true);
+    expect(controller.signal.reason).toBeInstanceOf(RunAbortedByUser);
+    expect((controller.signal.reason as RunAbortedError).name).toBe('RunAbortedByUser');
   });
 
   test('abortRun keeps the first cause when called twice (native abort no-op)', () => {
     const controller = new AbortController();
-    abortRun(controller, 'user_stop');
-    abortRun(controller, 'client_disconnect');
+    abortRun(controller, new RunAbortedByUser());
+    abortRun(controller, new RunAbortedByClientDisconnect());
 
-    expect((controller.signal.reason as RunAbortedError).reason).toBe('user_stop');
+    expect((controller.signal.reason as RunAbortedError).name).toBe('RunAbortedByUser');
   });
 
   test('abortRun tolerates a missing controller', () => {
-    expect(() => abortRun(undefined, 'user_stop')).not.toThrow();
+    expect(() => abortRun(undefined, new RunAbortedByUser())).not.toThrow();
   });
 
-  test('createAbortError returns the cause-carrying error from the signal', () => {
+  test('createAbortError returns the cause recorded on the signal', () => {
     const controller = new AbortController();
-    abortRun(controller, 'client_disconnect');
+    abortRun(controller, new RunAbortedByClientDisconnect());
 
     const err = createAbortError(controller.signal);
-    expect(err).toBeInstanceOf(RunAbortedError);
-    expect(err).toBe(controller.signal.reason); // the cause recorded on the signal
-    expect((err as RunAbortedError).reason).toBe('client_disconnect');
-    expect(err.message).toBe('Run aborted by client disconnect');
+    expect(err).toBeInstanceOf(RunAbortedByClientDisconnect);
+    expect(err).toBe(controller.signal.reason);
+    expect(err.name).toBe('RunAbortedByClientDisconnect');
   });
 
   test('createAbortError falls back to a generic error without a cause', () => {
@@ -59,11 +77,11 @@ describe('abortReason', () => {
 
   test('abortReasonMessage resolves the cause-specific span message', () => {
     const userStop = new AbortController();
-    abortRun(userStop, 'user_stop');
+    abortRun(userStop, new RunAbortedByUser());
     expect(abortReasonMessage(userStop.signal)).toBe('Run aborted by user');
 
     const disconnect = new AbortController();
-    abortRun(disconnect, 'client_disconnect');
+    abortRun(disconnect, new RunAbortedByClientDisconnect());
     expect(abortReasonMessage(disconnect.signal)).toBe('Run aborted by client disconnect');
   });
 

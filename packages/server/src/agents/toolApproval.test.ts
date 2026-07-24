@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { waitForApproval } from './toolApproval';
-import { abortRun } from '../utils/abortReason';
+import { abortRun, RunAbortedByUser, RunAbortedByClientDisconnect } from '../utils/abortReason';
 import type { ClientSession } from './types';
 
 /**
@@ -91,14 +91,14 @@ describe('waitForApproval', () => {
     const approvalPromise = waitForApproval(session, 'tool-1');
     expect(session.pendingToolApprovals.has('tool-1')).toBe(true);
 
-    abortRun(abortController, 'user_stop');
+    abortRun(abortController, new RunAbortedByUser());
 
     await expect(approvalPromise).rejects.toThrow('Run aborted by user');
   });
 
   test('surfaces the abort cause when already aborted (client disconnect)', async () => {
     const abortController = new AbortController();
-    abortRun(abortController, 'client_disconnect'); // Pre-abort with cause
+    abortRun(abortController, new RunAbortedByClientDisconnect()); // Pre-abort with cause
 
     const session = createTestSession({ abortController });
 

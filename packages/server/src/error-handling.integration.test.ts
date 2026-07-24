@@ -8,6 +8,7 @@ import {
 } from '../test/test-utils';
 import { UseAIServer } from './server';
 import { AISDKAgent } from './agents/AISDKAgent';
+import { RunAbortedByUser, RunAbortedByClientDisconnect } from './utils/abortReason';
 import type { Tool, ToolDefinition } from './types';
 import type { Agent, AgentInput, EventEmitter, AgentResult } from './agents/types';
 import { langfuse } from './instrumentation';
@@ -435,27 +436,27 @@ describe('Abort cause labelling', () => {
     }
   }
 
-  test('handleAbortRun tags the signal as user_stop', async () => {
+  test('handleAbortRun tags the signal as RunAbortedByUser', async () => {
     const { server, socket, session, runId } = await startPendingToolRun(9330);
 
     socket.emit('message', { type: 'abort_run', data: { runId } });
     await waitForAborted(session);
 
-    expect(session.abortController.signal.reason.reason).toBe('user_stop');
-    expect(session.abortController.signal.reason.message).toBe('Run aborted by user');
+    expect(session.abortController.signal.reason).toBeInstanceOf(RunAbortedByUser);
+    expect(session.abortController.signal.reason.name).toBe('RunAbortedByUser');
 
     socket.disconnect();
     server.close();
   });
 
-  test('client disconnect tags the signal as client_disconnect', async () => {
+  test('client disconnect tags the signal as RunAbortedByClientDisconnect', async () => {
     const { server, socket, session } = await startPendingToolRun(9331);
 
     socket.disconnect();
     await waitForAborted(session);
 
-    expect(session.abortController.signal.reason.reason).toBe('client_disconnect');
-    expect(session.abortController.signal.reason.message).toBe('Run aborted by client disconnect');
+    expect(session.abortController.signal.reason).toBeInstanceOf(RunAbortedByClientDisconnect);
+    expect(session.abortController.signal.reason.name).toBe('RunAbortedByClientDisconnect');
 
     server.close();
   });
