@@ -7,6 +7,7 @@ import type { ClientSession, EventEmitter } from './types';
 import type { ToolDefinition, ToolApprovalRequestEvent } from '../types';
 import { TOOL_APPROVAL_REQUEST } from '../types';
 import { getToolAnnotations } from '../utils';
+import { createAbortError } from '../utils/abortReason';
 import { logger } from '../logger';
 
 /**
@@ -49,18 +50,19 @@ export function waitForApproval(
   toolCallId: string
 ): Promise<{ approved: boolean; reason?: string }> {
   return new Promise((resolve, reject) => {
+    const signal = session.abortController?.signal;
     // Check if already aborted (e.g., client disconnected before approval requested)
-    if (session.abortController?.signal.aborted) {
-      reject(new Error('Run aborted'));
+    if (signal?.aborted) {
+      reject(createAbortError(signal));
       return;
     }
 
     session.pendingToolApprovals.set(toolCallId, resolve);
 
     // Listen for abort signal to reject the promise (client disconnect or explicit abort)
-    session.abortController?.signal.addEventListener('abort', () => {
+    signal?.addEventListener('abort', () => {
       session.pendingToolApprovals.delete(toolCallId);
-      reject(new Error('Run aborted'));
+      reject(createAbortError(signal));
     }, { once: true });
   });
 }

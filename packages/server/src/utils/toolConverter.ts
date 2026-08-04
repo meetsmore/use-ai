@@ -1,4 +1,5 @@
 import type { ClientSession } from '../agents/types';
+import { createAbortError } from './abortReason';
 
 /**
  * Generic tool arguments type - tools receive key-value pairs
@@ -24,18 +25,19 @@ export function createClientToolExecutor(
   return async (args: ToolArguments, { toolCallId }): Promise<ToolResult> => {
     // Wait for client to send result (async - can take as long as needed)
     const result = await new Promise<string>((resolve, reject) => {
+      const signal = session.abortController?.signal;
       // Check if already aborted (e.g., client disconnected before tool call started)
-      if (session.abortController?.signal.aborted) {
-        reject(new Error('Run aborted'));
+      if (signal?.aborted) {
+        reject(createAbortError(signal));
         return;
       }
 
       session.pendingToolCalls.set(toolCallId, resolve);
 
       // Listen for abort signal to reject the promise (client disconnect or explicit abort)
-      session.abortController?.signal.addEventListener('abort', () => {
+      signal?.addEventListener('abort', () => {
         session.pendingToolCalls.delete(toolCallId);
-        reject(new Error('Run aborted'));
+        reject(createAbortError(signal));
       }, { once: true });
     });
 

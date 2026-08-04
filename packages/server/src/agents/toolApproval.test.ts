@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { waitForApproval } from './toolApproval';
+import { abortRun, RunAbortedByUser, RunAbortedByClientDisconnect } from '../utils/abortReason';
 import type { ClientSession } from './types';
 
 /**
@@ -81,6 +82,29 @@ describe('waitForApproval', () => {
 
     // Should not have registered a pending approval
     expect(session.pendingToolApprovals.has('tool-1')).toBe(false);
+  });
+
+  test('surfaces the abort cause in the rejection message (user stop)', async () => {
+    const abortController = new AbortController();
+    const session = createTestSession({ abortController });
+
+    const approvalPromise = waitForApproval(session, 'tool-1');
+    expect(session.pendingToolApprovals.has('tool-1')).toBe(true);
+
+    abortRun(abortController, new RunAbortedByUser());
+
+    await expect(approvalPromise).rejects.toThrow('Run aborted by user');
+  });
+
+  test('surfaces the abort cause when already aborted (client disconnect)', async () => {
+    const abortController = new AbortController();
+    abortRun(abortController, new RunAbortedByClientDisconnect()); // Pre-abort with cause
+
+    const session = createTestSession({ abortController });
+
+    await expect(
+      waitForApproval(session, 'tool-1')
+    ).rejects.toThrow('Run aborted by client disconnect');
   });
 
   test('abort listener does not interfere with normal resolution', async () => {
