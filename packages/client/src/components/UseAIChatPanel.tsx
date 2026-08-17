@@ -12,6 +12,7 @@ import type { SavedCommand } from '../commands/types';
 import { useSlashCommands } from '../hooks/useSlashCommands';
 import { useFileUpload } from '../hooks/useFileUpload';
 import { useDropdownState } from '../hooks/useDropdownState';
+import { useSelectionHandoff } from '../hooks/useSelectionHandoff';
 import { useTheme, useStrings } from '../theme';
 import type { UseAIStrings, UseAITheme } from '../theme';
 import { ToolApprovalDialog } from './ToolApprovalDialog';
@@ -281,6 +282,20 @@ export function UseAIChatPanel({
 
   // Message hover state for save button
   const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
+
+  // Wrappers around the rendered answer, used to carry a text selection from
+  // the streaming bubble to the persisted message that replaces it.
+  const streamingResponseRef = useRef<HTMLDivElement>(null);
+  const lastAnswerRef = useRef<HTMLDivElement>(null);
+  useSelectionHandoff({ loading, streamingRef: streamingResponseRef, persistedRef: lastAnswerRef });
+
+  // Last assistant answer on screen. Abort notices and error bubbles are system
+  // messages that happen to carry the assistant role, so they are matched by
+  // display mode rather than excluded one at a time. This is the bubble the
+  // streaming one hands its selection over to.
+  const lastAnswerId = [...displayMessages]
+    .reverse()
+    .find((m) => m.role === 'assistant' && (m.displayMode ?? 'default') === 'default')?.id;
 
   // File upload hook - includes processing state for transformation progress
   const {
@@ -1004,7 +1019,16 @@ export function UseAIChatPanel({
                       strings={strings}
                     />
                   )}
-                  <MarkdownContent content={getTextFromContent(message.content)} />
+                  {/* display:contents keeps this purely a selection anchor:
+                      it holds only the rendered answer, never the reasoning
+                      block, so text offsets map 1:1 onto the streaming bubble. */}
+                  <div
+                    className="markdown-answer"
+                    ref={message.id === lastAnswerId ? lastAnswerRef : undefined}
+                    style={{ display: 'contents' }}
+                  >
+                    <MarkdownContent content={getTextFromContent(message.content)} />
+                  </div>
                 </>
               ) : (
                 // User/tool bubbles: display-only text so transformed_file
@@ -1098,7 +1122,11 @@ export function UseAIChatPanel({
                       strings={strings}
                     />
                   )}
-                  {streamingText && <MarkdownContent content={streamingText} />}
+                  {streamingText && (
+                    <div className="markdown-answer" ref={streamingResponseRef} style={{ display: 'contents' }}>
+                      <MarkdownContent content={streamingText} />
+                    </div>
+                  )}
                   {!streamingText && (
                     <span className="dots" style={{ opacity: 0.6 }}>...</span>
                   )}
@@ -1402,10 +1430,14 @@ export function UseAIChatPanel({
 
       <style>{`
         /* Markdown content styles */
-        .markdown-content > :first-child {
+        /* .markdown-answer is a display:contents wrapper (a selection anchor),
+           so the edge margins have to be trimmed one level deeper as well. */
+        .markdown-content > :first-child,
+        .markdown-content > .markdown-answer:first-child > :first-child {
           margin-top: 0 !important;
         }
-        .markdown-content > :last-child {
+        .markdown-content > :last-child,
+        .markdown-content > .markdown-answer:last-child > :last-child {
           margin-bottom: 0 !important;
         }
         .markdown-content p:last-child {
