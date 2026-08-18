@@ -769,6 +769,8 @@ export function UseAIProvider({
     ? serverEvents.streamingText : '';
   const effectiveStreamingReasoning = serverEvents.streamingChatIdRef.current === chatManagement.displayedChatId
     ? serverEvents.streamingReasoning : '';
+  const effectiveStreamingMessageId = serverEvents.streamingChatIdRef.current === chatManagement.displayedChatId
+    ? serverEvents.streamingMessageId : null;
 
   const chatUIContextValue: ChatUIContextValue = {
     connected,
@@ -833,6 +835,7 @@ export function UseAIProvider({
     connected,
     streamingText: effectiveStreamingText,
     streamingReasoning: effectiveStreamingReasoning,
+    streamingMessageId: effectiveStreamingMessageId,
     currentChatId: chatManagement.displayedChatId,
     onNewChat: chatManagement.createNewChat,
     onLoadChat: chatManagement.loadChat,

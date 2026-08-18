@@ -5,6 +5,7 @@ import { UseAIChatPanel, type UseAIChatPanelProps } from './UseAIChatPanel';
 import type { PersistedMessage } from '../providers/chatRepository/types';
 
 const ANSWER = 'The first paragraph.\n\nThe second paragraph.';
+const STREAMING_ID = 'msg-assistant';
 
 const userMessage: PersistedMessage = {
   id: 'msg-user',
@@ -13,11 +14,13 @@ const userMessage: PersistedMessage = {
   createdAt: new Date(0),
 };
 
+/** The persisted answer carries the id that was allocated when the run started. */
 const assistantMessage: PersistedMessage = {
-  id: 'msg-assistant',
+  id: STREAMING_ID,
   role: 'assistant',
   content: ANSWER,
   createdAt: new Date(0),
+  traceId: 'trace-1',
 };
 
 /**
@@ -39,6 +42,7 @@ function panelProps(overrides: Partial<UseAIChatPanelProps> = {}): UseAIChatPane
     loading: true,
     connected: true,
     streamingText: ANSWER,
+    streamingMessageId: STREAMING_ID,
     ...overrides,
   };
 }
@@ -57,22 +61,27 @@ function selectText(container: HTMLElement, text: string): void {
     const selection = window.getSelection()!;
     selection.removeAllRanges();
     selection.addRange(range);
-    // Browsers fire this on every selection change; jsdom does not.
-    document.dispatchEvent(new window.Event('selectionchange'));
     return;
   }
   throw new Error(`"${text}" not found in container`);
 }
 
-describe('selecting the answer while it streams', () => {
+function assistantBubbles(container: HTMLElement): HTMLElement[] {
+  return Array.from(container.querySelectorAll<HTMLElement>('[data-testid="chat-message-assistant"]'));
+}
+
+describe('streaming answer rendered as a provisional message', () => {
   beforeEach(() => {
     window.getSelection()?.removeAllRanges();
   });
 
-  // Text the model has already written keeps its DOM nodes, so a selection over
-  // it holds while the rest of the answer streams in. (The paragraph currently
-  // being written is the exception: replacing a text node's data collapses any
-  // range inside it, which is how every browser behaves.)
+  test('renders the streamed text inside a normal assistant message bubble', () => {
+    const { container } = render(<UseAIChatPanel {...panelProps()} />);
+    const bubbles = assistantBubbles(container);
+    expect(bubbles).toHaveLength(1);
+    expect(bubbles[0].textContent).toContain('The second paragraph.');
+  });
+
   test('keeps the selection as more text arrives', () => {
     const { container, rerender } = render(<UseAIChatPanel {...panelProps({ streamingText: ANSWER })} />);
     selectText(container, 'first paragraph');
@@ -82,32 +91,37 @@ describe('selecting the answer while it streams', () => {
     expect(window.getSelection()!.toString()).toBe('first paragraph');
   });
 
+  test('the persisted answer reuses the streaming bubble element', () => {
+    const { container, rerender } = render(<UseAIChatPanel {...panelProps()} />);
+    const streamingBubble = assistantBubbles(container)[0];
+
+    rerender(
+      <UseAIChatPanel
+        {...panelProps({ loading: false, streamingText: '', streamingMessageId: null, messages: [userMessage, assistantMessage] })}
+      />
+    );
+
+    const bubbles = assistantBubbles(container);
+    expect(bubbles).toHaveLength(1);
+    expect(bubbles[0]).toBe(streamingBubble);
+  });
+
   test('keeps the selection when the streamed answer becomes a persisted message', () => {
     const { container, rerender } = render(<UseAIChatPanel {...panelProps()} />);
     selectText(container, 'second paragraph');
 
     rerender(
       <UseAIChatPanel
-        {...panelProps({
-          loading: false,
-          streamingText: '',
-          messages: [userMessage, assistantMessage],
-        })}
+        {...panelProps({ loading: false, streamingText: '', streamingMessageId: null, messages: [userMessage, assistantMessage] })}
       />
     );
 
     const selection = window.getSelection()!;
     expect(selection.toString()).toBe('second paragraph');
-    // Matching text alone would also pass with the range still sitting on the
-    // unmounted streaming bubble's detached nodes.
-    expect(container.querySelector('.markdown-answer')!.contains(selection.anchorNode)).toBe(true);
+    expect(container.contains(selection.anchorNode)).toBe(true);
   });
 
-  // The user selects text mid-stream and then presses stop. The notice bubble
-  // that abort appends is the last assistant message, but it renders as a plain
-  // pill with no answer wrapper, so treating it as the answer would leave the
-  // handoff with nothing to restore onto and drop the selection.
-  test('restores the selection onto the answer when the user stops the run', () => {
+  test('keeps the selection when the user stops the run', () => {
     const { container, rerender } = render(<UseAIChatPanel {...panelProps()} />);
     selectText(container, 'second paragraph');
 
@@ -116,6 +130,7 @@ describe('selecting the answer while it streams', () => {
         {...panelProps({
           loading: false,
           streamingText: '',
+          streamingMessageId: null,
           messages: [userMessage, assistantMessage, abortNotice],
         })}
       />
@@ -123,22 +138,43 @@ describe('selecting the answer while it streams', () => {
 
     const selection = window.getSelection()!;
     expect(selection.toString()).toBe('second paragraph');
-    expect(container.querySelector('.markdown-answer')!.contains(selection.anchorNode)).toBe(true);
+    expect(container.contains(selection.anchorNode)).toBe(true);
   });
 
-  test('does not restore a selection the user never made', () => {
-    const { rerender } = render(<UseAIChatPanel {...panelProps()} />);
-
-    rerender(
-      <UseAIChatPanel
-        {...panelProps({
-          loading: false,
-          streamingText: '',
-          messages: [userMessage, assistantMessage],
-        })}
-      />
+  // saveAIResponse appends the persisted message before the run UI state
+  // resets, so for one render both the persisted answer and the streaming text
+  // exist. Only one bubble may show.
+  test('shows one bubble while the persisted answer and the streaming text overlap', () => {
+    const { container } = render(
+      <UseAIChatPanel {...panelProps({ messages: [userMessage, assistantMessage] })} />
     );
+    expect(assistantBubbles(container)).toHaveLength(1);
+  });
 
-    expect(window.getSelection()!.toString()).toBe('');
+  test('shows the plain loading indicator before any text streams', () => {
+    const { container } = render(<UseAIChatPanel {...panelProps({ streamingText: '', streamingReasoning: '' })} />);
+    expect(assistantBubbles(container)).toHaveLength(0);
+    expect(container.querySelector('.dots')).not.toBeNull();
+  });
+
+  test('shows the loading indicator inside the bubble while only reasoning streams', () => {
+    const { container } = render(
+      <UseAIChatPanel {...panelProps({ streamingText: '', streamingReasoning: 'thinking...' })} />
+    );
+    const bubbles = assistantBubbles(container);
+    expect(bubbles).toHaveLength(1);
+    expect(bubbles[0].querySelector('.dots')).not.toBeNull();
+  });
+
+  test('does not show a timestamp or feedback buttons while streaming', () => {
+    const { container } = render(<UseAIChatPanel {...panelProps({ feedbackEnabled: true, onFeedback: () => {} })} />);
+    const bubble = assistantBubbles(container)[0];
+    expect(bubble.querySelector('[data-testid="feedback-buttons"]')).toBeNull();
+    expect(bubble.querySelector('[data-testid="message-timestamp"]')).toBeNull();
+  });
+
+  test('falls back to a bubble without a stable key when no streaming id is given', () => {
+    const { container } = render(<UseAIChatPanel {...panelProps({ streamingMessageId: undefined })} />);
+    expect(assistantBubbles(container)).toHaveLength(1);
   });
 });

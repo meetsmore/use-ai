@@ -12,7 +12,6 @@ import type { SavedCommand } from '../commands/types';
 import { useSlashCommands } from '../hooks/useSlashCommands';
 import { useFileUpload } from '../hooks/useFileUpload';
 import { useDropdownState } from '../hooks/useDropdownState';
-import { useSelectionHandoff } from '../hooks/useSelectionHandoff';
 import { useTheme, useStrings } from '../theme';
 import type { UseAIStrings, UseAITheme } from '../theme';
 import { ToolApprovalDialog } from './ToolApprovalDialog';
@@ -142,6 +141,18 @@ function fileChipInfo(part: PersistedContentPart): { name: string; size: number 
 /**
  * Props for the chat panel component.
  */
+/**
+ * A message as shown in the panel. `streaming` marks the provisional entry
+ * for the answer that is still arriving; it has no timestamp, feedback
+ * buttons or persisted reasoning parts yet.
+ */
+type DisplayMessage = PersistedMessage & { streaming?: boolean };
+
+/** Key for the provisional streaming message when no persisted id is known. */
+const PROVISIONAL_MESSAGE_ID = 'streaming-answer';
+/** Placeholder; the provisional message never shows a timestamp. */
+const PROVISIONAL_CREATED_AT = new Date(0);
+
 export interface UseAIChatPanelProps {
   onSendMessage: (message: string, attachments?: FileAttachment[]) => void;
   /**
@@ -158,6 +169,15 @@ export interface UseAIChatPanelProps {
   streamingText?: string;
   /** Currently streaming reasoning text from extended thinking */
   streamingReasoning?: string;
+  /**
+   * Id the streaming answer will be persisted under. While set, the streaming
+   * answer renders as a provisional message with this id, so when the persisted
+   * answer arrives under the same id React updates the bubble in place instead
+   * of unmounting it. Without it the provisional bubble remounts on completion.
+   * @default null
+   * @example "msg_1723972800000_k3j9x2a"
+   */
+  streamingMessageId?: string | null;
   currentChatId?: string | null;
   onNewChat?: () => Promise<string | void>;
   onLoadChat?: (chatId: string) => Promise<void>;
@@ -231,6 +251,7 @@ export function UseAIChatPanel({
   connected,
   streamingText = '',
   streamingReasoning = '',
+  streamingMessageId = null,
   currentChatId,
   onNewChat,
   onLoadChat,
@@ -272,6 +293,27 @@ export function UseAIChatPanel({
   // a unified bubble to the user.
   const displayMessages = mergeAssistantMessagesForDisplay(messages);
 
+  // The streaming answer is shown as a provisional assistant message under the
+  // id it will be persisted with. When the persisted message arrives it takes
+  // the same key, so React updates the existing bubble instead of replacing it,
+  // and a text selection inside it survives. saveAIResponse appends the
+  // persisted message one render before the streaming state clears, so the
+  // provisional entry is skipped once a message with that id exists.
+  const provisionalMessage: DisplayMessage | null =
+    (streamingText || streamingReasoning) &&
+    !(streamingMessageId && displayMessages.some((m) => m.id === streamingMessageId))
+      ? {
+          id: streamingMessageId ?? PROVISIONAL_MESSAGE_ID,
+          role: 'assistant',
+          content: streamingText,
+          createdAt: PROVISIONAL_CREATED_AT,
+          streaming: true,
+        }
+      : null;
+  const renderedMessages: DisplayMessage[] = provisionalMessage
+    ? [...displayMessages, provisionalMessage]
+    : displayMessages;
+
   const [input, setInput] = useState('');
   const chatHistoryDropdown = useDropdownState();
   const agentDropdown = useDropdownState();
@@ -282,20 +324,6 @@ export function UseAIChatPanel({
 
   // Message hover state for save button
   const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
-
-  // Wrappers around the rendered answer, used to carry a text selection from
-  // the streaming bubble to the persisted message that replaces it.
-  const streamingResponseRef = useRef<HTMLDivElement>(null);
-  const lastAnswerRef = useRef<HTMLDivElement>(null);
-  useSelectionHandoff({ loading, streamingRef: streamingResponseRef, persistedRef: lastAnswerRef });
-
-  // Last assistant answer on screen. Abort notices and error bubbles are system
-  // messages that happen to carry the assistant role, so they are matched by
-  // display mode rather than excluded one at a time. This is the bubble the
-  // streaming one hands its selection over to.
-  const lastAnswerId = [...displayMessages]
-    .reverse()
-    .find((m) => m.role === 'assistant' && (m.displayMode ?? 'default') === 'default')?.id;
 
   // File upload hook - includes processing state for transformation progress
   const {
@@ -884,7 +912,7 @@ export function UseAIChatPanel({
           </div>
         )}
 
-        {displayMessages.map((message) => {
+        {renderedMessages.map((message) => {
           // Info notices (e.g. the abort "generation stopped" bubble) are
           // display-only system messages. Render a compact, centered pill —
           // no reasoning dropdown, markdown, feedback, or hover affordances.
@@ -1012,23 +1040,27 @@ export function UseAIChatPanel({
               )}
               {message.role === 'assistant' ? (
                 <>
-                  {message.reasoningParts && message.reasoningParts.length > 0 && (
+                  {message.streaming && streamingReasoning && (
+                    <Reasoning
+                      reasoningParts={[]}
+                      isStreaming={true}
+                      streamingText={streamingReasoning}
+                      theme={theme}
+                      strings={strings}
+                    />
+                  )}
+                  {!message.streaming && message.reasoningParts && message.reasoningParts.length > 0 && (
                     <Reasoning
                       reasoningParts={message.reasoningParts}
                       theme={theme}
                       strings={strings}
                     />
                   )}
-                  {/* display:contents keeps this purely a selection anchor:
-                      it holds only the rendered answer, never the reasoning
-                      block, so text offsets map 1:1 onto the streaming bubble. */}
-                  <div
-                    className="markdown-answer"
-                    ref={message.id === lastAnswerId ? lastAnswerRef : undefined}
-                    style={{ display: 'contents' }}
-                  >
+                  {message.streaming && !streamingText ? (
+                    <span className="dots" style={{ opacity: 0.6 }}>...</span>
+                  ) : (
                     <MarkdownContent content={getTextFromContent(message.content)} />
-                  </div>
+                  )}
                 </>
               ) : (
                 // User/tool bubbles: display-only text so transformed_file
@@ -1043,7 +1075,7 @@ export function UseAIChatPanel({
               })}
             </div>
             {/* Feedback buttons - only for assistant messages with traceId */}
-            {message.role === 'assistant' && message.traceId && feedbackEnabled && onFeedback && (
+            {message.role === 'assistant' && !message.streaming && message.traceId && feedbackEnabled && onFeedback && (
               <div
                 data-testid="feedback-buttons"
                 style={{
@@ -1075,24 +1107,27 @@ export function UseAIChatPanel({
                 />
               </div>
             )}
-            <div
-              style={{
-                fontSize: '11px',
-                color: theme.secondaryTextColor,
-                marginTop: '4px',
-                padding: '0 4px',
-              }}
-            >
-              {message.createdAt.toLocaleTimeString([], {
-                hour: '2-digit',
-                minute: '2-digit'
-              })}
-            </div>
+            {!message.streaming && (
+              <div
+                data-testid="message-timestamp"
+                style={{
+                  fontSize: '11px',
+                  color: theme.secondaryTextColor,
+                  marginTop: '4px',
+                  padding: '0 4px',
+                }}
+              >
+                {message.createdAt.toLocaleTimeString([], {
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })}
+              </div>
+            )}
           </div>
           );
         })}
 
-        {loading && (
+        {loading && !provisionalMessage && (
           <div
             style={{
               display: 'flex',
@@ -1111,27 +1146,7 @@ export function UseAIChatPanel({
                 maxWidth: '80%',
               }}
             >
-              {streamingText || streamingReasoning ? (
-                <>
-                  {streamingReasoning && (
-                    <Reasoning
-                      reasoningParts={[]}
-                      isStreaming={true}
-                      streamingText={streamingReasoning}
-                      theme={theme}
-                      strings={strings}
-                    />
-                  )}
-                  {streamingText && (
-                    <div className="markdown-answer" ref={streamingResponseRef} style={{ display: 'contents' }}>
-                      <MarkdownContent content={streamingText} />
-                    </div>
-                  )}
-                  {!streamingText && (
-                    <span className="dots" style={{ opacity: 0.6 }}>...</span>
-                  )}
-                </>
-              ) : fileProcessing && fileProcessing.status === 'processing' ? (
+              {fileProcessing && fileProcessing.status === 'processing' ? (
                 <div>
                   <span style={{ opacity: 0.6 }}>{strings.input.processingFile}</span>
                   {fileProcessing.progress != null && (
@@ -1413,14 +1428,10 @@ export function UseAIChatPanel({
 
       <style>{`
         /* Markdown content styles */
-        /* .markdown-answer is a display:contents wrapper (a selection anchor),
-           so the edge margins have to be trimmed one level deeper as well. */
-        .markdown-content > :first-child,
-        .markdown-content > .markdown-answer:first-child > :first-child {
+        .markdown-content > :first-child {
           margin-top: 0 !important;
         }
-        .markdown-content > :last-child,
-        .markdown-content > .markdown-answer:last-child > :last-child {
+        .markdown-content > :last-child {
           margin-bottom: 0 !important;
         }
         .markdown-content p:last-child {

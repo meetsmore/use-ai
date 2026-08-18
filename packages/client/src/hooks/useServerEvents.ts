@@ -13,6 +13,7 @@ import type {
 } from '../types';
 import { EventType, ErrorCode, TOOL_APPROVAL_REQUEST } from '../types';
 import type { UseAIClient } from '../client';
+import { generateMessageId } from '../providers/chatRepository/types';
 import type { UseToolSystemReturn } from './useToolSystem';
 import type { UseAIStrings } from '../theme';
 import type { PersistedMessage, MessageDisplayMode } from '../providers/chatRepository/types';
@@ -22,7 +23,14 @@ export interface UseServerEventsOptions {
   /** Tool system for executing tools and looking up tool metadata */
   toolSystem: UseToolSystemReturn;
   /** Saves an AI response to chat storage */
-  saveAIResponse: (content: string, displayMode?: MessageDisplayMode, traceId?: string, turnMessages?: PersistedMessage[], reasoningParts?: ReasoningPart[]) => Promise<void>;
+  saveAIResponse: (
+    content: string,
+    displayMode?: MessageDisplayMode,
+    traceId?: string,
+    turnMessages?: PersistedMessage[],
+    reasoningParts?: ReasoningPart[],
+    messageId?: string,
+  ) => Promise<void>;
   /** UI strings for error messages and tool execution fallbacks */
   strings: UseAIStrings;
 }
@@ -38,6 +46,14 @@ export interface UseServerEventsReturn {
   setLoading: React.Dispatch<React.SetStateAction<boolean>>;
   /** Current streaming text from the AI response */
   streamingText: string;
+  /**
+   * Id the streaming answer will be persisted under, allocated at RUN_STARTED
+   * and cleared when the run ends. The chat panel renders the streaming answer
+   * as a provisional message with this id, so the persisted answer replaces it
+   * under the same React key.
+   * @example "msg_1723972800000_k3j9x2a"
+   */
+  streamingMessageId: string | null;
   /** Clear streaming text (e.g., when starting a new message) */
   clearStreamingText: () => void;
   /** Currently executing tool info for UI display, or null */
@@ -81,6 +97,9 @@ export function useServerEvents({
   const [loading, setLoading] = useState(false);
   const [streamingText, setStreamingText] = useState('');
   const [streamingReasoning, setStreamingReasoning] = useState('');
+  const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
+  // Mirror of streamingMessageId for the stable event handler.
+  const streamingMessageIdRef = useRef<string | null>(null);
   const streamingChatIdRef = useRef<string | null>(null);
 
   // Mirror of `loading` for use from stable callbacks (handleDisconnect) where
@@ -144,7 +163,7 @@ export function useServerEvents({
         // races and the second save clobbers the first — dropping the turn's
         // tool context (only surfaces after reload, since in-memory state uses a
         // functional setMessages update that keeps both).
-        await saveAIResponseRef.current(content, undefined, opts.traceId, turnMessages, reasoningParts);
+        await saveAIResponseRef.current(content, undefined, opts.traceId, turnMessages, reasoningParts, streamingMessageIdRef.current ?? undefined);
         await saveAIResponseRef.current(notice, 'info');
       } else {
         // No trailing text: skip the empty placeholder bubble. Attach
@@ -157,13 +176,15 @@ export function useServerEvents({
 
     // RUN_FINISHED: only persist when the AI produced a final text response.
     if (content) {
-      await saveAIResponseRef.current(content, undefined, opts.traceId, turnMessages, reasoningParts);
+      await saveAIResponseRef.current(content, undefined, opts.traceId, turnMessages, reasoningParts, streamingMessageIdRef.current ?? undefined);
     }
   }, []);
 
   const resetRunUiState = useCallback(() => {
     setStreamingText('');
     setStreamingReasoning('');
+    setStreamingMessageId(null);
+    streamingMessageIdRef.current = null;
     streamingChatIdRef.current = null;
     // Clear executingTool in case TOOL_CALL_END was never received
     // (e.g., stream truncated by token limit, or aborted mid-tool).
@@ -183,6 +204,9 @@ export function useServerEvents({
       runIdAtRunStartRef.current = client.currentRunId ?? undefined;
       hasTextFromPriorStepRef.current = false;
       setStreamingReasoning('');
+      const messageId = generateMessageId();
+      streamingMessageIdRef.current = messageId;
+      setStreamingMessageId(messageId);
     } else if (event.type === EventType.REASONING_MESSAGE_START) {
       // Add paragraph separator between reasoning from different steps
       setStreamingReasoning(prev => prev ? prev + '\n\n' : prev);
@@ -282,12 +306,8 @@ export function useServerEvents({
     const message = strs.errors[ErrorCode.CONNECTION_LOST] || strs.errors[ErrorCode.UNKNOWN_ERROR];
 
     saveAIResponseRef.current(message, 'error');
-    setStreamingText('');
-    setStreamingReasoning('');
-    streamingChatIdRef.current = null;
-    setExecutingTool(null);
-    setLoading(false);
-  }, []);
+    resetRunUiState();
+  }, [resetRunUiState]);
 
   // Compute display value for UI
   const executingTool = executingToolRaw ? {
@@ -298,6 +318,7 @@ export function useServerEvents({
     loading,
     setLoading,
     streamingText,
+    streamingMessageId,
     clearStreamingText,
     executingTool,
     streamingChatIdRef,
