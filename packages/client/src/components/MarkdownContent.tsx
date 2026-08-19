@@ -7,8 +7,10 @@ interface MarkdownContentProps {
   content: string;
 }
 
+const REMARK_PLUGINS = [remarkGfm];
+
 /**
- * Both of these must stay module-level constants.
+ * This map must stay a module-level constant.
  *
  * react-markdown re-creates its element tree on every render, and React
  * reconciles that tree by component identity. If the `components` map were
@@ -17,11 +19,9 @@ interface MarkdownContentProps {
  * of updating it. During streaming that happens on every token: the browser
  * throws away and rebuilds the entire answer many times per second, which
  * destroys any text selection the user is making and makes the scroll position
- * jump. Keeping them stable lets React update text nodes in place, so a
+ * jump. Keeping it stable lets React update text nodes in place, so a
  * selection survives the stream.
  */
-const REMARK_PLUGINS = [remarkGfm];
-
 const MARKDOWN_COMPONENTS: Components = {
   // Override default element rendering for better chat styling
   p: ({ children }) => <p style={{ margin: '0 0 0.5em 0' }}>{children}</p>,
