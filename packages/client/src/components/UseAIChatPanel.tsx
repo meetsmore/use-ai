@@ -1381,6 +1381,23 @@ export function UseAIChatPanel({
             </div>
           </div>
         )}
+
+        {/* Accuracy disclaimer. Kept out of the empty chat so the first
+            impression stays clean; once the user has sent a message it stays
+            visible for the rest of the conversation. */}
+        {features.inputDisclaimer && displayMessages.length > 0 && (
+          <div
+            data-testid="chat-input-disclaimer"
+            style={{
+              marginTop: '8px',
+              fontSize: '12px',
+              lineHeight: 1.3,
+              color: theme.disclaimerTextColor,
+            }}
+          >
+            {strings.input.disclaimer}
+          </div>
+        )}
       </div>
 
       <style>{`

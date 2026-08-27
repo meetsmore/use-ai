@@ -47,6 +47,8 @@ export const defaultStrings = {
     thinking: 'Thinking',
     /** File processing indicator text (shown during file transformation like OCR) */
     processingFile: 'Processing file...',
+    /** Disclaimer shown under the input box once a conversation has started */
+    disclaimer: 'AI can make mistakes. Please double-check important information.',
   },
 
   // File upload

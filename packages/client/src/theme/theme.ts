@@ -34,6 +34,8 @@ export const defaultTheme = {
   secondaryTextColor: '#6b7280',
   /** Placeholder text color */
   placeholderTextColor: '#9ca3af',
+  /** Text color for the disclaimer under the input box */
+  disclaimerTextColor: 'rgba(0, 0, 0, 0.45)',
 
   // Status colors
   /** Online status indicator color */
