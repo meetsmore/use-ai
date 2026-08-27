@@ -3,6 +3,7 @@ import { describe, test, expect, mock } from 'bun:test';
 import { render, fireEvent } from '@testing-library/react';
 import { UseAIChat, __UseAIChatContext, type ChatUIContextValue } from './UseAIChat';
 import type { PersistedMessage } from '../providers/chatRepository/types';
+import { StringsContext, defaultStrings } from '../theme';
 
 function createContextValue(overrides: Partial<ChatUIContextValue> = {}): ChatUIContextValue {
   return {
@@ -114,6 +115,77 @@ describe('UseAIChat', () => {
 
       expect(queryByTestId('save-command-button')).toBeNull();
       expect(queryByTestId('inline-save-command')).toBeNull();
+    });
+  });
+
+  describe('input disclaimer', () => {
+    const userMessage: PersistedMessage = {
+      id: 'msg-1',
+      role: 'user',
+      content: 'hello world',
+      createdAt: new Date(0),
+    };
+
+    test('stays hidden when the inputDisclaimer feature is not enabled', () => {
+      const ctx = createContextValue({ messages: [userMessage] });
+
+      const { queryByTestId } = render(
+        <__UseAIChatContext.Provider value={ctx}>
+          <UseAIChat />
+        </__UseAIChatContext.Provider>
+      );
+
+      expect(queryByTestId('chat-input-disclaimer')).toBeNull();
+    });
+
+    test('stays hidden while the chat is empty', () => {
+      const ctx = createContextValue({ enabledFeatures: { inputDisclaimer: true } });
+
+      const { queryByTestId } = render(
+        <__UseAIChatContext.Provider value={ctx}>
+          <UseAIChat />
+        </__UseAIChatContext.Provider>
+      );
+
+      expect(queryByTestId('chat-input-disclaimer')).toBeNull();
+    });
+
+    test('appears once the conversation has started', () => {
+      const ctx = createContextValue({
+        messages: [userMessage],
+        enabledFeatures: { inputDisclaimer: true },
+      });
+
+      const { getByTestId } = render(
+        <__UseAIChatContext.Provider value={ctx}>
+          <UseAIChat />
+        </__UseAIChatContext.Provider>
+      );
+
+      expect(getByTestId('chat-input-disclaimer')).toHaveTextContent(
+        defaultStrings.input.disclaimer
+      );
+    });
+
+    test('uses the overridden text from strings', () => {
+      const ctx = createContextValue({
+        messages: [userMessage],
+        enabledFeatures: { inputDisclaimer: true },
+      });
+      const strings = {
+        ...defaultStrings,
+        input: { ...defaultStrings.input, disclaimer: 'Custom disclaimer' },
+      };
+
+      const { getByTestId } = render(
+        <StringsContext.Provider value={strings}>
+          <__UseAIChatContext.Provider value={ctx}>
+            <UseAIChat />
+          </__UseAIChatContext.Provider>
+        </StringsContext.Provider>
+      );
+
+      expect(getByTestId('chat-input-disclaimer')).toHaveTextContent('Custom disclaimer');
     });
   });
 });

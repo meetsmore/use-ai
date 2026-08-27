@@ -12,6 +12,7 @@ root.render(
   <UseAIProvider
     serverUrl="ws://localhost:8081"
     systemPrompt="You are a helpful AI assistant for a demo application. Be concise and friendly in your responses."
+    enabledFeatures={{ inputDisclaimer: true }}
     forwardedPropsProvider={() => ({
       mcpHeaders: {
         'http://localhost:3002': {

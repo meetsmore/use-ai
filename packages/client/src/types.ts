@@ -7,8 +7,9 @@ export interface UseAIConfig {
 }
 
 /**
- * Toggles for optional chat UI features. Each feature defaults to enabled
- * when its flag is omitted, so set a flag to false to opt out of that feature.
+ * Toggles for optional chat UI features. Opt-out features default to enabled
+ * when their flag is omitted; opt-in features default to disabled. The default
+ * is documented on each flag.
  */
 export interface EnabledFeatures {
   /**
@@ -17,14 +18,22 @@ export interface EnabledFeatures {
    * @default true
    */
   slashCommands?: boolean;
+  /**
+   * The disclaimer shown under the input box once a conversation has started,
+   * reminding the user that the AI can be wrong. Hidden on an empty chat.
+   * Override the text via `strings.input.disclaimer`.
+   * @default false
+   */
+  inputDisclaimer?: boolean;
 }
 
 /**
  * Default state for every opt-out feature. Merge user-supplied
  * `enabledFeatures` over this to resolve effective flags. Extend this constant
- * when adding a new feature toggle.
+ * when adding a new opt-out toggle; opt-in features are left out so they stay
+ * undefined until the consumer turns them on.
  */
-export const DEFAULT_ENABLED_FEATURES: Required<EnabledFeatures> = {
+export const DEFAULT_ENABLED_FEATURES: Pick<Required<EnabledFeatures>, 'slashCommands'> = {
   slashCommands: true,
 };
 
