@@ -13,6 +13,7 @@ function createContextValue(overrides: Partial<ChatUIContextValue> = {}): ChatUI
     messages: [],
     streamingText: '',
     streamingReasoning: '',
+    streamingMessageId: null,
     suggestions: [],
     fileUploadConfig: undefined,
     history: {
@@ -71,6 +72,42 @@ describe('UseAIChat', () => {
 
     expect(getByTestId('thinking-toggle')).toBeInTheDocument();
     expect(getByText('Thinking...')).toBeInTheDocument();
+  });
+
+  // Without the id the streaming bubble and the persisted one are different
+  // elements, and a selection made while the answer streams is lost on
+  // completion. See UseAIChatPanel.selection.test.tsx.
+  test('renders the streaming answer under the id it will be persisted with', () => {
+    const ctx = createContextValue({
+      loading: true,
+      streamingText: 'partial answer',
+      streamingMessageId: 'msg-assistant',
+    });
+
+    const { container, rerender } = render(
+      <__UseAIChatContext.Provider value={ctx}>
+        <UseAIChat />
+      </__UseAIChatContext.Provider>
+    );
+
+    const streamingBubble = container.querySelector('[data-testid="chat-message-assistant-streaming"]');
+    expect(streamingBubble).not.toBeNull();
+
+    const persisted: PersistedMessage = {
+      id: 'msg-assistant',
+      role: 'assistant',
+      content: 'partial answer, completed',
+      createdAt: new Date(0),
+    };
+    rerender(
+      <__UseAIChatContext.Provider
+        value={createContextValue({ messages: [persisted], streamingText: '', streamingMessageId: null })}
+      >
+        <UseAIChat />
+      </__UseAIChatContext.Provider>
+    );
+
+    expect(container.querySelector('[data-testid="chat-message-assistant"]')).toBe(streamingBubble);
   });
 
   describe('save command feature toggle', () => {

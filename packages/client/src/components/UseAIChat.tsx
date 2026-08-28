@@ -30,6 +30,12 @@ export interface ChatUIContextValue {
   streamingText: string;
   /** Currently streaming reasoning text from extended thinking */
   streamingReasoning: string;
+  /**
+   * Id the streaming answer will be persisted under, or null when no run is
+   * streaming into the displayed chat. Passing it to the panel lets the
+   * streaming bubble and the persisted one be the same element.
+   */
+  streamingMessageId: string | null;
   /** Aggregated suggestions from all useAI hooks */
   suggestions: string[];
   /** File upload configuration */
@@ -201,6 +207,7 @@ export function UseAIChat({ floating = false, submitMode }: UseAIChatProps) {
     connected: ctx.connected,
     streamingText: ctx.streamingText,
     streamingReasoning: ctx.streamingReasoning,
+    streamingMessageId: ctx.streamingMessageId,
     currentChatId: ctx.history.currentId,
     onNewChat: ctx.history.create,
     onLoadChat: ctx.history.load,

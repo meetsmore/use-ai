@@ -318,13 +318,21 @@ export function useChatManagement({
     }
   }, [repository, setMessages]);
 
-  /** Saves an AI response to storage and updates UI. */
+  /**
+   * Saves an AI response to storage and updates UI.
+   *
+   * `messageId` lets the caller choose the persisted id. The streaming answer
+   * is rendered under the id allocated at RUN_STARTED, so persisting the final
+   * answer under that same id lets React reuse the streaming bubble instead of
+   * mounting a new one.
+   */
   const saveAIResponse = useCallback(async (
     content: string,
     displayMode?: MessageDisplayMode,
     traceId?: string,
     turnMessages?: PersistedMessage[],
-    reasoningParts?: ReasoningPart[]
+    reasoningParts?: ReasoningPart[],
+    messageId?: string
   ): Promise<void> => {
     const currentChatIdValue = currentChatIdSnapshot.current;
     const pendingChatIdValue = pendingChatIdSnapshot.current;
@@ -350,7 +358,7 @@ export function useChatManagement({
       }
 
       const finalMessage: PersistedMessage = {
-        id: generateMessageId(),
+        id: messageId ?? generateMessageId(),
         role: 'assistant',
         content,
         createdAt: new Date(),
