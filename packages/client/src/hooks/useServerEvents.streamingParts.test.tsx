@@ -34,9 +34,9 @@ function setup() {
 }
 
 /**
- * `streamingText` and `streamingReasoning` flatten a whole run into two
- * strings, so a multi-step run's thinking arrives as one block. `streamingParts`
- * keeps the step boundaries the run actually had.
+ * The parts are the only form the in-flight answer is kept in, so they must
+ * carry the step boundaries the run actually had. Flattening them into what one
+ * bubble shows happens in the UI; see utils/streamingParts.test.ts.
  */
 describe('useServerEvents — streaming parts', () => {
   it('keeps each step of reasoning separate instead of concatenating them', async () => {
@@ -55,8 +55,6 @@ describe('useServerEvents — streaming parts', () => {
       { kind: 'reasoning', text: 'First I check the time.' },
       { kind: 'reasoning', text: 'Then I add the numbers.' },
     ]);
-    // The flattened string keeps its existing shape for the built-in bubble.
-    expect(result.current.streamingReasoning).toBe('First I check the time.\n\nThen I add the numbers.');
   });
 
   it('interleaves reasoning, tool calls and text in the order they arrived', async () => {

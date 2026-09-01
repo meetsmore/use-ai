@@ -28,10 +28,6 @@ export interface ChatUIContextValue {
   abortRun: () => void;
   /** Current messages in the conversation */
   messages: PersistedMessage[];
-  /** Currently streaming text from assistant (real-time updates) */
-  streamingText: string;
-  /** Currently streaming reasoning text from extended thinking */
-  streamingReasoning: string;
   /**
    * Id the streaming answer will be persisted under, or null when no run is
    * streaming into the displayed chat. Passing it to the panel lets the
@@ -221,8 +217,6 @@ export function UseAIChat({ floating = false, submitMode, components }: UseAICha
     messages: ctx.messages,
     loading: ctx.loading,
     connected: ctx.connected,
-    streamingText: ctx.streamingText,
-    streamingReasoning: ctx.streamingReasoning,
     streamingMessageId: ctx.streamingMessageId,
     streamingParts: ctx.streamingParts,
     currentChatId: ctx.history.currentId,

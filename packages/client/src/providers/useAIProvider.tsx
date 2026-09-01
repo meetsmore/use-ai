@@ -239,10 +239,8 @@ export interface ChatPanelProps {
   loading: boolean;
   /** Whether the client is connected to the server */
   connected: boolean;
-  /** Optional currently streaming text from assistant */
-  streamingText?: string;
-  /** Optional currently streaming reasoning text from extended thinking */
-  streamingReasoning?: string;
+  /** The in-flight answer split into ordered parts; empty between runs */
+  streamingParts?: ChatStreamingPart[];
   /** Optional array of suggestion strings to display when chat is empty */
   suggestions?: string[];
   /** List of available agents from the server */
@@ -648,7 +646,7 @@ export function UseAIProvider({
   const handleSendMessage = useCallback(async (message: string, attachments?: FileAttachment[], messageForwardedProps?: UseAIForwardedProps) => {
     if (!clientRef.current) return;
 
-    serverEvents.clearStreamingText();
+    serverEvents.clearStreamingParts();
 
     const activatedChatId = chatManagement.activatePendingChat();
     const activeChatId = activatedChatId || chatManagement.currentChatId;
@@ -772,10 +770,6 @@ export function UseAIProvider({
 
   // ── Chat UI ─────────────────────────────────────────────────────────────
 
-  const effectiveStreamingText = serverEvents.streamingChatIdRef.current === chatManagement.displayedChatId
-    ? serverEvents.streamingText : '';
-  const effectiveStreamingReasoning = serverEvents.streamingChatIdRef.current === chatManagement.displayedChatId
-    ? serverEvents.streamingReasoning : '';
   const effectiveStreamingMessageId = serverEvents.streamingChatIdRef.current === chatManagement.displayedChatId
     ? serverEvents.streamingMessageId : null;
   const effectiveStreamingParts = serverEvents.streamingChatIdRef.current === chatManagement.displayedChatId
@@ -787,8 +781,6 @@ export function UseAIProvider({
     sendMessage: handleSendMessage,
     abortRun,
     messages,
-    streamingText: effectiveStreamingText,
-    streamingReasoning: effectiveStreamingReasoning,
     streamingMessageId: effectiveStreamingMessageId,
     streamingParts: effectiveStreamingParts,
     suggestions: promptState.aggregatedSuggestions,
@@ -845,8 +837,6 @@ export function UseAIProvider({
     messages,
     loading: serverEvents.loading,
     connected,
-    streamingText: effectiveStreamingText,
-    streamingReasoning: effectiveStreamingReasoning,
     streamingMessageId: effectiveStreamingMessageId,
     streamingParts: effectiveStreamingParts,
     currentChatId: chatManagement.displayedChatId,
@@ -899,8 +889,7 @@ export function UseAIProvider({
         messages={messages}
         loading={serverEvents.loading}
         connected={connected}
-        streamingText={effectiveStreamingText}
-        streamingReasoning={effectiveStreamingReasoning}
+        streamingParts={effectiveStreamingParts}
         suggestions={promptState.aggregatedSuggestions}
         availableAgents={availableAgents}
         defaultAgent={defaultAgent}

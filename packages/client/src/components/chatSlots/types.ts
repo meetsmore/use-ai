@@ -44,10 +44,10 @@ export interface ChatEmptyStateSlotProps extends ChatSlotProps {
 export interface ChatMessageSlotProps extends ChatSlotProps {
   /**
    * While `streaming` is true this is the provisional entry for the answer that
-   * is still arriving: `content` holds the text received so far, and `createdAt`,
-   * `traceId`, `feedback` and `reasoningParts` are not populated yet. It carries
-   * the id the answer will be persisted under, so the same slot instance keeps
-   * rendering it once the run finishes.
+   * is still arriving: `content` is empty and `createdAt`, `traceId`, `feedback`
+   * and `reasoningParts` are not populated yet, so read the answer from
+   * `streamingParts`. It carries the id the answer will be persisted under, so
+   * the same slot instance keeps rendering it once the run finishes.
    *
    * The slot itself keeps its React key across that handoff, but the keys it
    * gives its own children must match on both sides too. Deriving them from
@@ -71,18 +71,15 @@ export interface ChatMessageSlotProps extends ChatSlotProps {
   /** Whether this message is the answer currently being streamed. */
   streaming: boolean;
   /**
-   * Extended-thinking text received so far, with every step's reasoning joined
-   * into one string. Prefer `streamingParts` when the steps should stay apart.
-   * Only populated while `streaming` is true; once persisted the reasoning is
-   * on `message.reasoningParts`.
-   */
-  streamingReasoning: string;
-  /**
    * The answer so far, split into the parts the model emitted and kept in
    * order: reasoning, text and tool calls as they happened. This is the
    * streaming counterpart of `sourceMessages`, so a slot can render a run the
-   * same way while it happens and after it is persisted. Empty unless
-   * `streaming` is true.
+   * same way while it happens and after it is persisted, and it is the only
+   * place the streamed answer is available. Empty unless `streaming` is true.
+   *
+   * `getTextFromStreamingParts` and `getReasoningPartsFromStreamingParts`
+   * flatten it the way a persisted turn is flattened, for a slot that wants one
+   * bubble rather than a timeline.
    */
   streamingParts: ChatStreamingPart[];
   feedbackEnabled: boolean;

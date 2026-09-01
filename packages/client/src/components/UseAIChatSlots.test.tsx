@@ -13,6 +13,7 @@ import type {
   UseAIChatComponentOverrides,
 } from './chatSlots';
 import type { PersistedMessage } from '../providers/chatRepository/types';
+import { getTextFromStreamingParts } from '../utils/streamingParts';
 
 const message: PersistedMessage = {
   id: 'message-1',
@@ -31,7 +32,7 @@ function renderPanel(
       messages={[message]}
       loading
       connected
-      streamingText="Streaming"
+      streamingParts={[{ kind: 'text', text: 'Streaming' }]}
       pendingApprovals={[{
         toolCallId: 'tool-1',
         toolCallName: 'fillForm',
@@ -61,9 +62,9 @@ describe('UseAIChat component slots', () => {
     const Header = ({ currentChatId }: ChatHeaderSlotProps) => (
       <div data-testid="custom-header">{currentChatId}</div>
     );
-    const Message = ({ message: slotMessage, streaming }: ChatMessageSlotProps) => (
+    const Message = ({ message: slotMessage, streaming, streamingParts }: ChatMessageSlotProps) => (
       <div data-testid="custom-message" data-streaming={String(streaming)}>
-        {slotMessage.content as string}
+        {streaming ? getTextFromStreamingParts(streamingParts) : (slotMessage.content as string)}
       </div>
     );
     const ToolApproval = ({ approvals, onApprove, onReject }: ChatToolApprovalSlotProps) => (
@@ -111,15 +112,14 @@ describe('UseAIChat component slots', () => {
   });
 
   test('routes the streaming answer through the Message slot', () => {
-    const Message = ({ message: slotMessage, streaming, streamingReasoning, streamingParts, isLast }: ChatMessageSlotProps) => (
+    const Message = ({ message: slotMessage, streaming, streamingParts, isLast }: ChatMessageSlotProps) => (
       <div
         data-testid={`slot-${slotMessage.id}`}
         data-streaming={String(streaming)}
-        data-reasoning={streamingReasoning}
         data-parts={streamingParts.map((part) => part.kind).join(',')}
         data-last={String(isLast)}
       >
-        {slotMessage.content as string}
+        {streaming ? getTextFromStreamingParts(streamingParts) : (slotMessage.content as string)}
       </div>
     );
 
@@ -127,17 +127,16 @@ describe('UseAIChat component slots', () => {
       { Message },
       {
         streamingMessageId: 'message-2',
-        streamingReasoning: 'Weighing options',
         streamingParts: [
           { kind: 'reasoning', text: 'Weighing options' },
           { kind: 'tool_call', toolCallId: 'tc1', name: 'search', args: '{}' },
+          { kind: 'text', text: 'Streaming' },
         ],
       }
     );
 
     const persisted = getByTestId('slot-message-1');
     expect(persisted).toHaveAttribute('data-streaming', 'false');
-    expect(persisted).toHaveAttribute('data-reasoning', '');
     expect(persisted).toHaveAttribute('data-parts', '');
     expect(persisted).toHaveAttribute('data-last', 'false');
 
@@ -146,9 +145,8 @@ describe('UseAIChat component slots', () => {
     const streamingBubble = getByTestId('slot-message-2');
     expect(streamingBubble).toHaveTextContent('Streaming');
     expect(streamingBubble).toHaveAttribute('data-streaming', 'true');
-    expect(streamingBubble).toHaveAttribute('data-reasoning', 'Weighing options');
     // The ordered parts let a slot keep the run's steps apart while it streams.
-    expect(streamingBubble).toHaveAttribute('data-parts', 'reasoning,tool_call');
+    expect(streamingBubble).toHaveAttribute('data-parts', 'reasoning,tool_call,text');
     expect(streamingBubble).toHaveAttribute('data-last', 'true');
   });
 
@@ -160,7 +158,7 @@ describe('UseAIChat component slots', () => {
   test('renders PendingIndicator before the answer starts arriving', () => {
     const { getByTestId } = renderPanel(
       { PendingIndicator },
-      { streamingText: '', executingTool }
+      { streamingParts: [], executingTool }
     );
 
     expect(getByTestId('custom-pending')).toHaveTextContent('Filling the form');

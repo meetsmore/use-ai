@@ -2,10 +2,21 @@ import React from 'react';
 import { describe, test, expect, beforeEach } from 'bun:test';
 import { render } from '@testing-library/react';
 import { UseAIChatPanel, type UseAIChatPanelProps } from './UseAIChatPanel';
+import type { ChatStreamingPart } from '../hooks/useServerEvents';
 import type { PersistedMessage } from '../providers/chatRepository/types';
 
 const ANSWER = 'The first paragraph.\n\nThe second paragraph.';
 const STREAMING_ID = 'msg-assistant';
+
+/**
+ * The panel is only handed the run's ordered parts; the bubble flattens them.
+ * A two-paragraph answer arrives as two text parts, the same shape a two-step
+ * run produces, so the flattened string must match the persisted `ANSWER`.
+ */
+const ANSWER_PARTS: ChatStreamingPart[] = [
+  { kind: 'text', text: 'The first paragraph.' },
+  { kind: 'text', text: 'The second paragraph.' },
+];
 
 const userMessage: PersistedMessage = {
   id: 'msg-user',
@@ -41,7 +52,7 @@ function panelProps(overrides: Partial<UseAIChatPanelProps> = {}): UseAIChatPane
     messages: [userMessage],
     loading: true,
     connected: true,
-    streamingText: ANSWER,
+    streamingParts: ANSWER_PARTS,
     streamingMessageId: STREAMING_ID,
     ...overrides,
   };
@@ -88,10 +99,16 @@ describe('streaming answer rendered as a provisional message', () => {
   });
 
   test('keeps the selection as more text arrives', () => {
-    const { container, rerender } = render(<UseAIChatPanel {...panelProps({ streamingText: ANSWER })} />);
+    const { container, rerender } = render(<UseAIChatPanel {...panelProps()} />);
     selectText(container, 'first paragraph');
 
-    rerender(<UseAIChatPanel {...panelProps({ streamingText: `${ANSWER}\n\nThe third paragraph.` })} />);
+    rerender(
+      <UseAIChatPanel
+        {...panelProps({
+          streamingParts: [...ANSWER_PARTS, { kind: 'text', text: 'The third paragraph.' }],
+        })}
+      />
+    );
 
     expect(window.getSelection()!.toString()).toBe('first paragraph');
   });
@@ -102,7 +119,7 @@ describe('streaming answer rendered as a provisional message', () => {
 
     rerender(
       <UseAIChatPanel
-        {...panelProps({ loading: false, streamingText: '', streamingMessageId: null, messages: [userMessage, assistantMessage] })}
+        {...panelProps({ loading: false, streamingParts: [], streamingMessageId: null, messages: [userMessage, assistantMessage] })}
       />
     );
 
@@ -124,7 +141,7 @@ describe('streaming answer rendered as a provisional message', () => {
 
     rerender(
       <UseAIChatPanel
-        {...panelProps({ loading: false, streamingText: '', streamingMessageId: null, messages: [userMessage, assistantMessage] })}
+        {...panelProps({ loading: false, streamingParts: [], streamingMessageId: null, messages: [userMessage, assistantMessage] })}
       />
     );
 
@@ -140,7 +157,7 @@ describe('streaming answer rendered as a provisional message', () => {
 
     rerender(
       <UseAIChatPanel
-        {...panelProps({ loading: false, streamingText: '', streamingMessageId: null, messages: [userMessage, assistantMessage] })}
+        {...panelProps({ loading: false, streamingParts: [], streamingMessageId: null, messages: [userMessage, assistantMessage] })}
       />
     );
 
@@ -157,7 +174,7 @@ describe('streaming answer rendered as a provisional message', () => {
       <UseAIChatPanel
         {...panelProps({
           loading: false,
-          streamingText: '',
+          streamingParts: [],
           streamingMessageId: null,
           messages: [userMessage, assistantMessage, abortNotice],
         })}
@@ -180,14 +197,16 @@ describe('streaming answer rendered as a provisional message', () => {
   });
 
   test('shows the plain loading indicator before any text streams', () => {
-    const { container } = render(<UseAIChatPanel {...panelProps({ streamingText: '', streamingReasoning: '' })} />);
+    const { container } = render(<UseAIChatPanel {...panelProps({ streamingParts: [] })} />);
     expect(assistantBubbles(container)).toHaveLength(0);
     expect(container.querySelector('.dots')).not.toBeNull();
   });
 
   test('shows the loading indicator inside the bubble while only reasoning streams', () => {
     const { container } = render(
-      <UseAIChatPanel {...panelProps({ streamingText: '', streamingReasoning: 'thinking...' })} />
+      <UseAIChatPanel
+        {...panelProps({ streamingParts: [{ kind: 'reasoning', text: 'thinking...' }] })}
+      />
     );
     const bubbles = assistantBubbles(container);
     expect(bubbles).toHaveLength(1);

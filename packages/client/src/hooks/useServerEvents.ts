@@ -38,9 +38,9 @@ export interface UseServerEventsOptions {
 
 /**
  * One piece of the answer currently being produced, in the order the model
- * emitted it. `streamingText` and `streamingReasoning` flatten a whole run into
- * two strings, which loses the step boundaries; this keeps them, so a run that
- * thinks, calls a tool, thinks again and answers can be shown as it happened.
+ * emitted it. A run that thinks, calls a tool, thinks again and answers keeps
+ * those boundaries here, so the UI can show it as it happened. Flattening the
+ * parts into what one bubble shows is the UI's job (see `utils/streamingParts`).
  */
 export type ChatStreamingPart =
   | { kind: 'reasoning'; text: string }
@@ -62,8 +62,6 @@ export interface UseServerEventsReturn {
   loading: boolean;
   /** Set the loading state (e.g., when sending a message) */
   setLoading: React.Dispatch<React.SetStateAction<boolean>>;
-  /** Current streaming text from the AI response */
-  streamingText: string;
   /**
    * Id the streaming answer will be persisted under, allocated at RUN_STARTED
    * and cleared when the run ends. The chat panel renders the streaming answer
@@ -72,14 +70,12 @@ export interface UseServerEventsReturn {
    * @example "msg_1723972800000_k3j9x2a"
    */
   streamingMessageId: string | null;
-  /** Clear streaming text (e.g., when starting a new message) */
-  clearStreamingText: () => void;
+  /** Drop the in-flight answer (e.g., when starting a new message) */
+  clearStreamingParts: () => void;
   /** Currently executing tool info for UI display, or null */
   executingTool: ExecutingToolDisplay | null;
-  /** Ref tracking which chat the current streaming text belongs to */
+  /** Ref tracking which chat the in-flight answer belongs to */
   streamingChatIdRef: React.MutableRefObject<string | null>;
-  /** Current streaming reasoning text from extended thinking */
-  streamingReasoning: string;
   /** The in-flight answer split into ordered parts; empty between runs. */
   streamingParts: ChatStreamingPart[];
   /**
@@ -115,8 +111,6 @@ export function useServerEvents({
   strings,
 }: UseServerEventsOptions): UseServerEventsReturn {
   const [loading, setLoading] = useState(false);
-  const [streamingText, setStreamingText] = useState('');
-  const [streamingReasoning, setStreamingReasoning] = useState('');
   const [streamingParts, setStreamingParts] = useState<ChatStreamingPart[]>([]);
   const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
   // Mirror of streamingMessageId for the stable event handler.
@@ -134,10 +128,6 @@ export function useServerEvents({
   // still link saved partial responses back to the trace.
   const runIdAtRunStartRef = useRef<string | undefined>(undefined);
 
-  // Tracks whether prior steps in this run emitted text, so we can insert
-  // a paragraph separator (\n\n) in streamingText between steps.
-  const hasTextFromPriorStepRef = useRef<boolean>(false);
-
   // Executing tool state for UI display
   const [executingToolRaw, setExecutingTool] = useState<{
     toolCallId: string;
@@ -146,8 +136,8 @@ export function useServerEvents({
   } | null>(null);
   const executingToolFallbackRef = useRef<string | null>(null);
 
-  const clearStreamingText = useCallback(() => {
-    setStreamingText('');
+  const clearStreamingParts = useCallback(() => {
+    setStreamingParts([]);
   }, []);
 
   /** Appends `delta` to the trailing part of `kind`, starting one if needed. */
@@ -214,8 +204,6 @@ export function useServerEvents({
   }, []);
 
   const resetRunUiState = useCallback(() => {
-    setStreamingText('');
-    setStreamingReasoning('');
     setStreamingParts([]);
     setStreamingMessageId(null);
     streamingMessageIdRef.current = null;
@@ -236,25 +224,16 @@ export function useServerEvents({
       // so messages added after this point are from the AI turn.
       messageCountAtRunStartRef.current = client.messages.length;
       runIdAtRunStartRef.current = client.currentRunId ?? undefined;
-      hasTextFromPriorStepRef.current = false;
-      setStreamingReasoning('');
       setStreamingParts([]);
       const messageId = generateMessageId();
       streamingMessageIdRef.current = messageId;
       setStreamingMessageId(messageId);
     } else if (event.type === EventType.REASONING_MESSAGE_START) {
-      // Add paragraph separator between reasoning from different steps
-      setStreamingReasoning(prev => prev ? prev + '\n\n' : prev);
       setStreamingParts(prev => [...prev, { kind: 'reasoning', text: '' }]);
     } else if (event.type === EventType.REASONING_MESSAGE_CONTENT) {
       const reasoningEvent = event as ReasoningMessageContentEvent;
-      setStreamingReasoning(prev => prev + reasoningEvent.delta);
       appendToPart('reasoning', reasoningEvent.delta);
     } else if (event.type === EventType.TEXT_MESSAGE_START) {
-      // Add paragraph separator between steps so combined text reads naturally
-      if (hasTextFromPriorStepRef.current) {
-        setStreamingText(prev => prev + '\n\n');
-      }
       setStreamingParts(prev => [...prev, { kind: 'text', text: '' }]);
     } else if (event.type === EventType.TOOL_CALL_ARGS) {
       const argsEvent = event as ToolCallArgsEvent;
@@ -315,8 +294,6 @@ export function useServerEvents({
       ts.handleApprovalRequest(e);
     } else if (event.type === EventType.TEXT_MESSAGE_CONTENT) {
       const contentEvent = event as TextMessageContentEvent;
-      hasTextFromPriorStepRef.current = true;
-      setStreamingText(prev => prev + contentEvent.delta);
       appendToPart('text', contentEvent.delta);
     } else if (event.type === EventType.TEXT_MESSAGE_END) {
       // Don't clear streaming text here — wait for RUN_FINISHED so text
@@ -369,12 +346,10 @@ export function useServerEvents({
   return {
     loading,
     setLoading,
-    streamingText,
     streamingMessageId,
-    clearStreamingText,
+    clearStreamingParts,
     executingTool,
     streamingChatIdRef,
-    streamingReasoning,
     streamingParts,
     handleServerEvent,
     handleDisconnect,

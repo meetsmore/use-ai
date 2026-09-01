@@ -65,13 +65,10 @@ export interface UseAIChatPanelProps {
   messages: Message[];
   loading: boolean;
   connected: boolean;
-  /** Currently streaming text from assistant (real-time updates) */
-  streamingText?: string;
-  /** Currently streaming reasoning text from extended thinking */
-  streamingReasoning?: string;
   /**
-   * The in-flight answer split into ordered parts. Handed to the `Message`
-   * slot; the built-in bubble renders `streamingText`/`streamingReasoning`.
+   * The in-flight answer split into ordered parts, and the only form the
+   * streamed answer is passed in. Flattening it into what one bubble shows is
+   * the `Message` slot's job.
    */
   streamingParts?: ChatStreamingPart[];
   /**
@@ -151,8 +148,6 @@ export function UseAIChatPanel({
   messages,
   loading,
   connected,
-  streamingText = '',
-  streamingReasoning = '',
   streamingParts = EMPTY_STREAMING_PARTS,
   streamingMessageId = null,
   currentChatId,
@@ -203,14 +198,16 @@ export function UseAIChatPanel({
   // the same key, so React updates the existing bubble instead of replacing it,
   // and a text selection inside it survives. saveAIResponse appends the
   // persisted message one render before the streaming state clears, so the
-  // provisional entry is skipped once a message with that id exists.
+  // provisional entry is skipped once a message with that id exists. `content`
+  // stays empty: the answer is passed as `streamingParts`, and the slot decides
+  // how to render it.
   const provisionalMessage: DisplayMessage | null =
-    (streamingText || streamingReasoning) &&
+    streamingParts.length > 0 &&
     !(streamingMessageId && displayMessages.some((m) => m.id === streamingMessageId))
       ? {
           id: streamingMessageId ?? PROVISIONAL_MESSAGE_ID,
           role: 'assistant',
-          content: streamingText,
+          content: '',
           createdAt: PROVISIONAL_CREATED_AT,
           sourceMessages: [],
           streaming: true,
@@ -393,7 +390,6 @@ export function UseAIChatPanel({
               isLast: index === renderedMessages.length - 1,
               sourceMessages: message.sourceMessages,
               streaming: !!message.streaming,
-              streamingReasoning: message.streaming ? streamingReasoning : '',
               streamingParts: message.streaming ? streamingParts : EMPTY_STREAMING_PARTS,
               feedbackEnabled: !!feedbackEnabled,
               onFeedback,

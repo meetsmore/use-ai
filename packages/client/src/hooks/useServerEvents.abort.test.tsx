@@ -114,7 +114,7 @@ describe('useServerEvents — abort handling', () => {
     ]);
 
     expect(result.current.loading).toBe(false);
-    expect(result.current.streamingText).toBe('');
+    expect(result.current.streamingParts).toEqual([]);
   });
 
   it('stopping mid tool-execution saves the tool_use/tool_result pair to history so the next turn stays valid', async () => {

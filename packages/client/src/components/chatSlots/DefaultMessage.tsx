@@ -1,6 +1,10 @@
 import React, { useState } from 'react';
 import { useStrings, useTheme } from '../../theme';
 import { getDisplayTextFromContent, getTextFromContent } from '../../utils/messageContent';
+import {
+  getReasoningPartsFromStreamingParts,
+  getTextFromStreamingParts,
+} from '../../utils/streamingParts';
 import { MarkdownContent } from '../MarkdownContent';
 import { FilePlaceholder } from '../FileChip';
 import { Reasoning } from '../Reasoning';
@@ -13,7 +17,7 @@ import type { ChatMessageSlotProps } from './types';
 export function DefaultMessage({
   message,
   streaming,
-  streamingReasoning,
+  streamingParts,
   feedbackEnabled,
   onFeedback,
   saveAsCommand,
@@ -59,7 +63,11 @@ export function DefaultMessage({
   // untouched.
   const messageTestId = streaming ? 'chat-message-assistant-streaming' : `chat-message-${message.role}`;
   const contentTestId = streaming ? 'chat-message-content-streaming' : 'chat-message-content';
-  const text = getTextFromContent(message.content);
+  // One bubble per turn, so the run's ordered parts are flattened the same way
+  // mergeAssistantMessagesForDisplay flattens the persisted turn. Both sides
+  // must yield the same string for the handoff to leave the element alone.
+  const text = streaming ? getTextFromStreamingParts(streamingParts) : getTextFromContent(message.content);
+  const streamingReasoningParts = streaming ? getReasoningPartsFromStreamingParts(streamingParts) : [];
 
   return (
     <div
@@ -156,11 +164,10 @@ export function DefaultMessage({
       )}
       {message.role === 'assistant' ? (
         <>
-          {streaming && streamingReasoning && (
+          {streaming && streamingReasoningParts.length > 0 && (
             <Reasoning
-              reasoningParts={[]}
+              reasoningParts={streamingReasoningParts}
               isStreaming={true}
-              streamingText={streamingReasoning}
               theme={theme}
               strings={strings}
             />
@@ -175,7 +182,7 @@ export function DefaultMessage({
           {streaming && !text ? (
             <span className="dots" style={{ opacity: 0.6 }}>...</span>
           ) : (
-            <MarkdownContent content={getTextFromContent(message.content)} />
+            <MarkdownContent content={text} />
           )}
         </>
       ) : (

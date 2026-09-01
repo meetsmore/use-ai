@@ -11,8 +11,7 @@ function createContextValue(overrides: Partial<ChatUIContextValue> = {}): ChatUI
     loading: false,
     sendMessage: mock(async () => {}),
     messages: [],
-    streamingText: '',
-    streamingReasoning: '',
+    streamingParts: [],
     streamingMessageId: null,
     suggestions: [],
     fileUploadConfig: undefined,
@@ -73,10 +72,10 @@ describe('UseAIChat', () => {
     expect(queryByTestId('provider-header')).toBeNull();
   });
 
-  test('passes streaming reasoning through to UseAIChatPanel', () => {
+  test('passes the streaming parts through to UseAIChatPanel', () => {
     const ctx = createContextValue({
       loading: true,
-      streamingReasoning: 'First thought...',
+      streamingParts: [{ kind: 'reasoning', text: 'First thought...' }],
     });
 
     const { getByTestId, getByText } = render(
@@ -95,7 +94,7 @@ describe('UseAIChat', () => {
   test('renders the streaming answer under the id it will be persisted with', () => {
     const ctx = createContextValue({
       loading: true,
-      streamingText: 'partial answer',
+      streamingParts: [{ kind: 'text', text: 'partial answer' }],
       streamingMessageId: 'msg-assistant',
     });
 
@@ -116,7 +115,7 @@ describe('UseAIChat', () => {
     };
     rerender(
       <__UseAIChatContext.Provider
-        value={createContextValue({ messages: [persisted], streamingText: '', streamingMessageId: null })}
+        value={createContextValue({ messages: [persisted], streamingParts: [], streamingMessageId: null })}
       >
         <UseAIChat />
       </__UseAIChatContext.Provider>
