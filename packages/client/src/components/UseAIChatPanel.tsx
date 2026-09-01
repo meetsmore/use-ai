@@ -1,23 +1,30 @@
 import React, { useState, useRef, useEffect } from 'react';
-import type { Chat, PersistedMessage, PersistedMessageContent, PersistedContentPart, MessageDisplayMode } from '../providers/chatRepository/types';
-import { getTextFromContent, getDisplayTextFromContent } from '../utils/messageContent';
-import { mergeAssistantMessagesForDisplay } from '../utils/mergeAssistantMessages';
-import { shouldSubmitOnEnter, type SubmitMode } from '../utils/keyboard';
-import type { AgentInfo, FeedbackValue, ToolAnnotations, EnabledFeatures } from '../types';
+import type { Chat, PersistedMessage } from '../providers/chatRepository/types';
+import { getDisplayTextFromContent } from '../utils/messageContent';
+import { mergeAssistantMessagesForDisplay, type MergedMessage } from '../utils/mergeAssistantMessages';
+import type { SubmitMode } from '../utils/keyboard';
+import type { AgentInfo, FeedbackValue, EnabledFeatures } from '../types';
 import { DEFAULT_ENABLED_FEATURES } from '../types';
 import type { FileAttachment, FileUploadConfig, FileProcessingState } from '../fileUpload/types';
-import { MarkdownContent } from './MarkdownContent';
-import { FileChip, FilePlaceholder } from './FileChip';
 import type { SavedCommand } from '../commands/types';
 import { useSlashCommands } from '../hooks/useSlashCommands';
 import { useFileUpload } from '../hooks/useFileUpload';
-import { useDropdownState } from '../hooks/useDropdownState';
-import { useTheme, useStrings } from '../theme';
+import { useStrings, useTheme } from '../theme';
 import type { UseAIStrings, UseAITheme } from '../theme';
-import { ToolApprovalDialog } from './ToolApprovalDialog';
-import { Reasoning } from './Reasoning';
-
-import type { ReasoningPart } from '../types';
+import type { ChatStreamingPart, ExecutingToolDisplay } from '../hooks/useServerEvents';
+import {
+  Slot,
+  DefaultHeader,
+  DefaultEmptyState,
+  DefaultMessage,
+  DefaultPendingIndicator,
+  DefaultComposer,
+  DefaultToolApproval,
+  DefaultDisclaimer,
+  type ChatSaveAsCommand,
+  type ChatToolApproval,
+  type UseAIChatComponentOverrides,
+} from './chatSlots';
 
 // Re-export types for backwards compatibility
 export type UseAIChatPanelStrings = UseAIStrings;
@@ -29,121 +36,14 @@ export type UseAIChatPanelTheme = UseAITheme;
 type Message = PersistedMessage;
 
 /**
- * Props for the FeedbackButton component.
- */
-interface FeedbackButtonProps {
-  /** The type of feedback this button represents */
-  type: 'upvote' | 'downvote';
-  /** Whether this feedback type is currently selected */
-  isSelected: boolean;
-  /** Callback when clicked */
-  onClick: () => void;
-  /** Color when selected */
-  selectedColor: string;
-  /** Color when not selected */
-  unselectedColor: string;
-}
-
-/**
- * Thumbs up/down feedback button with pop animation.
- */
-function FeedbackButton({ type, isSelected, onClick, selectedColor, unselectedColor }: FeedbackButtonProps) {
-  const buttonRef = useRef<HTMLButtonElement>(null);
-
-  const handleClick = () => {
-    // Pop animation only on select, not de-select
-    if (!isSelected && buttonRef.current) {
-      buttonRef.current.style.transform = 'scale(1.3)';
-      setTimeout(() => {
-        if (buttonRef.current) {
-          buttonRef.current.style.transform = 'scale(1)';
-        }
-      }, 150);
-    }
-    onClick();
-  };
-
-  const thumbsUpPath = "M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3";
-  const thumbsDownPath = "M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17";
-
-  return (
-    <button
-      ref={buttonRef}
-      data-testid={`feedback-${type}`}
-      onClick={handleClick}
-      title={type === 'upvote' ? 'Good response' : 'Poor response'}
-      style={{
-        background: 'transparent',
-        border: 'none',
-        padding: '4px',
-        cursor: 'pointer',
-        color: isSelected ? selectedColor : unselectedColor,
-        opacity: isSelected ? 1 : 0.5,
-        transition: 'all 0.15s',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderRadius: '4px',
-        transform: 'scale(1)',
-      }}
-      onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
-        if (!isSelected) {
-          e.currentTarget.style.opacity = '0.8';
-          e.currentTarget.style.color = selectedColor;
-        }
-      }}
-      onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
-        if (!isSelected) {
-          e.currentTarget.style.opacity = '0.5';
-          e.currentTarget.style.color = unselectedColor;
-        }
-      }}
-    >
-      <svg
-        width="14"
-        height="14"
-        viewBox="0 0 24 24"
-        fill={isSelected ? 'currentColor' : 'none'}
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d={type === 'upvote' ? thumbsUpPath : thumbsDownPath} />
-      </svg>
-    </button>
-  );
-}
-
-/**
- * Helper that checks whether `content` includes a file attachment. Covers both
- * the metadata-only `file` and the ref-based `attachment_ref`; both are rendered as
- * a name/size FilePlaceholder.
- */
-function hasFileContent(content: PersistedMessageContent): content is PersistedContentPart[] {
-  return (
-    Array.isArray(content) &&
-    content.some(part => part.type === 'file' || part.type === 'attachment_ref')
-  );
-}
-
-/** Extracts name + size from a file-bearing persisted part for the FilePlaceholder shown on reload. */
-function fileChipInfo(part: PersistedContentPart): { name: string; size: number } | null {
-  if (part.type === 'file') {
-    return { name: part.file.name, size: part.file.size };
-  }
-  if (part.type === 'attachment_ref') {
-    return { name: part.name, size: part.size };
-  }
-  return null;
-}
-
-/**
  * A message as shown in the panel. `streaming` marks the provisional entry
  * for the answer that is still arriving; it has no timestamp, feedback
  * buttons or persisted reasoning parts yet.
  */
-type DisplayMessage = PersistedMessage & { streaming?: boolean };
+type DisplayMessage = MergedMessage & { streaming?: boolean };
+
+/** Stable identity so an omitted `streamingParts` does not re-render the slot. */
+const EMPTY_STREAMING_PARTS: ChatStreamingPart[] = [];
 
 /** Key for the provisional streaming message when no persisted id is known. */
 const PROVISIONAL_MESSAGE_ID = 'streaming-answer';
@@ -169,6 +69,11 @@ export interface UseAIChatPanelProps {
   streamingText?: string;
   /** Currently streaming reasoning text from extended thinking */
   streamingReasoning?: string;
+  /**
+   * The in-flight answer split into ordered parts. Handed to the `Message`
+   * slot; the built-in bubble renders `streamingText`/`streamingReasoning`.
+   */
+  streamingParts?: ChatStreamingPart[];
   /**
    * Id the streaming answer will be persisted under. While set, the streaming
    * answer renders as a provisional message with this id, so when the persisted
@@ -207,18 +112,13 @@ export interface UseAIChatPanelProps {
   /** Optional close button to render in header (for floating mode) */
   closeButton?: React.ReactNode;
   /** Currently executing tool info for status display */
-  executingTool?: { displayText: string } | null;
+  executingTool?: ExecutingToolDisplay | null;
   /** Whether feedback buttons are enabled (requires Langfuse on server) */
   feedbackEnabled?: boolean;
   /** Callback when user submits feedback on a message */
   onFeedback?: (messageId: string, traceId: string, feedback: FeedbackValue) => void;
   /** Pending tool approvals awaiting user confirmation */
-  pendingApprovals?: Array<{
-    toolCallId: string;
-    toolCallName: string;
-    toolCallArgs: Record<string, unknown>;
-    annotations?: ToolAnnotations;
-  }>;
+  pendingApprovals?: ChatToolApproval[];
   /** Callback to approve all pending tool calls */
   onApproveToolCall?: () => void;
   /** Callback to reject all pending tool calls */
@@ -237,6 +137,8 @@ export interface UseAIChatPanelProps {
    * @default 'enter'
    */
   submitMode?: SubmitMode;
+  /** Replace individual regions while retaining the built-in behavior by default. */
+  components?: UseAIChatComponentOverrides;
 }
 
 /**
@@ -251,6 +153,7 @@ export function UseAIChatPanel({
   connected,
   streamingText = '',
   streamingReasoning = '',
+  streamingParts = EMPTY_STREAMING_PARTS,
   streamingMessageId = null,
   currentChatId,
   onNewChat,
@@ -278,6 +181,7 @@ export function UseAIChatPanel({
   onApproveToolCall,
   onRejectToolCall,
   submitMode = 'enter',
+  components,
 }: UseAIChatPanelProps) {
   const strings = useStrings();
   const theme = useTheme();
@@ -292,6 +196,7 @@ export function UseAIChatPanel({
   // This preserves per-step data structure (for LLM context) while showing
   // a unified bubble to the user.
   const displayMessages = mergeAssistantMessagesForDisplay(messages);
+  const showInputDisclaimer = !!features.inputDisclaimer && displayMessages.length > 0;
 
   // The streaming answer is shown as a provisional assistant message under the
   // id it will be persisted with. When the persisted message arrives it takes
@@ -307,6 +212,7 @@ export function UseAIChatPanel({
           role: 'assistant',
           content: streamingText,
           createdAt: PROVISIONAL_CREATED_AT,
+          sourceMessages: [],
           streaming: true,
         }
       : null;
@@ -315,15 +221,8 @@ export function UseAIChatPanel({
     : displayMessages;
 
   const [input, setInput] = useState('');
-  const chatHistoryDropdown = useDropdownState();
-  const agentDropdown = useDropdownState();
-  const [chatHistory, setChatHistory] = useState<Array<Omit<Chat, 'messages'>>>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [displayedSuggestions, setDisplayedSuggestions] = useState<string[]>([]);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  // Message hover state for save button
-  const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
 
   // File upload hook - includes processing state for transformation progress
   const {
@@ -359,21 +258,6 @@ export function UseAIChatPanel({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const maxTextareaHeight = 160;
-
-  // Auto-resize textarea based on content
-  useEffect(() => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
-
-    // Reset to single row to measure actual content height
-    textarea.style.height = 'auto';
-
-    // Calculate new height based on scrollHeight (clamped to max)
-    const newHeight = Math.min(textarea.scrollHeight, maxTextareaHeight);
-    textarea.style.height = `${newHeight}px`;
-  }, [input]);
-
   // Randomly select up to 4 suggestions when messages become empty
   useEffect(() => {
     if (!suggestions || suggestions.length === 0) {
@@ -397,46 +281,40 @@ export function UseAIChatPanel({
     slashCommands.closeAutocomplete();
   };
 
-  // Handle input change with slash command detection
-  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const value = e.target.value;
+  const handleInputValueChange = (value: string) => {
     setInput(value);
     slashCommands.handleInputChange(value);
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    // Let slash commands hook handle keyboard navigation
-    if (slashCommands.handleKeyDown(e)) {
-      return;
-    }
+  /**
+   * The save-as-slash-command affordance for a user message, or undefined when
+   * the feature is off, the host takes no commands, or the message is not one
+   * the user wrote.
+   */
+  const saveAsCommandFor = (message: DisplayMessage): ChatSaveAsCommand | undefined => {
+    if (message.role !== 'user' || !slashCommandsEnabled || !onSaveCommand) return undefined;
+    const text = getDisplayTextFromContent(message.content);
 
-    if (shouldSubmitOnEnter(e, submitMode)) {
-      e.preventDefault();
-      handleSend();
-    }
+    return {
+      isEditing: slashCommands.isSavingCommand(message.id),
+      start: () => slashCommands.startSavingCommand(message.id, text),
+      save: (name: string) => onSaveCommand(name, text),
+      editor: slashCommands.renderInlineSaveUI({ messageId: message.id, messageText: text }),
+    };
   };
 
-  const handleNewChat = async () => {
-    if (onNewChat) {
-      await onNewChat();
-    }
-  };
-
-  const handleDeleteChat = async () => {
-    if (onDeleteChat && currentChatId && confirm(strings.header.deleteConfirm)) {
-      await onDeleteChat(currentChatId);
-      if (onNewChat) {
-        await onNewChat();
-      }
-    }
-  };
-
-  const handleLoadChat = async (chatId: string) => {
-    if (onLoadChat) {
-      await onLoadChat(chatId);
-      chatHistoryDropdown.close();
-    }
-  };
+  const composerPlaceholder = !connected
+    ? strings.input.connectingPlaceholder
+    : loading
+      ? `${executingTool?.displayText ?? strings.input.thinking}...`
+      : strings.input.placeholder;
+  const canSend = !!(
+    connected &&
+    !loading &&
+    pendingApprovals.length === 0 &&
+    (input.trim() || attachments.length > 0)
+  );
+  const canAbort = loading && !!onAbort;
 
   return (
     <div
@@ -459,374 +337,24 @@ export function UseAIChatPanel({
       {DropZoneOverlay}
 
       {/* Header */}
-      <div
-        style={{
-          padding: '12px 16px',
-          borderBottom: `1px solid ${theme.borderColor}`,
-          background: theme.backgroundColor,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: '12px',
+      <Slot
+        component={components?.Header}
+        fallback={DefaultHeader}
+        props={{
+          connected,
+          messages: displayMessages,
+          currentChatId: currentChatId ?? null,
+          availableAgents: availableAgents ?? [],
+          defaultAgent: defaultAgent ?? null,
+          selectedAgent: selectedAgent ?? null,
+          closeButton,
+          onNewChat,
+          onDeleteChat,
+          onListChats,
+          onLoadChat,
+          onAgentChange,
         }}
-      >
-        {/* Left side: Chat dropdown */}
-        <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
-          {onListChats ? (
-            <button
-              data-testid="chat-history-dropdown-button"
-              onClick={async () => {
-                const chats = await onListChats();
-                setChatHistory(chats);
-                chatHistoryDropdown.toggle();
-              }}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                padding: '6px 8px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                fontSize: '14px',
-                fontWeight: '600',
-                color: theme.textColor,
-                borderRadius: '6px',
-                transition: 'background 0.2s',
-                width: '100%',
-                textAlign: 'left',
-                overflow: 'hidden',
-              }}
-              onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
-                e.currentTarget.style.background = theme.hoverBackground;
-              }}
-              onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
-                e.currentTarget.style.background = 'transparent';
-              }}
-            >
-              <span style={{
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-                flex: 1,
-                minWidth: 0,
-              }}>
-                {/* Get current chat title */}
-                {(() => {
-                  if (displayMessages.length > 0) {
-                    const firstUserMsg = displayMessages.find((m) => m.role === 'user');
-                    if (firstUserMsg) {
-                      const textContent = getDisplayTextFromContent(firstUserMsg.content);
-                      const maxLength = 30;
-                      return textContent.length > maxLength
-                        ? textContent.substring(0, maxLength) + '...'
-                        : textContent || strings.header.newChat;
-                    }
-                  }
-                  return strings.header.newChat;
-                })()}
-              </span>
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0 }}>
-                <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </button>
-          ) : (
-            <div style={{ fontSize: '14px', fontWeight: '600', color: theme.textColor, padding: '6px 8px' }}>
-              {strings.header.aiAssistant}
-            </div>
-          )}
-        </div>
-
-        {/* Right side: Actions */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-          {/* Model selector */}
-          {availableAgents && availableAgents.length > 1 && onAgentChange && (
-            <div style={{ position: 'relative' }}>
-              <button
-                data-testid="agent-selector"
-                onClick={agentDropdown.toggle}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  padding: '6px 8px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  fontSize: '13px',
-                  fontWeight: '500',
-                  color: theme.secondaryTextColor,
-                  borderRadius: '6px',
-                  transition: 'all 0.2s',
-                }}
-                onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
-                  e.currentTarget.style.background = theme.hoverBackground;
-                  e.currentTarget.style.color = theme.textColor;
-                }}
-                onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
-                  e.currentTarget.style.background = 'transparent';
-                  e.currentTarget.style.color = theme.secondaryTextColor;
-                }}
-                title="Select AI model"
-              >
-                <span style={{
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                  maxWidth: '120px',
-                }}>
-                  {(() => {
-                    const agent = availableAgents.find((a: AgentInfo) => a.id === (selectedAgent ?? defaultAgent));
-                    return agent?.name || 'AI';
-                  })()}
-                </span>
-                <svg width="10" height="10" viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0 }}>
-                  <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </button>
-
-              {/* Agent Selector Dropdown */}
-              {agentDropdown.isOpen && (
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: '100%',
-                    left: '50%',
-                    transform: 'translateX(-50%)',
-                    marginTop: '4px',
-                    minWidth: '180px',
-                    maxWidth: '280px',
-                    background: theme.backgroundColor,
-                    borderRadius: '8px',
-                    boxShadow: '0 4px 16px rgba(0, 0, 0, 0.15)',
-                    zIndex: 1003,
-                    overflow: 'hidden',
-                    padding: '4px',
-                  }}
-                >
-                  {availableAgents.map((agent: AgentInfo) => {
-                    const isSelected = agent.id === (selectedAgent ?? defaultAgent);
-                    return (
-                      <div
-                        key={agent.id}
-                        data-testid="agent-option"
-                        onClick={() => {
-                          onAgentChange(agent.id === defaultAgent ? null : agent.id);
-                          agentDropdown.close();
-                        }}
-                        style={{
-                          padding: '8px 12px',
-                          background: isSelected ? theme.activeBackground : 'transparent',
-                          borderRadius: '6px',
-                          cursor: 'pointer',
-                          transition: 'background 0.15s',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: '8px',
-                        }}
-                        onMouseEnter={(e: React.MouseEvent<HTMLDivElement>) => {
-                          if (!isSelected) {
-                            e.currentTarget.style.background = theme.hoverBackground;
-                          }
-                        }}
-                        onMouseLeave={(e: React.MouseEvent<HTMLDivElement>) => {
-                          if (!isSelected) {
-                            e.currentTarget.style.background = 'transparent';
-                          }
-                        }}
-                      >
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{
-                            fontSize: '13px',
-                            fontWeight: isSelected ? '600' : '500',
-                            color: isSelected ? theme.primaryColor : theme.textColor,
-                          }}>
-                            {agent.name}
-                          </div>
-                          {agent.annotation && (
-                            <div style={{
-                              fontSize: '11px',
-                              color: theme.secondaryTextColor,
-                              marginTop: '2px',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                            }}>
-                              {agent.annotation}
-                            </div>
-                          )}
-                        </div>
-                        {isSelected && (
-                          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ flexShrink: 0 }}>
-                            <path d="M2 7L5.5 10.5L12 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                          </svg>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* New Chat button */}
-          {onNewChat && (
-            <button
-              data-testid="new-chat-button"
-              onClick={handleNewChat}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                borderRadius: '6px',
-                padding: '6px 8px',
-                color: theme.secondaryTextColor,
-                fontSize: '13px',
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-              }}
-              onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
-                e.currentTarget.style.background = theme.hoverBackground;
-                e.currentTarget.style.color = theme.textColor;
-              }}
-              onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
-                e.currentTarget.style.background = 'transparent';
-                e.currentTarget.style.color = theme.secondaryTextColor;
-              }}
-              title={strings.header.newChat}
-            >
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <path d="M8 3.5V12.5M3.5 8H12.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-              </svg>
-            </button>
-          )}
-
-          {/* Delete button */}
-          {onDeleteChat && displayMessages.length > 0 && (
-            <button
-              data-testid="delete-chat-button"
-              onClick={handleDeleteChat}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                borderRadius: '6px',
-                padding: '6px 8px',
-                color: theme.secondaryTextColor,
-                fontSize: '13px',
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-              }}
-              onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
-                e.currentTarget.style.background = theme.hoverBackground;
-                e.currentTarget.style.color = theme.textColor;
-              }}
-              onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
-                e.currentTarget.style.background = 'transparent';
-                e.currentTarget.style.color = theme.secondaryTextColor;
-              }}
-              title={strings.header.deleteChat}
-            >
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <path d="M2 4H14M6.5 7V11M9.5 7V11M3 4L4 13C4 13.5304 4.21071 14.0391 4.58579 14.4142C4.96086 14.7893 5.46957 15 6 15H10C10.5304 15 11.0391 14.7893 11.4142 14.4142C11.7893 14.0391 12 13.5304 12 13L13 4M5.5 4V2.5C5.5 2.23478 5.60536 1.98043 5.79289 1.79289C5.98043 1.60536 6.23478 1.5 6.5 1.5H9.5C9.76522 1.5 10.0196 1.60536 10.2071 1.79289C10.3946 1.98043 10.5 2.23478 10.5 2.5V4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </button>
-          )}
-
-          {/* Optional close button (passed in for floating mode) */}
-          {closeButton}
-        </div>
-      </div>
-
-      {/* Chat History Dropdown */}
-      {chatHistoryDropdown.isOpen && onListChats && (
-        <div
-          style={{
-            position: 'absolute',
-            top: '60px',
-            left: '16px',
-            width: '320px',
-            maxHeight: '400px',
-            background: theme.backgroundColor,
-            borderRadius: '8px',
-            boxShadow: theme.panelShadow,
-            zIndex: 1003,
-            display: 'flex',
-            flexDirection: 'column',
-            overflow: 'hidden',
-          }}
-        >
-          {/* Chat List */}
-          <div
-            style={{
-              flex: 1,
-              overflowY: 'auto',
-              padding: '8px',
-            }}
-          >
-            {chatHistory.length === 0 ? (
-              <div
-                style={{
-                  textAlign: 'center',
-                  color: theme.secondaryTextColor,
-                  padding: '32px 16px',
-                  fontSize: '13px',
-                }}
-              >
-                <p style={{ margin: 0 }}>{strings.chatHistory.noChatHistory}</p>
-              </div>
-            ) : (
-              chatHistory.map((chat) => (
-                <div
-                  key={chat.id}
-                  data-testid="chat-history-item"
-                  onClick={() => handleLoadChat(chat.id)}
-                  style={{
-                    padding: '10px 12px',
-                    marginBottom: '4px',
-                    background: currentChatId === chat.id ? theme.activeBackground : 'transparent',
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    transition: 'background 0.15s',
-                  }}
-                  onMouseEnter={(e: React.MouseEvent<HTMLDivElement>) => {
-                    if (currentChatId !== chat.id) {
-                      e.currentTarget.style.background = theme.hoverBackground;
-                    }
-                  }}
-                  onMouseLeave={(e: React.MouseEvent<HTMLDivElement>) => {
-                    if (currentChatId !== chat.id) {
-                      e.currentTarget.style.background = 'transparent';
-                    }
-                  }}
-                >
-                  <div style={{ fontSize: '13px', fontWeight: '500', color: theme.textColor, marginBottom: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {chat.title || strings.header.newChat}
-                  </div>
-                  <div style={{ fontSize: '11px', color: theme.secondaryTextColor }}>
-                    {new Date(chat.updatedAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}
-                    {currentChatId === chat.id && (
-                      <span style={{
-                        marginLeft: '8px',
-                        color: theme.primaryColor,
-                        fontWeight: '600',
-                      }}>
-                        • {strings.chatHistory.active}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Backdrops to close dropdowns */}
-      {chatHistoryDropdown.Backdrop}
-      {agentDropdown.Backdrop}
+      />
 
       {/* Messages */}
       <div
@@ -840,622 +368,119 @@ export function UseAIChatPanel({
         }}
       >
         {displayMessages.length === 0 && (
-          <div
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              padding: '40px 20px',
-              gap: '20px',
+          <Slot
+            component={components?.EmptyState}
+            fallback={DefaultEmptyState}
+            props={{
+              suggestions: displayedSuggestions,
+              connected,
+              loading,
+              onSelectSuggestion: (suggestion) => {
+                if (connected && !loading) onSendMessage(suggestion);
+              },
             }}
-          >
-            <div style={{ textAlign: 'center', color: theme.secondaryTextColor, fontSize: '14px' }}>
-              <p style={{ margin: 0, fontSize: '32px', marginBottom: '12px' }}>💬</p>
-              <p style={{ margin: 0 }}>{strings.emptyChat.startConversation}</p>
-              <p style={{ margin: '8px 0 0', fontSize: '12px' }}>
-                {strings.emptyChat.askMeToHelp}
-              </p>
-            </div>
-
-            {/* Suggestions */}
-            {displayedSuggestions.length > 0 && (
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr',
-                  gap: '8px',
-                  width: '100%',
-                  maxWidth: '320px',
-                }}
-              >
-                {displayedSuggestions.map((suggestion, index) => (
-                  <button
-                    key={index}
-                    data-testid="chat-suggestion-button"
-                    onClick={() => {
-                      if (connected && !loading) {
-                        onSendMessage(suggestion);
-                      }
-                    }}
-                    disabled={!connected || loading}
-                    style={{
-                      padding: '10px 14px',
-                      background: theme.backgroundColor,
-                      border: `1px solid ${theme.borderColor}`,
-                      borderRadius: '8px',
-                      fontSize: '13px',
-                      color: theme.textColor,
-                      cursor: connected && !loading ? 'pointer' : 'not-allowed',
-                      textAlign: 'left',
-                      transition: 'all 0.2s',
-                      lineHeight: '1.4',
-                      opacity: connected && !loading ? 1 : 0.5,
-                    }}
-                    onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
-                      if (connected && !loading) {
-                        e.currentTarget.style.background = theme.hoverBackground;
-                        e.currentTarget.style.transform = 'translateY(-1px)';
-                        e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.08)';
-                      }
-                    }}
-                    onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
-                      e.currentTarget.style.background = theme.backgroundColor;
-                      e.currentTarget.style.transform = 'translateY(0)';
-                      e.currentTarget.style.boxShadow = 'none';
-                    }}
-                  >
-                    {suggestion}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+          />
         )}
 
-        {renderedMessages.map((message) => {
-          // Info notices (e.g. the abort "generation stopped" bubble) are
-          // display-only system messages. Render a compact, centered pill —
-          // no reasoning dropdown, markdown, feedback, or hover affordances.
-          if (message.displayMode === 'info') {
-            return (
-              <div
-                key={message.id}
-                data-testid="chat-message-info"
-                className="chat-message chat-message-info"
-                style={{ display: 'flex', justifyContent: 'center', padding: '2px 0' }}
-              >
-                <div
-                  style={{
-                    maxWidth: '80%',
-                    padding: '6px 12px',
-                    borderRadius: '12px',
-                    background: theme.assistantMessageBackground,
-                    color: theme.secondaryTextColor,
-                    fontSize: '12px',
-                    lineHeight: '1.4',
-                    textAlign: 'center',
-                    wordWrap: 'break-word',
-                  }}
-                >
-                  {getDisplayTextFromContent(message.content)}
-                </div>
-              </div>
-            );
-          }
-
-          // The provisional bubble is deliberately kept out of
-          // `chat-message-assistant` and `chat-message-content`: the E2E suites
-          // wait on those test ids to mean "the answer is done", and a bubble
-          // that appears with the first token would satisfy that wait
-          // mid-stream. Only the attributes change when the answer is
-          // persisted, so the elements themselves, and any selection inside
-          // them, are untouched.
-          const messageTestId = message.streaming
-            ? 'chat-message-assistant-streaming'
-            : `chat-message-${message.role}`;
-          const contentTestId = message.streaming
-            ? 'chat-message-content-streaming'
-            : 'chat-message-content';
-
-          return (
-          <div
+        {renderedMessages.map((message, index) => (
+          <Slot
             key={message.id}
-            data-testid={messageTestId}
-            className={`chat-message chat-message-${message.role}`}
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: message.role === 'user' ? 'flex-end' : 'flex-start',
+            component={components?.Message}
+            fallback={DefaultMessage}
+            props={{
+              message,
+              index,
+              isLast: index === renderedMessages.length - 1,
+              sourceMessages: message.sourceMessages,
+              streaming: !!message.streaming,
+              streamingReasoning: message.streaming ? streamingReasoning : '',
+              streamingParts: message.streaming ? streamingParts : EMPTY_STREAMING_PARTS,
+              feedbackEnabled: !!feedbackEnabled,
+              onFeedback,
+              saveAsCommand: saveAsCommandFor(message),
             }}
-            onMouseEnter={() => message.role === 'user' && setHoveredMessageId(message.id)}
-            onMouseLeave={() => setHoveredMessageId(null)}
-          >
-            <div
-              style={{
-                position: 'relative',
-                maxWidth: '80%',
-              }}
-            >
-              {/* Save as command button - appears on hover for user messages */}
-              {message.role === 'user' && slashCommandsEnabled && hoveredMessageId === message.id && onSaveCommand && !slashCommands.isSavingCommand(message.id) && (
-                <button
-                  data-testid="save-command-button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    const messageText = getDisplayTextFromContent(message.content);
-                    slashCommands.startSavingCommand(message.id, messageText);
-                  }}
-                  title="Save as slash command"
-                  style={{
-                    position: 'absolute',
-                    top: '-8px',
-                    right: '-8px',
-                    width: '24px',
-                    height: '24px',
-                    borderRadius: '50%',
-                    border: 'none',
-                    background: theme.backgroundColor,
-                    boxShadow: '0 2px 6px rgba(0, 0, 0, 0.15)',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: theme.primaryColor,
-                    transition: 'all 0.15s',
-                    zIndex: 10,
-                  }}
-                  onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
-                    e.currentTarget.style.transform = 'scale(1.1)';
-                    e.currentTarget.style.boxShadow = '0 3px 8px rgba(0, 0, 0, 0.2)';
-                  }}
-                  onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
-                    e.currentTarget.style.transform = 'scale(1)';
-                    e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.15)';
-                  }}
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
-                    <polyline points="17 21 17 13 7 13 7 21" />
-                    <polyline points="7 3 7 8 15 8" />
-                  </svg>
-                </button>
-              )}
-              <div
-                data-testid={contentTestId}
-                className={`chat-message-content${message.role === 'assistant' ? ' markdown-content' : ''}`}
-                style={{
-                  padding: '10px 14px',
-                  borderRadius: slashCommands.isSavingCommand(message.id)
-                    ? '12px 12px 0 0'
-                    : '12px',
-                  background: message.displayMode === 'error'
-                    ? theme.errorBackground
-                    : message.role === 'user'
-                    ? theme.primaryGradient
-                    : theme.assistantMessageBackground,
-                  color: message.displayMode === 'error'
-                    ? theme.errorTextColor
-                    : message.role === 'user' ? 'white' : theme.textColor,
-                  fontSize: '14px',
-                  lineHeight: '1.5',
-                  wordWrap: 'break-word',
-                }}
-              >
-              {/* Render file placeholders for user messages with files */}
-              {message.role === 'user' && hasFileContent(message.content) && (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px' }}>
-                  {message.content.flatMap((part: PersistedContentPart, idx: number) => {
-                    const info = fileChipInfo(part);
-                    return info
-                      ? [<FilePlaceholder key={idx} name={info.name} size={info.size} />]
-                      : [];
-                  })}
-                </div>
-              )}
-              {message.role === 'assistant' ? (
-                <>
-                  {message.streaming && streamingReasoning && (
-                    <Reasoning
-                      reasoningParts={[]}
-                      isStreaming={true}
-                      streamingText={streamingReasoning}
-                      theme={theme}
-                      strings={strings}
-                    />
-                  )}
-                  {!message.streaming && message.reasoningParts && message.reasoningParts.length > 0 && (
-                    <Reasoning
-                      reasoningParts={message.reasoningParts}
-                      theme={theme}
-                      strings={strings}
-                    />
-                  )}
-                  {message.streaming && !streamingText ? (
-                    <span className="dots" style={{ opacity: 0.6 }}>...</span>
-                  ) : (
-                    <MarkdownContent content={getTextFromContent(message.content)} />
-                  )}
-                </>
-              ) : (
-                // User/tool bubbles: display-only text so transformed_file
-                // (e.g. OCR body) isn't dumped into the chat bubble.
-                getDisplayTextFromContent(message.content)
-              )}
-              </div>
-              {/* Inline save command UI - glued to chat bubble */}
-              {slashCommands.renderInlineSaveUI({
-                messageId: message.id,
-                messageText: getDisplayTextFromContent(message.content),
-              })}
-            </div>
-            {/* Feedback buttons - only for assistant messages with traceId */}
-            {message.role === 'assistant' && !message.streaming && message.traceId && feedbackEnabled && onFeedback && (
-              <div
-                data-testid="feedback-buttons"
-                style={{
-                  display: 'flex',
-                  gap: '4px',
-                  marginTop: '4px',
-                  padding: '0 4px',
-                }}
-              >
-                <FeedbackButton
-                  type="upvote"
-                  isSelected={message.feedback === 'upvote'}
-                  onClick={() => {
-                    const newFeedback = message.feedback === 'upvote' ? null : 'upvote';
-                    onFeedback(message.id, message.traceId!, newFeedback);
-                  }}
-                  selectedColor={theme.primaryColor}
-                  unselectedColor={theme.secondaryTextColor}
-                />
-                <FeedbackButton
-                  type="downvote"
-                  isSelected={message.feedback === 'downvote'}
-                  onClick={() => {
-                    const newFeedback = message.feedback === 'downvote' ? null : 'downvote';
-                    onFeedback(message.id, message.traceId!, newFeedback);
-                  }}
-                  selectedColor={theme.errorTextColor}
-                  unselectedColor={theme.secondaryTextColor}
-                />
-              </div>
-            )}
-            {!message.streaming && (
-              <div
-                data-testid="message-timestamp"
-                style={{
-                  fontSize: '11px',
-                  color: theme.secondaryTextColor,
-                  marginTop: '4px',
-                  padding: '0 4px',
-                }}
-              >
-                {message.createdAt.toLocaleTimeString([], {
-                  hour: '2-digit',
-                  minute: '2-digit'
-                })}
-              </div>
-            )}
-          </div>
-          );
-        })}
+          />
+        ))}
 
         {loading && !provisionalMessage && (
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'flex-start',
+          <Slot
+            component={components?.PendingIndicator}
+            fallback={DefaultPendingIndicator}
+            props={{
+              executingTool: executingTool ?? null,
+              fileProcessing: fileProcessing ?? null,
             }}
-          >
-            <div
-              className="markdown-content"
-              style={{
-                padding: '10px 14px',
-                borderRadius: '12px',
-                background: theme.assistantMessageBackground,
-                fontSize: '14px',
-                lineHeight: '1.5',
-                color: theme.textColor,
-                maxWidth: '80%',
-              }}
-            >
-              {fileProcessing && fileProcessing.status === 'processing' ? (
-                <div>
-                  <span style={{ opacity: 0.6 }}>{strings.input.processingFile}</span>
-                  {fileProcessing.progress != null && (
-                    <>
-                      <span style={{ opacity: 0.6, marginLeft: '4px' }}>
-                        {Math.round(fileProcessing.progress)}%
-                      </span>
-                      <div style={{
-                        marginTop: '6px',
-                        height: '4px',
-                        borderRadius: '2px',
-                        background: theme.borderColor,
-                        overflow: 'hidden',
-                      }}>
-                        <div style={{
-                          height: '100%',
-                          width: `${fileProcessing.progress}%`,
-                          borderRadius: '2px',
-                          background: theme.primaryColor,
-                          transition: 'width 0.3s ease',
-                        }} />
-                      </div>
-                    </>
-                  )}
-                  {fileProcessing.progress == null && (
-                    <span className="dots" style={{ marginLeft: '4px' }}>...</span>
-                  )}
-                </div>
-              ) : (
-                <span className="dots" style={{ opacity: 0.6 }}>...</span>
-              )}
-            </div>
-          </div>
+          />
         )}
 
         <div ref={messagesEndRef} />
       </div>
 
       {/* Input */}
-      <div
-        style={{
-          padding: '16px',
-          borderTop: `1px solid ${theme.borderColor}`,
-        }}
-      >
-        {/* File error message */}
-        {fileError && (
-          <div
-            data-testid="file-error"
-            style={{
-              marginBottom: '8px',
-              padding: '8px 12px',
-              background: theme.errorBackground,
-              color: theme.errorTextColor,
-              borderRadius: '6px',
-              fontSize: '13px',
-            }}
-          >
-            {fileError}
-          </div>
-        )}
+      {/* Hidden file input remains mounted even when Composer is replaced. */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        data-testid="file-input"
+        style={{ display: 'none' }}
+        onChange={handleFileInputChange}
+        accept={acceptedTypes?.join(',')}
+      />
 
-        {/* File chips */}
-        {attachments.length > 0 && (
-          <div
-            data-testid="file-attachments"
-            style={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              gap: '8px',
-              marginBottom: '8px',
-            }}
-          >
-            {attachments.map((attachment) => (
-              <FileChip
-                key={attachment.id}
-                attachment={attachment}
-                onRemove={() => removeAttachment(attachment.id)}
-                disabled={loading}
-                processingState={fileProcessingState.get(attachment.id)}
-              />
-            ))}
-          </div>
-        )}
-
-        {/* Hidden file input - always rendered */}
-        <input
-          ref={fileInputRef}
-          type="file"
-          multiple
-          data-testid="file-input"
-          style={{ display: 'none' }}
-          onChange={handleFileInputChange}
-          accept={acceptedTypes?.join(',')}
+      {/* Tool approval is independent from Composer so replacing the input UI
+          cannot accidentally remove the controls required to resume a run. */}
+      {pendingApprovals.length > 0 && onApproveToolCall && onRejectToolCall && (
+        <Slot
+          component={components?.ToolApproval}
+          fallback={DefaultToolApproval}
+          props={{
+            approvals: pendingApprovals,
+            onApprove: onApproveToolCall,
+            onReject: onRejectToolCall,
+          }}
         />
+      )}
 
-        {/* Tool approval dialog - replaces input when pending */}
-        {pendingApprovals.length > 0 && onApproveToolCall && onRejectToolCall ? (
-          <ToolApprovalDialog
-            toolCallName={pendingApprovals[0].toolCallName}
-            toolCallArgs={pendingApprovals[0].toolCallArgs}
-            annotations={pendingApprovals[0].annotations}
-            toolCount={pendingApprovals.length}
-            pendingTools={pendingApprovals}
-            onApprove={onApproveToolCall}
-            onReject={onRejectToolCall}
-            theme={theme}
-            strings={strings}
-          />
-        ) : (
-          /* Input container - single border around everything */
-          <div
-            style={{
-              border: `1px solid ${theme.borderColor}`,
-              borderRadius: '12px',
-              background: theme.backgroundColor,
-              overflow: 'hidden',
-              position: 'relative',
-            }}
-          >
-            {/* Command Autocomplete */}
-            {slashCommands.AutocompleteComponent}
+      <Slot
+        component={components?.Composer}
+        fallback={DefaultComposer}
+        props={{
+          input,
+          connected,
+          loading,
+          placeholder: composerPlaceholder,
+          canSend,
+          canAbort,
+          attachments,
+          fileUploadEnabled,
+          fileError,
+          pendingApprovals,
+          onInputChange: handleInputValueChange,
+          onSend: handleSend,
+          onAbort,
+          onOpenFilePicker: openFilePicker,
+          onRemoveAttachment: removeAttachment,
+          submitMode,
+          attachmentProcessing: fileProcessingState,
+          disclaimerVisible: showInputDisclaimer,
+          slashCommands: {
+            isOpen: slashCommands.isAutocompleteVisible,
+            onKeyDown: slashCommands.handleKeyDown,
+            list: slashCommands.AutocompleteComponent,
+          },
+        }}
+      />
 
-            {/* Textarea area */}
-            <textarea
-              ref={textareaRef}
-              data-testid="chat-input"
-              className="chat-input"
-              value={input}
-              onChange={handleInputChange}
-              onKeyDown={handleKeyDown}
-              placeholder={
-                !connected
-                  ? strings.input.connectingPlaceholder
-                  : loading
-                    ? `${executingTool?.displayText ?? strings.input.thinking}...`
-                    : strings.input.placeholder
-              }
-              disabled={!connected || loading || pendingApprovals.length > 0}
-              rows={1}
-              style={{
-                width: '100%',
-                padding: '10px 14px 6px',
-                border: 'none',
-                fontSize: '14px',
-                lineHeight: '1.4',
-                resize: 'none',
-                maxHeight: `${maxTextareaHeight}px`,
-                fontFamily: 'inherit',
-                outline: 'none',
-                background: 'transparent',
-                overflowY: 'auto',
-                boxSizing: 'border-box',
-              }}
-            />
-
-            {/* Bottom toolbar - fixed */}
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '4px 8px',
-              }}
-            >
-              {/* Left side - file picker */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                {fileUploadEnabled && (
-                  <button
-                    data-testid="file-picker-button"
-                    onClick={openFilePicker}
-                    disabled={!connected || loading || pendingApprovals.length > 0}
-                    style={{
-                      padding: '4px',
-                      background: 'transparent',
-                      border: `1px solid ${theme.borderColor}`,
-                      borderRadius: '50%',
-                      cursor: connected && !loading && pendingApprovals.length === 0 ? 'pointer' : 'not-allowed',
-                      color: theme.secondaryTextColor,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      width: '28px',
-                      height: '28px',
-                      transition: 'all 0.15s',
-                      opacity: connected && !loading && pendingApprovals.length === 0 ? 1 : 0.5,
-                    }}
-                    onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
-                      if (connected && !loading && pendingApprovals.length === 0) {
-                        e.currentTarget.style.color = theme.primaryColor;
-                        e.currentTarget.style.borderColor = theme.primaryColor;
-                      }
-                    }}
-                    onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
-                      e.currentTarget.style.color = theme.secondaryTextColor;
-                      e.currentTarget.style.borderColor = theme.borderColor;
-                    }}
-                    title={strings.fileUpload.attachFiles}
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="12" y1="5" x2="12" y2="19" />
-                      <line x1="5" y1="12" x2="19" y2="12" />
-                    </svg>
-                  </button>
-                )}
-              </div>
-
-              {/* Right side - send / stop button.
-                  While loading and a stop handler is wired up, swap in a stop
-                  button so the user can interrupt streaming. Disabled when a
-                  tool is currently executing — that branch can't be safely
-                  cancelled in Phase 1 because the tool's side effects have
-                  already run on the client. */}
-              {(() => {
-                const canAbort = loading && !!onAbort
-                const canSend = connected && !loading && pendingApprovals.length === 0 && (input.trim() || attachments.length > 0);
-                if (loading && onAbort) {
-                  return (
-                    <button
-                      data-testid="chat-stop-button"
-                      className="chat-stop-button"
-                      onClick={onAbort}
-                      disabled={!canAbort}
-                      title={canAbort ? 'Stop generating' : 'Cannot stop while a tool is running'}
-                      aria-label="Stop generating"
-                      style={{
-                        padding: '6px',
-                        background: canAbort ? theme.stopButtonBackground : theme.buttonDisabledBackground,
-                        color: theme.secondaryTextColor,
-                        border: 'none',
-                        borderRadius: '50%',
-                        cursor: canAbort ? 'pointer' : 'not-allowed',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        width: '32px',
-                        height: '32px',
-                        transition: 'all 0.2s',
-                      }}
-                    >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none">
-                        <rect x="6" y="6" width="12" height="12" rx="2" />
-                      </svg>
-                    </button>
-                  );
-                }
-                return (
-                  <button
-                    data-testid="chat-send-button"
-                    className="chat-send-button"
-                    onClick={handleSend}
-                    disabled={!canSend}
-                    style={{
-                      padding: '6px',
-                      background: canSend ? theme.primaryGradient : theme.buttonDisabledBackground,
-                      color: canSend ? 'white' : theme.secondaryTextColor,
-                      border: 'none',
-                      borderRadius: '50%',
-                      cursor: canSend ? 'pointer' : 'not-allowed',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      width: '32px',
-                      height: '32px',
-                      transition: 'all 0.2s',
-                    }}
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="12" y1="19" x2="12" y2="5" />
-                      <polyline points="5 12 12 5 19 12" />
-                    </svg>
-                  </button>
-                );
-              })()}
-            </div>
-          </div>
-        )}
-
-        {/* Accuracy disclaimer. Kept out of the empty chat so the first
-            impression stays clean; once the user has sent a message it stays
-            visible for the rest of the conversation. */}
-        {features.inputDisclaimer && displayMessages.length > 0 && (
-          <div
-            data-testid="chat-input-disclaimer"
-            style={{
-              marginTop: '8px',
-              fontSize: '12px',
-              lineHeight: 1.3,
-              color: theme.disclaimerTextColor,
-            }}
-          >
-            {strings.input.disclaimer}
-          </div>
-        )}
-      </div>
+      {/* Keep the disclaimer independent from Composer so a full input UI
+          replacement cannot accidentally remove configured safety copy. */}
+      {showInputDisclaimer && (
+        <Slot
+          component={components?.Disclaimer}
+          fallback={DefaultDisclaimer}
+          props={{ text: strings.input.disclaimer }}
+        />
+      )}
 
       <style>{`
         /* Markdown content styles */

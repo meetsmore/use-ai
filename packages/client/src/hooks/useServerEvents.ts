@@ -3,6 +3,7 @@ import type {
   AGUIEvent,
   ToolCallStartEvent,
   ToolCallEndEvent,
+  ToolCallArgsEvent,
   RunErrorEvent,
   RunFinishedEvent,
   TextMessageContentEvent,
@@ -35,7 +36,24 @@ export interface UseServerEventsOptions {
   strings: UseAIStrings;
 }
 
+/**
+ * One piece of the answer currently being produced, in the order the model
+ * emitted it. `streamingText` and `streamingReasoning` flatten a whole run into
+ * two strings, which loses the step boundaries; this keeps them, so a run that
+ * thinks, calls a tool, thinks again and answers can be shown as it happened.
+ */
+export type ChatStreamingPart =
+  | { kind: 'reasoning'; text: string }
+  | { kind: 'text'; text: string }
+  /** Args arrive as a JSON string, incomplete until the call is fully received. */
+  | { kind: 'tool_call'; toolCallId: string; name: string; args: string };
+
 export interface ExecutingToolDisplay {
+  /** @example "toolu_01abc123" */
+  toolCallId: string;
+  /** Registered tool name, e.g. "searchDocs". */
+  name: string;
+  /** The tool's `title` annotation, or a generic fallback when it has none. */
   displayText: string;
 }
 
@@ -62,6 +80,8 @@ export interface UseServerEventsReturn {
   streamingChatIdRef: React.MutableRefObject<string | null>;
   /** Current streaming reasoning text from extended thinking */
   streamingReasoning: string;
+  /** The in-flight answer split into ordered parts; empty between runs. */
+  streamingParts: ChatStreamingPart[];
   /**
    * Handles a server event. Called from the provider's client subscription.
    * Takes the client instance so it can access client-internal state
@@ -97,6 +117,7 @@ export function useServerEvents({
   const [loading, setLoading] = useState(false);
   const [streamingText, setStreamingText] = useState('');
   const [streamingReasoning, setStreamingReasoning] = useState('');
+  const [streamingParts, setStreamingParts] = useState<ChatStreamingPart[]>([]);
   const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
   // Mirror of streamingMessageId for the stable event handler.
   const streamingMessageIdRef = useRef<string | null>(null);
@@ -120,12 +141,24 @@ export function useServerEvents({
   // Executing tool state for UI display
   const [executingToolRaw, setExecutingTool] = useState<{
     toolCallId: string;
+    name: string;
     title: string | null;
   } | null>(null);
   const executingToolFallbackRef = useRef<string | null>(null);
 
   const clearStreamingText = useCallback(() => {
     setStreamingText('');
+  }, []);
+
+  /** Appends `delta` to the trailing part of `kind`, starting one if needed. */
+  const appendToPart = useCallback((kind: 'reasoning' | 'text', delta: string) => {
+    setStreamingParts(prev => {
+      const last = prev[prev.length - 1];
+      if (last?.kind === kind) {
+        return [...prev.slice(0, -1), { ...last, text: last.text + delta }];
+      }
+      return [...prev, { kind, text: delta }];
+    });
   }, []);
 
   // Keep refs to avoid stale closures in the event handler
@@ -183,6 +216,7 @@ export function useServerEvents({
   const resetRunUiState = useCallback(() => {
     setStreamingText('');
     setStreamingReasoning('');
+    setStreamingParts([]);
     setStreamingMessageId(null);
     streamingMessageIdRef.current = null;
     streamingChatIdRef.current = null;
@@ -204,20 +238,31 @@ export function useServerEvents({
       runIdAtRunStartRef.current = client.currentRunId ?? undefined;
       hasTextFromPriorStepRef.current = false;
       setStreamingReasoning('');
+      setStreamingParts([]);
       const messageId = generateMessageId();
       streamingMessageIdRef.current = messageId;
       setStreamingMessageId(messageId);
     } else if (event.type === EventType.REASONING_MESSAGE_START) {
       // Add paragraph separator between reasoning from different steps
       setStreamingReasoning(prev => prev ? prev + '\n\n' : prev);
+      setStreamingParts(prev => [...prev, { kind: 'reasoning', text: '' }]);
     } else if (event.type === EventType.REASONING_MESSAGE_CONTENT) {
       const reasoningEvent = event as ReasoningMessageContentEvent;
       setStreamingReasoning(prev => prev + reasoningEvent.delta);
+      appendToPart('reasoning', reasoningEvent.delta);
     } else if (event.type === EventType.TEXT_MESSAGE_START) {
       // Add paragraph separator between steps so combined text reads naturally
       if (hasTextFromPriorStepRef.current) {
         setStreamingText(prev => prev + '\n\n');
       }
+      setStreamingParts(prev => [...prev, { kind: 'text', text: '' }]);
+    } else if (event.type === EventType.TOOL_CALL_ARGS) {
+      const argsEvent = event as ToolCallArgsEvent;
+      setStreamingParts(prev => prev.map(part =>
+        part.kind === 'tool_call' && part.toolCallId === argsEvent.toolCallId
+          ? { ...part, args: part.args + argsEvent.delta }
+          : part
+      ));
     } else if (event.type === EventType.TOOL_CALL_START) {
       const e = event as ToolCallStartEvent & Partial<ToolCallStartExtensions>;
 
@@ -230,7 +275,11 @@ export function useServerEvents({
         executingToolFallbackRef.current = fallbacks[Math.floor(Math.random() * fallbacks.length)];
       }
 
-      setExecutingTool({ toolCallId: e.toolCallId, title });
+      setExecutingTool({ toolCallId: e.toolCallId, name: e.toolCallName, title });
+      setStreamingParts(prev => [
+        ...prev,
+        { kind: 'tool_call', toolCallId: e.toolCallId, name: e.toolCallName, args: '' },
+      ]);
     } else if (event.type === EventType.TOOL_CALL_END) {
       const toolCallEnd = event as ToolCallEndEvent;
       const toolCallId = toolCallEnd.toolCallId;
@@ -268,6 +317,7 @@ export function useServerEvents({
       const contentEvent = event as TextMessageContentEvent;
       hasTextFromPriorStepRef.current = true;
       setStreamingText(prev => prev + contentEvent.delta);
+      appendToPart('text', contentEvent.delta);
     } else if (event.type === EventType.TEXT_MESSAGE_END) {
       // Don't clear streaming text here — wait for RUN_FINISHED so text
       // stays visible across multi-step runs (no flash between steps).
@@ -310,7 +360,9 @@ export function useServerEvents({
   }, [resetRunUiState]);
 
   // Compute display value for UI
-  const executingTool = executingToolRaw ? {
+  const executingTool: ExecutingToolDisplay | null = executingToolRaw ? {
+    toolCallId: executingToolRaw.toolCallId,
+    name: executingToolRaw.name,
     displayText: executingToolRaw.title ?? executingToolFallbackRef.current ?? strings.toolExecution.fallbackMessages[0],
   } : null;
 
@@ -323,6 +375,7 @@ export function useServerEvents({
     executingTool,
     streamingChatIdRef,
     streamingReasoning,
+    streamingParts,
     handleServerEvent,
     handleDisconnect,
   };

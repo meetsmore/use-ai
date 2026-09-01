@@ -723,6 +723,110 @@ root.render(
 );
 ```
 
+For partial customization, override only the built-in chat regions you own.
+Every slot receives the built-in UI as `children`: render it to decorate the
+default behavior, or omit it to replace that region completely.
+
+```tsx
+import type {
+  ChatMessageSlotProps,
+  ChatComposerSlotProps,
+} from '@meetsmore-oss/use-ai-client';
+
+function Message({ message, children }: ChatMessageSlotProps) {
+  return <div className={`my-message my-message-${message.role}`}>{children}</div>;
+}
+
+function Composer({ input, onInputChange, onSend, canSend }: ChatComposerSlotProps) {
+  return (
+    <form onSubmit={(event) => { event.preventDefault(); onSend(); }}>
+      <textarea value={input} onChange={(event) => onInputChange(event.target.value)} />
+      <button disabled={!canSend}>Send</button>
+    </form>
+  );
+}
+
+<UseAIProvider
+  serverUrl="wss://your-server.com"
+  chatComponents={{ Message, Composer }}
+>
+  <App />
+</UseAIProvider>
+```
+
+Available slots are `Header`, `EmptyState`, `Message`, `PendingIndicator`,
+`Composer`, `ToolApproval`, and `Disclaimer`. Provider-level `chatComponents` apply to all
+chat instances. A specific `<UseAIChat components={...} />` takes precedence.
+
+Each region's built-in implementation is exported as `DefaultHeader`,
+`DefaultMessage` and so on, taking exactly the props its slot receives. Reuse
+one when only part of a region needs to change:
+
+```tsx
+import { DefaultMessage, type ChatMessageSlotProps } from '@meetsmore-oss/use-ai-client';
+
+function Message(props: ChatMessageSlotProps) {
+  return (
+    <>
+      <DefaultMessage {...props} />
+      {props.isLast && <Citations />}
+    </>
+  );
+}
+```
+
+The answer being streamed goes through `Message` too, as a provisional entry
+carrying the id it will be persisted under. `streaming` tells the two apart, and
+`streamingParts` holds the answer so far as the ordered pieces the model emitted:
+
+```tsx
+function Message({ message, streaming, streamingParts }: ChatMessageSlotProps) {
+  if (!streaming) return <PersistedTurn message={message} />;
+
+  return (
+    <div className="my-message is-streaming">
+      {streamingParts.map((part, index) => {
+        if (part.kind === 'reasoning') return <Thinking key={index} text={part.text} />;
+        if (part.kind === 'tool_call') return <ToolCard key={index} name={part.name} />;
+        return <Body key={index} text={part.text} />;
+      })}
+    </div>
+  );
+}
+```
+
+A run that thinks, calls a tool, thinks again and answers gives four parts in
+that order. `streamingText` and `streamingReasoning` are still there, each
+flattening the whole run into one string; the built-in bubble uses those.
+
+`PendingIndicator` covers the gap between the run starting and the first token
+arriving, plus send-time file processing. It receives `executingTool` and
+`fileProcessing`, and stops rendering once the answer starts arriving.
+
+### Rendering a turn as a timeline
+
+The built-in bubble shows one turn as a single block of text: the tool calls,
+their results and the per-step reasoning are merged away. `sourceMessages` hands
+those back, in the order the model produced them, so a `Message` slot can lay
+the turn out step by step instead:
+
+```tsx
+function Message({ sourceMessages }: ChatMessageSlotProps) {
+  return sourceMessages.flatMap((source) => {
+    if (source.role === 'tool') return [];          // consumed as a call's result
+    return [
+      ...(source.reasoningParts ?? []).map((part) => <Thinking text={part.text} />),
+      <Prose content={source.content} />,
+      ...(source.toolCalls ?? []).map((call) => <ToolCard call={call} />),
+    ];
+  });
+}
+```
+
+A `tool` message carries the result of the call with the matching `toolCallId`,
+so anything a tool returned (citations, a table, a chart) is available to render
+under the answer. `apps/example` has a working page: `/custom-slots-demo`.
+
 You can also disable them by passing `null`:
 
 ```tsx

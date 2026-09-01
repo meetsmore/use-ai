@@ -27,7 +27,34 @@ export { UseAIFloatingChatWrapper, CloseButton } from './components/UseAIFloatin
 export { UseAIFloatingButton } from './components/UseAIFloatingButton';
 export { UseAIChat } from './components/UseAIChat';
 export type { UseAIChatProps } from './components/UseAIChat';
+export type {
+  ChatSlotProps,
+  ChatHeaderSlotProps,
+  ChatEmptyStateSlotProps,
+  ChatMessageSlotProps,
+  ChatPendingIndicatorSlotProps,
+  ChatComposerSlotProps,
+  ChatToolApprovalSlotProps,
+  ChatDisclaimerSlotProps,
+  ChatToolApproval,
+  ChatSaveAsCommand,
+  ChatSlashCommands,
+  UseAIChatComponents,
+  UseAIChatComponentOverrides,
+} from './components/chatSlots';
+// The built-in implementations, so an override can reuse or wrap one instead of
+// rebuilding a region from scratch.
+export {
+  DefaultHeader,
+  DefaultEmptyState,
+  DefaultMessage,
+  DefaultPendingIndicator,
+  DefaultComposer,
+  DefaultToolApproval,
+  DefaultDisclaimer,
+} from './components/chatSlots';
 export type { SubmitMode } from './utils/keyboard';
+export type { MergedMessage } from './utils/mergeAssistantMessages';
 
 export type { UseAIOptions, UseAIResult } from './useAI';
 export type { UseAIWorkflowResult, TriggerWorkflowOptions, WorkflowProgress } from './useAIWorkflow';
@@ -148,6 +175,7 @@ export type {
   UseServerEventsOptions,
   UseServerEventsReturn,
   ExecutingToolDisplay,
+  ChatStreamingPart,
 } from './hooks/useServerEvents';
 
 // Message queue

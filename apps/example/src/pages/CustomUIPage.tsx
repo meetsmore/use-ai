@@ -62,6 +62,40 @@ function MyChat({ isOpen, onClose, messages, onSendMessage, loading }: ChatPanel
       </div>
 
       <div style={docStyles.definitionCard}>
+        <h2 style={docStyles.subtitle}>Component Slots</h2>
+        <p style={docStyles.text}>
+          Override only the regions you need. Render <code style={docStyles.code}>children</code>{' '}
+          to decorate the built-in UI, or omit it to replace that region completely.
+        </p>
+        <CollapsibleCode>
+{`import type {
+  ChatMessageSlotProps,
+  ChatComposerSlotProps,
+} from '@meetsmore-oss/use-ai-client';
+
+function Message({ message, children }: ChatMessageSlotProps) {
+  return <div className={\`message message-\${message.role}\`}>{children}</div>;
+}
+
+function Composer({ input, onInputChange, onSend, canSend }: ChatComposerSlotProps) {
+  return (
+    <form onSubmit={(event) => { event.preventDefault(); onSend(); }}>
+      <textarea value={input} onChange={(event) => onInputChange(event.target.value)} />
+      <button disabled={!canSend}>Send</button>
+    </form>
+  );
+}
+
+<UseAIProvider chatComponents={{ Message, Composer }} serverUrl="...">
+  <App />
+</UseAIProvider>
+
+// Override one chat instance (takes precedence over the provider)
+<UseAIChat components={{ EmptyState: MyEmptyState }} />`}
+        </CollapsibleCode>
+      </div>
+
+      <div style={docStyles.definitionCard}>
         <h2 style={docStyles.subtitle}>Disable Components</h2>
         <CollapsibleCode>
 {`// Disable the floating button (chat panel only)

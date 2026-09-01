@@ -21,10 +21,14 @@ import { useToolSystem, type RegisterToolsOptions } from '../hooks/useToolSystem
 import type { SubmitMode } from '../utils/keyboard';
 import { usePromptState } from '../hooks/usePromptState';
 import { useFeedback } from '../hooks/useFeedback';
-import { useServerEvents } from '../hooks/useServerEvents';
+import { useServerEvents, type ChatStreamingPart } from '../hooks/useServerEvents';
 import { useMessageQueue, type SendMessageOptions } from '../hooks/useMessageQueue';
 import { ThemeContext, StringsContext, defaultTheme, defaultStrings } from '../theme';
 import type { UseAITheme, UseAIStrings } from '../theme';
+import type { UseAIChatComponentOverrides } from '../components/chatSlots';
+
+/** Stable identity so a hidden chat's streaming parts do not re-render consumers. */
+const EMPTY_STREAMING_PARTS: ChatStreamingPart[] = [];
 
 // ── Context Types ───────────────────────────────────────────────────────────
 
@@ -256,6 +260,8 @@ export interface UseAIProviderProps extends UseAIConfig {
   systemPrompt?: string;
   CustomButton?: React.ComponentType<FloatingButtonProps> | null;
   CustomChat?: React.ComponentType<ChatPanelProps> | null;
+  /** Default component overrides for every built-in chat rendered by this provider. */
+  chatComponents?: UseAIChatComponentOverrides;
   /**
    * Custom chat repository for message persistence.
    * Defaults to LocalStorageChatRepository if not provided.
@@ -464,6 +470,7 @@ export function UseAIProvider({
   systemPrompt,
   CustomButton,
   CustomChat,
+  chatComponents,
   chatRepository,
   forwardedPropsProvider,
   fileUploadConfig: fileUploadConfigProp,
@@ -771,6 +778,8 @@ export function UseAIProvider({
     ? serverEvents.streamingReasoning : '';
   const effectiveStreamingMessageId = serverEvents.streamingChatIdRef.current === chatManagement.displayedChatId
     ? serverEvents.streamingMessageId : null;
+  const effectiveStreamingParts = serverEvents.streamingChatIdRef.current === chatManagement.displayedChatId
+    ? serverEvents.streamingParts : EMPTY_STREAMING_PARTS;
 
   const chatUIContextValue: ChatUIContextValue = {
     connected,
@@ -781,6 +790,7 @@ export function UseAIProvider({
     streamingText: effectiveStreamingText,
     streamingReasoning: effectiveStreamingReasoning,
     streamingMessageId: effectiveStreamingMessageId,
+    streamingParts: effectiveStreamingParts,
     suggestions: promptState.aggregatedSuggestions,
     fileUploadConfig,
     fileProcessing: fileProcessingState,
@@ -822,6 +832,7 @@ export function UseAIProvider({
       submit: feedback.submitFeedback,
     },
     submitMode,
+    components: chatComponents,
   };
 
   const isUIDisabled = CustomButton === null || CustomChat === null;
@@ -837,6 +848,7 @@ export function UseAIProvider({
     streamingText: effectiveStreamingText,
     streamingReasoning: effectiveStreamingReasoning,
     streamingMessageId: effectiveStreamingMessageId,
+    streamingParts: effectiveStreamingParts,
     currentChatId: chatManagement.displayedChatId,
     onNewChat: chatManagement.createNewChat,
     onLoadChat: chatManagement.loadChat,
@@ -861,6 +873,7 @@ export function UseAIProvider({
     onApproveToolCall: toolSystem.pendingApprovals.length > 0 ? toolSystem.approveAll : undefined,
     onRejectToolCall: toolSystem.pendingApprovals.length > 0 ? toolSystem.rejectAll : undefined,
     submitMode,
+    components: chatComponents,
   };
 
   const renderDefaultChat = () => {

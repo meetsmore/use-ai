@@ -15,6 +15,7 @@ const AVAILABLE_PAGES = [
   { path: '/programmatic-chat', label: 'Programmatic Chat', description: 'Sending messages programmatically via sendMessage()' },
   { path: '/chat-history', label: 'Chat History', description: 'localStorage persistence, ChatRepository, chat management' },
   { path: '/slash-commands', label: 'Slash Commands', description: 'Slash command autocomplete and custom command repository' },
+  { path: '/custom-slots-demo', label: 'Component Slots Demo', description: 'Fully custom chat UI built with Header, Message, Composer, and other component slots' },
   { path: '/custom-ui', label: 'Custom UI', description: 'CustomButton, CustomChat props and onOpenChange callback' },
   { path: '/theme-i18n', label: 'Theme & i18n', description: 'Theme colors, strings localization, error messages' },
   { path: '/suggestions', label: 'Suggestions', description: 'Empty chat suggestions aggregated from all components' },

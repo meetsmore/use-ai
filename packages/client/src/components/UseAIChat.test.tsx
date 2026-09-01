@@ -58,6 +58,21 @@ function createContextValue(overrides: Partial<ChatUIContextValue> = {}): ChatUI
 }
 
 describe('UseAIChat', () => {
+  test('prefers instance component overrides over provider-level overrides', () => {
+    const ProviderHeader = () => <div data-testid="provider-header" />;
+    const InstanceHeader = () => <div data-testid="instance-header" />;
+    const ctx = createContextValue({ components: { Header: ProviderHeader } });
+
+    const { getByTestId, queryByTestId } = render(
+      <__UseAIChatContext.Provider value={ctx}>
+        <UseAIChat components={{ Header: InstanceHeader }} />
+      </__UseAIChatContext.Provider>
+    );
+
+    expect(getByTestId('instance-header')).toBeInTheDocument();
+    expect(queryByTestId('provider-header')).toBeNull();
+  });
+
   test('passes streaming reasoning through to UseAIChatPanel', () => {
     const ctx = createContextValue({
       loading: true,
