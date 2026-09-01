@@ -55,6 +55,10 @@ export {
 } from './components/chatSlots';
 export type { SubmitMode } from './utils/keyboard';
 export type { MergedMessage } from './utils/mergeAssistantMessages';
+export {
+  getTextFromStreamingParts,
+  getReasoningPartsFromStreamingParts,
+} from './utils/streamingParts';
 
 export type { UseAIOptions, UseAIResult } from './useAI';
 export type { UseAIWorkflowResult, TriggerWorkflowOptions, WorkflowProgress } from './useAIWorkflow';
