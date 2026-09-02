@@ -139,6 +139,18 @@ function fileChipInfo(part: PersistedContentPart): { name: string; size: number 
 }
 
 /**
+ * A message as shown in the panel. `streaming` marks the provisional entry
+ * for the answer that is still arriving; it has no timestamp, feedback
+ * buttons or persisted reasoning parts yet.
+ */
+type DisplayMessage = PersistedMessage & { streaming?: boolean };
+
+/** Key for the provisional streaming message when no persisted id is known. */
+const PROVISIONAL_MESSAGE_ID = 'streaming-answer';
+/** Placeholder; the provisional message never shows a timestamp. */
+const PROVISIONAL_CREATED_AT = new Date(0);
+
+/**
  * Props for the chat panel component.
  */
 export interface UseAIChatPanelProps {
@@ -157,6 +169,15 @@ export interface UseAIChatPanelProps {
   streamingText?: string;
   /** Currently streaming reasoning text from extended thinking */
   streamingReasoning?: string;
+  /**
+   * Id the streaming answer will be persisted under. While set, the streaming
+   * answer renders as a provisional message with this id, so when the persisted
+   * answer arrives under the same id React updates the bubble in place instead
+   * of unmounting it. Without it the provisional bubble remounts on completion.
+   * @default null
+   * @example "msg_1723972800000_k3j9x2a"
+   */
+  streamingMessageId?: string | null;
   currentChatId?: string | null;
   onNewChat?: () => Promise<string | void>;
   onLoadChat?: (chatId: string) => Promise<void>;
@@ -230,6 +251,7 @@ export function UseAIChatPanel({
   connected,
   streamingText = '',
   streamingReasoning = '',
+  streamingMessageId = null,
   currentChatId,
   onNewChat,
   onLoadChat,
@@ -270,6 +292,27 @@ export function UseAIChatPanel({
   // This preserves per-step data structure (for LLM context) while showing
   // a unified bubble to the user.
   const displayMessages = mergeAssistantMessagesForDisplay(messages);
+
+  // The streaming answer is shown as a provisional assistant message under the
+  // id it will be persisted with. When the persisted message arrives it takes
+  // the same key, so React updates the existing bubble instead of replacing it,
+  // and a text selection inside it survives. saveAIResponse appends the
+  // persisted message one render before the streaming state clears, so the
+  // provisional entry is skipped once a message with that id exists.
+  const provisionalMessage: DisplayMessage | null =
+    (streamingText || streamingReasoning) &&
+    !(streamingMessageId && displayMessages.some((m) => m.id === streamingMessageId))
+      ? {
+          id: streamingMessageId ?? PROVISIONAL_MESSAGE_ID,
+          role: 'assistant',
+          content: streamingText,
+          createdAt: PROVISIONAL_CREATED_AT,
+          streaming: true,
+        }
+      : null;
+  const renderedMessages: DisplayMessage[] = provisionalMessage
+    ? [...displayMessages, provisionalMessage]
+    : displayMessages;
 
   const [input, setInput] = useState('');
   const chatHistoryDropdown = useDropdownState();
@@ -869,7 +912,7 @@ export function UseAIChatPanel({
           </div>
         )}
 
-        {displayMessages.map((message) => {
+        {renderedMessages.map((message) => {
           // Info notices (e.g. the abort "generation stopped" bubble) are
           // display-only system messages. Render a compact, centered pill —
           // no reasoning dropdown, markdown, feedback, or hover affordances.
@@ -900,10 +943,24 @@ export function UseAIChatPanel({
             );
           }
 
+          // The provisional bubble is deliberately kept out of
+          // `chat-message-assistant` and `chat-message-content`: the E2E suites
+          // wait on those test ids to mean "the answer is done", and a bubble
+          // that appears with the first token would satisfy that wait
+          // mid-stream. Only the attributes change when the answer is
+          // persisted, so the elements themselves, and any selection inside
+          // them, are untouched.
+          const messageTestId = message.streaming
+            ? 'chat-message-assistant-streaming'
+            : `chat-message-${message.role}`;
+          const contentTestId = message.streaming
+            ? 'chat-message-content-streaming'
+            : 'chat-message-content';
+
           return (
           <div
             key={message.id}
-            data-testid={`chat-message-${message.role}`}
+            data-testid={messageTestId}
             className={`chat-message chat-message-${message.role}`}
             style={{
               display: 'flex',
@@ -964,7 +1021,7 @@ export function UseAIChatPanel({
                 </button>
               )}
               <div
-                data-testid="chat-message-content"
+                data-testid={contentTestId}
                 className={`chat-message-content${message.role === 'assistant' ? ' markdown-content' : ''}`}
                 style={{
                   padding: '10px 14px',
@@ -997,14 +1054,27 @@ export function UseAIChatPanel({
               )}
               {message.role === 'assistant' ? (
                 <>
-                  {message.reasoningParts && message.reasoningParts.length > 0 && (
+                  {message.streaming && streamingReasoning && (
+                    <Reasoning
+                      reasoningParts={[]}
+                      isStreaming={true}
+                      streamingText={streamingReasoning}
+                      theme={theme}
+                      strings={strings}
+                    />
+                  )}
+                  {!message.streaming && message.reasoningParts && message.reasoningParts.length > 0 && (
                     <Reasoning
                       reasoningParts={message.reasoningParts}
                       theme={theme}
                       strings={strings}
                     />
                   )}
-                  <MarkdownContent content={getTextFromContent(message.content)} />
+                  {message.streaming && !streamingText ? (
+                    <span className="dots" style={{ opacity: 0.6 }}>...</span>
+                  ) : (
+                    <MarkdownContent content={getTextFromContent(message.content)} />
+                  )}
                 </>
               ) : (
                 // User/tool bubbles: display-only text so transformed_file
@@ -1019,7 +1089,7 @@ export function UseAIChatPanel({
               })}
             </div>
             {/* Feedback buttons - only for assistant messages with traceId */}
-            {message.role === 'assistant' && message.traceId && feedbackEnabled && onFeedback && (
+            {message.role === 'assistant' && !message.streaming && message.traceId && feedbackEnabled && onFeedback && (
               <div
                 data-testid="feedback-buttons"
                 style={{
@@ -1051,24 +1121,27 @@ export function UseAIChatPanel({
                 />
               </div>
             )}
-            <div
-              style={{
-                fontSize: '11px',
-                color: theme.secondaryTextColor,
-                marginTop: '4px',
-                padding: '0 4px',
-              }}
-            >
-              {message.createdAt.toLocaleTimeString([], {
-                hour: '2-digit',
-                minute: '2-digit'
-              })}
-            </div>
+            {!message.streaming && (
+              <div
+                data-testid="message-timestamp"
+                style={{
+                  fontSize: '11px',
+                  color: theme.secondaryTextColor,
+                  marginTop: '4px',
+                  padding: '0 4px',
+                }}
+              >
+                {message.createdAt.toLocaleTimeString([], {
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })}
+              </div>
+            )}
           </div>
           );
         })}
 
-        {loading && (
+        {loading && !provisionalMessage && (
           <div
             style={{
               display: 'flex',
@@ -1087,23 +1160,7 @@ export function UseAIChatPanel({
                 maxWidth: '80%',
               }}
             >
-              {streamingText || streamingReasoning ? (
-                <>
-                  {streamingReasoning && (
-                    <Reasoning
-                      reasoningParts={[]}
-                      isStreaming={true}
-                      streamingText={streamingReasoning}
-                      theme={theme}
-                      strings={strings}
-                    />
-                  )}
-                  {streamingText && <MarkdownContent content={streamingText} />}
-                  {!streamingText && (
-                    <span className="dots" style={{ opacity: 0.6 }}>...</span>
-                  )}
-                </>
-              ) : fileProcessing && fileProcessing.status === 'processing' ? (
+              {fileProcessing && fileProcessing.status === 'processing' ? (
                 <div>
                   <span style={{ opacity: 0.6 }}>{strings.input.processingFile}</span>
                   {fileProcessing.progress != null && (
