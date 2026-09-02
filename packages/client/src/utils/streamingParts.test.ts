@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'bun:test';
-import { getReasoningPartsFromStreamingParts, getTextFromStreamingParts } from './streamingParts';
+import {
+  getReasoningPartsFromStreamingParts,
+  getTextFromStreamingParts,
+  hasStreamedAnswerContent,
+} from './streamingParts';
 import { mergeAssistantMessagesForDisplay } from './mergeAssistantMessages';
 import type { PersistedMessage } from '../providers/chatRepository/types';
 import type { ChatStreamingPart } from '../hooks/useServerEvents';
@@ -64,5 +68,32 @@ describe('getReasoningPartsFromStreamingParts', () => {
 
   it('skips a step that has not received any reasoning yet', () => {
     expect(getReasoningPartsFromStreamingParts([{ kind: 'reasoning', text: '' }])).toEqual([]);
+  });
+});
+
+describe('hasStreamedAnswerContent', () => {
+  it('is true once a step has produced text', () => {
+    expect(hasStreamedAnswerContent([{ kind: 'text', text: 'A' }])).toBe(true);
+  });
+
+  it('is true once a step has produced reasoning', () => {
+    expect(hasStreamedAnswerContent([{ kind: 'reasoning', text: 'Hmm.' }])).toBe(true);
+  });
+
+  // A tool call runs before the answer says anything. The bubble would be empty
+  // for the whole call, and the pending indicator that names the running tool
+  // would be suppressed behind it.
+  it('is false while only a tool call has started', () => {
+    expect(hasStreamedAnswerContent([
+      { kind: 'tool_call', toolCallId: 'tc1', name: 'search', args: '' },
+    ])).toBe(false);
+  });
+
+  it('is false for a step opened before its first delta', () => {
+    expect(hasStreamedAnswerContent([{ kind: 'text', text: '' }])).toBe(false);
+  });
+
+  it('is false between runs', () => {
+    expect(hasStreamedAnswerContent([])).toBe(false);
   });
 });

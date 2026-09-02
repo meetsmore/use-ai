@@ -164,6 +164,22 @@ describe('UseAIChat component slots', () => {
     expect(getByTestId('custom-pending')).toHaveTextContent('Filling the form');
   });
 
+  // TOOL_CALL_START opens a part, but a tool call is not the answer speaking.
+  // Handing that window to the provisional bubble draws an empty bubble and
+  // makes `executingTool` unreachable.
+  test('keeps PendingIndicator while a tool runs before the answer starts', () => {
+    const { getByTestId, queryByTestId } = renderPanel(
+      { PendingIndicator },
+      {
+        streamingParts: [{ kind: 'tool_call', toolCallId: 'tool-1', name: 'fillForm', args: '{}' }],
+        executingTool,
+      }
+    );
+
+    expect(getByTestId('custom-pending')).toHaveTextContent('Filling the form');
+    expect(queryByTestId('chat-message-assistant-streaming')).toBeNull();
+  });
+
   test('drops PendingIndicator once the answer starts arriving', () => {
     const { queryByTestId } = renderPanel({ PendingIndicator }, { executingTool });
 

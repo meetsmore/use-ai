@@ -131,7 +131,7 @@ services:
       # - OPENAI_API_KEY=${OPENAI_API_KEY}
 
       # Optional: Model selection
-      # - ANTHROPIC_MODEL=claude-sonnet-4-20250514
+      # - ANTHROPIC_MODEL=claude-opus-5
       # - OPENAI_MODEL=gpt-4-turbo
 
       # Optional: Server configuration
@@ -758,6 +758,21 @@ Available slots are `Header`, `EmptyState`, `Message`, `PendingIndicator`,
 `Composer`, `ToolApproval`, and `Disclaimer`. Provider-level `chatComponents` apply to all
 chat instances. A specific `<UseAIChat components={...} />` takes precedence.
 
+**Migrating a `CustomChat` from 1.17:** `ChatPanelProps` no longer carries
+`streamingText` and `streamingReasoning`, and `ReasoningProps` no longer carries
+`streamingText`. The in-flight answer now arrives as `streamingParts`, the
+ordered parts of the run. Flatten them with the exported helpers:
+
+```tsx
+import {
+  getTextFromStreamingParts,
+  getReasoningPartsFromStreamingParts,
+} from '@meetsmore-oss/use-ai-client';
+
+const streamingText = getTextFromStreamingParts(streamingParts);
+const streamingReasoning = getReasoningPartsFromStreamingParts(streamingParts);
+```
+
 The answer being streamed goes through `Message` too, as a provisional entry
 carrying the id it will be persisted under, so `streaming` tells the two apart.
 
@@ -985,7 +1000,8 @@ For most use cases, you can just use `@meetsmore-oss/use-ai-server` as-is, and c
 ```bash
 # AI Provider (at least one required)
 ANTHROPIC_API_KEY=sk-ant-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-# ANTHROPIC_MODEL=claude-sonnet-4-20250514
+# ANTHROPIC_MODEL=claude-opus-5
+# ANTHROPIC_WORKSPACE_ID=wrkspc_xxxxxxxxxxxxxxxxxxxxxxx  # Required for an identity-linked key
 # OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 # OPENAI_MODEL=gpt-4-turbo
 
@@ -1028,7 +1044,7 @@ const server = new UseAIServer({
     'claude': new AISDKAgent({
       name: 'Claude',
       annotation: 'Powered by Anthropic', // shown in agent selector UI
-      hooks: { loadConfig: () => ({ model: anthropic('claude-sonnet-4-20250514') }) },
+      hooks: { loadConfig: () => ({ model: anthropic('claude-opus-5') }) },
     })
   },
   defaultAgent: 'claude',

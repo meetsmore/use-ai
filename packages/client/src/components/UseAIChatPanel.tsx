@@ -1,7 +1,8 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import type { Chat, PersistedMessage } from '../providers/chatRepository/types';
 import { getDisplayTextFromContent } from '../utils/messageContent';
 import { mergeAssistantMessagesForDisplay, type MergedMessage } from '../utils/mergeAssistantMessages';
+import { hasStreamedAnswerContent } from '../utils/streamingParts';
 import type { SubmitMode } from '../utils/keyboard';
 import type { AgentInfo, FeedbackValue, EnabledFeatures } from '../types';
 import { DEFAULT_ENABLED_FEATURES } from '../types';
@@ -190,7 +191,9 @@ export function UseAIChatPanel({
   // combined with the final text-only message. Tool messages are filtered out.
   // This preserves per-step data structure (for LLM context) while showing
   // a unified bubble to the user.
-  const displayMessages = mergeAssistantMessagesForDisplay(messages);
+  // Memoized: a run re-renders the panel on every streamed token, and the merge
+  // walks the whole conversation.
+  const displayMessages = useMemo(() => mergeAssistantMessagesForDisplay(messages), [messages]);
   const showInputDisclaimer = !!features.inputDisclaimer && displayMessages.length > 0;
 
   // True from the render that appends the persisted answer until the streaming
@@ -209,7 +212,7 @@ export function UseAIChatPanel({
   // stays empty: the answer is passed as `streamingParts`, and the slot decides
   // how to render it.
   const provisionalMessage: DisplayMessage | null =
-    streamingParts.length > 0 && !persistedStreamingAnswer
+    hasStreamedAnswerContent(streamingParts) && !persistedStreamingAnswer
       ? {
           id: streamingMessageId ?? PROVISIONAL_MESSAGE_ID,
           role: 'assistant',

@@ -66,7 +66,7 @@ export type { ClientSession } from './agents/types';
  *   apiKey: process.env.ANTHROPIC_API_KEY,
  * });
  * const claudeAgent = new AISDKAgent({
- *   hooks: { loadConfig: () => ({ model: anthropic('claude-sonnet-4-20250514') }) },
+ *   hooks: { loadConfig: () => ({ model: anthropic('claude-opus-5') }) },
  * });
  * const server = new UseAIServer({
  *   port: 8081,

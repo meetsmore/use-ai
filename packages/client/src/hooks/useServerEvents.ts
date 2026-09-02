@@ -7,6 +7,7 @@ import type {
   RunErrorEvent,
   RunFinishedEvent,
   TextMessageContentEvent,
+  TextMessageStartEvent,
   ToolCallStartExtensions,
   ToolApprovalRequestEvent,
   ReasoningMessageContentEvent,
@@ -44,7 +45,12 @@ export interface UseServerEventsOptions {
  */
 export type ChatStreamingPart =
   | { kind: 'reasoning'; text: string }
-  | { kind: 'text'; text: string }
+  /**
+   * `messageId` is the id of the assistant message this text is persisted as,
+   * so deltas of one step reach one part even when reasoning interrupts them.
+   * @example "msg_01abc123"
+   */
+  | { kind: 'text'; text: string; messageId?: string }
   /** Args arrive as a JSON string, incomplete until the call is fully received. */
   | { kind: 'tool_call'; toolCallId: string; name: string; args: string };
 
@@ -148,14 +154,36 @@ export function useServerEvents({
     setStreamingParts([]);
   }, []);
 
-  /** Appends `delta` to the trailing part of `kind`, starting one if needed. */
-  const appendToPart = useCallback((kind: 'reasoning' | 'text', delta: string) => {
+  /**
+   * Appends `delta` to this step's text part, starting one if needed.
+   *
+   * The step's part is found by id rather than taken from the end, because
+   * reasoning can arrive between two text deltas of the same step. Splitting
+   * there would join the two halves with a blank line the persisted message
+   * does not have, and the answer would change as the run finishes.
+   */
+  const appendText = useCallback((messageId: string | undefined, delta: string) => {
+    setStreamingParts(prev => {
+      for (let index = prev.length - 1; index >= 0; index--) {
+        const part = prev[index];
+        if (part.kind === 'text' && part.messageId === messageId) {
+          const next = [...prev];
+          next[index] = { ...part, text: part.text + delta };
+          return next;
+        }
+      }
+      return [...prev, { kind: 'text', text: delta, messageId }];
+    });
+  }, []);
+
+  /** Appends `delta` to the trailing reasoning part, starting one if needed. */
+  const appendReasoning = useCallback((delta: string) => {
     setStreamingParts(prev => {
       const last = prev[prev.length - 1];
-      if (last?.kind === kind) {
+      if (last?.kind === 'reasoning') {
         return [...prev.slice(0, -1), { ...last, text: last.text + delta }];
       }
-      return [...prev, { kind, text: delta }];
+      return [...prev, { kind: 'reasoning', text: delta }];
     });
   }, []);
 
@@ -246,17 +274,26 @@ export function useServerEvents({
         reasoningPartEndedRef.current = false;
         setStreamingParts(prev => [...prev, { kind: 'reasoning', text: reasoningEvent.delta }]);
       } else {
-        appendToPart('reasoning', reasoningEvent.delta);
+        appendReasoning(reasoningEvent.delta);
       }
     } else if (event.type === EventType.TEXT_MESSAGE_START) {
-      setStreamingParts(prev => [...prev, { kind: 'text', text: '' }]);
+      const startEvent = event as TextMessageStartEvent;
+      setStreamingParts(prev => [...prev, { kind: 'text', text: '', messageId: startEvent.messageId }]);
     } else if (event.type === EventType.TOOL_CALL_ARGS) {
       const argsEvent = event as ToolCallArgsEvent;
-      setStreamingParts(prev => prev.map(part =>
-        part.kind === 'tool_call' && part.toolCallId === argsEvent.toolCallId
-          ? { ...part, args: part.args + argsEvent.delta }
-          : part
-      ));
+      setStreamingParts(prev => {
+        // One event per argument token, so an unchanged run must keep its array:
+        // a new one re-renders the whole panel for nothing.
+        for (let index = 0; index < prev.length; index++) {
+          const part = prev[index];
+          if (part.kind === 'tool_call' && part.toolCallId === argsEvent.toolCallId) {
+            const next = [...prev];
+            next[index] = { ...part, args: part.args + argsEvent.delta };
+            return next;
+          }
+        }
+        return prev;
+      });
     } else if (event.type === EventType.TOOL_CALL_START) {
       const e = event as ToolCallStartEvent & Partial<ToolCallStartExtensions>;
 
@@ -309,7 +346,7 @@ export function useServerEvents({
       ts.handleApprovalRequest(e);
     } else if (event.type === EventType.TEXT_MESSAGE_CONTENT) {
       const contentEvent = event as TextMessageContentEvent;
-      appendToPart('text', contentEvent.delta);
+      appendText(contentEvent.messageId, contentEvent.delta);
     } else if (event.type === EventType.REASONING_MESSAGE_END) {
       reasoningPartEndedRef.current = true;
     } else if (event.type === EventType.TEXT_MESSAGE_END) {

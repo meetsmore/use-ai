@@ -25,3 +25,15 @@ export function getReasoningPartsFromStreamingParts(parts: ChatStreamingPart[]):
     part.kind === 'reasoning' && part.text ? [{ text: part.text }] : [],
   );
 }
+
+/**
+ * Whether the answer itself has started, that is, whether any step has produced
+ * text or reasoning.
+ *
+ * A tool call opens a part before the answer says anything, and a step opens an
+ * empty text part before its first delta. Neither is something to show, so the
+ * run stays with the pending indicator until this turns true.
+ */
+export function hasStreamedAnswerContent(parts: ChatStreamingPart[]): boolean {
+  return parts.some((part) => part.kind !== 'tool_call' && part.text.length > 0);
+}

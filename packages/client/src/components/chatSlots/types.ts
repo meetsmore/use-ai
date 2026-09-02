@@ -105,12 +105,15 @@ export interface ChatSaveAsCommand {
 
 /**
  * The placeholder shown after a run starts but before the answer produces its
- * first token, and while a send-time file transformation (e.g. OCR) runs. Once
- * text or reasoning arrives the answer renders through the `Message` slot
+ * first token, and while a send-time file transformation (e.g. OCR) runs. A
+ * tool call that runs before the answer says anything falls in this window too.
+ * Once text or reasoning arrives the answer renders through the `Message` slot
  * instead, so this stops being rendered.
  */
 export interface ChatPendingIndicatorSlotProps extends ChatSlotProps {
+  /** The tool the run is waiting on, or null when it is not running one. */
   executingTool: ExecutingToolDisplay | null;
+  /** The transformation running over an attachment, or null when none runs. */
   fileProcessing: FileProcessingState | null;
 }
 

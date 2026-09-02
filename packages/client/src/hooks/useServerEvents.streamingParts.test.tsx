@@ -96,8 +96,70 @@ describe('useServerEvents — streaming parts', () => {
     expect(result.current.streamingParts).toEqual([
       { kind: 'reasoning', text: 'Need the time.' },
       { kind: 'tool_call', toolCallId: 'tc1', name: 'getServerTime', args: '{"tz":"UTC"}' },
-      { kind: 'text', text: 'It is noon.' },
+      { kind: 'text', text: 'It is noon.', messageId: 'm1' },
     ]);
+  });
+
+  // The persisted turn keeps one assistant message per step, so a step's text
+  // is one string there. Reasoning that arrives between two text deltas of the
+  // same step must therefore not cut the text in two: the flattened parts would
+  // gain a blank line the persisted message does not have, and the bubble would
+  // change the moment the run finishes.
+  it('keeps a step\'s text in one part when reasoning arrives between its deltas', async () => {
+    const { result, client } = setup();
+
+    await act(async () => {
+      await result.current.handleServerEvent(client, { type: EventType.RUN_STARTED, threadId: 't', runId: 'run-1' });
+      await result.current.handleServerEvent(client, { type: EventType.TEXT_MESSAGE_START, messageId: 'm1' });
+      await result.current.handleServerEvent(client, { type: EventType.TEXT_MESSAGE_CONTENT, messageId: 'm1', delta: 'It is ' });
+      await result.current.handleServerEvent(client, { type: EventType.REASONING_MESSAGE_START, messageId: 'r1' });
+      await result.current.handleServerEvent(client, { type: EventType.REASONING_MESSAGE_CONTENT, messageId: 'r1', delta: 'Check the clock.' });
+      await result.current.handleServerEvent(client, { type: EventType.TEXT_MESSAGE_CONTENT, messageId: 'm1', delta: 'noon.' });
+    });
+
+    expect(result.current.streamingParts).toEqual([
+      { kind: 'text', text: 'It is noon.', messageId: 'm1' },
+      { kind: 'reasoning', text: 'Check the clock.' },
+    ]);
+  });
+
+  it('starts a new text part for the next step', async () => {
+    const { result, client } = setup();
+
+    await act(async () => {
+      await result.current.handleServerEvent(client, { type: EventType.RUN_STARTED, threadId: 't', runId: 'run-1' });
+      await result.current.handleServerEvent(client, { type: EventType.TEXT_MESSAGE_START, messageId: 'm1' });
+      await result.current.handleServerEvent(client, { type: EventType.TEXT_MESSAGE_CONTENT, messageId: 'm1', delta: 'Checking.' });
+      await result.current.handleServerEvent(client, { type: EventType.TEXT_MESSAGE_END, messageId: 'm1' });
+      await result.current.handleServerEvent(client, { type: EventType.TEXT_MESSAGE_START, messageId: 'm2' });
+      await result.current.handleServerEvent(client, { type: EventType.TEXT_MESSAGE_CONTENT, messageId: 'm2', delta: 'It is noon.' });
+    });
+
+    expect(result.current.streamingParts).toEqual([
+      { kind: 'text', text: 'Checking.', messageId: 'm1' },
+      { kind: 'text', text: 'It is noon.', messageId: 'm2' },
+    ]);
+  });
+
+  // Every argument token of every tool call arrives as its own event, and the
+  // whole panel re-renders on each new array. A run that is not building the
+  // named call has nothing to change.
+  it('keeps the same parts array when no tool call matches the args event', async () => {
+    const { result, client } = setup();
+
+    await act(async () => {
+      await result.current.handleServerEvent(client, { type: EventType.RUN_STARTED, threadId: 't', runId: 'run-1' });
+      await result.current.handleServerEvent(client, { type: EventType.TEXT_MESSAGE_START, messageId: 'm1' });
+      await result.current.handleServerEvent(client, { type: EventType.TEXT_MESSAGE_CONTENT, messageId: 'm1', delta: 'Working.' });
+    });
+
+    const before = result.current.streamingParts;
+
+    await act(async () => {
+      await result.current.handleServerEvent(client, { type: EventType.TOOL_CALL_ARGS, toolCallId: 'unknown', delta: '{}' });
+    });
+
+    expect(result.current.streamingParts).toBe(before);
   });
 
   it('clears the parts when the run finishes', async () => {
