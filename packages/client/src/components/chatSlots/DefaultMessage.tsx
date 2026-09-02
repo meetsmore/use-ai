@@ -67,7 +67,12 @@ export function DefaultMessage({
   // mergeAssistantMessagesForDisplay flattens the persisted turn. Both sides
   // must yield the same string for the handoff to leave the element alone.
   const text = streaming ? getTextFromStreamingParts(streamingParts) : getTextFromContent(message.content);
-  const streamingReasoningParts = streaming ? getReasoningPartsFromStreamingParts(streamingParts) : [];
+  // One element for both sides of the handoff: two conditionals would sit at
+  // different positions in the fragment below, so React would unmount one and
+  // mount the other, collapsing a dropdown the user had opened mid-stream.
+  const reasoningParts = streaming
+    ? getReasoningPartsFromStreamingParts(streamingParts)
+    : message.reasoningParts ?? [];
 
   return (
     <div
@@ -164,17 +169,10 @@ export function DefaultMessage({
       )}
       {message.role === 'assistant' ? (
         <>
-          {streaming && streamingReasoningParts.length > 0 && (
+          {reasoningParts.length > 0 && (
             <Reasoning
-              reasoningParts={streamingReasoningParts}
-              isStreaming={true}
-              theme={theme}
-              strings={strings}
-            />
-          )}
-          {!streaming && message.reasoningParts && message.reasoningParts.length > 0 && (
-            <Reasoning
-              reasoningParts={message.reasoningParts}
+              reasoningParts={reasoningParts}
+              isStreaming={streaming}
               theme={theme}
               strings={strings}
             />

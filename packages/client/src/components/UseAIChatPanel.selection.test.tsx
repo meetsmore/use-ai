@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, test, expect, beforeEach } from 'bun:test';
-import { render } from '@testing-library/react';
+import { fireEvent, render } from '@testing-library/react';
 import { UseAIChatPanel, type UseAIChatPanelProps } from './UseAIChatPanel';
 import type { ChatStreamingPart } from '../hooks/useServerEvents';
 import type { PersistedMessage } from '../providers/chatRepository/types';
@@ -194,6 +194,38 @@ describe('streaming answer rendered as a provisional message', () => {
       <UseAIChatPanel {...panelProps({ messages: [userMessage, assistantMessage] })} />
     );
     expect(assistantBubbles(container)).toHaveLength(1);
+    // `loading` is still true in that render, so the pending indicator would
+    // otherwise draw a second, empty bubble under the finished answer.
+    expect(container.querySelector('.dots')).toBeNull();
+  });
+
+  // Both sides of the handoff render one Reasoning element in the same
+  // position, so React updates it instead of replacing it. Two conditionals
+  // would remount it and collapse what the user had opened.
+  test('keeps the reasoning dropdown open when the answer is persisted', () => {
+    const streamingProps = panelProps({
+      streamingParts: [{ kind: 'reasoning', text: 'Checking the time.' }, ...ANSWER_PARTS],
+    });
+    const { container, rerender } = render(<UseAIChatPanel {...streamingProps} />);
+
+    fireEvent.click(container.querySelector('[data-testid="thinking-toggle"]')!);
+    expect(container.querySelector('[data-testid="thinking-content"]')).not.toBeNull();
+
+    rerender(
+      <UseAIChatPanel
+        {...panelProps({
+          loading: false,
+          streamingParts: [],
+          streamingMessageId: null,
+          messages: [
+            userMessage,
+            { ...assistantMessage, reasoningParts: [{ text: 'Checking the time.' }] },
+          ],
+        })}
+      />
+    );
+
+    expect(container.querySelector('[data-testid="thinking-content"]')).not.toBeNull();
   });
 
   test('shows the plain loading indicator before any text streams', () => {

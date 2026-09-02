@@ -193,6 +193,13 @@ export function UseAIChatPanel({
   const displayMessages = mergeAssistantMessagesForDisplay(messages);
   const showInputDisclaimer = !!features.inputDisclaimer && displayMessages.length > 0;
 
+  // True from the render that appends the persisted answer until the streaming
+  // state clears. In that window the provisional entry below is gone but
+  // `loading` is still true, so the pending indicator has to check this as well
+  // or it draws a stray bubble under the finished answer.
+  const persistedStreamingAnswer =
+    !!streamingMessageId && displayMessages.some((m) => m.id === streamingMessageId);
+
   // The streaming answer is shown as a provisional assistant message under the
   // id it will be persisted with. When the persisted message arrives it takes
   // the same key, so React updates the existing bubble instead of replacing it,
@@ -202,8 +209,7 @@ export function UseAIChatPanel({
   // stays empty: the answer is passed as `streamingParts`, and the slot decides
   // how to render it.
   const provisionalMessage: DisplayMessage | null =
-    streamingParts.length > 0 &&
-    !(streamingMessageId && displayMessages.some((m) => m.id === streamingMessageId))
+    streamingParts.length > 0 && !persistedStreamingAnswer
       ? {
           id: streamingMessageId ?? PROVISIONAL_MESSAGE_ID,
           role: 'assistant',
@@ -398,7 +404,7 @@ export function UseAIChatPanel({
           />
         ))}
 
-        {loading && !provisionalMessage && (
+        {loading && !provisionalMessage && !persistedStreamingAnswer && (
           <Slot
             component={components?.PendingIndicator}
             fallback={DefaultPendingIndicator}
