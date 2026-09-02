@@ -182,7 +182,10 @@ function OrbitMessage({
             <span>{new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
           )}
         </div>
-        {entries.length === 0 ? (
+        {/* A run has its parts before it has content: the meta line above is
+            already saying it is writing, so the bubble stays empty until the
+            first entry arrives. */}
+        {entries.length === 0 && !streaming ? (
           <OrbitProse text={text || 'Completed.'} />
         ) : (
           entries.map((entry) => {

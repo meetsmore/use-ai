@@ -225,36 +225,72 @@ export function buildTimeline(sourceMessages: PersistedMessage[]): TimelineEntry
   return entries;
 }
 
+/** One step's parts, held back until the step's order is known. */
+interface StreamingStep {
+  reasoning: string[];
+  text: string;
+  tools: Extract<ChatStreamingPart, { kind: 'tool_call' }>[];
+}
+
 /**
- * The same flattening for a run still in flight. The parts already arrive in
- * order, so this only reshapes them; results are not known yet, which is what
- * leaves the tool cards in their pending state.
+ * The same flattening for a run still in flight. Results are not known yet,
+ * which is what leaves the tool cards in their pending state.
+ *
+ * The parts arrive in the order the model emitted them, but a step's text and
+ * its tool calls are emitted in either order and a persisted message records no
+ * order between the two, so `buildTimeline` always puts the text first. The
+ * parts are grouped per step here and emitted in that same order, otherwise a
+ * step whose tool call came first would see its card and its prose swap places
+ * when the run finishes, remounting both.
  *
  * Ordinals are counted exactly as `buildTimeline` counts them, which is what
- * keeps an entry's key stable when the run finishes and the persisted turn
- * takes over. Both walk the same turn in the same order and drop blank text the
- * same way, so the nth text entry here is the nth text entry there.
+ * keeps an entry's key stable across that handoff: the nth text entry here is
+ * the nth text entry there.
  */
 export function buildStreamingTimeline(parts: ChatStreamingPart[]): TimelineEntry[] {
-  const ordinals = { reasoning: 0, text: 0 };
+  const steps: StreamingStep[] = [];
+  let step: StreamingStep | undefined;
 
-  return parts.flatMap((part) => {
-    if (part.kind === 'tool_call') {
-      return [{
-        kind: 'tool' as const,
-        key: part.toolCallId,
-        toolCallId: part.toolCallId,
-        name: part.name,
-        args: parseJson(part.args),
-      }];
+  for (const part of parts) {
+    // A step ends with its tool calls, so anything else after one starts the next.
+    if (!step || (part.kind !== 'tool_call' && step.tools.length > 0)) {
+      step = { reasoning: [], text: '', tools: [] };
+      steps.push(step);
     }
-    if (!part.text.trim()) return [];
 
-    const key = part.kind === 'reasoning'
-      ? `r${ordinals.reasoning++}`
-      : `t${ordinals.text++}`;
-    return [{ kind: part.kind, key, text: part.text }];
-  });
+    if (part.kind === 'tool_call') step.tools.push(part);
+    else if (part.kind === 'reasoning') step.reasoning.push(part.text);
+    // Joined without a separator, as `messageText` joins a message's text parts.
+    else step.text += part.text;
+  }
+
+  const entries: TimelineEntry[] = [];
+  const ordinals = { reasoning: 0, text: 0 };
+  for (const { reasoning, text, tools } of steps) {
+    for (const thought of reasoning) {
+      if (thought.trim()) {
+        entries.push({ kind: 'reasoning', key: `r${ordinals.reasoning++}`, text: thought });
+      }
+    }
+
+    // Trimmed, as `buildTimeline` trims a message's text: the two strings have
+    // to match exactly or the prose element is replaced at the handoff.
+    if (text.trim()) {
+      entries.push({ kind: 'text', key: `t${ordinals.text++}`, text: text.trim() });
+    }
+
+    for (const tool of tools) {
+      entries.push({
+        kind: 'tool',
+        key: tool.toolCallId,
+        toolCallId: tool.toolCallId,
+        name: tool.name,
+        args: parseJson(tool.args),
+      });
+    }
+  }
+
+  return entries;
 }
 
 export function OrbitReasoning({ text, open }: { text: string; open?: boolean }) {
@@ -327,26 +363,42 @@ export function collectSources(entries: TimelineEntry[]): OrbitSource[] {
   return [...byUrl.values()];
 }
 
+/**
+ * A tool can put anything in `url`, and `new URL` throws on a relative or
+ * malformed one. Nothing above this renders an error boundary, so a throw here
+ * would unmount the whole chat; drop the hostname line instead.
+ */
+function sourceHostname(url: string): string | null {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return null;
+  }
+}
+
 export function OrbitCitations({ sources }: { sources: OrbitSource[] }) {
   return (
     <div className="orbit-citations" data-testid="orbit-citations">
       <p className="orbit-kicker">SOURCES</p>
       <div className="orbit-citation-row">
-        {sources.map((source, index) => (
-          <a
-            key={source.url}
-            className="orbit-citation"
-            href={source.url}
-            target="_blank"
-            rel="noreferrer"
-            data-testid="orbit-citation"
-          >
-            <span>{index + 1}</span>
-            <strong>{source.title}</strong>
-            {source.snippet && <small>{source.snippet}</small>}
-            <em>{new URL(source.url).hostname}</em>
-          </a>
-        ))}
+        {sources.map((source, index) => {
+          const hostname = sourceHostname(source.url);
+          return (
+            <a
+              key={source.url}
+              className="orbit-citation"
+              href={source.url}
+              target="_blank"
+              rel="noreferrer"
+              data-testid="orbit-citation"
+            >
+              <span>{index + 1}</span>
+              <strong>{source.title}</strong>
+              {source.snippet && <small>{source.snippet}</small>}
+              {hostname && <em>{hostname}</em>}
+            </a>
+          );
+        })}
       </div>
     </div>
   );
