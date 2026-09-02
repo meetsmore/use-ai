@@ -3,9 +3,11 @@ import type {
   AGUIEvent,
   ToolCallStartEvent,
   ToolCallEndEvent,
+  ToolCallArgsEvent,
   RunErrorEvent,
   RunFinishedEvent,
   TextMessageContentEvent,
+  TextMessageStartEvent,
   ToolCallStartExtensions,
   ToolApprovalRequestEvent,
   ReasoningMessageContentEvent,
@@ -35,7 +37,29 @@ export interface UseServerEventsOptions {
   strings: UseAIStrings;
 }
 
+/**
+ * One piece of the answer currently being produced, in the order the model
+ * emitted it. A run that thinks, calls a tool, thinks again and answers keeps
+ * those boundaries here, so the UI can show it as it happened. Flattening the
+ * parts into what one bubble shows is the UI's job (see `utils/streamingParts`).
+ */
+export type ChatStreamingPart =
+  | { kind: 'reasoning'; text: string }
+  /**
+   * `messageId` is the id of the assistant message this text is persisted as,
+   * so deltas of one step reach one part even when reasoning interrupts them.
+   * @example "msg_01abc123"
+   */
+  | { kind: 'text'; text: string; messageId?: string }
+  /** Args arrive as a JSON string, incomplete until the call is fully received. */
+  | { kind: 'tool_call'; toolCallId: string; name: string; args: string };
+
 export interface ExecutingToolDisplay {
+  /** @example "toolu_01abc123" */
+  toolCallId: string;
+  /** Registered tool name, e.g. "searchDocs". */
+  name: string;
+  /** The tool's `title` annotation, or a generic fallback when it has none. */
   displayText: string;
 }
 
@@ -44,8 +68,6 @@ export interface UseServerEventsReturn {
   loading: boolean;
   /** Set the loading state (e.g., when sending a message) */
   setLoading: React.Dispatch<React.SetStateAction<boolean>>;
-  /** Current streaming text from the AI response */
-  streamingText: string;
   /**
    * Id the streaming answer will be persisted under, allocated at RUN_STARTED
    * and cleared when the run ends. The chat panel renders the streaming answer
@@ -54,14 +76,14 @@ export interface UseServerEventsReturn {
    * @example "msg_1723972800000_k3j9x2a"
    */
   streamingMessageId: string | null;
-  /** Clear streaming text (e.g., when starting a new message) */
-  clearStreamingText: () => void;
+  /** Drop the in-flight answer (e.g., when starting a new message) */
+  clearStreamingParts: () => void;
   /** Currently executing tool info for UI display, or null */
   executingTool: ExecutingToolDisplay | null;
-  /** Ref tracking which chat the current streaming text belongs to */
+  /** Ref tracking which chat the in-flight answer belongs to */
   streamingChatIdRef: React.MutableRefObject<string | null>;
-  /** Current streaming reasoning text from extended thinking */
-  streamingReasoning: string;
+  /** The in-flight answer split into ordered parts; empty between runs. */
+  streamingParts: ChatStreamingPart[];
   /**
    * Handles a server event. Called from the provider's client subscription.
    * Takes the client instance so it can access client-internal state
@@ -95,8 +117,7 @@ export function useServerEvents({
   strings,
 }: UseServerEventsOptions): UseServerEventsReturn {
   const [loading, setLoading] = useState(false);
-  const [streamingText, setStreamingText] = useState('');
-  const [streamingReasoning, setStreamingReasoning] = useState('');
+  const [streamingParts, setStreamingParts] = useState<ChatStreamingPart[]>([]);
   const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
   // Mirror of streamingMessageId for the stable event handler.
   const streamingMessageIdRef = useRef<string | null>(null);
@@ -113,19 +134,57 @@ export function useServerEvents({
   // still link saved partial responses back to the trace.
   const runIdAtRunStartRef = useRef<string | undefined>(undefined);
 
-  // Tracks whether prior steps in this run emitted text, so we can insert
-  // a paragraph separator (\n\n) in streamingText between steps.
-  const hasTextFromPriorStepRef = useRef<boolean>(false);
-
   // Executing tool state for UI display
   const [executingToolRaw, setExecutingTool] = useState<{
     toolCallId: string;
+    name: string;
     title: string | null;
   } | null>(null);
   const executingToolFallbackRef = useRef<string | null>(null);
 
-  const clearStreamingText = useCallback(() => {
-    setStreamingText('');
+  // Set on REASONING_MESSAGE_END so the next reasoning delta opens a new part.
+  // The server normally opens every block with REASONING_MESSAGE_START, but a
+  // provider that streams deltas without a start chunk gets only one START per
+  // step, and those deltas would otherwise land in the block that already
+  // ended. The persisted side splits on END too (client.ts pushes one block per
+  // END), so both sides cut the reasoning at the same boundary.
+  const reasoningPartEndedRef = useRef(false);
+
+  const clearStreamingParts = useCallback(() => {
+    setStreamingParts([]);
+  }, []);
+
+  /**
+   * Appends `delta` to this step's text part, starting one if needed.
+   *
+   * The step's part is found by id rather than taken from the end, because
+   * reasoning can arrive between two text deltas of the same step. Splitting
+   * there would join the two halves with a blank line the persisted message
+   * does not have, and the answer would change as the run finishes.
+   */
+  const appendText = useCallback((messageId: string | undefined, delta: string) => {
+    setStreamingParts(prev => {
+      for (let index = prev.length - 1; index >= 0; index--) {
+        const part = prev[index];
+        if (part.kind === 'text' && part.messageId === messageId) {
+          const next = [...prev];
+          next[index] = { ...part, text: part.text + delta };
+          return next;
+        }
+      }
+      return [...prev, { kind: 'text', text: delta, messageId }];
+    });
+  }, []);
+
+  /** Appends `delta` to the trailing reasoning part, starting one if needed. */
+  const appendReasoning = useCallback((delta: string) => {
+    setStreamingParts(prev => {
+      const last = prev[prev.length - 1];
+      if (last?.kind === 'reasoning') {
+        return [...prev.slice(0, -1), { ...last, text: last.text + delta }];
+      }
+      return [...prev, { kind: 'reasoning', text: delta }];
+    });
   }, []);
 
   // Keep refs to avoid stale closures in the event handler
@@ -181,8 +240,7 @@ export function useServerEvents({
   }, []);
 
   const resetRunUiState = useCallback(() => {
-    setStreamingText('');
-    setStreamingReasoning('');
+    setStreamingParts([]);
     setStreamingMessageId(null);
     streamingMessageIdRef.current = null;
     streamingChatIdRef.current = null;
@@ -202,22 +260,40 @@ export function useServerEvents({
       // so messages added after this point are from the AI turn.
       messageCountAtRunStartRef.current = client.messages.length;
       runIdAtRunStartRef.current = client.currentRunId ?? undefined;
-      hasTextFromPriorStepRef.current = false;
-      setStreamingReasoning('');
+      reasoningPartEndedRef.current = false;
+      setStreamingParts([]);
       const messageId = generateMessageId();
       streamingMessageIdRef.current = messageId;
       setStreamingMessageId(messageId);
     } else if (event.type === EventType.REASONING_MESSAGE_START) {
-      // Add paragraph separator between reasoning from different steps
-      setStreamingReasoning(prev => prev ? prev + '\n\n' : prev);
+      reasoningPartEndedRef.current = false;
+      setStreamingParts(prev => [...prev, { kind: 'reasoning', text: '' }]);
     } else if (event.type === EventType.REASONING_MESSAGE_CONTENT) {
       const reasoningEvent = event as ReasoningMessageContentEvent;
-      setStreamingReasoning(prev => prev + reasoningEvent.delta);
-    } else if (event.type === EventType.TEXT_MESSAGE_START) {
-      // Add paragraph separator between steps so combined text reads naturally
-      if (hasTextFromPriorStepRef.current) {
-        setStreamingText(prev => prev + '\n\n');
+      if (reasoningPartEndedRef.current) {
+        reasoningPartEndedRef.current = false;
+        setStreamingParts(prev => [...prev, { kind: 'reasoning', text: reasoningEvent.delta }]);
+      } else {
+        appendReasoning(reasoningEvent.delta);
       }
+    } else if (event.type === EventType.TEXT_MESSAGE_START) {
+      const startEvent = event as TextMessageStartEvent;
+      setStreamingParts(prev => [...prev, { kind: 'text', text: '', messageId: startEvent.messageId }]);
+    } else if (event.type === EventType.TOOL_CALL_ARGS) {
+      const argsEvent = event as ToolCallArgsEvent;
+      setStreamingParts(prev => {
+        // One event per argument token, so an unchanged run must keep its array:
+        // a new one re-renders the whole panel for nothing.
+        for (let index = 0; index < prev.length; index++) {
+          const part = prev[index];
+          if (part.kind === 'tool_call' && part.toolCallId === argsEvent.toolCallId) {
+            const next = [...prev];
+            next[index] = { ...part, args: part.args + argsEvent.delta };
+            return next;
+          }
+        }
+        return prev;
+      });
     } else if (event.type === EventType.TOOL_CALL_START) {
       const e = event as ToolCallStartEvent & Partial<ToolCallStartExtensions>;
 
@@ -230,7 +306,11 @@ export function useServerEvents({
         executingToolFallbackRef.current = fallbacks[Math.floor(Math.random() * fallbacks.length)];
       }
 
-      setExecutingTool({ toolCallId: e.toolCallId, title });
+      setExecutingTool({ toolCallId: e.toolCallId, name: e.toolCallName, title });
+      setStreamingParts(prev => [
+        ...prev,
+        { kind: 'tool_call', toolCallId: e.toolCallId, name: e.toolCallName, args: '' },
+      ]);
     } else if (event.type === EventType.TOOL_CALL_END) {
       const toolCallEnd = event as ToolCallEndEvent;
       const toolCallId = toolCallEnd.toolCallId;
@@ -266,8 +346,9 @@ export function useServerEvents({
       ts.handleApprovalRequest(e);
     } else if (event.type === EventType.TEXT_MESSAGE_CONTENT) {
       const contentEvent = event as TextMessageContentEvent;
-      hasTextFromPriorStepRef.current = true;
-      setStreamingText(prev => prev + contentEvent.delta);
+      appendText(contentEvent.messageId, contentEvent.delta);
+    } else if (event.type === EventType.REASONING_MESSAGE_END) {
+      reasoningPartEndedRef.current = true;
     } else if (event.type === EventType.TEXT_MESSAGE_END) {
       // Don't clear streaming text here — wait for RUN_FINISHED so text
       // stays visible across multi-step runs (no flash between steps).
@@ -310,19 +391,20 @@ export function useServerEvents({
   }, [resetRunUiState]);
 
   // Compute display value for UI
-  const executingTool = executingToolRaw ? {
+  const executingTool: ExecutingToolDisplay | null = executingToolRaw ? {
+    toolCallId: executingToolRaw.toolCallId,
+    name: executingToolRaw.name,
     displayText: executingToolRaw.title ?? executingToolFallbackRef.current ?? strings.toolExecution.fallbackMessages[0],
   } : null;
 
   return {
     loading,
     setLoading,
-    streamingText,
     streamingMessageId,
-    clearStreamingText,
+    clearStreamingParts,
     executingTool,
     streamingChatIdRef,
-    streamingReasoning,
+    streamingParts,
     handleServerEvent,
     handleDisconnect,
   };

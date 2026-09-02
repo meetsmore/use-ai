@@ -131,7 +131,7 @@ services:
       # - OPENAI_API_KEY=${OPENAI_API_KEY}
 
       # Optional: Model selection
-      # - ANTHROPIC_MODEL=claude-sonnet-4-20250514
+      # - ANTHROPIC_MODEL=claude-opus-5
       # - OPENAI_MODEL=gpt-4-turbo
 
       # Optional: Server configuration
@@ -723,6 +723,79 @@ root.render(
 );
 ```
 
+For partial customization, override only the built-in chat regions you own.
+Every slot receives the built-in UI as `children`: render it to decorate the
+default behavior, or omit it to replace that region completely.
+
+```tsx
+import type {
+  ChatMessageSlotProps,
+  ChatComposerSlotProps,
+} from '@meetsmore-oss/use-ai-client';
+
+function Message({ message, children }: ChatMessageSlotProps) {
+  return <div className={`my-message my-message-${message.role}`}>{children}</div>;
+}
+
+function Composer({ input, onInputChange, onSend, canSend }: ChatComposerSlotProps) {
+  return (
+    <form onSubmit={(event) => { event.preventDefault(); onSend(); }}>
+      <textarea value={input} onChange={(event) => onInputChange(event.target.value)} />
+      <button disabled={!canSend}>Send</button>
+    </form>
+  );
+}
+
+<UseAIProvider
+  serverUrl="wss://your-server.com"
+  chatComponents={{ Message, Composer }}
+>
+  <App />
+</UseAIProvider>
+```
+
+Available slots are `Header`, `EmptyState`, `Message`, `PendingIndicator`,
+`Composer`, `ToolApproval`, and `Disclaimer`. Provider-level `chatComponents` apply to all
+chat instances. A specific `<UseAIChat components={...} />` takes precedence.
+
+**Migrating a `CustomChat` from 1.17:** `ChatPanelProps` no longer carries
+`streamingText` and `streamingReasoning`, and `ReasoningProps` no longer carries
+`streamingText`. The in-flight answer now arrives as `streamingParts`, the
+ordered parts of the run. Flatten them with the exported helpers:
+
+```tsx
+import {
+  getTextFromStreamingParts,
+  getReasoningPartsFromStreamingParts,
+} from '@meetsmore-oss/use-ai-client';
+
+const streamingText = getTextFromStreamingParts(streamingParts);
+const streamingReasoning = getReasoningPartsFromStreamingParts(streamingParts);
+```
+
+The answer being streamed goes through `Message` too, as a provisional entry
+carrying the id it will be persisted under, so `streaming` tells the two apart.
+
+Each region's built-in implementation is exported as `DefaultHeader`,
+`DefaultMessage` and so on, taking exactly the props its slot receives. Reuse
+one when only part of a region needs to change:
+
+```tsx
+import { DefaultMessage, type ChatMessageSlotProps } from '@meetsmore-oss/use-ai-client';
+
+function Message(props: ChatMessageSlotProps) {
+  return (
+    <>
+      <DefaultMessage {...props} />
+      {props.isLast && <Citations />}
+    </>
+  );
+}
+```
+
+A working example of every slot, including a turn rendered as a timeline, lives
+in `apps/example` at `/custom-slots-demo`.
+
 You can also disable them by passing `null`:
 
 ```tsx
@@ -927,7 +1000,8 @@ For most use cases, you can just use `@meetsmore-oss/use-ai-server` as-is, and c
 ```bash
 # AI Provider (at least one required)
 ANTHROPIC_API_KEY=sk-ant-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-# ANTHROPIC_MODEL=claude-sonnet-4-20250514
+# ANTHROPIC_MODEL=claude-opus-5
+# ANTHROPIC_WORKSPACE_ID=wrkspc_xxxxxxxxxxxxxxxxxxxxxxx  # Required for an identity-linked key
 # OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 # OPENAI_MODEL=gpt-4-turbo
 
@@ -970,7 +1044,7 @@ const server = new UseAIServer({
     'claude': new AISDKAgent({
       name: 'Claude',
       annotation: 'Powered by Anthropic', // shown in agent selector UI
-      hooks: { loadConfig: () => ({ model: anthropic('claude-sonnet-4-20250514') }) },
+      hooks: { loadConfig: () => ({ model: anthropic('claude-opus-5') }) },
     })
   },
   defaultAgent: 'claude',

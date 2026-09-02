@@ -7,6 +7,8 @@ import type { AgentInfo, FeedbackValue, ToolAnnotations, EnabledFeatures } from 
 import type { FileUploadConfig, FileAttachment, FileProcessingState } from '../fileUpload/types';
 import type { SavedCommand } from '../commands/types';
 import type { Chat } from '../providers/chatRepository/types';
+import type { UseAIChatComponentOverrides } from './chatSlots';
+import type { ChatStreamingPart, ExecutingToolDisplay } from '../hooks/useServerEvents';
 
 /**
  * Internal context value for chat UI state.
@@ -26,16 +28,14 @@ export interface ChatUIContextValue {
   abortRun: () => void;
   /** Current messages in the conversation */
   messages: PersistedMessage[];
-  /** Currently streaming text from assistant (real-time updates) */
-  streamingText: string;
-  /** Currently streaming reasoning text from extended thinking */
-  streamingReasoning: string;
   /**
    * Id the streaming answer will be persisted under, or null when no run is
    * streaming into the displayed chat. Passing it to the panel lets the
    * streaming bubble and the persisted one be the same element.
    */
   streamingMessageId: string | null;
+  /** The in-flight answer split into ordered parts; empty between runs. */
+  streamingParts: ChatStreamingPart[];
   /** Aggregated suggestions from all useAI hooks */
   suggestions: string[];
   /** File upload configuration */
@@ -94,7 +94,7 @@ export interface ChatUIContextValue {
   /** Tool execution and approval state */
   tools: {
     /** Currently executing tool info for status display */
-    executing: { displayText: string } | null;
+    executing: ExecutingToolDisplay | null;
     /** Pending tool approval */
     pending: {
       /** All tools awaiting approval */
@@ -129,6 +129,8 @@ export interface ChatUIContextValue {
    * @default 'enter'
    */
   submitMode?: SubmitMode;
+  /** Provider-level component overrides for the built-in chat UI. */
+  components?: UseAIChatComponentOverrides;
 }
 
 /**
@@ -169,6 +171,11 @@ export interface UseAIChatProps {
    * - `'mod-enter'`: Enter inserts a newline. Cmd/Ctrl+Enter submits.
    */
   submitMode?: SubmitMode;
+  /**
+   * Replace individual regions of the built-in chat UI. Instance overrides
+   * take precedence over `UseAIProvider.chatComponents`.
+   */
+  components?: UseAIChatComponentOverrides;
 }
 
 /**
@@ -196,8 +203,13 @@ export interface UseAIChatProps {
  * </UseAIProvider>
  * ```
  */
-export function UseAIChat({ floating = false, submitMode }: UseAIChatProps) {
+export function UseAIChat({ floating = false, submitMode, components }: UseAIChatProps) {
   const ctx = useChatUIContext();
+
+  const mergedComponents = {
+    ...ctx.components,
+    ...components,
+  };
 
   const chatPanelProps = {
     submitMode: submitMode ?? ctx.submitMode,
@@ -205,9 +217,8 @@ export function UseAIChat({ floating = false, submitMode }: UseAIChatProps) {
     messages: ctx.messages,
     loading: ctx.loading,
     connected: ctx.connected,
-    streamingText: ctx.streamingText,
-    streamingReasoning: ctx.streamingReasoning,
     streamingMessageId: ctx.streamingMessageId,
+    streamingParts: ctx.streamingParts,
     currentChatId: ctx.history.currentId,
     onNewChat: ctx.history.create,
     onLoadChat: ctx.history.load,
@@ -233,6 +244,7 @@ export function UseAIChat({ floating = false, submitMode }: UseAIChatProps) {
     onApproveToolCall: ctx.tools.pending.tools.length > 0 ? ctx.tools.pending.approveAll : undefined,
     onRejectToolCall: ctx.tools.pending.tools.length > 0 ? ctx.tools.pending.rejectAll : undefined,
     onAbort: ctx.abortRun,
+    components: mergedComponents,
   };
 
   if (floating) {

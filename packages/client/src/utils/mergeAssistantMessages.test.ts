@@ -183,6 +183,51 @@ describe('mergeAssistantMessagesForDisplay', () => {
     expect(result[2].displayMode).toBe('info');
   });
 
+  it('keeps the whole turn in sourceMessages, in the order it was produced', () => {
+    const result = mergeAssistantMessagesForDisplay([
+      msg({ id: '1', role: 'user', content: 'Find the docs' }),
+      msg({ id: '2', role: 'assistant', content: 'Searching.', toolCalls: [tc('tc1', 'search')] }),
+      msg({ id: '3', role: 'tool', content: '{"sources":[]}', toolCallId: 'tc1' }),
+      msg({ id: '4', role: 'assistant', content: 'Here it is.' }),
+    ]);
+
+    expect(result.map((m) => m.sourceMessages.map((source) => source.id))).toEqual([
+      ['1'],
+      ['2', '3', '4'],
+    ]);
+    // The tool call and its result survive here even though merging drops both.
+    const turn = result[1].sourceMessages;
+    expect(turn[0].toolCalls?.[0].id).toBe('tc1');
+    expect(turn[1].content).toBe('{"sources":[]}');
+  });
+
+  it('does not carry one turn\'s sources into the next', () => {
+    const result = mergeAssistantMessagesForDisplay([
+      msg({ id: '1', role: 'user', content: 'First' }),
+      msg({ id: '2', role: 'assistant', content: 'One.' }),
+      msg({ id: '3', role: 'user', content: 'Second' }),
+      msg({ id: '4', role: 'assistant', content: 'Two.' }),
+    ]);
+
+    expect(result[3].sourceMessages.map((source) => source.id)).toEqual(['4']);
+  });
+
+  it('does not carry sources out of a turn that only made a silent tool call', () => {
+    // Aborting while a tool runs stores a turn with no assistant text and no
+    // reasoning, so nothing is flushed at the turn boundary.
+    const result = mergeAssistantMessagesForDisplay([
+      msg({ id: '1', role: 'user', content: 'First' }),
+      msg({ id: '2', role: 'assistant', content: '', toolCalls: [tc('tc1', 'search')] }),
+      msg({ id: '3', role: 'tool', content: '{}', toolCallId: 'tc1' }),
+      msg({ id: '4', role: 'assistant', content: 'Generation stopped.', displayMode: 'info' }),
+      msg({ id: '5', role: 'user', content: 'Second' }),
+      msg({ id: '6', role: 'assistant', content: 'Two.' }),
+    ]);
+
+    const answer = result[result.length - 1];
+    expect(answer.sourceMessages.map((source) => source.id)).toEqual(['6']);
+  });
+
   it('keeps an info notice standalone after a plain text reply', () => {
     const result = mergeAssistantMessagesForDisplay([
       msg({ id: '1', role: 'user', content: 'Hi' }),

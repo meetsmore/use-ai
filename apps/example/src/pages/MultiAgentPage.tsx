@@ -91,7 +91,7 @@ new UseAIServer({
   agents: {
     claude: new AISDKAgent({
       name: 'Claude',
-      hooks: { loadConfig: () => ({ model: anthropic('claude-sonnet-4-20250514') }) },
+      hooks: { loadConfig: () => ({ model: anthropic('claude-opus-5') }) },
     }),
     gpt: new AISDKAgent({
       name: 'GPT-4o',

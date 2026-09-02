@@ -41,6 +41,9 @@ function createAgents(): { agents: Record<string, Agent>; defaultAgent: string }
     ? createGateway({ apiKey: process.env.AI_GATEWAY_API_KEY })
     : undefined;
   const anthropicApiKey = process.env.ANTHROPIC_API_KEY;
+  // An identity-linked Anthropic key acts inside a workspace, and the API
+  // rejects a request that does not name one.
+  const anthropicWorkspaceId = process.env.ANTHROPIC_WORKSPACE_ID;
   const openaiApiKey = process.env.OPENAI_API_KEY;
 
   // Temperature can be set via env var (useful for E2E tests to reduce flakiness)
@@ -117,8 +120,11 @@ function createAgents(): { agents: Record<string, Agent>; defaultAgent: string }
     const modelId = process.env.AI_GATEWAY_CLAUDE_MODEL || 'anthropic/claude-haiku-4.5';
     addAgent('claude', 'Claude', gateway(modelId), modelId, true, claudeProviderOptions);
   } else if (anthropicApiKey) {
-    const modelId = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-20250514';
-    const model = createAnthropic({ apiKey: anthropicApiKey })(modelId);
+    const modelId = process.env.ANTHROPIC_MODEL || 'claude-opus-5';
+    const model = createAnthropic({
+      apiKey: anthropicApiKey,
+      ...(anthropicWorkspaceId ? { headers: { 'anthropic-workspace-id': anthropicWorkspaceId } } : {}),
+    })(modelId);
     addAgent('claude', 'Claude', model, modelId, false, claudeProviderOptions);
   }
 

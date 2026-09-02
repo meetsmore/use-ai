@@ -17,6 +17,7 @@ import ClientToolsPage from './pages/ClientToolsPage';
 import ChatHistoryPage from './pages/ChatHistoryPage';
 import SlashCommandsPage from './pages/SlashCommandsPage';
 import CustomUIPage from './pages/CustomUIPage';
+import CustomSlotsDemoPage from './pages/CustomSlotsDemoPage';
 import ThemeI18nPage from './pages/ThemeI18nPage';
 import SuggestionsPage from './pages/SuggestionsPage';
 import DestructiveApprovalPage from './pages/DestructiveApprovalPage';
@@ -66,6 +67,7 @@ const NAV_CATEGORIES: NavCategory[] = [
   {
     label: 'UI Customization',
     items: [
+      { path: '/custom-slots-demo', label: 'Component Slots Demo' },
       { path: '/custom-ui', label: 'Custom UI' },
       { path: '/theme-i18n', label: 'Theme & i18n' },
       { path: '/submit-mode', label: 'Submit Mode (Enter key)' },
@@ -174,6 +176,7 @@ function AppContent() {
         <Route path="/programmatic-chat"><ProgrammaticChatPage /></Route>
         <Route path="/chat-history"><ChatHistoryPage /></Route>
         <Route path="/slash-commands"><SlashCommandsPage /></Route>
+        <Route path="/custom-slots-demo"><CustomSlotsDemoPage /></Route>
         <Route path="/custom-ui"><CustomUIPage /></Route>
         <Route path="/theme-i18n"><ThemeI18nPage /></Route>
         <Route path="/submit-mode"><SubmitModePage /></Route>

@@ -21,10 +21,14 @@ import { useToolSystem, type RegisterToolsOptions } from '../hooks/useToolSystem
 import type { SubmitMode } from '../utils/keyboard';
 import { usePromptState } from '../hooks/usePromptState';
 import { useFeedback } from '../hooks/useFeedback';
-import { useServerEvents } from '../hooks/useServerEvents';
+import { useServerEvents, type ChatStreamingPart } from '../hooks/useServerEvents';
 import { useMessageQueue, type SendMessageOptions } from '../hooks/useMessageQueue';
 import { ThemeContext, StringsContext, defaultTheme, defaultStrings } from '../theme';
 import type { UseAITheme, UseAIStrings } from '../theme';
+import type { UseAIChatComponentOverrides } from '../components/chatSlots';
+
+/** Stable identity so a hidden chat's streaming parts do not re-render consumers. */
+const EMPTY_STREAMING_PARTS: ChatStreamingPart[] = [];
 
 // ── Context Types ───────────────────────────────────────────────────────────
 
@@ -235,10 +239,15 @@ export interface ChatPanelProps {
   loading: boolean;
   /** Whether the client is connected to the server */
   connected: boolean;
-  /** Optional currently streaming text from assistant */
-  streamingText?: string;
-  /** Optional currently streaming reasoning text from extended thinking */
-  streamingReasoning?: string;
+  /** The in-flight answer split into ordered parts; empty between runs */
+  streamingParts?: ChatStreamingPart[];
+  /**
+   * Id the streaming answer will be persisted under, or null between runs.
+   * Render the in-flight answer under this id to let the persisted answer take
+   * the same React key, so the bubble is updated instead of replaced and a
+   * selection inside it survives.
+   */
+  streamingMessageId?: string | null;
   /** Optional array of suggestion strings to display when chat is empty */
   suggestions?: string[];
   /** List of available agents from the server */
@@ -256,6 +265,8 @@ export interface UseAIProviderProps extends UseAIConfig {
   systemPrompt?: string;
   CustomButton?: React.ComponentType<FloatingButtonProps> | null;
   CustomChat?: React.ComponentType<ChatPanelProps> | null;
+  /** Default component overrides for every built-in chat rendered by this provider. */
+  chatComponents?: UseAIChatComponentOverrides;
   /**
    * Custom chat repository for message persistence.
    * Defaults to LocalStorageChatRepository if not provided.
@@ -464,6 +475,7 @@ export function UseAIProvider({
   systemPrompt,
   CustomButton,
   CustomChat,
+  chatComponents,
   chatRepository,
   forwardedPropsProvider,
   fileUploadConfig: fileUploadConfigProp,
@@ -641,7 +653,7 @@ export function UseAIProvider({
   const handleSendMessage = useCallback(async (message: string, attachments?: FileAttachment[], messageForwardedProps?: UseAIForwardedProps) => {
     if (!clientRef.current) return;
 
-    serverEvents.clearStreamingText();
+    serverEvents.clearStreamingParts();
 
     const activatedChatId = chatManagement.activatePendingChat();
     const activeChatId = activatedChatId || chatManagement.currentChatId;
@@ -765,12 +777,10 @@ export function UseAIProvider({
 
   // ── Chat UI ─────────────────────────────────────────────────────────────
 
-  const effectiveStreamingText = serverEvents.streamingChatIdRef.current === chatManagement.displayedChatId
-    ? serverEvents.streamingText : '';
-  const effectiveStreamingReasoning = serverEvents.streamingChatIdRef.current === chatManagement.displayedChatId
-    ? serverEvents.streamingReasoning : '';
   const effectiveStreamingMessageId = serverEvents.streamingChatIdRef.current === chatManagement.displayedChatId
     ? serverEvents.streamingMessageId : null;
+  const effectiveStreamingParts = serverEvents.streamingChatIdRef.current === chatManagement.displayedChatId
+    ? serverEvents.streamingParts : EMPTY_STREAMING_PARTS;
 
   const chatUIContextValue: ChatUIContextValue = {
     connected,
@@ -778,9 +788,8 @@ export function UseAIProvider({
     sendMessage: handleSendMessage,
     abortRun,
     messages,
-    streamingText: effectiveStreamingText,
-    streamingReasoning: effectiveStreamingReasoning,
     streamingMessageId: effectiveStreamingMessageId,
+    streamingParts: effectiveStreamingParts,
     suggestions: promptState.aggregatedSuggestions,
     fileUploadConfig,
     fileProcessing: fileProcessingState,
@@ -822,6 +831,7 @@ export function UseAIProvider({
       submit: feedback.submitFeedback,
     },
     submitMode,
+    components: chatComponents,
   };
 
   const isUIDisabled = CustomButton === null || CustomChat === null;
@@ -834,9 +844,8 @@ export function UseAIProvider({
     messages,
     loading: serverEvents.loading,
     connected,
-    streamingText: effectiveStreamingText,
-    streamingReasoning: effectiveStreamingReasoning,
     streamingMessageId: effectiveStreamingMessageId,
+    streamingParts: effectiveStreamingParts,
     currentChatId: chatManagement.displayedChatId,
     onNewChat: chatManagement.createNewChat,
     onLoadChat: chatManagement.loadChat,
@@ -861,6 +870,7 @@ export function UseAIProvider({
     onApproveToolCall: toolSystem.pendingApprovals.length > 0 ? toolSystem.approveAll : undefined,
     onRejectToolCall: toolSystem.pendingApprovals.length > 0 ? toolSystem.rejectAll : undefined,
     submitMode,
+    components: chatComponents,
   };
 
   const renderDefaultChat = () => {
@@ -886,8 +896,8 @@ export function UseAIProvider({
         messages={messages}
         loading={serverEvents.loading}
         connected={connected}
-        streamingText={effectiveStreamingText}
-        streamingReasoning={effectiveStreamingReasoning}
+        streamingParts={effectiveStreamingParts}
+        streamingMessageId={effectiveStreamingMessageId}
         suggestions={promptState.aggregatedSuggestions}
         availableAgents={availableAgents}
         defaultAgent={defaultAgent}

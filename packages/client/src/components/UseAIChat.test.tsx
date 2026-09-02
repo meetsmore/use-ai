@@ -11,8 +11,7 @@ function createContextValue(overrides: Partial<ChatUIContextValue> = {}): ChatUI
     loading: false,
     sendMessage: mock(async () => {}),
     messages: [],
-    streamingText: '',
-    streamingReasoning: '',
+    streamingParts: [],
     streamingMessageId: null,
     suggestions: [],
     fileUploadConfig: undefined,
@@ -58,10 +57,25 @@ function createContextValue(overrides: Partial<ChatUIContextValue> = {}): ChatUI
 }
 
 describe('UseAIChat', () => {
-  test('passes streaming reasoning through to UseAIChatPanel', () => {
+  test('prefers instance component overrides over provider-level overrides', () => {
+    const ProviderHeader = () => <div data-testid="provider-header" />;
+    const InstanceHeader = () => <div data-testid="instance-header" />;
+    const ctx = createContextValue({ components: { Header: ProviderHeader } });
+
+    const { getByTestId, queryByTestId } = render(
+      <__UseAIChatContext.Provider value={ctx}>
+        <UseAIChat components={{ Header: InstanceHeader }} />
+      </__UseAIChatContext.Provider>
+    );
+
+    expect(getByTestId('instance-header')).toBeInTheDocument();
+    expect(queryByTestId('provider-header')).toBeNull();
+  });
+
+  test('passes the streaming parts through to UseAIChatPanel', () => {
     const ctx = createContextValue({
       loading: true,
-      streamingReasoning: 'First thought...',
+      streamingParts: [{ kind: 'reasoning', text: 'First thought...' }],
     });
 
     const { getByTestId, getByText } = render(
@@ -80,7 +94,7 @@ describe('UseAIChat', () => {
   test('renders the streaming answer under the id it will be persisted with', () => {
     const ctx = createContextValue({
       loading: true,
-      streamingText: 'partial answer',
+      streamingParts: [{ kind: 'text', text: 'partial answer' }],
       streamingMessageId: 'msg-assistant',
     });
 
@@ -101,7 +115,7 @@ describe('UseAIChat', () => {
     };
     rerender(
       <__UseAIChatContext.Provider
-        value={createContextValue({ messages: [persisted], streamingText: '', streamingMessageId: null })}
+        value={createContextValue({ messages: [persisted], streamingParts: [], streamingMessageId: null })}
       >
         <UseAIChat />
       </__UseAIChatContext.Provider>

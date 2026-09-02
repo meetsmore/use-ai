@@ -54,9 +54,9 @@ function ChevronIcon({ color, size = 16, rotated }: { color: string; size?: numb
 }
 
 export interface ReasoningProps {
+  /** Every step's reasoning, whether the run is still in flight or persisted. */
   reasoningParts: ReasoningPart[];
   isStreaming?: boolean;
-  streamingText?: string;
   theme: UseAITheme;
   strings: UseAIStrings;
 }
@@ -64,7 +64,6 @@ export interface ReasoningProps {
 export function Reasoning({
   reasoningParts,
   isStreaming = false,
-  streamingText,
   theme,
   strings,
 }: ReasoningProps) {
@@ -72,11 +71,7 @@ export function Reasoning({
 
   const toggle = useCallback(() => setIsOpen(prev => !prev), []);
 
-  // Combine completed parts + streaming block
-  const allText = [
-    ...reasoningParts.map(p => p.text),
-    ...(isStreaming && streamingText ? [streamingText] : []),
-  ].join('\n\n');
+  const allText = reasoningParts.map(p => p.text).join('\n\n');
 
   const headerContent = isStreaming
     ? <ShimmerText text={strings.thinking.inProgress} theme={theme} />
