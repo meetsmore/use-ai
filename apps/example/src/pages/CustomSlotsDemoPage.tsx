@@ -14,6 +14,8 @@ import {
   type PersistedMessageContent,
   type UseAIChatComponentOverrides,
 } from '@meetsmore-oss/use-ai-client';
+import { CollapsibleCode } from '../components/CollapsibleCode';
+import { docStyles } from '../styles/docStyles';
 import {
   OrbitCitations,
   OrbitProse,
@@ -399,14 +401,39 @@ const computeOrbitalPeriod = defineTool(
   }
 );
 
-const SLOT_NAMES = ['Header', 'Empty state', 'Messages', 'Pending indicator', 'Composer', 'Tool approval', 'Disclaimer'];
-
-const RENDERING_NOTES = [
-  'Tool calls as cards, in the turn',
-  'LaTeX in assistant prose',
-  'Sources pinned under the answer',
-  'Reasoning inline, step by step',
+const SLOT_NAMES = [
+  'Header: brand mark, agent picker, connection status',
+  'Empty state: kicker, intro, prompt list',
+  'Message: the whole turn, drawn as a timeline',
+  'Pending indicator: writing dots on the message meta line',
+  'Composer: textarea, attachments, send and stop',
+  'Tool approval: inline approve and reject row',
+  'Disclaimer: footer line under the composer',
 ];
+
+const CODE_EXAMPLE = `import {
+  UseAIChat,
+  type ChatMessageSlotProps,
+  type UseAIChatComponentOverrides,
+} from '@meetsmore-oss/use-ai-client';
+
+function OrbitMessage({ message, sourceMessages, streaming, streamingParts }: ChatMessageSlotProps) {
+  const entries = streaming ? buildStreamingTimeline(streamingParts) : buildTimeline(sourceMessages);
+
+  return <article className="orbit-message">{entries.map(renderEntry)}</article>;
+}
+
+const orbitComponents: UseAIChatComponentOverrides = {
+  Header: OrbitHeader,
+  EmptyState: OrbitEmptyState,
+  Message: OrbitMessage,
+  PendingIndicator: OrbitPendingIndicator,
+  Composer: OrbitComposer,
+  ToolApproval: OrbitToolApproval,
+  Disclaimer: OrbitDisclaimer,
+};
+
+<UseAIChat components={orbitComponents} />`;
 
 export default function CustomSlotsDemoPage() {
   useAI({
@@ -420,49 +447,66 @@ export default function CustomSlotsDemoPage() {
   });
 
   return (
-    <div className="custom-slots-demo" data-testid="custom-slots-demo-page">
+    <div className="custom-slots-demo" style={docStyles.container} data-testid="custom-slots-demo-page">
       <style>{orbitStyles}</style>
-      <section className="orbit-page-intro">
-        <div>
-          <p className="orbit-page-kicker">COMPONENT SLOTS / LIVE EXAMPLE</p>
-          <h1>Same engine.<br /><em>A different character.</em></h1>
-        </div>
-        <div className="orbit-page-note">
-          <span>07</span>
-          <p>Every visible region below is supplied by the consuming app. Protocol, state, and streaming stay inside use-ai.</p>
-        </div>
-      </section>
+      <h1 style={docStyles.title}>Component Slots Demo</h1>
 
-      <section className="orbit-demo-grid">
+      <div style={docStyles.infoCard}>
+        <h2 style={docStyles.subtitle}>About</h2>
+        <p style={docStyles.text}>
+          Pass <code style={docStyles.code}>components</code> to{' '}
+          <code style={docStyles.code}>UseAIChat</code> to replace a region of the chat with your own
+          component. This page replaces all seven regions. The protocol, the state and the streaming
+          stay inside use-ai.
+        </p>
+        <ul style={docStyles.list}>
+          {SLOT_NAMES.map((name) => (
+            <li key={name}>{name}</li>
+          ))}
+        </ul>
+      </div>
+
+      <div style={docStyles.demoCard}>
+        <h2 style={docStyles.subtitle}>Live Demo</h2>
+        <p style={docStyles.text}>
+          Ask a question to see the slots draw a turn. The page registers two tools:{' '}
+          <code style={docStyles.code}>searchHandbook</code> returns sources, and{' '}
+          <code style={docStyles.code}>computeOrbitalPeriod</code> returns a formula in LaTeX.
+        </p>
         <div className="orbit-chat-shell">
           <div className="orbit-chat-accent" />
           <div className="orbit-chat" data-testid="orbit-chat">
             <UseAIChat components={orbitComponents} />
           </div>
         </div>
+      </div>
 
-        <aside className="orbit-specimen-card">
-          <p className="orbit-page-kicker">OVERRIDDEN REGIONS</p>
-          <h2>Slots, not a theme preset.</h2>
-          <p>
-            These are regular React components receiving live chat state and callbacks. Change markup, layout, or behavior without forking the chat client.
-          </p>
-          <ol>
-            {SLOT_NAMES.map((name, index) => (
-              <li key={name}><span>0{index + 1}</span>{name}</li>
-            ))}
-          </ol>
-          <p className="orbit-page-kicker">BUILT FROM sourceMessages</p>
-          <ul className="orbit-notes">
-            {RENDERING_NOTES.map((note) => (
-              <li key={note}>{note}</li>
-            ))}
-          </ul>
-          <div className="orbit-code-line">
-            <code>{'<UseAIChat components={orbitComponents} />'}</code>
-          </div>
-        </aside>
-      </section>
+      <div style={docStyles.definitionCard}>
+        <h2 style={docStyles.subtitle}>Code Example</h2>
+        <CollapsibleCode>{CODE_EXAMPLE}</CollapsibleCode>
+      </div>
+
+      <div style={docStyles.contextCard}>
+        <h2 style={docStyles.subtitle}>How It Works</h2>
+        <ul style={docStyles.list}>
+          <li>Each slot is a React component. It receives the live chat state and the callbacks as props.</li>
+          <li>
+            The <code style={docStyles.code}>Message</code> slot builds the timeline from{' '}
+            <code style={docStyles.code}>sourceMessages</code>: reasoning, tool cards and prose, in the
+            order the model produced them.
+          </li>
+          <li>
+            While the answer streams, the same slot reads{' '}
+            <code style={docStyles.code}>streamingParts</code>. The layout therefore does not change when
+            the run finishes.
+          </li>
+          <li>Tool results carry sources. The slot pins the sources under the answer.</li>
+          <li>
+            Render <code style={docStyles.code}>children</code> to decorate a built-in region. Omit{' '}
+            <code style={docStyles.code}>children</code> to replace the region.
+          </li>
+        </ul>
+      </div>
     </div>
   );
 }
@@ -472,25 +516,8 @@ const orbitStyles = `
     --orbit-ink: #11182b;
     --orbit-lime: #d7ff3f;
     --orbit-coral: #ff6b57;
-    min-height: 100vh;
-    padding: 52px clamp(24px, 5vw, 72px) 72px;
-    box-sizing: border-box;
-    color: var(--orbit-ink);
-    background:
-      radial-gradient(circle at 90% 4%, rgba(255, 107, 87, .19), transparent 27%),
-      linear-gradient(115deg, rgba(17, 24, 43, .045) 1px, transparent 1px),
-      #f1f2e9;
-    background-size: auto, 34px 34px, auto;
-    font-family: Inter, ui-sans-serif, system-ui, sans-serif;
   }
-  .orbit-page-intro { display: flex; justify-content: space-between; align-items: end; gap: 40px; max-width: 1180px; margin: 0 auto 42px; }
-  .orbit-page-kicker, .orbit-kicker, .orbit-eyebrow { margin: 0; font-size: 10px; line-height: 1.2; font-weight: 800; letter-spacing: .19em; }
-  .orbit-page-intro h1 { margin: 13px 0 0; font-size: clamp(38px, 5vw, 68px); line-height: .96; letter-spacing: -.055em; font-weight: 760; }
-  .orbit-page-intro h1 em, .orbit-empty h2 em { color: var(--orbit-coral); font-family: Georgia, serif; font-weight: 400; }
-  .orbit-page-note { display: flex; align-items: start; gap: 14px; width: min(360px, 100%); padding-bottom: 5px; }
-  .orbit-page-note > span { display: grid; place-items: center; flex: 0 0 44px; height: 44px; background: var(--orbit-lime); border: 1px solid var(--orbit-ink); border-radius: 50%; font-size: 13px; font-weight: 800; }
-  .orbit-page-note p { margin: 0; font-size: 13px; line-height: 1.55; color: #555b68; }
-  .orbit-demo-grid { display: grid; grid-template-columns: minmax(520px, 1fr) 310px; gap: 24px; max-width: 1180px; margin: 0 auto; align-items: stretch; }
+  .orbit-kicker, .orbit-eyebrow { margin: 0; font-size: 10px; line-height: 1.2; font-weight: 800; letter-spacing: .19em; }
   .orbit-chat-shell { display: grid; position: relative; min-height: 680px; overflow: hidden; background: var(--orbit-ink); border-radius: 26px; box-shadow: 0 26px 70px rgba(17, 24, 43, .18); }
   .orbit-chat-accent { position: absolute; top: -55px; right: -42px; width: 190px; height: 190px; border: 34px solid rgba(215, 255, 63, .11); border-radius: 50%; pointer-events: none; z-index: 1; }
   .orbit-chat { min-height: 0; position: relative; z-index: 2; }
@@ -565,9 +592,6 @@ const orbitStyles = `
   .orbit-citation strong { color: #e8eae3; font-size: 11px; line-height: 1.3; }
   .orbit-citation small { color: #8e96a8; font-size: 10px; line-height: 1.4; }
   .orbit-citation em { color: #747d91; font-size: 9px; font-style: normal; }
-  .orbit-notes { list-style: none; margin: 0 0 18px; padding: 0; display: grid; gap: 6px; }
-  .orbit-notes li { position: relative; padding-left: 15px; color: #626775; font-size: 11px; line-height: 1.5; }
-  .orbit-notes li::before { content: ''; position: absolute; left: 0; top: 6px; width: 6px; height: 6px; border-radius: 2px; background: var(--orbit-coral); }
   .orbit-avatar-pulse { animation: orbit-pulse 1.6s ease-in-out infinite; }
   .orbit-writing { display: flex; align-items: center; gap: 3px; text-transform: none; letter-spacing: 0; }
   .orbit-writing i { width: 3px; height: 3px; background: var(--orbit-lime); border-radius: 50%; animation: orbit-dot 1s ease-in-out infinite; }
@@ -599,29 +623,10 @@ const orbitStyles = `
   .orbit-approval small { color: #aab0bf; font-size: 9px; }
   .orbit-approval button { padding: 7px 9px; color: #c4c9d3; background: transparent; border: 1px solid rgba(255,255,255,.13); border-radius: 7px; cursor: pointer; font: 600 9px inherit; }
   .orbit-approval button.is-approve { color: var(--orbit-ink); background: var(--orbit-coral); border-color: var(--orbit-coral); }
-  .orbit-specimen-card { display: flex; flex-direction: column; min-height: 680px; box-sizing: border-box; padding: 28px 26px; background: #fffdf5; border: 1px solid rgba(17,24,43,.13); border-radius: 26px; }
-  .orbit-specimen-card h2 { margin: 16px 0 10px; font-family: Georgia, serif; font-size: 28px; line-height: 1.05; font-weight: 400; letter-spacing: -.025em; }
-  .orbit-specimen-card > p:not(.orbit-page-kicker) { margin: 0; color: #626775; font-size: 12px; line-height: 1.6; }
-  .orbit-specimen-card ol { list-style: none; margin: 27px 0; padding: 0; border-top: 1px solid #dadbd4; }
-  .orbit-specimen-card li { display: flex; gap: 13px; padding: 11px 0; border-bottom: 1px solid #dadbd4; font-size: 12px; font-weight: 700; }
-  .orbit-specimen-card li span { color: var(--orbit-coral); font-size: 9px; font-weight: 800; }
-  .orbit-code-line { margin-top: auto; padding: 13px; color: #edf0e5; background: var(--orbit-ink); border-radius: 10px; overflow: hidden; }
-  .orbit-code-line code { font-size: 9px; white-space: nowrap; }
   @keyframes orbit-pulse { 50% { box-shadow: 0 0 0 6px rgba(215,255,63,.08); } }
   @keyframes orbit-dot { 50% { opacity: .25; transform: translateY(-2px); } }
-  @media (max-width: 1050px) {
-    .orbit-demo-grid { grid-template-columns: 1fr; }
-    .orbit-specimen-card { min-height: auto; }
-    .orbit-specimen-card ol { display: grid; grid-template-columns: 1fr 1fr; gap: 0 18px; }
-    .orbit-code-line { margin-top: 8px; }
-  }
   @media (max-width: 720px) {
-    .custom-slots-demo { padding: 32px 14px 48px; }
-    .orbit-page-intro { display: block; }
-    .orbit-page-note { margin-top: 24px; }
-    .orbit-demo-grid { display: block; }
     .orbit-chat-shell { min-height: 650px; }
-    .orbit-specimen-card { margin-top: 18px; }
     .orbit-composer-actions small { display: none; }
     .orbit-agent-name, .orbit-agent-select { display: none; }
   }
