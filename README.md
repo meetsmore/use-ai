@@ -758,6 +758,9 @@ Available slots are `Header`, `EmptyState`, `Message`, `PendingIndicator`,
 `Composer`, `ToolApproval`, and `Disclaimer`. Provider-level `chatComponents` apply to all
 chat instances. A specific `<UseAIChat components={...} />` takes precedence.
 
+The answer being streamed goes through `Message` too, as a provisional entry
+carrying the id it will be persisted under, so `streaming` tells the two apart.
+
 Each region's built-in implementation is exported as `DefaultHeader`,
 `DefaultMessage` and so on, taking exactly the props its slot receives. Reuse
 one when only part of a region needs to change:
@@ -775,60 +778,8 @@ function Message(props: ChatMessageSlotProps) {
 }
 ```
 
-The answer being streamed goes through `Message` too, as a provisional entry
-carrying the id it will be persisted under. `streaming` tells the two apart, and
-`streamingParts` holds the answer so far as the ordered pieces the model emitted:
-
-```tsx
-function Message({ message, streaming, streamingParts }: ChatMessageSlotProps) {
-  if (!streaming) return <PersistedTurn message={message} />;
-
-  return (
-    <div className="my-message is-streaming">
-      {streamingParts.map((part, index) => {
-        if (part.kind === 'reasoning') return <Thinking key={index} text={part.text} />;
-        if (part.kind === 'tool_call') return <ToolCard key={index} name={part.name} />;
-        return <Body key={index} text={part.text} />;
-      })}
-    </div>
-  );
-}
-```
-
-A run that thinks, calls a tool, thinks again and answers gives four parts in
-that order. A slot that wants one bubble instead of the pieces can flatten them
-the way the built-in bubble does, with the exported `getTextFromStreamingParts`
-(the text of every step, joined with a blank line) and
-`getReasoningPartsFromStreamingParts` (the reasoning in the shape a persisted
-turn carries it).
-
-`PendingIndicator` covers the gap between the run starting and the first token
-arriving, plus send-time file processing. It receives `executingTool` and
-`fileProcessing`, and stops rendering once the answer starts arriving.
-
-### Rendering a turn as a timeline
-
-The built-in bubble shows one turn as a single block of text: the tool calls,
-their results and the per-step reasoning are merged away. `sourceMessages` hands
-those back, in the order the model produced them, so a `Message` slot can lay
-the turn out step by step instead:
-
-```tsx
-function Message({ sourceMessages }: ChatMessageSlotProps) {
-  return sourceMessages.flatMap((source) => {
-    if (source.role === 'tool') return [];          // consumed as a call's result
-    return [
-      ...(source.reasoningParts ?? []).map((part) => <Thinking text={part.text} />),
-      <Prose content={source.content} />,
-      ...(source.toolCalls ?? []).map((call) => <ToolCard call={call} />),
-    ];
-  });
-}
-```
-
-A `tool` message carries the result of the call with the matching `toolCallId`,
-so anything a tool returned (citations, a table, a chart) is available to render
-under the answer. `apps/example` has a working page: `/custom-slots-demo`.
+A working example of every slot, including a turn rendered as a timeline, lives
+in `apps/example` at `/custom-slots-demo`.
 
 You can also disable them by passing `null`:
 
