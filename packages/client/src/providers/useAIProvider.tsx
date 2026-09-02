@@ -241,6 +241,13 @@ export interface ChatPanelProps {
   connected: boolean;
   /** The in-flight answer split into ordered parts; empty between runs */
   streamingParts?: ChatStreamingPart[];
+  /**
+   * Id the streaming answer will be persisted under, or null between runs.
+   * Render the in-flight answer under this id to let the persisted answer take
+   * the same React key, so the bubble is updated instead of replaced and a
+   * selection inside it survives.
+   */
+  streamingMessageId?: string | null;
   /** Optional array of suggestion strings to display when chat is empty */
   suggestions?: string[];
   /** List of available agents from the server */
@@ -890,6 +897,7 @@ export function UseAIProvider({
         loading={serverEvents.loading}
         connected={connected}
         streamingParts={effectiveStreamingParts}
+        streamingMessageId={effectiveStreamingMessageId}
         suggestions={promptState.aggregatedSuggestions}
         availableAgents={availableAgents}
         defaultAgent={defaultAgent}
