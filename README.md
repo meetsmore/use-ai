@@ -796,8 +796,11 @@ function Message({ message, streaming, streamingParts }: ChatMessageSlotProps) {
 ```
 
 A run that thinks, calls a tool, thinks again and answers gives four parts in
-that order. `streamingText` and `streamingReasoning` are still there, each
-flattening the whole run into one string; the built-in bubble uses those.
+that order. A slot that wants one bubble instead of the pieces can flatten them
+the way the built-in bubble does, with the exported `getTextFromStreamingParts`
+(the text of every step, joined with a blank line) and
+`getReasoningPartsFromStreamingParts` (the reasoning in the shape a persisted
+turn carries it).
 
 `PendingIndicator` covers the gap between the run starting and the first token
 arriving, plus send-time file processing. It receives `executingTool` and
