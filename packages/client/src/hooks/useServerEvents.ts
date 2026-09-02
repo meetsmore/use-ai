@@ -136,6 +136,14 @@ export function useServerEvents({
   } | null>(null);
   const executingToolFallbackRef = useRef<string | null>(null);
 
+  // Set on REASONING_MESSAGE_END so the next reasoning delta opens a new part.
+  // The server normally opens every block with REASONING_MESSAGE_START, but a
+  // provider that streams deltas without a start chunk gets only one START per
+  // step, and those deltas would otherwise land in the block that already
+  // ended. The persisted side splits on END too (client.ts pushes one block per
+  // END), so both sides cut the reasoning at the same boundary.
+  const reasoningPartEndedRef = useRef(false);
+
   const clearStreamingParts = useCallback(() => {
     setStreamingParts([]);
   }, []);
@@ -224,15 +232,22 @@ export function useServerEvents({
       // so messages added after this point are from the AI turn.
       messageCountAtRunStartRef.current = client.messages.length;
       runIdAtRunStartRef.current = client.currentRunId ?? undefined;
+      reasoningPartEndedRef.current = false;
       setStreamingParts([]);
       const messageId = generateMessageId();
       streamingMessageIdRef.current = messageId;
       setStreamingMessageId(messageId);
     } else if (event.type === EventType.REASONING_MESSAGE_START) {
+      reasoningPartEndedRef.current = false;
       setStreamingParts(prev => [...prev, { kind: 'reasoning', text: '' }]);
     } else if (event.type === EventType.REASONING_MESSAGE_CONTENT) {
       const reasoningEvent = event as ReasoningMessageContentEvent;
-      appendToPart('reasoning', reasoningEvent.delta);
+      if (reasoningPartEndedRef.current) {
+        reasoningPartEndedRef.current = false;
+        setStreamingParts(prev => [...prev, { kind: 'reasoning', text: reasoningEvent.delta }]);
+      } else {
+        appendToPart('reasoning', reasoningEvent.delta);
+      }
     } else if (event.type === EventType.TEXT_MESSAGE_START) {
       setStreamingParts(prev => [...prev, { kind: 'text', text: '' }]);
     } else if (event.type === EventType.TOOL_CALL_ARGS) {
@@ -295,6 +310,8 @@ export function useServerEvents({
     } else if (event.type === EventType.TEXT_MESSAGE_CONTENT) {
       const contentEvent = event as TextMessageContentEvent;
       appendToPart('text', contentEvent.delta);
+    } else if (event.type === EventType.REASONING_MESSAGE_END) {
+      reasoningPartEndedRef.current = true;
     } else if (event.type === EventType.TEXT_MESSAGE_END) {
       // Don't clear streaming text here — wait for RUN_FINISHED so text
       // stays visible across multi-step runs (no flash between steps).

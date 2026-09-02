@@ -57,6 +57,28 @@ describe('useServerEvents — streaming parts', () => {
     ]);
   });
 
+  // A provider that streams reasoning deltas without a start chunk gets one
+  // REASONING_MESSAGE_START for the whole step, so the block boundary the
+  // persisted turn keeps (one block per REASONING_MESSAGE_END) has to come off
+  // END here too. Otherwise the second block's text joins the first one and the
+  // thinking text changes the moment the run finishes.
+  it('starts a new reasoning part after a block ended, without a second start', async () => {
+    const { result, client } = setup();
+
+    await act(async () => {
+      await result.current.handleServerEvent(client, { type: EventType.RUN_STARTED, threadId: 't', runId: 'run-1' });
+      await result.current.handleServerEvent(client, { type: EventType.REASONING_MESSAGE_START, messageId: 'r1' });
+      await result.current.handleServerEvent(client, { type: EventType.REASONING_MESSAGE_CONTENT, messageId: 'r1', delta: 'First I check the time.' });
+      await result.current.handleServerEvent(client, { type: EventType.REASONING_MESSAGE_END, messageId: 'r1' });
+      await result.current.handleServerEvent(client, { type: EventType.REASONING_MESSAGE_CONTENT, messageId: 'r1', delta: 'Then I add the numbers.' });
+    });
+
+    expect(result.current.streamingParts).toEqual([
+      { kind: 'reasoning', text: 'First I check the time.' },
+      { kind: 'reasoning', text: 'Then I add the numbers.' },
+    ]);
+  });
+
   it('interleaves reasoning, tool calls and text in the order they arrived', async () => {
     const { result, client } = setup();
 
