@@ -7,6 +7,38 @@ import type { CorsOptions } from '../types';
 export type RuntimeType = 'bun' | 'node';
 
 /**
+ * A plain WebSocket connection, as the runtime adapters expose it.
+ * Text frames only; the framing above it is the caller's business.
+ */
+export interface RawWebSocket {
+  /** Remote address of the peer, when the runtime exposes one. */
+  readonly remoteAddress?: string;
+  /** Whether the connection is still open. */
+  readonly open: boolean;
+  /** Sends a text frame. */
+  send(data: string): void;
+  /** Closes the connection. */
+  close(): void;
+  /** Registers the handler for text frames arriving from the peer. */
+  onMessage(handler: (data: string) => void): void;
+  /** Registers the handler for the connection closing, for any reason. */
+  onClose(handler: () => void): void;
+}
+
+/**
+ * A plain WebSocket listener, served on the same port and HTTP server as Socket.IO.
+ */
+export interface RawWebSocketListener {
+  /**
+   * Path that upgrades to a plain WebSocket.
+   * @example '/ws'
+   */
+  path: string;
+  /** Called once per accepted connection. */
+  onConnection(connection: RawWebSocket): void;
+}
+
+/**
  * Configuration for creating a runtime server.
  */
 export interface RuntimeServerConfig {
@@ -27,6 +59,11 @@ export interface RuntimeServerConfig {
    * Called when a polling transport connection is established.
    */
   onPollingConnection?: (sessionId: string, ip: string) => void;
+  /**
+   * Plain WebSocket listener to serve alongside Socket.IO.
+   * Omit to serve Socket.IO only.
+   */
+  websocket?: RawWebSocketListener;
 }
 
 /**

@@ -2,6 +2,7 @@ import type { Server as SocketIOServer } from 'socket.io';
 import { Server as BunEngine } from '@socket.io/bun-engine';
 import type { RuntimeAdapter, RuntimeServerConfig, RuntimeServerHandle } from '../types';
 import { resolveCorsHeaders, resolvePreflightHeaders } from './cors';
+import { BunRawWebSocket, isRawWebSocket, type RawWebSocketData } from './rawWebSocket';
 
 /**
  * Runtime adapter for Bun.
@@ -33,7 +34,34 @@ export class BunRuntimeAdapter implements RuntimeAdapter {
     io.bind(this.engine);
 
     const handler = this.engine.handleRequest.bind(this.engine);
-    const websocketHandler = this.engine.handler().websocket;
+    const engineWebSocket = this.engine.handler().websocket;
+
+    // Bun.serve takes a single websocket handler table for the whole server, so the
+    // plain listener and the Socket.IO engine share it and dispatch on ws.data.
+    const rawSockets = new WeakMap<object, BunRawWebSocket>();
+    type EngineWebSocketHandler = typeof engineWebSocket;
+    type EngineWebSocket = Parameters<EngineWebSocketHandler['open']>[0];
+    const websocketHandler: EngineWebSocketHandler = {
+      ...engineWebSocket,
+      open: (ws: EngineWebSocket) => {
+        if (!isRawWebSocket(ws)) return engineWebSocket.open(ws);
+        const { remoteAddress } = ws.data as unknown as RawWebSocketData;
+        const connection = new BunRawWebSocket(ws, remoteAddress);
+        rawSockets.set(ws, connection);
+        config.websocket?.onConnection(connection);
+      },
+      message: (ws: EngineWebSocket, message: Parameters<EngineWebSocketHandler['message']>[1]) => {
+        if (!isRawWebSocket(ws)) return engineWebSocket.message(ws, message);
+        rawSockets.get(ws)?.receiveMessage(
+          typeof message === 'string' ? message : new TextDecoder().decode(message as Uint8Array),
+        );
+      },
+      close: (ws: EngineWebSocket, code: number, reason: string) => {
+        if (!isRawWebSocket(ws)) return engineWebSocket.close(ws, code, reason);
+        rawSockets.get(ws)?.receiveClose();
+        rawSockets.delete(ws);
+      },
+    };
 
     // Start Bun server
     const bunServer = Bun.serve({
@@ -61,6 +89,18 @@ export class BunRuntimeAdapter implements RuntimeAdapter {
           return new Response(JSON.stringify({ status: 'ok' }), {
             headers: { 'Content-Type': 'application/json', ...corsHeaders },
           });
+        }
+
+        // Plain WebSocket path
+        if (config.websocket && url.pathname === config.websocket.path) {
+          const data: RawWebSocketData = {
+            useAiRawWebSocket: true,
+            remoteAddress: server.requestIP(req)?.address,
+          };
+          // The engine owns the server's WebSocket data type; the plain listener
+          // rides along on the same handler table and is told apart by useAiRawWebSocket.
+          if (server.upgrade(req, { data: data as unknown as EngineWebSocket['data'] })) return undefined;
+          return new Response('Expected a WebSocket upgrade', { status: 400, headers: corsHeaders });
         }
 
         // Socket.IO path

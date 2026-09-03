@@ -22,7 +22,7 @@ import { logger } from './logger';
 import { recordErrorTrace, startTracing } from './instrumentation';
 import { v4 as uuidv4 } from 'uuid';
 import type { Agent, EventEmitter, AGUIEventExtended } from './agents/types';
-import type { ClientSession } from './agents/types';
+import type { ClientConnection, ClientSession } from './agents/types';
 import type { UseAIServerPlugin, MessageHandler } from './plugins/types';
 import { FeedbackPlugin } from './plugins/FeedbackPlugin';
 import { isRemoteTool, isServerTool } from './utils/toolFilters';
@@ -36,10 +36,12 @@ import {
   type RuntimeAdapter,
   type RuntimeServerHandle,
   type ClientIpTracker,
+  type RawWebSocket,
 } from './runtime';
+import { WebSocketClientConnection } from './webSocketConnection';
 
-// Re-export ClientSession type for external use
-export type { ClientSession } from './agents/types';
+// Re-export session types for external use
+export type { ClientSession, ClientConnection } from './agents/types';
 
 /**
  * WebSocket server that coordinates between client applications and AI agents.
@@ -96,10 +98,11 @@ export class UseAIServer {
   private defaultAgentId: string; // ID of the default agent
   private agents: Record<string, Agent>; // Registry of all agents
   private clients: Map<string, ClientSession> = new Map();
-  private config: Required<Omit<UseAIServerConfig, 'defaultAgent' | 'agents' | 'plugins' | 'tools' | 'mcpEndpoints' | 'maxHttpBufferSize' | 'cors' | 'idleTimeout' | 'runtime' | 'spanProcessors' | 'resolveAttachments'>> & {
+  private config: Required<Omit<UseAIServerConfig, 'defaultAgent' | 'agents' | 'plugins' | 'tools' | 'mcpEndpoints' | 'maxHttpBufferSize' | 'cors' | 'idleTimeout' | 'runtime' | 'spanProcessors' | 'resolveAttachments' | 'webSocketPath'>> & {
     maxHttpBufferSize: number;
     cors?: CorsOptions;
     idleTimeout: number;
+    webSocketPath: string | null;
   };
   private rateLimiter: RateLimiter;
   private cleanupInterval: NodeJS.Timeout;
@@ -131,6 +134,7 @@ export class UseAIServer {
       maxHttpBufferSize: config.maxHttpBufferSize ?? 20 * 1024 * 1024, // 20MB default
       cors: config.cors,
       idleTimeout: config.idleTimeout ?? 30,
+      webSocketPath: config.webSocketPath === undefined ? '/ws' : config.webSocketPath,
     };
 
     // Set agents registry
@@ -218,6 +222,12 @@ export class UseAIServer {
       onPollingConnection: (sessionId, ip) => {
         this.clientIpTracker.trackPollingConnection(sessionId, ip);
       },
+      websocket: this.config.webSocketPath
+        ? {
+            path: this.config.webSocketPath,
+            onConnection: (socket) => this.handleWebSocketConnection(socket),
+          }
+        : undefined,
     });
   }
 
@@ -285,8 +295,6 @@ export class UseAIServer {
 
   private setupSocketIOServer() {
     this.io.on('connection', (socket: Socket) => {
-      const clientId = `client-${++this.clientIdCounter}`;
-      const threadId = uuidv4();
       // Get connection info for IP address resolution
       const conn = socket.conn as unknown as { id: string; transport: { name: string; socket?: { remoteAddress?: string } } };
       // Get IP address for rate limiting:
@@ -296,96 +304,150 @@ export class UseAIServer {
       const ipAddress = this.clientIpTracker.getClientIp(conn)
         || socket.handshake.address
         || socket.id;
-      const transport = conn.transport.name;
-      logger.info('Client connected', { clientId, threadId, ipAddress, transport });
+
+      const session = this.createSession(socket, ipAddress);
+      logger.info('Client connected', {
+        clientId: session.clientId,
+        threadId: session.threadId,
+        ipAddress,
+        transport: conn.transport.name,
+      });
 
       // Log transport upgrades
       socket.conn.on('upgrade', (transport) => {
-        logger.info('Client upgraded transport', { clientId, transport: transport.name });
+        logger.info('Client upgraded transport', { clientId: session.clientId, transport: transport.name });
       });
 
-      const session: ClientSession = {
-        clientId,
-        ipAddress,
-        socket,
-        threadId,
-        tools: [],
-        state: null,
-        pendingToolCalls: new Map(),
-        pendingToolApprovals: new Map(),
-      };
-
-      this.clients.set(socket.id, session);
-
-      // Send available agents to client
-      const availableAgents = Object.entries(this.agents).map(([id, agent]) => ({
-        id,
-        name: agent.getName?.() || id,
-        annotation: agent.getAnnotation?.(),
-      }));
-      socket.emit('agents', {
-        agents: availableAgents,
-        defaultAgent: this.defaultAgentId,
-      });
-
-      // Call plugin lifecycle hooks
-      for (const plugin of this.plugins) {
-        plugin.onClientConnect?.(session);
-      }
-
-      socket.on('message', async (message: UseAIClientMessage) => {
-        try {
-          await this.handleClientMessage(socket, message);
-        } catch (error) {
-          logger.error('Error handling message', {
-            error: error instanceof Error ? error.message : 'Unknown error',
-            clientId,
-          });
-          if (message.type === 'run_agent') {
-            const runAgentData = (message as RunAgentMessage).data;
-            const unhandledForwardedProps = runAgentData?.forwardedProps as UseAIForwardedProps | undefined;
-            recordErrorTrace({
-              runId: runAgentData?.runId || socket.id,
-              errorCategory: 'unhandled_error',
-              errorMessage: error instanceof Error ? error.message : 'Unknown error',
-              sessionId: clientId,
-              threadId: runAgentData?.threadId,
-              ipAddress: session?.ipAddress,
-              metadata: { ...unhandledForwardedProps?.telemetryMetadata },
-            });
-          }
-          this.sendEvent(socket, {
-            type: EventType.RUN_ERROR,
-            message: error instanceof Error ? error.message : 'Unknown error',
-            timestamp: Date.now(),
-          });
-        }
-      });
+      socket.on('message', (message: UseAIClientMessage) => this.receiveClientMessage(session, message));
 
       socket.on('disconnect', () => {
-        logger.info('Client disconnected', { clientId, ipAddress });
-
-        // Abort any pending tool calls/approvals for this session
-        abortRun(session.abortController, new RunAbortedByClientDisconnect());
-
+        logger.info('Client disconnected', { clientId: session.clientId, ipAddress });
         // Clean up polling IP entry
         this.clientIpTracker.removePollingConnection(conn.id);
-
-        // Call plugin lifecycle hooks
-        for (const plugin of this.plugins) {
-          plugin.onClientDisconnect?.(session);
-        }
-
-        // Note: Rate limiting persists by IP address across connections
-        this.clients.delete(socket.id);
+        this.destroySession(session);
       });
     });
 
     logger.info('UseAI server ready', { port: this.config.port });
   }
 
-  private async handleClientMessage(socket: Socket, message: UseAIClientMessage) {
-    const session = this.clients.get(socket.id);
+  /**
+   * Accepts a plain WebSocket connection, the alternative to Socket.IO served on the
+   * same port. Frames are JSON text: upstream the client message on its own, downstream
+   * a `{ name, data }` envelope. See docs/websocket-protocol.md.
+   */
+  private handleWebSocketConnection(socket: RawWebSocket) {
+    const connection = new WebSocketClientConnection(`ws-${uuidv4()}`, socket);
+    const ipAddress = socket.remoteAddress || connection.id;
+
+    const session = this.createSession(connection, ipAddress);
+    logger.info('Client connected', {
+      clientId: session.clientId,
+      threadId: session.threadId,
+      ipAddress,
+      transport: 'websocket',
+    });
+
+    socket.onMessage((data) => {
+      let message: UseAIClientMessage;
+      try {
+        message = JSON.parse(data) as UseAIClientMessage;
+      } catch {
+        logger.warn('Discarding malformed frame', { clientId: session.clientId });
+        return;
+      }
+      void this.receiveClientMessage(session, message);
+    });
+
+    socket.onClose(() => {
+      logger.info('Client disconnected', { clientId: session.clientId, ipAddress });
+      this.destroySession(session);
+    });
+  }
+
+  /**
+   * Creates the session for a newly accepted connection and announces the server's
+   * agents to it. Both connection kinds land here.
+   */
+  private createSession(connection: ClientConnection, ipAddress: string): ClientSession {
+    const session: ClientSession = {
+      clientId: `client-${++this.clientIdCounter}`,
+      ipAddress,
+      socket: connection,
+      threadId: uuidv4(),
+      tools: [],
+      state: null,
+      pendingToolCalls: new Map(),
+      pendingToolApprovals: new Map(),
+    };
+
+    this.clients.set(connection.id, session);
+
+    connection.emit('agents', {
+      agents: Object.entries(this.agents).map(([id, agent]) => ({
+        id,
+        name: agent.getName?.() || id,
+        annotation: agent.getAnnotation?.(),
+      })),
+      defaultAgent: this.defaultAgentId,
+    });
+
+    for (const plugin of this.plugins) {
+      plugin.onClientConnect?.(session);
+    }
+
+    return session;
+  }
+
+  /**
+   * Tears down a session whose connection has gone away.
+   * Rate limiting persists by IP address across connections, so it is not reset here.
+   */
+  private destroySession(session: ClientSession) {
+    // Abort any pending tool calls/approvals for this session
+    abortRun(session.abortController, new RunAbortedByClientDisconnect());
+
+    for (const plugin of this.plugins) {
+      plugin.onClientDisconnect?.(session);
+    }
+
+    this.clients.delete(session.socket.id);
+  }
+
+  /**
+   * Runs a client message and reports anything it throws back to that client.
+   */
+  private async receiveClientMessage(session: ClientSession, message: UseAIClientMessage) {
+    try {
+      await this.handleClientMessage(session.socket, message);
+    } catch (error) {
+      logger.error('Error handling message', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        clientId: session.clientId,
+      });
+      if (message.type === 'run_agent') {
+        const runAgentData = (message as RunAgentMessage).data;
+        const unhandledForwardedProps = runAgentData?.forwardedProps as UseAIForwardedProps | undefined;
+        recordErrorTrace({
+          runId: runAgentData?.runId || session.socket.id,
+          errorCategory: 'unhandled_error',
+          errorMessage: error instanceof Error ? error.message : 'Unknown error',
+          sessionId: session.clientId,
+          threadId: runAgentData?.threadId,
+          ipAddress: session.ipAddress,
+          metadata: { ...unhandledForwardedProps?.telemetryMetadata },
+        });
+      }
+      this.sendEvent(session.socket, {
+        type: EventType.RUN_ERROR,
+        message: error instanceof Error ? error.message : 'Unknown error',
+        timestamp: Date.now(),
+      });
+    }
+  }
+
+  private async handleClientMessage(connection: ClientConnection, message: UseAIClientMessage) {
+    const session = this.clients.get(connection.id);
     if (!session) return;
 
     // Check if a plugin has registered a handler for this message type
@@ -930,9 +992,9 @@ export class UseAIServer {
     logger.info('Run aborted', { clientId: session.clientId, runId });
   }
 
-  private sendEvent<T = unknown>(socket: Socket, event: T) {
-    if (socket.connected) {
-      socket.emit('event', event);
+  private sendEvent<T = unknown>(connection: ClientConnection, event: T) {
+    if (connection.connected) {
+      connection.emit('event', event);
     }
   }
 

@@ -5,6 +5,7 @@ import { UseAIChatPanel } from '../components/UseAIChatPanel';
 import { UseAIFloatingChatWrapper, CloseButton } from '../components/UseAIFloatingChatWrapper';
 import { __UseAIChatContext, type ChatUIContextValue } from '../components/UseAIChat';
 import { UseAIClient } from '../client';
+import type { UseAITransport } from '../transport/types';
 import { convertToolsToDefinitions, type ToolsDefinition } from '../defineTool';
 import type { ChatRepository, Chat, ChatMetadata, CreateChatOptions, PersistedMessage, PersistedMessageContent } from './chatRepository/types';
 import { LocalStorageChatRepository } from './chatRepository/LocalStorageChatRepository';
@@ -263,6 +264,24 @@ export interface ChatPanelProps {
 export interface UseAIProviderProps extends UseAIConfig {
   children: ReactNode;
   systemPrompt?: string;
+  /**
+   * Transport used to reach the server. Defaults to a {@link SocketIOTransport} built
+   * from `serverUrl`, which is what the bundled server serves. Supply one to reach a
+   * server that speaks something else — {@link WebSocketTransport} carries documented
+   * JSON frames over a plain WebSocket.
+   *
+   * Only the value from the first render is read, so an inline object does not churn
+   * the connection. Change transports by remounting the provider.
+   *
+   * @example
+   * ```tsx
+   * <UseAIProvider
+   *   serverUrl="wss://your-server.com"
+   *   transport={new WebSocketTransport('wss://your-server.com/ws')}
+   * >
+   * ```
+   */
+  transport?: UseAITransport;
   CustomButton?: React.ComponentType<FloatingButtonProps> | null;
   CustomChat?: React.ComponentType<ChatPanelProps> | null;
   /** Default component overrides for every built-in chat rendered by this provider. */
@@ -471,6 +490,7 @@ const DEFAULT_FILE_UPLOAD_CONFIG: FileUploadConfig = {
  */
 export function UseAIProvider({
   serverUrl,
+  transport,
   children,
   systemPrompt,
   CustomButton,
@@ -573,16 +593,20 @@ export function UseAIProvider({
   const handleDisconnectRef = useRef(serverEvents.handleDisconnect);
   handleDisconnectRef.current = serverEvents.handleDisconnect;
 
+  // Read once: an inline `transport` object would otherwise re-create the client
+  // on every render.
+  const transportRef = useRef(transport);
+
   useEffect(() => {
     console.log('[UseAIProvider] Initializing client with serverUrl:', serverUrl);
-    const client = new UseAIClient(serverUrl);
+    const client = new UseAIClient(transportRef.current ?? serverUrl);
 
     const unsubscribeConnection = client.onConnectionStateChange((isConnected) => {
       console.log('[UseAIProvider] Connection state changed:', isConnected);
       setConnected(isConnected);
       if (!isConnected) {
-        // The server destroys its session on disconnect (keyed by socket.id),
-        // so any in-flight run is unrecoverable even after Socket.IO reconnects.
+        // The server destroys its session on disconnect (keyed by connection id),
+        // so any in-flight run is unrecoverable even after the transport reconnects.
         // Reset UI state so the user can send a new message instead of being
         // stuck in a permanent "loading" state.
         handleDisconnectRef.current();

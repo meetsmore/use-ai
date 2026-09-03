@@ -135,6 +135,16 @@ export interface UseAIServerConfig<TAgents extends Record<string, import('./agen
    */
   idleTimeout?: number;
   /**
+   * Path that accepts plain WebSocket connections, served on the same port as Socket.IO.
+   *
+   * A client reaches it with `WebSocketTransport` rather than the default Socket.IO
+   * transport. Set to `null` to serve Socket.IO only.
+   *
+   * @default '/ws'
+   * @example '/agent'
+   */
+  webSocketPath?: string | null;
+  /**
    * The runtime to use for the server.
    * - 'auto': Automatically detect the runtime (Bun or Node.js)
    * - 'bun': Force Bun runtime (will throw if not running on Bun)

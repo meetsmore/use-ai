@@ -2,7 +2,10 @@
  * Configuration for the UseAI client provider.
  */
 export interface UseAIConfig {
-  /** The WebSocket URL of the UseAI server */
+  /**
+   * The WebSocket URL of the UseAI server.
+   * Unused when an explicit `transport` is supplied, but still reported on the context.
+   */
   serverUrl: string;
 }
 

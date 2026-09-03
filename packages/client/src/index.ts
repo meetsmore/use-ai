@@ -2,6 +2,14 @@ export { useAI } from './useAI';
 export { useAIWorkflow } from './useAIWorkflow';
 export { UseAIProvider, useAIContext } from './providers/useAIProvider';
 export { UseAIClient } from './client';
+export { SocketIOTransport, WebSocketTransport } from './transport';
+export type {
+  UseAITransport,
+  UseAITransportEventName,
+  SocketIOTransportOptions,
+  WebSocketTransportOptions,
+  WebSocketLike,
+} from './transport';
 export { defineTool, executeDefinedTool, convertToolsToDefinitions } from './defineTool';
 /** @hidden */
 export { z } from 'zod';

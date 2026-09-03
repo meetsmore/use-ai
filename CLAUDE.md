@@ -61,6 +61,8 @@ bun run kill                   # Kill processes on ports 3000, 3002, 8081
 
 Use `wss://your-domain.com` for secure WebSocket connections. For local development without SSL, use `ws://localhost:8081`.
 
+The client reaches the server through a `UseAITransport`. `SocketIOTransport` is the default. `WebSocketTransport` carries JSON frames over a plain WebSocket, which the server serves at `webSocketPath` (default `/ws`) on the same port. The framing is documented in `docs/websocket-protocol.md`.
+
 ## Core Architecture
 
 ### Data Flow

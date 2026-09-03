@@ -1,6 +1,20 @@
-import type { Socket } from 'socket.io';
 import type { ModelMessage } from 'ai';
 import type { ToolDefinition, AGUIEvent, ToolApprovalRequestEvent } from '../types';
+
+/**
+ * A client connection, as much of it as a session needs.
+ *
+ * Both connection kinds the server accepts satisfy this: a Socket.IO socket, and a
+ * plain WebSocket where `emit(name, data)` is written out as `{"name":...,"data":...}`.
+ */
+export interface ClientConnection {
+  /** Identifies the connection for the lifetime of the session. */
+  readonly id: string;
+  /** Whether the connection is still open. */
+  readonly connected: boolean;
+  /** Sends a named payload to the client. */
+  emit(name: string, data?: unknown): void;
+}
 
 /**
  * Context for a single client session.
@@ -11,8 +25,8 @@ export interface ClientSession {
   clientId: string;
   /** IP address of the client (used for rate limiting) */
   ipAddress: string;
-  /** Socket.IO socket for bidirectional communication with client */
-  socket: Socket;
+  /** Connection to the client. Emit named payloads on it to reach the client. */
+  socket: ClientConnection;
   /** Unique identifier for the conversation thread */
   threadId: string;
   /** ID of the currently executing run (if any) */

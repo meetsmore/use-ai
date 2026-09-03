@@ -1,6 +1,8 @@
 import { createServer, type Server as HttpServer } from 'http';
 import type { Server as SocketIOServer } from 'socket.io';
+import { WebSocketServer } from 'ws';
 import type { RuntimeAdapter, RuntimeServerConfig, RuntimeServerHandle } from '../types';
+import { NodeRawWebSocket } from './rawWebSocket';
 
 /**
  * Runtime adapter for Node.js.
@@ -34,6 +36,25 @@ export class NodeRuntimeAdapter implements RuntimeAdapter {
       // Socket.IO will handle the request via its internal listeners
     });
 
+    // The plain listener claims its path before Socket.IO attaches, so engine.io's
+    // own upgrade handler sees a handshake already written and leaves the socket alone.
+    const websocketConfig = config.websocket;
+    let wss: WebSocketServer | null = null;
+    if (websocketConfig) {
+      wss = new WebSocketServer({ noServer: true, maxPayload: config.maxHttpBufferSize });
+      httpServer.on('upgrade', (req, socket, head) => {
+        const url = new URL(req.url || '/', `http://localhost:${config.port}`);
+        if (url.pathname !== websocketConfig.path) return;
+        wss!.handleUpgrade(req, socket, head, (ws) => {
+          const forwardedFor = req.headers['x-forwarded-for'];
+          const remoteAddress = typeof forwardedFor === 'string'
+            ? forwardedFor.split(',')[0].trim()
+            : req.socket.remoteAddress;
+          websocketConfig.onConnection(new NodeRawWebSocket(ws, remoteAddress));
+        });
+      });
+    }
+
     // Attach Socket.IO to the HTTP server
     // Socket.IO handles CORS internally for /socket.io/* paths
     io.attach(httpServer, {
@@ -66,6 +87,7 @@ export class NodeRuntimeAdapter implements RuntimeAdapter {
 
     return {
       stop: () => {
+        wss?.close();
         httpServer.close();
       },
       server: httpServer,

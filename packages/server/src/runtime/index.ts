@@ -7,6 +7,8 @@ export type {
   RuntimeType,
   RuntimeServerConfig,
   RuntimeServerHandle,
+  RawWebSocket,
+  RawWebSocketListener,
 } from './types';
 export { detectRuntime } from './detection';
 export { createClientIpTracker, type ClientIpTracker, type ClientIpConnection } from './clientIp';

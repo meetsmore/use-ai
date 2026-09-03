@@ -1,6 +1,6 @@
 export { UseAIServer } from './server';
 export type { UseAIServerConfig, McpEndpointConfig, ToolDefinition, CorsOptions } from './types';
-export type { ClientSession } from './server';
+export type { ClientSession, ClientConnection } from './server';
 
 // Attachment ref resolution (host seam + helper)
 export { resolveAttachmentParts } from './attachmentResolution';

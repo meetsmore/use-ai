@@ -1,4 +1,3 @@
-import { io, Socket } from 'socket.io-client';
 import { EventType } from '@meetsmore-oss/use-ai-core';
 import type {
   ToolDefinition,
@@ -23,6 +22,8 @@ import type {
   ReasoningEncryptedValueEvent,
   ReasoningPart,
 } from './types';
+import { SocketIOTransport } from './transport/SocketIOTransport';
+import type { UseAITransport } from './transport/types';
 import { v4 as uuidv4 } from 'uuid';
 
 /**
@@ -45,11 +46,11 @@ export type ToolCallHandler = (
 ) => void;
 
 /**
- * Socket.IO client for communicating with the UseAI server.
+ * Client for communicating with the UseAI server.
  * Uses the AG-UI protocol (https://docs.ag-ui.com/), so will be compatible with other AG-UI compliant servers.
  *
  * Handles:
- * - Connection management and automatic reconnection
+ * - Connection management, via a {@link UseAITransport}
  * - Sending RunAgentInput messages to server
  * - Parsing AG-UI event streams from server
  * - Tool execution coordination
@@ -57,14 +58,9 @@ export type ToolCallHandler = (
  * You probably don't need to use this directly, instead use {@link UseAIProvider}.
  */
 export class UseAIClient {
-  private socket: Socket | null = null;
+  private transport: UseAITransport;
+  private transportUnsubscribes: Array<() => void> = [];
   private eventHandlers: Map<string, AGUIEventHandler> = new Map();
-  // Reconnect indefinitely so clients recover after extended outages (mobile
-  // app backgrounded long enough for server pingTimeout, airplane mode, etc.).
-  // Socket.IO applies exponential backoff capped at reconnectionDelayMax,
-  // so steady-state retry frequency is ~one attempt per 10s.
-  private reconnectDelay = 1000;
-  private reconnectDelayMax = 10_000;
 
   // Session state
   private _threadId: string | null = null;
@@ -111,81 +107,62 @@ export class UseAIClient {
   /**
    * Creates a new UseAI client instance.
    *
-   * @param serverUrl - The WebSocket URL of the UseAI server
+   * @param target - The URL of the UseAI server, which is reached over Socket.IO, or a
+   *   {@link UseAITransport} to reach it over something else.
+   * @example
+   * ```typescript
+   * new UseAIClient('wss://your-server.com');
+   * new UseAIClient(new WebSocketTransport('wss://your-server.com/ws'));
+   * ```
    */
-  constructor(private serverUrl: string) {}
+  constructor(target: string | UseAITransport) {
+    this.transport = typeof target === 'string' ? new SocketIOTransport(target) : target;
+  }
 
   /**
-   * Establishes a Socket.IO connection to the server.
+   * Opens the transport's connection to the server.
    * Connection state changes are notified via onConnectionStateChange().
-   * Socket.IO handles reconnection automatically.
+   * Reconnection is the transport's responsibility and is automatic for both bundled transports.
    */
   connect(): void {
-    this.socket = io(this.serverUrl, {
-      transports: ['polling', 'websocket'],
-      reconnection: true,
-      reconnectionAttempts: Infinity,
-      reconnectionDelay: this.reconnectDelay,
-      reconnectionDelayMax: this.reconnectDelayMax,
-      withCredentials: true,
-    });
+    this.transportUnsubscribes.push(
+      this.transport.on('connect', () => {
+        console.log('[UseAI] Connected to server');
+        this.connectionStateHandlers.forEach(handler => handler(true));
+      }),
 
-    this.socket.on('connect', () => {
-      console.log('[UseAI] Connected to server');
-      console.log('[UseAI] Transport:', this.socket?.io?.engine?.transport?.name);
+      this.transport.on('event', (data) => {
+        const aguiEvent = data as AGUIEvent;
+        try {
+          console.log('[Client] Received event:', aguiEvent.type);
+          this.handleEvent(aguiEvent);
+        } catch (error) {
+          console.error('[UseAI] Error handling event:', error);
+        }
+      }),
 
-      // Listen for transport upgrades (only if engine is available)
-      const engine = this.socket?.io?.engine;
-      if (engine) {
-        engine.on('upgrade', (transport: { name: string }) => {
-          console.log('[UseAI] Upgraded to transport:', transport.name);
-        });
+      this.transport.on('agents', (data) => {
+        const { agents, defaultAgent } = data as { agents: AgentInfo[]; defaultAgent: string };
+        console.log('[Client] Received available agents:', data);
+        this._availableAgents = agents;
+        this._defaultAgent = defaultAgent;
+        this.agentsChangeHandlers.forEach(handler => handler(agents, defaultAgent));
+      }),
 
-        engine.on('upgradeError', (err: { message: string }) => {
-          console.warn('[UseAI] Upgrade error:', err.message);
-        });
-      }
+      this.transport.on('config', (data) => {
+        const { langfuseEnabled } = data as { langfuseEnabled?: boolean };
+        console.log('[Client] Received server config:', data);
+        this._langfuseEnabled = langfuseEnabled ?? false;
+        this.langfuseConfigHandlers.forEach(handler => handler(this._langfuseEnabled));
+      }),
 
-      // Notify connection state handlers
-      this.connectionStateHandlers.forEach(handler => handler(true));
-    });
+      this.transport.on('disconnect', (reason) => {
+        console.log('[UseAI] Disconnected:', reason);
+        this.connectionStateHandlers.forEach(handler => handler(false));
+      }),
+    );
 
-    this.socket.on('event', (aguiEvent: AGUIEvent) => {
-      try {
-        console.log('[Client] Received event:', aguiEvent.type);
-        this.handleEvent(aguiEvent);
-      } catch (error) {
-        console.error('[UseAI] Error handling event:', error);
-      }
-    });
-
-    // Listen for available agents from server
-    this.socket.on('agents', (data: { agents: AgentInfo[]; defaultAgent: string }) => {
-      console.log('[Client] Received available agents:', data);
-      this._availableAgents = data.agents;
-      this._defaultAgent = data.defaultAgent;
-      // Notify listeners
-      this.agentsChangeHandlers.forEach(handler => handler(data.agents, data.defaultAgent));
-    });
-
-    // Listen for server config (including Langfuse enabled status)
-    this.socket.on('config', (data: { langfuseEnabled?: boolean }) => {
-      console.log('[Client] Received server config:', data);
-      this._langfuseEnabled = data.langfuseEnabled ?? false;
-      // Notify listeners
-      this.langfuseConfigHandlers.forEach(handler => handler(this._langfuseEnabled));
-    });
-
-    this.socket.on('connect_error', (error) => {
-      // Use warn instead of error to avoid triggering Next.js error overlay
-      console.warn('[UseAI] Connection error:', error.message);
-    });
-
-    this.socket.on('disconnect', (reason) => {
-      console.log('[UseAI] Disconnected:', reason);
-      // Notify connection state handlers
-      this.connectionStateHandlers.forEach(handler => handler(false));
-    });
+    this.transport.connect();
   }
 
 
@@ -869,21 +846,20 @@ export class UseAIClient {
   }
 
   send(message: UseAIClientMessage) {
-    if (this.socket && this.socket.connected) {
-      this.socket.emit('message', message);
+    if (this.transport.connected) {
+      this.transport.send(message);
     } else {
-      console.error('Socket.IO is not connected');
+      console.error('[UseAI] Not connected to server');
     }
   }
 
   /**
-   * Closes the Socket.IO connection to the server.
+   * Closes the connection to the server and unsubscribes from the transport.
    */
   disconnect() {
-    if (this.socket) {
-      this.socket.disconnect();
-      this.socket = null;
-    }
+    this.transportUnsubscribes.forEach(unsubscribe => unsubscribe());
+    this.transportUnsubscribes = [];
+    this.transport.disconnect();
   }
 
   /**
@@ -892,7 +868,7 @@ export class UseAIClient {
    * @returns true if connected, false otherwise
    */
   isConnected(): boolean {
-    return this.socket !== null && this.socket.connected;
+    return this.transport.connected;
   }
 
   /**
@@ -919,7 +895,7 @@ export class UseAIClient {
    * @param feedback - 'upvote' for positive, 'downvote' for negative, null to remove
    */
   submitFeedback(messageId: string, traceId: string, feedback: FeedbackValue): void {
-    if (!this.socket?.connected) {
+    if (!this.transport.connected) {
       console.warn('[UseAI] Cannot submit feedback: not connected');
       return;
     }
