@@ -21,6 +21,12 @@ export type UseAITransportEventName = 'connect' | 'disconnect' | 'event' | 'agen
  * and {@link WebSocketTransport}.
  */
 export interface UseAITransport {
+  /**
+   * The server this transport connects to. Reported as `serverUrl` on the provider context.
+   * @example 'wss://your-server.com'
+   */
+  readonly url: string;
+
   /** Opens the connection. Reconnection until {@link disconnect} is the transport's own responsibility. */
   connect(): void;
 

@@ -22,7 +22,8 @@ export type UseAIConfig =
       /**
        * Transport to reach the server with. The provider reads it once, on the first
        * render, so an inline object does not reconnect the client on every render.
-       * Remount the provider to change transports.
+       * Remount the provider to change transports. The context reports the
+       * transport's `url` as `serverUrl`.
        */
       transport: UseAITransport;
       serverUrl?: never;

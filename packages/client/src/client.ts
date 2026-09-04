@@ -119,6 +119,11 @@ export class UseAIClient {
     this.transport = typeof target === 'string' ? new SocketIOTransport(target) : target;
   }
 
+  /** URL of the server the transport connects to. */
+  get serverUrl(): string {
+    return this.transport.url;
+  }
+
   /**
    * Opens the transport's connection to the server.
    * Connection state changes are notified via onConnectionStateChange().

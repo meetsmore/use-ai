@@ -122,8 +122,8 @@ export interface PromptsContextValue {
  * Contains connection state and methods for managing tools and prompts.
  */
 export interface UseAIContextValue {
-  /** URL of the server, when the provider was given `serverUrl` rather than `transport`. */
-  serverUrl?: string;
+  /** URL of the server. With an explicit `transport`, this is the transport's `url`. */
+  serverUrl: string;
   /** Whether the client is connected to the server */
   connected: boolean;
   /** The underlying WebSocket client instance */
@@ -162,6 +162,7 @@ let hasWarnedAboutMissingProvider = false;
  * Allows hooks to gracefully degrade instead of crashing.
  */
 const noOpContextValue: UseAIContextValue = {
+  serverUrl: '',
   connected: false,
   client: null,
   tools: {
@@ -742,7 +743,7 @@ export function UseAIProvider({
   // ── Context Values ──────────────────────────────────────────────────────
 
   const value: UseAIContextValue = {
-    serverUrl,
+    serverUrl: transportRef.current?.url ?? serverUrl!,
     connected,
     client: clientRef.current,
     tools: {

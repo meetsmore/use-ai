@@ -41,13 +41,13 @@ export class SocketIOTransport implements UseAITransport {
   private reconnectionDelayMax: number;
 
   /**
-   * @param serverUrl - The URL of the UseAI server
+   * @param url - The URL of the UseAI server
    * @example
    * ```typescript
    * new SocketIOTransport('ws://localhost:8081');
    * ```
    */
-  constructor(private serverUrl: string, options: SocketIOTransportOptions = {}) {
+  constructor(readonly url: string, options: SocketIOTransportOptions = {}) {
     this.reconnectionDelay = options.reconnectionDelay ?? 1000;
     this.reconnectionDelayMax = options.reconnectionDelayMax ?? 10_000;
   }
@@ -57,7 +57,7 @@ export class SocketIOTransport implements UseAITransport {
   }
 
   connect(): void {
-    const socket = io(this.serverUrl, {
+    const socket = io(this.url, {
       transports: ['polling', 'websocket'],
       reconnection: true,
       reconnectionAttempts: Infinity,

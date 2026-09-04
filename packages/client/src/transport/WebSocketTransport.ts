@@ -60,7 +60,7 @@ export class WebSocketTransport implements UseAITransport {
    * new WebSocketTransport('wss://your-server.com');
    * ```
    */
-  constructor(private url: string, options: WebSocketTransportOptions = {}) {
+  constructor(readonly url: string, options: WebSocketTransportOptions = {}) {
     this.options = {
       reconnectionDelay: options.reconnectionDelay ?? 1000,
       reconnectionDelayMax: options.reconnectionDelayMax ?? 10_000,
