@@ -37,6 +37,17 @@ export function waitForConnection(socket: Socket): Promise<void> {
 }
 
 /**
+ * Polls until the condition holds.
+ */
+export async function waitFor(condition: () => boolean, message: string, timeoutMs = 5000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (!condition()) {
+    if (Date.now() > deadline) throw new Error(`Timed out waiting for ${message}`);
+    await new Promise(resolve => setTimeout(resolve, 10));
+  }
+}
+
+/**
  * Wait for an AG-UI event from the Socket.IO server
  */
 export function waitForEvent(socket: Socket, timeout = 5000): Promise<AGUIEvent> {

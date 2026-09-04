@@ -25,6 +25,7 @@ A React client/framework for easily enabling AI to control your users frontend.
 - [Features](#features)
   - [General](#general)
     - [AG-UI Protocol](#ag-ui-protocol)
+    - [Transports](#transports)
   - [Client](#client)
     - [`useAI` hook](#useai-hook)
     - [`UseAIProvider`](#useaiprovider)
@@ -297,6 +298,35 @@ There are some minor extensions to the protocol:
 **Message Types**:
 - `run_workflow`: Trigger headless workflow (use-ai extension) [see `@meetsmore-oss/use-ai-plugin-workflows`]
 
+### Transports
+
+The client reaches the server through a `UseAITransport`. Two transports ship with the library.
+
+| Transport            | Wire                                              | Bundled server setting   |
+| -------------------- | ------------------------------------------------- | ------------------------ |
+| `SocketIOTransport`  | Socket.IO, over polling and WebSocket             | `transport: 'socketio'`  |
+| `WebSocketTransport` | AG-UI events as JSON text, over a plain WebSocket | `transport: 'websocket'` |
+
+Give `UseAIProvider` either `serverUrl` or `transport`. `serverUrl` builds a `SocketIOTransport`, so nothing changes if you use the bundled server with its defaults.
+
+Pass `WebSocketTransport` to reach a server that does not serve Socket.IO. Such a server does not have to be Node. It must accept a WebSocket connection. It must then exchange the documented frames.
+
+```tsx
+import { UseAIProvider, WebSocketTransport } from '@meetsmore-oss/use-ai-client';
+
+root.render(
+  <UseAIProvider transport={new WebSocketTransport('wss://your-server.com')}>
+    <App />
+  </UseAIProvider>
+);
+```
+
+The bundled server serves one transport. Set `transport: 'websocket'` on `UseAIServer`, or `TRANSPORT=websocket` on the Docker image, to serve a plain WebSocket at `/` instead of Socket.IO.
+
+To carry the same messages over something else, implement `UseAITransport` yourself. It opens and closes a connection, sends client messages, and delivers AG-UI events.
+
+See [docs/websocket-protocol.md](docs/websocket-protocol.md) for the frames, the turn sequence, and the reconnection behaviour.
+
 ## Client
 
 ### `useAI` hook
@@ -352,6 +382,8 @@ root.render(
   </UseAIProvider>
 );
 ```
+
+Pass `transport` instead of `serverUrl` to reach a server over something other than Socket.IO. See [Transports](#transports).
 
 ### Component State via `prompt`
 
@@ -1048,6 +1080,7 @@ const server = new UseAIServer({
     })
   },
   defaultAgent: 'claude',
+  transport: 'socketio',  // or 'websocket', see 'Transports'
   rateLimitMaxRequests: 1_000,
   rateLimitWindowMs: 60_000,
   plugins: [              // see 'Plugins'

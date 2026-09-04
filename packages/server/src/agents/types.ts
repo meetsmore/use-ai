@@ -1,6 +1,24 @@
-import type { Socket } from 'socket.io';
 import type { ModelMessage } from 'ai';
-import type { ToolDefinition, AGUIEvent, ToolApprovalRequestEvent } from '../types';
+import type { ToolDefinition, AGUIEvent, ToolApprovalRequestEvent, UseAIClientMessage } from '../types';
+
+/**
+ * One client connection, whatever protocol carries it. The server accepts every
+ * connection through this interface, so protocol details stay in its implementations.
+ */
+export interface ClientConnection {
+  /** Identifies the connection for the lifetime of the session. */
+  readonly id: string;
+  /** Address the connection came from, used for rate limiting. */
+  readonly ipAddress: string;
+  /** Whether the connection is still open. */
+  readonly connected: boolean;
+  /** Sends a named payload to the client. `event` carries an AG-UI event. */
+  emit(name: string, data?: unknown): void;
+  /** Registers the handler for messages from the client. */
+  onMessage(handler: (message: UseAIClientMessage) => void): void;
+  /** Registers the handler for the connection closing, for any reason. */
+  onClose(handler: () => void): void;
+}
 
 /**
  * Context for a single client session.
@@ -11,8 +29,8 @@ export interface ClientSession {
   clientId: string;
   /** IP address of the client (used for rate limiting) */
   ipAddress: string;
-  /** Socket.IO socket for bidirectional communication with client */
-  socket: Socket;
+  /** Connection to the client. Emit named payloads on it to reach the client. */
+  socket: ClientConnection;
   /** Unique identifier for the conversation thread */
   threadId: string;
   /** ID of the currently executing run (if any) */
