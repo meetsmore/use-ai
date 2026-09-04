@@ -21,7 +21,7 @@ export class NodeRawWebSocket implements RawWebSocket {
 
   onMessage(handler: (data: string) => void): void {
     this.ws.on('message', (data: unknown, isBinary: boolean) => {
-      handler(isBinary ? '' : String(data));
+      if (!isBinary) handler(String(data));
     });
   }
 

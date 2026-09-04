@@ -9,9 +9,11 @@ export type {
   RuntimeServerHandle,
   RawWebSocket,
   RuntimeListener,
+  SocketIOListener,
+  WebSocketListener,
 } from './types';
 export { detectRuntime } from './detection';
-export { createClientIpTracker, type ClientIpTracker, type ClientIpConnection } from './clientIp';
+export { createClientIpTracker, forwardedClientIp, type ClientIpTracker, type ClientIpConnection } from './clientIp';
 
 /**
  * Creates a runtime adapter for the specified or detected runtime.

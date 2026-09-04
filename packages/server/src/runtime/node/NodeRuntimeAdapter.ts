@@ -1,6 +1,8 @@
 import { createServer, type Server as HttpServer } from 'http';
+import type { Server as SocketIOServer } from 'socket.io';
 import { WebSocketServer } from 'ws';
-import type { RuntimeAdapter, RuntimeListener, RuntimeServerConfig, RuntimeServerHandle } from '../types';
+import type { RuntimeAdapter, RuntimeListener, RuntimeServerConfig, RuntimeServerHandle, WebSocketListener } from '../types';
+import { forwardedClientIp } from '../clientIp';
 import { NodeRawWebSocket } from './rawWebSocket';
 
 /**
@@ -32,12 +34,9 @@ export class NodeRuntimeAdapter implements RuntimeAdapter {
       res.end('Not Found');
     });
 
-    let wss: WebSocketServer | null = null;
-    if (listener.transport === 'socketio') {
-      this.attachSocketIO(listener.io, httpServer, config);
-    } else {
-      wss = this.attachWebSocket(listener.onConnection, httpServer, config);
-    }
+    const wss = listener.transport === 'socketio'
+      ? this.attachSocketIO(listener.io, httpServer, config)
+      : this.attachWebSocket(listener.onConnection, httpServer, config);
 
     httpServer.listen(config.port);
 
@@ -50,11 +49,7 @@ export class NodeRuntimeAdapter implements RuntimeAdapter {
     };
   }
 
-  private attachSocketIO(
-    io: Extract<RuntimeListener, { transport: 'socketio' }>['io'],
-    httpServer: HttpServer,
-    config: RuntimeServerConfig,
-  ) {
+  private attachSocketIO(io: SocketIOServer, httpServer: HttpServer, config: RuntimeServerConfig): null {
     io.attach(httpServer, {
       transports: ['polling', 'websocket'],
       maxHttpBufferSize: config.maxHttpBufferSize,
@@ -69,20 +64,18 @@ export class NodeRuntimeAdapter implements RuntimeAdapter {
     if (config.onPollingConnection) {
       io.engine.on('connection', (socket) => {
         if (socket.transport.name === 'polling') {
-          const xForwardedFor = socket.request.headers['x-forwarded-for'];
-          const ip = typeof xForwardedFor === 'string'
-            ? xForwardedFor.split(',')[0].trim()
-            : socket.request.socket?.remoteAddress;
+          const ip = forwardedClientIp(socket.request.headers['x-forwarded-for'], socket.request.socket?.remoteAddress);
           if (ip) {
             config.onPollingConnection!(socket.id, ip);
           }
         }
       });
     }
+    return null;
   }
 
   private attachWebSocket(
-    onConnection: Extract<RuntimeListener, { transport: 'websocket' }>['onConnection'],
+    onConnection: WebSocketListener['onConnection'],
     httpServer: HttpServer,
     config: RuntimeServerConfig,
   ): WebSocketServer {
@@ -94,10 +87,7 @@ export class NodeRuntimeAdapter implements RuntimeAdapter {
         return;
       }
       wss.handleUpgrade(req, socket, head, (ws) => {
-        const forwardedFor = req.headers['x-forwarded-for'];
-        const remoteAddress = typeof forwardedFor === 'string'
-          ? forwardedFor.split(',')[0].trim()
-          : req.socket.remoteAddress;
+        const remoteAddress = forwardedClientIp(req.headers['x-forwarded-for'], req.socket.remoteAddress);
         onConnection(new NodeRawWebSocket(ws, remoteAddress));
       });
     });

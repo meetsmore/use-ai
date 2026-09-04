@@ -576,14 +576,13 @@ export function UseAIProvider({
   const handleDisconnectRef = useRef(serverEvents.handleDisconnect);
   handleDisconnectRef.current = serverEvents.handleDisconnect;
 
-  // Read once: an inline `transport` object would otherwise re-create the client
-  // on every render.
-  const transportRef = useRef(transport);
+  const resolvedServerUrl = transport?.url ?? serverUrl!;
 
   useEffect(() => {
-    const target = transportRef.current ?? serverUrl!;
-    console.log('[UseAIProvider] Initializing client with', typeof target === 'string' ? target : 'transport');
-    const client = new UseAIClient(target);
+    console.log('[UseAIProvider] Initializing client for', resolvedServerUrl);
+    // `transport` is deliberately not a dependency: an inline object must not
+    // re-create the client on every render.
+    const client = new UseAIClient(transport ?? serverUrl!);
 
     const unsubscribeConnection = client.onConnectionStateChange((isConnected) => {
       console.log('[UseAIProvider] Connection state changed:', isConnected);
@@ -743,7 +742,7 @@ export function UseAIProvider({
   // ── Context Values ──────────────────────────────────────────────────────
 
   const value: UseAIContextValue = {
-    serverUrl: transportRef.current?.url ?? serverUrl!,
+    serverUrl: resolvedServerUrl,
     connected,
     client: clientRef.current,
     tools: {

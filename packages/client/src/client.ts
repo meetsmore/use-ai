@@ -1,4 +1,4 @@
-import { EventType } from '@meetsmore-oss/use-ai-core';
+import { EventType, type CustomEvent } from '@meetsmore-oss/use-ai-core';
 import type {
   ToolDefinition,
   Message,
@@ -119,11 +119,6 @@ export class UseAIClient {
     this.transport = typeof target === 'string' ? new SocketIOTransport(target) : target;
   }
 
-  /** URL of the server the transport connects to. */
-  get serverUrl(): string {
-    return this.transport.url;
-  }
-
   /**
    * Opens the transport's connection to the server.
    * Connection state changes are notified via onConnectionStateChange().
@@ -131,47 +126,49 @@ export class UseAIClient {
    */
   connect(): void {
     this.transportUnsubscribes.push(
-      this.transport.on('connect', () => {
-        console.log('[UseAI] Connected to server');
-        this.connectionStateHandlers.forEach(handler => handler(true));
+      this.transport.onConnectionChange((connected, reason) => {
+        console.log(connected ? '[UseAI] Connected to server' : '[UseAI] Disconnected:', reason ?? '');
+        this.connectionStateHandlers.forEach(handler => handler(connected));
       }),
-
-      this.transport.on('event', (data) => {
-        const aguiEvent = data as AGUIEvent;
+      this.transport.onEvent((event) => {
         try {
-          console.log('[Client] Received event:', aguiEvent.type);
-          this.handleEvent(aguiEvent);
+          console.log('[Client] Received event:', event.type);
+          this.handleEvent(event);
         } catch (error) {
           console.error('[UseAI] Error handling event:', error);
         }
-      }),
-
-      this.transport.on('agents', (data) => {
-        const { agents, defaultAgent } = data as { agents: AgentInfo[]; defaultAgent: string };
-        console.log('[Client] Received available agents:', data);
-        this._availableAgents = agents;
-        this._defaultAgent = defaultAgent;
-        this.agentsChangeHandlers.forEach(handler => handler(agents, defaultAgent));
-      }),
-
-      this.transport.on('config', (data) => {
-        const { langfuseEnabled } = data as { langfuseEnabled?: boolean };
-        console.log('[Client] Received server config:', data);
-        this._langfuseEnabled = langfuseEnabled ?? false;
-        this.langfuseConfigHandlers.forEach(handler => handler(this._langfuseEnabled));
-      }),
-
-      this.transport.on('disconnect', (reason) => {
-        console.log('[UseAI] Disconnected:', reason);
-        this.connectionStateHandlers.forEach(handler => handler(false));
       }),
     );
 
     this.transport.connect();
   }
 
+  /**
+   * The agent list and the server config arrive as CUSTOM events. They update the
+   * client and are not forwarded to onEvent subscribers.
+   */
+  private handleCustomEvent(event: CustomEvent): boolean {
+    if (event.name === 'agents') {
+      const { agents, defaultAgent } = event.value as { agents: AgentInfo[]; defaultAgent: string };
+      console.log('[Client] Received available agents:', event.value);
+      this._availableAgents = agents;
+      this._defaultAgent = defaultAgent;
+      this.agentsChangeHandlers.forEach(handler => handler(agents, defaultAgent));
+      return true;
+    }
+    if (event.name === 'config') {
+      const { langfuseEnabled } = event.value as { langfuseEnabled?: boolean };
+      console.log('[Client] Received server config:', event.value);
+      this._langfuseEnabled = langfuseEnabled ?? false;
+      this.langfuseConfigHandlers.forEach(handler => handler(this._langfuseEnabled));
+      return true;
+    }
+    return false;
+  }
 
   private handleEvent(event: AGUIEvent) {
+    if (event.type === EventType.CUSTOM && this.handleCustomEvent(event as CustomEvent)) return;
+
     // Track assistant message lifecycle for conversation history
     if (event.type === EventType.RUN_STARTED) {
       // Start of a new assistant response - initialize message

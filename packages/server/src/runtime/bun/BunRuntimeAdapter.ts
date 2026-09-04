@@ -1,10 +1,21 @@
+import type { Server as SocketIOServer } from 'socket.io';
 import { Server as BunEngine } from '@socket.io/bun-engine';
-import type { RuntimeAdapter, RuntimeListener, RuntimeServerConfig, RuntimeServerHandle } from '../types';
+import type { RuntimeAdapter, RuntimeListener, RuntimeServerConfig, RuntimeServerHandle, WebSocketListener } from '../types';
 import { resolveCorsHeaders, resolvePreflightHeaders } from './cors';
-import { BunRawWebSocket, type RawWebSocketData } from './rawWebSocket';
+import { BunRawWebSocket, type BunWebSocketData } from './rawWebSocket';
 
-type BunServer = Parameters<NonNullable<Parameters<typeof Bun.serve>[0]['fetch']>>[1];
-type WebSocketHandler = NonNullable<Parameters<typeof Bun.serve>[0]['websocket']>;
+type ServeOptions = Parameters<typeof Bun.serve>[0];
+type BunServer = Parameters<NonNullable<ServeOptions['fetch']>>[1];
+type WebSocketHandler = NonNullable<ServeOptions['websocket']>;
+
+/** The part of the HTTP server a listener owns. */
+interface ListenerHandlers {
+  /** Requests under this path go to `upgrade`; everything else is 404. */
+  path: string;
+  /** Answers the request, or returns undefined once the request was upgraded. */
+  upgrade(req: Request, server: BunServer): Promise<Response | undefined>;
+  websocket: WebSocketHandler;
+}
 
 /**
  * Runtime adapter for Bun.
@@ -17,7 +28,7 @@ export class BunRuntimeAdapter implements RuntimeAdapter {
   private engine: BunEngine | null = null;
 
   createServer(listener: RuntimeListener, config: RuntimeServerConfig): RuntimeServerHandle {
-    const { upgrade, websocket } =
+    const handlers =
       listener.transport === 'socketio'
         ? this.socketIOHandlers(listener.io, config)
         : this.webSocketHandlers(listener.onConnection);
@@ -48,27 +59,20 @@ export class BunRuntimeAdapter implements RuntimeAdapter {
           });
         }
 
-        const response = await upgrade(req, server, url);
-        if (response === null) return undefined;
-        if (response) {
-          // Add CORS headers to the listener's responses
-          if (Object.keys(corsHeaders).length > 0) {
-            const newHeaders = new Headers(response.headers);
-            for (const [key, value] of Object.entries(corsHeaders)) {
-              newHeaders.set(key, value);
-            }
-            return new Response(response.body, {
-              status: response.status,
-              statusText: response.statusText,
-              headers: newHeaders,
-            });
-          }
-          return response;
+        if (!url.pathname.startsWith(handlers.path)) {
+          return new Response('Not Found', { status: 404, headers: corsHeaders });
         }
 
-        return new Response('Not Found', { status: 404, headers: corsHeaders });
+        const response = await handlers.upgrade(req, server);
+        if (!response || Object.keys(corsHeaders).length === 0) return response;
+
+        const headers = new Headers(response.headers);
+        for (const [key, value] of Object.entries(corsHeaders)) {
+          headers.set(key, value);
+        }
+        return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
       },
-      websocket,
+      websocket: handlers.websocket,
     });
 
     return {
@@ -79,11 +83,7 @@ export class BunRuntimeAdapter implements RuntimeAdapter {
     };
   }
 
-  /**
-   * @returns `upgrade` yields a Response to send, `null` once the request was upgraded,
-   *   or `undefined` when the path is not the listener's.
-   */
-  private socketIOHandlers(io: RuntimeListener extends infer L ? (L extends { io: infer I } ? I : never) : never, config: RuntimeServerConfig) {
+  private socketIOHandlers(io: SocketIOServer, config: RuntimeServerConfig): ListenerHandlers {
     this.engine = new BunEngine({
       path: '/socket.io/',
       maxHttpBufferSize: config.maxHttpBufferSize,
@@ -103,43 +103,35 @@ export class BunRuntimeAdapter implements RuntimeAdapter {
 
     const handleRequest = this.engine.handleRequest.bind(this.engine);
     return {
-      upgrade: async (req: Request, server: BunServer, url: URL): Promise<Response | null | undefined> => {
-        if (!url.pathname.startsWith('/socket.io/')) return undefined;
-        // The engine returns undefined once it has upgraded the request itself.
-        return (await handleRequest(req, server as never)) ?? null;
-      },
+      path: '/socket.io/',
+      upgrade: (req, server) => handleRequest(req, server as never),
       websocket: this.engine.handler().websocket as unknown as WebSocketHandler,
     };
   }
 
-  private webSocketHandlers(onConnection: (connection: BunRawWebSocket) => void) {
-    const sockets = new WeakMap<object, BunRawWebSocket>();
-    const websocket: WebSocketHandler = {
-      open: (ws) => {
-        const { remoteAddress } = ws.data as RawWebSocketData;
-        const connection = new BunRawWebSocket(ws, remoteAddress);
-        sockets.set(ws, connection);
-        onConnection(connection);
-      },
-      message: (ws, message) => {
-        sockets.get(ws)?.receiveMessage(
-          typeof message === 'string' ? message : new TextDecoder().decode(message),
-        );
-      },
-      close: (ws) => {
-        sockets.get(ws)?.receiveClose();
-        sockets.delete(ws);
-      },
-    };
-
+  private webSocketHandlers(onConnection: WebSocketListener['onConnection']): ListenerHandlers {
+    const dataOf = (ws: { data: unknown }) => ws.data as BunWebSocketData;
     return {
-      upgrade: async (req: Request, server: BunServer, url: URL): Promise<Response | null | undefined> => {
-        if (url.pathname !== '/') return undefined;
-        const data: RawWebSocketData = { remoteAddress: server.requestIP(req)?.address };
-        if (server.upgrade(req, { data })) return null;
+      path: '/',
+      upgrade: async (req, server) => {
+        if (new URL(req.url).pathname !== '/') return new Response('Not Found', { status: 404 });
+        const data: BunWebSocketData = { remoteAddress: server.requestIP(req)?.address };
+        if (server.upgrade(req, { data })) return undefined;
         return new Response('Expected a WebSocket upgrade', { status: 426 });
       },
-      websocket,
+      websocket: {
+        open: (ws) => {
+          const data = dataOf(ws);
+          data.connection = new BunRawWebSocket(ws, data.remoteAddress);
+          onConnection(data.connection);
+        },
+        message: (ws, message) => {
+          if (typeof message === 'string') dataOf(ws).connection?.receiveMessage(message);
+        },
+        close: (ws) => {
+          dataOf(ws).connection?.receiveClose();
+        },
+      },
     };
   }
 }

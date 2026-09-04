@@ -1,19 +1,23 @@
 import type { ModelMessage } from 'ai';
-import type { ToolDefinition, AGUIEvent, ToolApprovalRequestEvent } from '../types';
+import type { ToolDefinition, AGUIEvent, ToolApprovalRequestEvent, UseAIClientMessage } from '../types';
 
 /**
- * A client connection, as much of it as a session needs.
- *
- * Both connection kinds the server accepts satisfy this: a Socket.IO socket, and a
- * plain WebSocket where `emit(name, data)` is written out as `{"name":...,"data":...}`.
+ * One client connection, whatever protocol carries it. The server accepts every
+ * connection through this interface, so protocol details stay in its implementations.
  */
 export interface ClientConnection {
   /** Identifies the connection for the lifetime of the session. */
   readonly id: string;
+  /** Address the connection came from, used for rate limiting. */
+  readonly ipAddress: string;
   /** Whether the connection is still open. */
   readonly connected: boolean;
-  /** Sends a named payload to the client. */
+  /** Sends a named payload to the client. `event` carries an AG-UI event. */
   emit(name: string, data?: unknown): void;
+  /** Registers the handler for messages from the client. */
+  onMessage(handler: (message: UseAIClientMessage) => void): void;
+  /** Registers the handler for the connection closing, for any reason. */
+  onClose(handler: () => void): void;
 }
 
 /**

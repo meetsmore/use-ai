@@ -7,6 +7,7 @@ import {
   createSequentialMockModel,
   TestCleanupManager,
 } from '../test/integration-test-utils';
+import { waitFor } from '../test/test-utils';
 import { AISDKAgent } from './agents/AISDKAgent';
 
 /**
@@ -34,14 +35,6 @@ function connectClient(port: number): Promise<{ client: UseAIClient; events: AGU
     });
     client.connect();
   });
-}
-
-async function waitFor(condition: () => boolean, message: string, timeoutMs = 5000): Promise<void> {
-  const deadline = Date.now() + timeoutMs;
-  while (!condition()) {
-    if (Date.now() > deadline) throw new Error(`Timed out waiting for ${message}`);
-    await new Promise(resolve => setTimeout(resolve, 10));
-  }
 }
 
 describe.each(RUNTIMES)('WebSocketTransport against a real server: %s runtime', (runtime) => {
@@ -172,6 +165,13 @@ describe('transport defaults to socketio', () => {
     expect(socket.connected).toBe(true);
     socket.disconnect();
 
-    await expect(connectClient(port)).rejects.toThrow('Timed out connecting');
-  }, 10_000);
+    // A Socket.IO server answers a plain upgrade at / with 404, so the socket closes at once.
+    const closed = await new Promise<boolean>((resolve) => {
+      const ws = new WebSocket(`ws://localhost:${port}`);
+      ws.onopen = () => resolve(false);
+      ws.onclose = () => resolve(true);
+      ws.onerror = () => {};
+    });
+    expect(closed).toBe(true);
+  });
 });

@@ -1,29 +1,18 @@
 import { io, Socket } from 'socket.io-client';
-import type { UseAIClientMessage } from '../types';
-import { TransportHandlerRegistry } from './handlerRegistry';
-import type { UseAITransport, UseAITransportEventName } from './types';
+import { EventType, type CustomEvent } from '@meetsmore-oss/use-ai-core';
+import type { AGUIEvent, UseAIClientMessage } from '../types';
+import type { UseAITransport } from './types';
+
+// Reconnect indefinitely so clients recover after extended outages (mobile
+// app backgrounded long enough for server pingTimeout, airplane mode, etc.).
+// Socket.IO applies exponential backoff capped at RECONNECTION_DELAY_MAX,
+// so steady-state retry frequency is ~one attempt per 10s.
+const RECONNECTION_DELAY = 1000;
+const RECONNECTION_DELAY_MAX = 10_000;
 
 /**
- * Options for {@link SocketIOTransport}.
- */
-export interface SocketIOTransportOptions {
-  /**
-   * Delay before the first reconnection attempt, in milliseconds.
-   *
-   * @default 1000
-   */
-  reconnectionDelay?: number;
-  /**
-   * Upper bound on the exponential backoff between reconnection attempts, in milliseconds.
-   *
-   * @default 10000
-   */
-  reconnectionDelayMax?: number;
-}
-
-/**
- * Transport over Socket.IO. This is what {@link UseAIProvider} uses when given only a `serverUrl`,
- * and what the bundled `@meetsmore-oss/use-ai-server` serves.
+ * Transport over Socket.IO. This is what {@link UseAIProvider} uses when given a `serverUrl`,
+ * and what the bundled `@meetsmore-oss/use-ai-server` serves by default.
  *
  * @example
  * ```typescript
@@ -32,13 +21,8 @@ export interface SocketIOTransportOptions {
  */
 export class SocketIOTransport implements UseAITransport {
   private socket: Socket | null = null;
-  private registry = new TransportHandlerRegistry();
-  // Reconnect indefinitely so clients recover after extended outages (mobile
-  // app backgrounded long enough for server pingTimeout, airplane mode, etc.).
-  // Socket.IO applies exponential backoff capped at reconnectionDelayMax,
-  // so steady-state retry frequency is ~one attempt per 10s.
-  private reconnectionDelay: number;
-  private reconnectionDelayMax: number;
+  private eventHandlers = new Set<(event: AGUIEvent) => void>();
+  private connectionHandlers = new Set<(connected: boolean, reason?: string) => void>();
 
   /**
    * @param url - The URL of the UseAI server
@@ -47,10 +31,7 @@ export class SocketIOTransport implements UseAITransport {
    * new SocketIOTransport('ws://localhost:8081');
    * ```
    */
-  constructor(readonly url: string, options: SocketIOTransportOptions = {}) {
-    this.reconnectionDelay = options.reconnectionDelay ?? 1000;
-    this.reconnectionDelayMax = options.reconnectionDelayMax ?? 10_000;
-  }
+  constructor(readonly url: string) {}
 
   get connected(): boolean {
     return this.socket !== null && this.socket.connected;
@@ -61,8 +42,8 @@ export class SocketIOTransport implements UseAITransport {
       transports: ['polling', 'websocket'],
       reconnection: true,
       reconnectionAttempts: Infinity,
-      reconnectionDelay: this.reconnectionDelay,
-      reconnectionDelayMax: this.reconnectionDelayMax,
+      reconnectionDelay: RECONNECTION_DELAY,
+      reconnectionDelayMax: RECONNECTION_DELAY_MAX,
       withCredentials: true,
     });
     this.socket = socket;
@@ -81,12 +62,14 @@ export class SocketIOTransport implements UseAITransport {
         });
       }
 
-      this.registry.dispatch('connect', undefined);
+      this.connectionHandlers.forEach(handler => handler(true));
     });
 
-    socket.on('event', (event: unknown) => this.registry.dispatch('event', event));
-    socket.on('agents', (data: unknown) => this.registry.dispatch('agents', data));
-    socket.on('config', (data: unknown) => this.registry.dispatch('config', data));
+    socket.on('event', (event: AGUIEvent) => this.dispatch(event));
+    // The Socket.IO server sends these two on their own channels; every other
+    // transport carries them as AG-UI CUSTOM events, so present them the same way.
+    socket.on('agents', (value: unknown) => this.dispatch(customEvent('agents', value)));
+    socket.on('config', (value: unknown) => this.dispatch(customEvent('config', value)));
 
     socket.on('connect_error', (error: Error) => {
       // Use warn instead of error to avoid triggering Next.js error overlay
@@ -94,22 +77,38 @@ export class SocketIOTransport implements UseAITransport {
     });
 
     socket.on('disconnect', (reason: string) => {
-      this.registry.dispatch('disconnect', reason);
+      this.connectionHandlers.forEach(handler => handler(false, reason));
     });
   }
 
   disconnect(): void {
-    if (this.socket) {
-      this.socket.disconnect();
-      this.socket = null;
-    }
+    this.socket?.disconnect();
+    this.socket = null;
   }
 
   send(message: UseAIClientMessage): void {
     this.socket?.emit('message', message);
   }
 
-  on(name: UseAITransportEventName, handler: (data: unknown) => void): () => void {
-    return this.registry.on(name, handler);
+  onEvent(handler: (event: AGUIEvent) => void): () => void {
+    this.eventHandlers.add(handler);
+    return () => {
+      this.eventHandlers.delete(handler);
+    };
   }
+
+  onConnectionChange(handler: (connected: boolean, reason?: string) => void): () => void {
+    this.connectionHandlers.add(handler);
+    return () => {
+      this.connectionHandlers.delete(handler);
+    };
+  }
+
+  private dispatch(event: AGUIEvent): void {
+    this.eventHandlers.forEach(handler => handler(event));
+  }
+}
+
+function customEvent(name: string, value: unknown): CustomEvent {
+  return { type: EventType.CUSTOM, name, value, timestamp: Date.now() };
 }

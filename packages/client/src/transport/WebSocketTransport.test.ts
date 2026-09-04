@@ -1,63 +1,9 @@
 import { describe, test, expect, beforeEach, afterEach, spyOn } from 'bun:test';
 import { WebSocketTransport } from './WebSocketTransport';
-
-/** Enough of a WHATWG WebSocket for partysocket to drive. */
-class FakeWebSocket extends EventTarget {
-  static instances: FakeWebSocket[] = [];
-
-  readyState = 0;
-  binaryType = 'blob';
-  sent: string[] = [];
-  closeCalls = 0;
-
-  constructor(readonly url: string) {
-    super();
-    FakeWebSocket.instances.push(this);
-  }
-
-  static get latest(): FakeWebSocket {
-    return FakeWebSocket.instances[FakeWebSocket.instances.length - 1];
-  }
-
-  send(data: string): void {
-    this.sent.push(data);
-  }
-
-  close(): void {
-    this.closeCalls++;
-    this.readyState = 3;
-  }
-
-  serverOpen(): void {
-    this.readyState = 1;
-    this.dispatchEvent(new Event('open'));
-  }
-
-  serverSend(data: unknown): void {
-    this.dispatchEvent(new MessageEvent('message', { data }));
-  }
-
-  serverClose(): void {
-    this.readyState = 3;
-    this.dispatchEvent(new CloseEvent('close', { code: 1006 }));
-  }
-}
-
-const tick = (ms = 0) => new Promise(resolve => setTimeout(resolve, ms));
-
-async function waitUntil(condition: () => boolean, timeoutMs = 500): Promise<void> {
-  const deadline = Date.now() + timeoutMs;
-  while (!condition()) {
-    if (Date.now() > deadline) throw new Error('Timed out');
-    await tick(1);
-  }
-}
+import { FakeWebSocket, FakeWebSocketConstructor, waitUntil } from '../../test/fakeWebSocket';
 
 function makeTransport(options: { reconnectionDelay?: number; reconnectionDelayMax?: number } = {}) {
-  return new WebSocketTransport('wss://server.example', {
-    ...options,
-    WebSocket: FakeWebSocket as unknown as typeof WebSocket,
-  });
+  return new WebSocketTransport('wss://server.example', { ...options, WebSocket: FakeWebSocketConstructor });
 }
 
 /** Connects and waits for the underlying socket, which partysocket opens asynchronously. */
@@ -65,17 +11,15 @@ async function connect(transport: WebSocketTransport): Promise<FakeWebSocket> {
   const before = FakeWebSocket.instances.length;
   transport.connect();
   await waitUntil(() => FakeWebSocket.instances.length > before);
-  return FakeWebSocket.latest;
+  return FakeWebSocket.latest!;
 }
-
-const customEvent = (name: string, value: unknown) => JSON.stringify({ type: 'CUSTOM', name, value });
 
 describe('WebSocketTransport', () => {
   let consoleLogSpy: ReturnType<typeof spyOn>;
   let consoleWarnSpy: ReturnType<typeof spyOn>;
 
   beforeEach(() => {
-    FakeWebSocket.instances = [];
+    FakeWebSocket.reset();
     consoleLogSpy = spyOn(console, 'log').mockImplementation(() => {});
     consoleWarnSpy = spyOn(console, 'warn').mockImplementation(() => {});
   });
@@ -94,54 +38,37 @@ describe('WebSocketTransport', () => {
     transport.disconnect();
   });
 
-  test('an AG-UI event frame is delivered on the event channel', async () => {
+  test('delivers each JSON frame as one AG-UI event', async () => {
     const transport = makeTransport();
     const events: unknown[] = [];
-    transport.on('event', data => events.push(data));
+    transport.onEvent(event => events.push(event));
 
     const socket = await connect(transport);
     socket.serverOpen();
     socket.serverSend(JSON.stringify({ type: 'RUN_STARTED', threadId: 't', runId: 'r' }));
+    socket.serverSend(JSON.stringify({ type: 'CUSTOM', name: 'agents', value: { agents: [], defaultAgent: 'claude' } }));
 
-    expect(events).toEqual([{ type: 'RUN_STARTED', threadId: 't', runId: 'r' }]);
-
-    transport.disconnect();
-  });
-
-  test('CUSTOM events named agents and config are delivered on their own channels', async () => {
-    const transport = makeTransport();
-    const events: unknown[] = [];
-    const agents: unknown[] = [];
-    const configs: unknown[] = [];
-    transport.on('event', data => events.push(data));
-    transport.on('agents', data => agents.push(data));
-    transport.on('config', data => configs.push(data));
-
-    const socket = await connect(transport);
-    socket.serverOpen();
-    socket.serverSend(customEvent('agents', { agents: [], defaultAgent: 'claude' }));
-    socket.serverSend(customEvent('config', { langfuseEnabled: true }));
-
-    expect(agents).toEqual([{ agents: [], defaultAgent: 'claude' }]);
-    expect(configs).toEqual([{ langfuseEnabled: true }]);
-    expect(events).toEqual([]);
+    expect(events).toEqual([
+      { type: 'RUN_STARTED', threadId: 't', runId: 'r' },
+      { type: 'CUSTOM', name: 'agents', value: { agents: [], defaultAgent: 'claude' } },
+    ]);
 
     transport.disconnect();
   });
 
-  test('delivers a frame to every subscriber of its channel', async () => {
+  test('delivers a frame to every subscriber', async () => {
     const transport = makeTransport();
     const first: unknown[] = [];
     const second: unknown[] = [];
-    transport.on('agents', data => first.push(data));
-    transport.on('agents', data => second.push(data));
+    transport.onEvent(event => first.push(event));
+    transport.onEvent(event => second.push(event));
 
     const socket = await connect(transport);
     socket.serverOpen();
-    socket.serverSend(customEvent('agents', { agents: [], defaultAgent: 'claude' }));
+    socket.serverSend(JSON.stringify({ type: 'RUN_FINISHED' }));
 
-    expect(first).toEqual([{ agents: [], defaultAgent: 'claude' }]);
-    expect(second).toEqual([{ agents: [], defaultAgent: 'claude' }]);
+    expect(first).toEqual([{ type: 'RUN_FINISHED' }]);
+    expect(second).toEqual([{ type: 'RUN_FINISHED' }]);
 
     transport.disconnect();
   });
@@ -149,7 +76,7 @@ describe('WebSocketTransport', () => {
   test('unsubscribing stops delivery', async () => {
     const transport = makeTransport();
     const events: unknown[] = [];
-    const unsubscribe = transport.on('event', data => events.push(data));
+    const unsubscribe = transport.onEvent(event => events.push(event));
 
     const socket = await connect(transport);
     socket.serverOpen();
@@ -162,26 +89,10 @@ describe('WebSocketTransport', () => {
     transport.disconnect();
   });
 
-  test('a CUSTOM event with an unknown name passes through as an event', async () => {
+  test('a malformed or non-text frame is ignored, not an error', async () => {
     const transport = makeTransport();
     const events: unknown[] = [];
-    transport.on('event', data => events.push(data));
-
-    const socket = await connect(transport);
-    socket.serverOpen();
-    socket.serverSend(customEvent('a_name_from_a_later_version', {}));
-
-    // UseAIClient ignores event types it does not handle, so passing it on is safe.
-    expect(events).toEqual([{ type: 'CUSTOM', name: 'a_name_from_a_later_version', value: {} }]);
-    expect(transport.connected).toBe(true);
-
-    transport.disconnect();
-  });
-
-  test('a malformed frame is ignored, not an error', async () => {
-    const transport = makeTransport();
-    const events: unknown[] = [];
-    transport.on('event', data => events.push(data));
+    transport.onEvent(event => events.push(event));
 
     const socket = await connect(transport);
     socket.serverOpen();
@@ -225,31 +136,30 @@ describe('WebSocketTransport', () => {
     transport.disconnect();
   });
 
-  test('a close after opening dispatches disconnect', async () => {
+  test('reports a connection change on open and on close', async () => {
     const transport = makeTransport({ reconnectionDelay: 10_000 });
-    const states: string[] = [];
-    transport.on('connect', () => states.push('connect'));
-    transport.on('disconnect', () => states.push('disconnect'));
+    const changes: boolean[] = [];
+    transport.onConnectionChange(connected => changes.push(connected));
 
     const socket = await connect(transport);
     socket.serverOpen();
     socket.serverClose();
 
-    expect(states).toEqual(['connect', 'disconnect']);
+    expect(changes).toEqual([true, false]);
 
     transport.disconnect();
   });
 
-  test('a failed connection attempt does not dispatch disconnect', async () => {
+  test('a failed connection attempt does not report a disconnection', async () => {
     const transport = makeTransport({ reconnectionDelay: 10_000 });
-    const states: string[] = [];
-    transport.on('disconnect', () => states.push('disconnect'));
+    const changes: boolean[] = [];
+    transport.onConnectionChange(connected => changes.push(connected));
 
     const socket = await connect(transport);
     // Never opened: the socket closes straight from the connecting state.
     socket.serverClose();
 
-    expect(states).toEqual([]);
+    expect(changes).toEqual([]);
 
     transport.disconnect();
   });
@@ -262,7 +172,7 @@ describe('WebSocketTransport', () => {
     socket.serverClose();
     await waitUntil(() => FakeWebSocket.instances.length > 1);
 
-    FakeWebSocket.latest.serverOpen();
+    FakeWebSocket.latest!.serverOpen();
     expect(transport.connected).toBe(true);
 
     transport.disconnect();
@@ -274,7 +184,7 @@ describe('WebSocketTransport', () => {
 
     for (let i = 0; i < 3; i++) {
       const count = FakeWebSocket.instances.length;
-      FakeWebSocket.latest.serverClose();
+      FakeWebSocket.latest!.serverClose();
       await waitUntil(() => FakeWebSocket.instances.length > count);
     }
 
@@ -292,7 +202,7 @@ describe('WebSocketTransport', () => {
     transport.disconnect();
     const openedByNow = FakeWebSocket.instances.length;
 
-    await tick(20);
+    await new Promise(resolve => setTimeout(resolve, 20));
 
     expect(FakeWebSocket.instances).toHaveLength(openedByNow);
     expect(transport.connected).toBe(false);

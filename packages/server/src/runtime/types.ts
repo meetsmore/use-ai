@@ -25,12 +25,20 @@ export interface RawWebSocket {
   onClose(handler: () => void): void;
 }
 
-/**
- * What the HTTP server hands connections to. A server runs exactly one.
- */
-export type RuntimeListener =
-  | { transport: 'socketio'; io: SocketIOServer }
-  | { transport: 'websocket'; onConnection(connection: RawWebSocket): void };
+/** Hands the HTTP server's `/socket.io/` traffic to a Socket.IO server. */
+export interface SocketIOListener {
+  transport: 'socketio';
+  io: SocketIOServer;
+}
+
+/** Accepts plain WebSocket upgrades at `/`. */
+export interface WebSocketListener {
+  transport: 'websocket';
+  onConnection(connection: RawWebSocket): void;
+}
+
+/** What the HTTP server hands connections to. A server runs exactly one. */
+export type RuntimeListener = SocketIOListener | WebSocketListener;
 
 /**
  * Configuration for creating a runtime server.

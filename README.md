@@ -323,7 +323,7 @@ root.render(
 
 The bundled server serves one transport. Set `transport: 'websocket'` on `UseAIServer`, or `TRANSPORT=websocket` on the Docker image, to serve a plain WebSocket at `/` instead of Socket.IO.
 
-To carry the same messages over something else, implement `UseAITransport` yourself. The interface has five members: `connect`, `disconnect`, `send`, `on` and `connected`.
+To carry the same messages over something else, implement `UseAITransport` yourself. It opens and closes a connection, sends client messages, and delivers AG-UI events.
 
 See [docs/websocket-protocol.md](docs/websocket-protocol.md) for the frames, the turn sequence, and the reconnection behaviour.
 

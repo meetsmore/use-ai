@@ -1,8 +1,6 @@
 import ReconnectingWebSocket from 'partysocket/ws';
-import { EventType } from '@meetsmore-oss/use-ai-core';
-import type { UseAIClientMessage } from '../types';
-import { TransportHandlerRegistry } from './handlerRegistry';
-import type { UseAITransport, UseAITransportEventName } from './types';
+import type { AGUIEvent, UseAIClientMessage } from '../types';
+import type { UseAITransport } from './types';
 
 /**
  * Options for {@link WebSocketTransport}.
@@ -34,9 +32,8 @@ export interface WebSocketTransportOptions {
  * Transport over a plain WebSocket. Every frame is JSON text.
  *
  * Upstream, the client sends each `UseAIClientMessage` as one frame, with nothing
- * around it. Downstream, the server sends one AG-UI event per frame. The `agents`
- * and `config` payloads travel as AG-UI `CUSTOM` events named `agents` and `config`.
- * The client ignores an event with a type or a custom name it does not know.
+ * around it. Downstream, the server sends one AG-UI event per frame. The client
+ * ignores an event type it does not handle.
  *
  * Reconnection is automatic: indefinite, with exponential backoff capped at
  * `reconnectionDelayMax`. The defaults match {@link SocketIOTransport}.
@@ -48,10 +45,9 @@ export interface WebSocketTransportOptions {
  */
 export class WebSocketTransport implements UseAITransport {
   private socket: ReconnectingWebSocket | null = null;
-  private registry = new TransportHandlerRegistry();
   private _connected = false;
-  private readonly options: Required<Pick<WebSocketTransportOptions, 'reconnectionDelay' | 'reconnectionDelayMax'>> &
-    Pick<WebSocketTransportOptions, 'WebSocket'>;
+  private eventHandlers = new Set<(event: AGUIEvent) => void>();
+  private connectionHandlers = new Set<(connected: boolean, reason?: string) => void>();
 
   /**
    * @param url - WebSocket URL of the server
@@ -60,13 +56,7 @@ export class WebSocketTransport implements UseAITransport {
    * new WebSocketTransport('wss://your-server.com');
    * ```
    */
-  constructor(readonly url: string, options: WebSocketTransportOptions = {}) {
-    this.options = {
-      reconnectionDelay: options.reconnectionDelay ?? 1000,
-      reconnectionDelayMax: options.reconnectionDelayMax ?? 10_000,
-      WebSocket: options.WebSocket,
-    };
-  }
+  constructor(readonly url: string, private readonly options: WebSocketTransportOptions = {}) {}
 
   get connected(): boolean {
     return this._connected;
@@ -77,8 +67,8 @@ export class WebSocketTransport implements UseAITransport {
 
     const socket = new ReconnectingWebSocket(this.url, [], {
       WebSocket: this.options.WebSocket,
-      minReconnectionDelay: this.options.reconnectionDelay,
-      maxReconnectionDelay: this.options.reconnectionDelayMax,
+      minReconnectionDelay: this.options.reconnectionDelay ?? 1000,
+      maxReconnectionDelay: this.options.reconnectionDelayMax ?? 10_000,
       reconnectionDelayGrowFactor: 2,
       maxRetries: Infinity,
       // UseAIClient only sends while connected, so nothing is queued for a later socket.
@@ -88,17 +78,12 @@ export class WebSocketTransport implements UseAITransport {
 
     socket.onopen = () => {
       this._connected = true;
-      this.registry.dispatch('connect', undefined);
+      this.connectionHandlers.forEach(handler => handler(true));
     };
 
     socket.onmessage = (event) => {
       const frame = parseFrame(event.data);
-      if (!frame) return;
-      if (frame.type === EventType.CUSTOM && (frame.name === 'agents' || frame.name === 'config')) {
-        this.registry.dispatch(frame.name, frame.value);
-        return;
-      }
-      this.registry.dispatch('event', frame);
+      if (frame) this.eventHandlers.forEach(handler => handler(frame));
     };
 
     socket.onerror = (event) => {
@@ -110,7 +95,7 @@ export class WebSocketTransport implements UseAITransport {
       // A close also fires for a failed attempt. Only a socket that opened reports a disconnection.
       if (!this._connected) return;
       this._connected = false;
-      this.registry.dispatch('disconnect', 'transport close');
+      this.connectionHandlers.forEach(handler => handler(false, 'transport close'));
     };
   }
 
@@ -128,18 +113,22 @@ export class WebSocketTransport implements UseAITransport {
     this.socket?.send(JSON.stringify(message));
   }
 
-  on(name: UseAITransportEventName, handler: (data: unknown) => void): () => void {
-    return this.registry.on(name, handler);
+  onEvent(handler: (event: AGUIEvent) => void): () => void {
+    this.eventHandlers.add(handler);
+    return () => {
+      this.eventHandlers.delete(handler);
+    };
+  }
+
+  onConnectionChange(handler: (connected: boolean, reason?: string) => void): () => void {
+    this.connectionHandlers.add(handler);
+    return () => {
+      this.connectionHandlers.delete(handler);
+    };
   }
 }
 
-interface Frame {
-  type: string;
-  name?: string;
-  value?: unknown;
-}
-
-function parseFrame(data: unknown): Frame | null {
+function parseFrame(data: unknown): AGUIEvent | null {
   if (typeof data !== 'string') {
     console.warn('[UseAI] Ignoring non-text frame');
     return null;
@@ -151,8 +140,8 @@ function parseFrame(data: unknown): Frame | null {
     console.warn('[UseAI] Ignoring malformed frame');
     return null;
   }
-  if (typeof parsed !== 'object' || parsed === null) return null;
-  const frame = parsed as Partial<Frame>;
-  if (typeof frame.type !== 'string') return null;
-  return frame as Frame;
+  if (typeof parsed !== 'object' || parsed === null || typeof (parsed as { type?: unknown }).type !== 'string') {
+    return null;
+  }
+  return parsed as AGUIEvent;
 }

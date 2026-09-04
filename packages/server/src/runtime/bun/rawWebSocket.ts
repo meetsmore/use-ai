@@ -1,8 +1,9 @@
 import type { RawWebSocket } from '../types';
 
-/** Per-connection data attached at upgrade time. */
-export interface RawWebSocketData {
+/** Per-connection data on `ws.data`: set at upgrade, completed on open. */
+export interface BunWebSocketData {
   remoteAddress?: string;
+  connection?: BunRawWebSocket;
 }
 
 interface BunWebSocket {

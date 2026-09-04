@@ -121,15 +121,17 @@ The server destroys the session when the connection closes. A reconnected client
 
 ## Your own transport
 
-`UseAITransport` has five members:
+`UseAITransport` has seven members:
 
+- `url`
+- `connected`
 - `connect`
 - `disconnect`
 - `send`
-- `on`
-- `connected`
+- `onEvent`, which delivers AG-UI events
+- `onConnectionChange`
 
-Implement `UseAITransport` to carry the same messages over something else.
+Implement `UseAITransport` to carry the same messages over something else. Deliver the agent list and the server config as `CUSTOM` events, as the section above describes.
 
 ```typescript
 import { UseAIClient, type UseAITransport } from '@meetsmore-oss/use-ai-client';

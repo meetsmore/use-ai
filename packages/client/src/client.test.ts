@@ -1,6 +1,7 @@
-import { describe, test, expect, mock, beforeEach, afterEach, spyOn } from 'bun:test';
-import type { Socket } from 'socket.io-client';
+import { describe, test, expect, beforeEach, afterEach, spyOn } from 'bun:test';
 import type { UseAIClientMessage } from './types';
+import { installSocketIOMock } from '../test/socketIOMock';
+import { FakeWebSocket, FakeWebSocketConstructor, waitUntil } from '../test/fakeWebSocket';
 
 /**
  * The UseAIClient suite, run over every bundled transport.
@@ -10,72 +11,7 @@ import type { UseAIClientMessage } from './types';
  * next to it, in transport/*.test.ts.
  */
 
-// ── Socket.IO harness ───────────────────────────────────────────────────────
-
-let socketHandlers: Record<string, Function[]> = {};
-let mockSocket: Partial<Socket> & { connected: boolean };
-
-function createMockSocket() {
-  socketHandlers = {};
-  mockSocket = {
-    on: mock((event: string, handler: Function) => {
-      (socketHandlers[event] ??= []).push(handler);
-      return mockSocket as Socket;
-    }),
-    emit: mock(() => mockSocket as Socket),
-    connected: false,
-    disconnect: mock(() => mockSocket as Socket),
-    io: {
-      engine: {
-        transport: { name: 'polling' },
-        on: mock(),
-      },
-    } as never,
-  };
-  return mockSocket as Socket;
-}
-
-mock.module('socket.io-client', () => ({
-  io: () => createMockSocket(),
-}));
-
-// ── Plain WebSocket harness ─────────────────────────────────────────────────
-
-/** Enough of a WHATWG WebSocket for partysocket to drive. */
-class FakeWebSocket extends EventTarget {
-  static latest: FakeWebSocket | null = null;
-
-  readyState = 0;
-  binaryType = 'blob';
-  sent: string[] = [];
-
-  constructor() {
-    super();
-    FakeWebSocket.latest = this;
-  }
-
-  send(data: string): void {
-    this.sent.push(data);
-  }
-
-  close(): void {
-    this.readyState = 3;
-  }
-
-  serverOpen(): void {
-    this.readyState = 1;
-    this.dispatchEvent(new Event('open'));
-  }
-
-  serverSend(data: string): void {
-    this.dispatchEvent(new MessageEvent('message', { data }));
-  }
-
-  serverClose(): void {
-    this.readyState = 3;
-    this.dispatchEvent(new CloseEvent('close', { code: 1006 }));
-  }
-}
+const sio = installSocketIOMock();
 
 // Imported after the module mock so SocketIOTransport picks it up.
 const { UseAIClient } = await import('./client');
@@ -101,36 +37,26 @@ interface Harness {
   sent(): UseAIClientMessage[];
 }
 
-async function waitUntil(condition: () => boolean, timeoutMs = 500): Promise<void> {
-  const deadline = Date.now() + timeoutMs;
-  while (!condition()) {
-    if (Date.now() > deadline) throw new Error('Timed out waiting for the transport to reconnect');
-    await new Promise(resolve => setTimeout(resolve, 1));
-  }
-}
-
 const HARNESSES: Array<[string, () => Harness]> = [
   [
     'SocketIOTransport',
     () => {
       const client = new UseAIClient(new SocketIOTransport('http://localhost:8081'));
       client.connect();
-      const socket = mockSocket;
-      const fire = (event: string, ...args: unknown[]) =>
-        socketHandlers[event]?.forEach(handler => handler(...args));
+      const socket = sio.socket;
 
       return {
         client,
         async open() {
           socket.connected = true;
-          fire('connect');
+          sio.fire('connect');
         },
         close(reason: string) {
           socket.connected = false;
-          fire('disconnect', reason);
+          sio.fire('disconnect', reason);
         },
         deliver(name, data) {
-          fire(name, data);
+          sio.fire(name, data);
         },
         sent() {
           const emit = socket.emit as unknown as { mock: { calls: unknown[][] } };
@@ -144,18 +70,18 @@ const HARNESSES: Array<[string, () => Harness]> = [
   [
     'WebSocketTransport',
     () => {
-      FakeWebSocket.latest = null;
+      FakeWebSocket.reset();
       const client = new UseAIClient(
         new WebSocketTransport('wss://localhost:8081', {
           reconnectionDelay: 1,
           reconnectionDelayMax: 1,
-          WebSocket: FakeWebSocket as unknown as typeof WebSocket,
+          WebSocket: FakeWebSocketConstructor,
         }),
       );
       client.connect();
       // partysocket opens the socket asynchronously, and opens a fresh one after a drop.
       const liveSocket = async () => {
-        await waitUntil(() => FakeWebSocket.latest !== null && FakeWebSocket.latest.readyState < 2);
+        await waitUntil(() => FakeWebSocket.latest !== undefined && FakeWebSocket.latest.readyState < 2);
         return FakeWebSocket.latest!;
       };
       const sent: string[] = [];
@@ -192,7 +118,10 @@ describe.each(HARNESSES)('UseAIClient over %s', (_name, createHarness) => {
   let client: Client;
 
   /** The last message the client sent upstream. */
-  const lastSent = () => harness.sent()[harness.sent().length - 1];
+  const lastSent = () => {
+    const all = harness.sent();
+    return all[all.length - 1];
+  };
   const emitEvent = (event: Record<string, unknown>) => harness.deliver('event', event);
 
   beforeEach(() => {
@@ -783,26 +712,24 @@ describe('UseAIClient construction', () => {
     const client = new UseAIClient('http://localhost:8081');
     client.connect();
 
-    expect(mockSocket).toBeDefined();
+    expect(sio.socket).toBeDefined();
     expect(client.isConnected()).toBe(false);
 
-    mockSocket.connected = true;
+    sio.socket.connected = true;
     expect(client.isConnected()).toBe(true);
 
     client.disconnect();
   });
 
   test('disconnect() unsubscribes from the transport', async () => {
-    FakeWebSocket.latest = null;
+    FakeWebSocket.reset();
     const client = new UseAIClient(
-      new WebSocketTransport('wss://localhost:8081', {
-        WebSocket: FakeWebSocket as unknown as typeof WebSocket,
-      }),
+      new WebSocketTransport('wss://localhost:8081', { WebSocket: FakeWebSocketConstructor }),
     );
     const stateChanges: boolean[] = [];
     client.onConnectionStateChange(connected => stateChanges.push(connected));
     client.connect();
-    await waitUntil(() => FakeWebSocket.latest !== null);
+    await waitUntil(() => FakeWebSocket.latest !== undefined);
     const socket = FakeWebSocket.latest!;
     socket.serverOpen();
 
