@@ -8,7 +8,6 @@ export type {
   UseAITransportEventName,
   SocketIOTransportOptions,
   WebSocketTransportOptions,
-  WebSocketLike,
 } from './transport';
 export { defineTool, executeDefinedTool, convertToolsToDefinitions } from './defineTool';
 /** @hidden */
@@ -81,6 +80,7 @@ export type {
   FloatingButtonProps,
   ChatPanelProps,
   UseAIProviderProps,
+  UseAIProviderOptions,
 } from './providers/useAIProvider';
 export type { SendMessageOptions } from './hooks/useMessageQueue';
 export type { DefinedTool, ToolsDefinition, ToolOptions, ToolAnnotations, ToolExecutionContext } from './defineTool';

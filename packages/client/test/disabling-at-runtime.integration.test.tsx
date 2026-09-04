@@ -23,7 +23,7 @@ describe('useAIContext without UseAIProvider', () => {
     const { result } = renderHook(() => useAIContext());
 
     expect(result.current).toBeDefined();
-    expect(result.current.serverUrl).toBe('');
+    expect(result.current.serverUrl).toBeUndefined();
     expect(result.current.connected).toBe(false);
     expect(result.current.client).toBeNull();
     expect(result.current.chat.currentId).toBeNull();

@@ -302,39 +302,30 @@ There are some minor extensions to the protocol:
 
 The client reaches the server through a `UseAITransport`. Two transports ship with the library.
 
-| Transport            | Wire                                     | Server endpoint                |
-| -------------------- | ---------------------------------------- | ------------------------------ |
-| `SocketIOTransport`  | Socket.IO, over polling and WebSocket    | `/socket.io/` (the default)    |
-| `WebSocketTransport` | JSON text frames, over a plain WebSocket | `webSocketPath`, default `/ws` |
+| Transport            | Wire                                              | Bundled server setting   |
+| -------------------- | ------------------------------------------------- | ------------------------ |
+| `SocketIOTransport`  | Socket.IO, over polling and WebSocket             | `transport: 'socketio'`  |
+| `WebSocketTransport` | AG-UI events as JSON text, over a plain WebSocket | `transport: 'websocket'` |
 
-`UseAIProvider` builds a `SocketIOTransport` from `serverUrl` when you do not pass one, so
-nothing changes if you use the bundled server.
+Give `UseAIProvider` either `serverUrl` or `transport`. `serverUrl` builds a `SocketIOTransport`, so nothing changes if you use the bundled server with its defaults.
 
-Pass `WebSocketTransport` to reach a server that does not serve Socket.IO. Such a server
-does not have to be Node. It must accept a WebSocket connection. It must then exchange
-the documented frames.
+Pass `WebSocketTransport` to reach a server that does not serve Socket.IO. Such a server does not have to be Node. It must accept a WebSocket connection. It must then exchange the documented frames.
 
 ```tsx
 import { UseAIProvider, WebSocketTransport } from '@meetsmore-oss/use-ai-client';
 
 root.render(
-  <UseAIProvider
-    serverUrl="wss://your-server.com"
-    transport={new WebSocketTransport('wss://your-server.com/ws')}
-  >
+  <UseAIProvider transport={new WebSocketTransport('wss://your-server.com')}>
     <App />
   </UseAIProvider>
 );
 ```
 
-The bundled server serves both listeners on one port. Set `webSocketPath: null` to serve
-Socket.IO only.
+The bundled server serves one transport. Set `transport: 'websocket'` on `UseAIServer`, or `TRANSPORT=websocket` on the Docker image, to serve a plain WebSocket at `/` instead of Socket.IO.
 
-To carry the same messages over something else, implement `UseAITransport` yourself. The
-interface has five members: `connect`, `disconnect`, `send`, `on` and `connected`.
+To carry the same messages over something else, implement `UseAITransport` yourself. The interface has five members: `connect`, `disconnect`, `send`, `on` and `connected`.
 
-See [docs/websocket-protocol.md](docs/websocket-protocol.md) for the frames, the turn
-sequence, and the reconnection behaviour.
+See [docs/websocket-protocol.md](docs/websocket-protocol.md) for the frames, the turn sequence, and the reconnection behaviour.
 
 ## Client
 
@@ -392,7 +383,7 @@ root.render(
 );
 ```
 
-Pass `transport` to reach a server over something other than Socket.IO. See [Transports](#transports).
+Pass `transport` instead of `serverUrl` to reach a server over something other than Socket.IO. See [Transports](#transports).
 
 ### Component State via `prompt`
 
@@ -1089,7 +1080,7 @@ const server = new UseAIServer({
     })
   },
   defaultAgent: 'claude',
-  webSocketPath: '/ws',   // plain WebSocket listener, see 'Transports'. null to disable.
+  transport: 'socketio',  // or 'websocket', see 'Transports'
   rateLimitMaxRequests: 1_000,
   rateLimitWindowMs: 60_000,
   plugins: [              // see 'Plugins'

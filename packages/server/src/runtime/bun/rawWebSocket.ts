@@ -1,14 +1,12 @@
 import type { RawWebSocket } from '../types';
 
-/** Marks a Bun WebSocket as belonging to the plain listener rather than to Socket.IO. */
+/** Per-connection data attached at upgrade time. */
 export interface RawWebSocketData {
-  useAiRawWebSocket: true;
   remoteAddress?: string;
 }
 
 interface BunWebSocket {
   readonly readyState: number;
-  data: unknown;
   send(data: string): unknown;
   close(): void;
 }
@@ -52,8 +50,4 @@ export class BunRawWebSocket implements RawWebSocket {
   receiveClose(): void {
     this.closeHandler?.();
   }
-}
-
-export function isRawWebSocket(ws: { data?: unknown }): boolean {
-  return (ws.data as Partial<RawWebSocketData> | undefined)?.useAiRawWebSocket === true;
 }

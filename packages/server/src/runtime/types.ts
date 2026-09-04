@@ -26,17 +26,11 @@ export interface RawWebSocket {
 }
 
 /**
- * A plain WebSocket listener, served on the same port and HTTP server as Socket.IO.
+ * What the HTTP server hands connections to. A server runs exactly one.
  */
-export interface RawWebSocketListener {
-  /**
-   * Path that upgrades to a plain WebSocket.
-   * @example '/ws'
-   */
-  path: string;
-  /** Called once per accepted connection. */
-  onConnection(connection: RawWebSocket): void;
-}
+export type RuntimeListener =
+  | { transport: 'socketio'; io: SocketIOServer }
+  | { transport: 'websocket'; onConnection(connection: RawWebSocket): void };
 
 /**
  * Configuration for creating a runtime server.
@@ -59,11 +53,6 @@ export interface RuntimeServerConfig {
    * Called when a polling transport connection is established.
    */
   onPollingConnection?: (sessionId: string, ip: string) => void;
-  /**
-   * Plain WebSocket listener to serve alongside Socket.IO.
-   * Omit to serve Socket.IO only.
-   */
-  websocket?: RawWebSocketListener;
 }
 
 /**
@@ -85,11 +74,11 @@ export interface RuntimeAdapter {
   readonly name: RuntimeType;
 
   /**
-   * Creates an HTTP server and binds Socket.IO to it.
+   * Creates an HTTP server and binds the listener to it.
    *
-   * @param io - Socket.IO server instance
+   * @param listener - Socket.IO server, or a plain WebSocket connection handler
    * @param config - Server configuration
    * @returns Handle to the running server
    */
-  createServer(io: SocketIOServer, config: RuntimeServerConfig): RuntimeServerHandle;
+  createServer(listener: RuntimeListener, config: RuntimeServerConfig): RuntimeServerHandle;
 }

@@ -1,33 +1,8 @@
+import ReconnectingWebSocket from 'partysocket/ws';
+import { EventType } from '@meetsmore-oss/use-ai-core';
 import type { UseAIClientMessage } from '../types';
 import { TransportHandlerRegistry } from './handlerRegistry';
 import type { UseAITransport, UseAITransportEventName } from './types';
-
-/**
- * The subset of the WHATWG `WebSocket` API that {@link WebSocketTransport} uses.
- * Declared structurally so a test double, or a polyfill on a runtime without a
- * global `WebSocket`, can stand in for the real thing.
- */
-export interface WebSocketLike {
-  send(data: string): void;
-  close(): void;
-  onopen: ((event: unknown) => void) | null;
-  onmessage: ((event: { data: unknown }) => void) | null;
-  onclose: ((event: unknown) => void) | null;
-  onerror: ((event: unknown) => void) | null;
-}
-
-/**
- * A downstream frame, as sent by the server.
- *
- * @example
- * ```json
- * { "name": "config", "data": { "langfuseEnabled": true } }
- * ```
- */
-interface DownstreamFrame {
-  name: string;
-  data: unknown;
-}
 
 /**
  * Options for {@link WebSocketTransport}.
@@ -35,74 +10,62 @@ interface DownstreamFrame {
 export interface WebSocketTransportOptions {
   /**
    * Delay before the first reconnection attempt, in milliseconds.
-   * Subsequent attempts double this, up to {@link reconnectionDelayMax}.
+   * Each later attempt doubles the delay, up to {@link reconnectionDelayMax}.
    *
    * @default 1000
    */
   reconnectionDelay?: number;
   /**
-   * Upper bound on the exponential backoff between reconnection attempts, in milliseconds.
+   * Upper bound on the delay between reconnection attempts, in milliseconds.
    *
    * @default 10000
    */
   reconnectionDelayMax?: number;
   /**
-   * Opens the underlying socket.
+   * WebSocket constructor to open the connection with.
+   * Supply one on a runtime without a global `WebSocket`, or in a test.
    *
-   * @default (url) => new WebSocket(url)
+   * @default globalThis.WebSocket
    */
-  createWebSocket?: (url: string) => WebSocketLike;
+  WebSocket?: typeof WebSocket;
 }
 
 /**
- * Transport over a plain WebSocket carrying JSON text frames.
+ * Transport over a plain WebSocket. Every frame is JSON text.
  *
- * Use this to reach a server that does not speak Socket.IO. The framing is:
+ * Upstream, the client sends each `UseAIClientMessage` as one frame, with nothing
+ * around it. Downstream, the server sends one AG-UI event per frame. The `agents`
+ * and `config` payloads travel as AG-UI `CUSTOM` events named `agents` and `config`.
+ * The client ignores an event with a type or a custom name it does not know.
  *
- * - **Upstream** — the `UseAIClientMessage`, serialized, with nothing wrapped around it:
- *   `{"type":"run_agent","data":{...}}`
- * - **Downstream** — a named envelope, because a plain WebSocket has no event names of its own:
- *   `{"name":"event","data":{...}}`. The names are `event`, `agents` and `config`.
- *   A frame with any other name is ignored, so a server may add names without breaking
- *   older clients.
- *
- * A server should send `agents` and `config` once, after the connection opens.
+ * Reconnection is automatic: indefinite, with exponential backoff capped at
+ * `reconnectionDelayMax`. The defaults match {@link SocketIOTransport}.
  *
  * @example
- * ```typescript
- * <UseAIProvider
- *   serverUrl="wss://your-server.com"
- *   transport={new WebSocketTransport('wss://your-server.com/ws')}
- * >
+ * ```tsx
+ * <UseAIProvider transport={new WebSocketTransport('wss://your-server.com')}>
  * ```
  */
 export class WebSocketTransport implements UseAITransport {
-  private socket: WebSocketLike | null = null;
+  private socket: ReconnectingWebSocket | null = null;
   private registry = new TransportHandlerRegistry();
   private _connected = false;
-  // A plain WebSocket has no reconnection of its own, so this transport matches
-  // the Socket.IO settings: retry indefinitely with exponential backoff capped at
-  // reconnectionDelayMax, so a client recovers after an extended outage (mobile app
-  // backgrounded, airplane mode) without hammering the server in the meantime.
-  private reconnectionDelay: number;
-  private reconnectionDelayMax: number;
-  private reconnectAttempts = 0;
-  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-  private reconnecting = false;
-  private createWebSocket: (url: string) => WebSocketLike;
+  private readonly options: Required<Pick<WebSocketTransportOptions, 'reconnectionDelay' | 'reconnectionDelayMax'>> &
+    Pick<WebSocketTransportOptions, 'WebSocket'>;
 
   /**
    * @param url - WebSocket URL of the server
    * @example
    * ```typescript
-   * new WebSocketTransport('wss://your-server.com/ws');
+   * new WebSocketTransport('wss://your-server.com');
    * ```
    */
   constructor(private url: string, options: WebSocketTransportOptions = {}) {
-    this.reconnectionDelay = options.reconnectionDelay ?? 1000;
-    this.reconnectionDelayMax = options.reconnectionDelayMax ?? 10_000;
-    this.createWebSocket =
-      options.createWebSocket ?? ((url: string) => new WebSocket(url) as unknown as WebSocketLike);
+    this.options = {
+      reconnectionDelay: options.reconnectionDelay ?? 1000,
+      reconnectionDelayMax: options.reconnectionDelayMax ?? 10_000,
+      WebSocket: options.WebSocket,
+    };
   }
 
   get connected(): boolean {
@@ -110,22 +73,53 @@ export class WebSocketTransport implements UseAITransport {
   }
 
   connect(): void {
-    this.reconnecting = true;
-    this.open();
+    if (this.socket) return;
+
+    const socket = new ReconnectingWebSocket(this.url, [], {
+      WebSocket: this.options.WebSocket,
+      minReconnectionDelay: this.options.reconnectionDelay,
+      maxReconnectionDelay: this.options.reconnectionDelayMax,
+      reconnectionDelayGrowFactor: 2,
+      maxRetries: Infinity,
+      // UseAIClient only sends while connected, so nothing is queued for a later socket.
+      maxEnqueuedMessages: 0,
+    });
+    this.socket = socket;
+
+    socket.onopen = () => {
+      this._connected = true;
+      this.registry.dispatch('connect', undefined);
+    };
+
+    socket.onmessage = (event) => {
+      const frame = parseFrame(event.data);
+      if (!frame) return;
+      if (frame.type === EventType.CUSTOM && (frame.name === 'agents' || frame.name === 'config')) {
+        this.registry.dispatch(frame.name, frame.value);
+        return;
+      }
+      this.registry.dispatch('event', frame);
+    };
+
+    socket.onerror = (event) => {
+      // Use warn instead of error to avoid triggering Next.js error overlay
+      console.warn('[UseAI] Connection error:', event.message);
+    };
+
+    socket.onclose = () => {
+      // A close also fires for a failed attempt. Only a socket that opened reports a disconnection.
+      if (!this._connected) return;
+      this._connected = false;
+      this.registry.dispatch('disconnect', 'transport close');
+    };
   }
 
   disconnect(): void {
-    this.reconnecting = false;
-    if (this.reconnectTimer !== null) {
-      clearTimeout(this.reconnectTimer);
-      this.reconnectTimer = null;
-    }
-
     const socket = this.socket;
     this.socket = null;
     this._connected = false;
     if (socket) {
-      this.detach(socket);
+      socket.onopen = socket.onmessage = socket.onerror = socket.onclose = null;
       socket.close();
     }
   }
@@ -137,88 +131,28 @@ export class WebSocketTransport implements UseAITransport {
   on(name: UseAITransportEventName, handler: (data: unknown) => void): () => void {
     return this.registry.on(name, handler);
   }
+}
 
-  private open(): void {
-    let socket: WebSocketLike;
-    try {
-      socket = this.createWebSocket(this.url);
-    } catch (error) {
-      // Use warn instead of error to avoid triggering Next.js error overlay
-      console.warn('[UseAI] Connection error:', error instanceof Error ? error.message : error);
-      this.scheduleReconnect();
-      return;
-    }
-    this.socket = socket;
+interface Frame {
+  type: string;
+  name?: string;
+  value?: unknown;
+}
 
-    socket.onopen = () => {
-      this._connected = true;
-      this.reconnectAttempts = 0;
-      this.registry.dispatch('connect', undefined);
-    };
-
-    socket.onmessage = (event) => {
-      const frame = this.parseFrame(event.data);
-      if (!frame) return;
-      this.registry.dispatch(frame.name, frame.data);
-    };
-
-    socket.onerror = () => {
-      // onclose always follows, and that is where reconnection is scheduled.
-      console.warn('[UseAI] Connection error:', this.url);
-    };
-
-    socket.onclose = () => {
-      this.detach(socket);
-      if (this.socket !== socket) return;
-      this.socket = null;
-
-      const wasConnected = this._connected;
-      this._connected = false;
-      // A socket that never opened reports only a failed attempt, not a disconnection.
-      if (wasConnected) {
-        this.registry.dispatch('disconnect', 'transport close');
-      }
-      this.scheduleReconnect();
-    };
+function parseFrame(data: unknown): Frame | null {
+  if (typeof data !== 'string') {
+    console.warn('[UseAI] Ignoring non-text frame');
+    return null;
   }
-
-  private parseFrame(data: unknown): DownstreamFrame | null {
-    if (typeof data !== 'string') {
-      console.warn('[UseAI] Ignoring non-text frame');
-      return null;
-    }
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(data);
-    } catch {
-      console.warn('[UseAI] Ignoring malformed frame');
-      return null;
-    }
-    if (typeof parsed !== 'object' || parsed === null) return null;
-    const frame = parsed as Partial<DownstreamFrame>;
-    if (typeof frame.name !== 'string') return null;
-    return { name: frame.name, data: frame.data };
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(data);
+  } catch {
+    console.warn('[UseAI] Ignoring malformed frame');
+    return null;
   }
-
-  private detach(socket: WebSocketLike): void {
-    socket.onopen = null;
-    socket.onmessage = null;
-    socket.onerror = null;
-    socket.onclose = null;
-  }
-
-  private scheduleReconnect(): void {
-    if (!this.reconnecting || this.reconnectTimer !== null) return;
-
-    const delay = Math.min(
-      this.reconnectionDelay * 2 ** this.reconnectAttempts,
-      this.reconnectionDelayMax,
-    );
-    this.reconnectAttempts++;
-
-    this.reconnectTimer = setTimeout(() => {
-      this.reconnectTimer = null;
-      if (this.reconnecting) this.open();
-    }, delay);
-  }
+  if (typeof parsed !== 'object' || parsed === null) return null;
+  const frame = parsed as Partial<Frame>;
+  if (typeof frame.type !== 'string') return null;
+  return frame as Frame;
 }

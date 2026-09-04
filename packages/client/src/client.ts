@@ -112,7 +112,7 @@ export class UseAIClient {
    * @example
    * ```typescript
    * new UseAIClient('wss://your-server.com');
-   * new UseAIClient(new WebSocketTransport('wss://your-server.com/ws'));
+   * new UseAIClient(new WebSocketTransport('wss://your-server.com'));
    * ```
    */
   constructor(target: string | UseAITransport) {

@@ -10,8 +10,8 @@ import {
 import { AISDKAgent } from './agents/AISDKAgent';
 
 /**
- * Drives the bundled WebSocketTransport against a real server through a full run:
- * prompt → tool call → tool result → RUN_FINISHED.
+ * Drives the bundled WebSocketTransport against a real server (transport: 'websocket')
+ * through a full run: prompt → tool call → tool result → RUN_FINISHED.
  *
  * Nothing is stubbed on either side, so this is what proves the documented framing
  * in docs/websocket-protocol.md is implementable.
@@ -19,8 +19,8 @@ import { AISDKAgent } from './agents/AISDKAgent';
 
 const RUNTIMES: ('bun' | 'node')[] = ['bun', 'node'];
 
-function connectClient(port: number, path = '/ws'): Promise<{ client: UseAIClient; events: AGUIEvent[] }> {
-  const client = new UseAIClient(new WebSocketTransport(`ws://localhost:${port}${path}`));
+function connectClient(port: number): Promise<{ client: UseAIClient; events: AGUIEvent[] }> {
+  const client = new UseAIClient(new WebSocketTransport(`ws://localhost:${port}`));
   const events: AGUIEvent[] = [];
   client.onEvent('test', event => events.push(event));
 
@@ -58,6 +58,7 @@ describe.each(RUNTIMES)('WebSocketTransport against a real server: %s runtime', 
     server = new UseAIServer({
       port,
       runtime,
+      transport: 'websocket',
       agents: { 'test-agent': new AISDKAgent({ hooks: { loadConfig: () => ({ model }) } }) },
       defaultAgent: 'test-agent',
     });
@@ -125,10 +126,9 @@ describe.each(RUNTIMES)('WebSocketTransport against a real server: %s runtime', 
     client.disconnect();
   });
 
-  test('Socket.IO still serves the same port', async () => {
-    const socket = await cleanup.createTestClient(port);
-    expect(socket.connected).toBe(true);
-    socket.disconnect();
+  test('the health endpoint still answers', async () => {
+    const response = await fetch(`http://localhost:${port}/health`);
+    expect(response.ok).toBe(true);
   });
 
   test('two plain WebSocket clients get isolated sessions', async () => {
@@ -150,45 +150,24 @@ describe.each(RUNTIMES)('WebSocketTransport against a real server: %s runtime', 
   });
 });
 
-describe('webSocketPath', () => {
+describe('transport defaults to socketio', () => {
   const cleanup = new TestCleanupManager();
 
   afterAll(() => {
     cleanup.cleanup();
   });
 
-  test('serves the plain listener at a custom path', async () => {
-    const port = 9550;
-    const model = createSequentialMockModel([{ text: 'hi' }]);
-    cleanup.trackServer(
-      new UseAIServer({
-        port,
-        webSocketPath: '/agent',
-        agents: { 'test-agent': new AISDKAgent({ hooks: { loadConfig: () => ({ model }) } }) },
-        defaultAgent: 'test-agent',
-      }),
-    );
-
-    const { client } = await connectClient(port, '/agent');
-    await waitFor(() => client.availableAgents.length > 0, 'the agents payload');
-
-    expect(client.defaultAgent).toBe('test-agent');
-    client.disconnect();
-  });
-
-  test('null serves Socket.IO only', async () => {
+  test('a default server serves Socket.IO and refuses a plain WebSocket', async () => {
     const port = 9560;
     const model = createSequentialMockModel([{ text: 'hi' }]);
     cleanup.trackServer(
       new UseAIServer({
         port,
-        webSocketPath: null,
         agents: { 'test-agent': new AISDKAgent({ hooks: { loadConfig: () => ({ model }) } }) },
         defaultAgent: 'test-agent',
       }),
     );
 
-    // Socket.IO is unaffected.
     const socket = await cleanup.createTestClient(port);
     expect(socket.connected).toBe(true);
     socket.disconnect();

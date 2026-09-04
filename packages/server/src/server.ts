@@ -37,6 +37,7 @@ import {
   type RuntimeServerHandle,
   type ClientIpTracker,
   type RawWebSocket,
+  type RuntimeListener,
 } from './runtime';
 import { WebSocketClientConnection } from './webSocketConnection';
 
@@ -91,18 +92,18 @@ export type { ClientSession, ClientConnection } from './agents/types';
  * ```
  */
 export class UseAIServer {
-  private io: SocketIOServer;
+  private io: SocketIOServer | null = null;
   private runtimeAdapter: RuntimeAdapter;
   private serverHandle: RuntimeServerHandle | null = null;
   private agent: Agent; // Default agent for chat (run_agent)
   private defaultAgentId: string; // ID of the default agent
   private agents: Record<string, Agent>; // Registry of all agents
   private clients: Map<string, ClientSession> = new Map();
-  private config: Required<Omit<UseAIServerConfig, 'defaultAgent' | 'agents' | 'plugins' | 'tools' | 'mcpEndpoints' | 'maxHttpBufferSize' | 'cors' | 'idleTimeout' | 'runtime' | 'spanProcessors' | 'resolveAttachments' | 'webSocketPath'>> & {
+  private config: Required<Omit<UseAIServerConfig, 'defaultAgent' | 'agents' | 'plugins' | 'tools' | 'mcpEndpoints' | 'maxHttpBufferSize' | 'cors' | 'idleTimeout' | 'runtime' | 'spanProcessors' | 'resolveAttachments' | 'transport'>> & {
     maxHttpBufferSize: number;
     cors?: CorsOptions;
     idleTimeout: number;
-    webSocketPath: string | null;
+    transport: 'socketio' | 'websocket';
   };
   private rateLimiter: RateLimiter;
   private cleanupInterval: NodeJS.Timeout;
@@ -134,7 +135,7 @@ export class UseAIServer {
       maxHttpBufferSize: config.maxHttpBufferSize ?? 20 * 1024 * 1024, // 20MB default
       cors: config.cors,
       idleTimeout: config.idleTimeout ?? 30,
-      webSocketPath: config.webSocketPath === undefined ? '/ws' : config.webSocketPath,
+      transport: config.transport ?? 'socketio',
     };
 
     // Set agents registry
@@ -198,13 +199,13 @@ export class UseAIServer {
     this.runtimeAdapter = createRuntimeAdapter(config.runtime ?? 'auto');
     logger.info('Using runtime adapter', { runtime: this.runtimeAdapter.name });
 
-    // Create Socket.IO server
-    this.io = new SocketIOServer({
-      transports: ['polling', 'websocket'],
-      maxHttpBufferSize: this.config.maxHttpBufferSize,
-    });
-
-    this.setupSocketIOServer();
+    if (this.config.transport === 'socketio') {
+      this.io = new SocketIOServer({
+        transports: ['polling', 'websocket'],
+        maxHttpBufferSize: this.config.maxHttpBufferSize,
+      });
+      this.setupSocketIOServer(this.io);
+    }
 
     if (this.rateLimiter.isEnabled()) {
       logger.info('Rate limiting enabled', {
@@ -213,8 +214,11 @@ export class UseAIServer {
       });
     }
 
-    // Start server using runtime adapter
-    this.serverHandle = this.runtimeAdapter.createServer(this.io, {
+    const listener: RuntimeListener = this.io
+      ? { transport: 'socketio', io: this.io }
+      : { transport: 'websocket', onConnection: (socket) => this.handleWebSocketConnection(socket) };
+
+    this.serverHandle = this.runtimeAdapter.createServer(listener, {
       port: this.config.port,
       idleTimeout: this.config.idleTimeout,
       cors: this.config.cors,
@@ -222,13 +226,8 @@ export class UseAIServer {
       onPollingConnection: (sessionId, ip) => {
         this.clientIpTracker.trackPollingConnection(sessionId, ip);
       },
-      websocket: this.config.webSocketPath
-        ? {
-            path: this.config.webSocketPath,
-            onConnection: (socket) => this.handleWebSocketConnection(socket),
-          }
-        : undefined,
     });
+    logger.info('UseAI server ready', { port: this.config.port, transport: this.config.transport });
   }
 
   /**
@@ -293,8 +292,8 @@ export class UseAIServer {
     logger.debug('Registered message handler', { type });
   }
 
-  private setupSocketIOServer() {
-    this.io.on('connection', (socket: Socket) => {
+  private setupSocketIOServer(io: SocketIOServer) {
+    io.on('connection', (socket: Socket) => {
       // Get connection info for IP address resolution
       const conn = socket.conn as unknown as { id: string; transport: { name: string; socket?: { remoteAddress?: string } } };
       // Get IP address for rate limiting:
@@ -327,14 +326,11 @@ export class UseAIServer {
         this.destroySession(session);
       });
     });
-
-    logger.info('UseAI server ready', { port: this.config.port });
   }
 
   /**
-   * Accepts a plain WebSocket connection, the alternative to Socket.IO served on the
-   * same port. Frames are JSON text: upstream the client message on its own, downstream
-   * a `{ name, data }` envelope. See docs/websocket-protocol.md.
+   * Accepts a plain WebSocket connection. Frames are JSON text: upstream the client
+   * message on its own, downstream one AG-UI event. See docs/websocket-protocol.md.
    */
   private handleWebSocketConnection(socket: RawWebSocket) {
     const connection = new WebSocketClientConnection(`ws-${uuidv4()}`, socket);
@@ -1170,7 +1166,7 @@ export class UseAIServer {
       this.plugins.map(plugin => plugin.close?.())
     );
 
-    this.io.close();
+    this.io?.close();
     if (this.serverHandle) {
       this.serverHandle.stop();
       this.serverHandle = null;

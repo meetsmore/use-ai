@@ -5,7 +5,6 @@ import { UseAIChatPanel } from '../components/UseAIChatPanel';
 import { UseAIFloatingChatWrapper, CloseButton } from '../components/UseAIFloatingChatWrapper';
 import { __UseAIChatContext, type ChatUIContextValue } from '../components/UseAIChat';
 import { UseAIClient } from '../client';
-import type { UseAITransport } from '../transport/types';
 import { convertToolsToDefinitions, type ToolsDefinition } from '../defineTool';
 import type { ChatRepository, Chat, ChatMetadata, CreateChatOptions, PersistedMessage, PersistedMessageContent } from './chatRepository/types';
 import { LocalStorageChatRepository } from './chatRepository/LocalStorageChatRepository';
@@ -123,8 +122,8 @@ export interface PromptsContextValue {
  * Contains connection state and methods for managing tools and prompts.
  */
 export interface UseAIContextValue {
-  /** The WebSocket URL of the UseAI server */
-  serverUrl: string;
+  /** URL of the server, when the provider was given `serverUrl` rather than `transport`. */
+  serverUrl?: string;
   /** Whether the client is connected to the server */
   connected: boolean;
   /** The underlying WebSocket client instance */
@@ -163,7 +162,6 @@ let hasWarnedAboutMissingProvider = false;
  * Allows hooks to gracefully degrade instead of crashing.
  */
 const noOpContextValue: UseAIContextValue = {
-  serverUrl: '',
   connected: false,
   client: null,
   tools: {
@@ -261,27 +259,11 @@ export interface ChatPanelProps {
   onAgentChange?: (agentId: string | null) => void;
 }
 
-export interface UseAIProviderProps extends UseAIConfig {
+export type UseAIProviderProps = UseAIConfig & UseAIProviderOptions;
+
+export interface UseAIProviderOptions {
   children: ReactNode;
   systemPrompt?: string;
-  /**
-   * Transport used to reach the server. Defaults to a {@link SocketIOTransport} built
-   * from `serverUrl`, which is what the bundled server serves. Supply one to reach a
-   * server that speaks something else — {@link WebSocketTransport} carries documented
-   * JSON frames over a plain WebSocket.
-   *
-   * Only the value from the first render is read, so an inline object does not churn
-   * the connection. Change transports by remounting the provider.
-   *
-   * @example
-   * ```tsx
-   * <UseAIProvider
-   *   serverUrl="wss://your-server.com"
-   *   transport={new WebSocketTransport('wss://your-server.com/ws')}
-   * >
-   * ```
-   */
-  transport?: UseAITransport;
   CustomButton?: React.ComponentType<FloatingButtonProps> | null;
   CustomChat?: React.ComponentType<ChatPanelProps> | null;
   /** Default component overrides for every built-in chat rendered by this provider. */
@@ -598,8 +580,9 @@ export function UseAIProvider({
   const transportRef = useRef(transport);
 
   useEffect(() => {
-    console.log('[UseAIProvider] Initializing client with serverUrl:', serverUrl);
-    const client = new UseAIClient(transportRef.current ?? serverUrl);
+    const target = transportRef.current ?? serverUrl!;
+    console.log('[UseAIProvider] Initializing client with', typeof target === 'string' ? target : 'transport');
+    const client = new UseAIClient(target);
 
     const unsubscribeConnection = client.onConnectionStateChange((isConnected) => {
       console.log('[UseAIProvider] Connection state changed:', isConnected);

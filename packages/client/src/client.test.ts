@@ -1,7 +1,6 @@
 import { describe, test, expect, mock, beforeEach, afterEach, spyOn } from 'bun:test';
 import type { Socket } from 'socket.io-client';
 import type { UseAIClientMessage } from './types';
-import type { WebSocketLike } from './transport/WebSocketTransport';
 
 /**
  * The UseAIClient suite, run over every bundled transport.
@@ -42,18 +41,40 @@ mock.module('socket.io-client', () => ({
 
 // ── Plain WebSocket harness ─────────────────────────────────────────────────
 
-class FakeWebSocket implements WebSocketLike {
+/** Enough of a WHATWG WebSocket for partysocket to drive. */
+class FakeWebSocket extends EventTarget {
+  static latest: FakeWebSocket | null = null;
+
+  readyState = 0;
+  binaryType = 'blob';
   sent: string[] = [];
-  onopen: ((event: unknown) => void) | null = null;
-  onmessage: ((event: { data: unknown }) => void) | null = null;
-  onclose: ((event: unknown) => void) | null = null;
-  onerror: ((event: unknown) => void) | null = null;
+
+  constructor() {
+    super();
+    FakeWebSocket.latest = this;
+  }
 
   send(data: string): void {
     this.sent.push(data);
   }
 
-  close(): void {}
+  close(): void {
+    this.readyState = 3;
+  }
+
+  serverOpen(): void {
+    this.readyState = 1;
+    this.dispatchEvent(new Event('open'));
+  }
+
+  serverSend(data: string): void {
+    this.dispatchEvent(new MessageEvent('message', { data }));
+  }
+
+  serverClose(): void {
+    this.readyState = 3;
+    this.dispatchEvent(new CloseEvent('close', { code: 1006 }));
+  }
 }
 
 // Imported after the module mock so SocketIOTransport picks it up.
@@ -123,37 +144,41 @@ const HARNESSES: Array<[string, () => Harness]> = [
   [
     'WebSocketTransport',
     () => {
-      let socket!: FakeWebSocket;
+      FakeWebSocket.latest = null;
       const client = new UseAIClient(
-        new WebSocketTransport('wss://localhost:8081/ws', {
+        new WebSocketTransport('wss://localhost:8081', {
           reconnectionDelay: 1,
           reconnectionDelayMax: 1,
-          createWebSocket: () => (socket = new FakeWebSocket()),
+          WebSocket: FakeWebSocket as unknown as typeof WebSocket,
         }),
       );
       client.connect();
+      // partysocket opens the socket asynchronously, and opens a fresh one after a drop.
+      const liveSocket = async () => {
+        await waitUntil(() => FakeWebSocket.latest !== null && FakeWebSocket.latest.readyState < 2);
+        return FakeWebSocket.latest!;
+      };
+      const sent: string[] = [];
 
       return {
         client,
         async open() {
-          const dropped = socket;
-          // A closed socket is detached; the replacement arrives on the backoff timer.
-          if (dropped.onopen === null) {
-            await waitUntil(() => socket !== dropped);
-          }
-          socket.onopen?.({});
+          const socket = await liveSocket();
+          socket.sent = sent;
+          socket.serverOpen();
         },
         close(reason: string) {
           // The reason a plain WebSocket reports comes from the close frame, not
           // from the caller; the client only logs it.
           void reason;
-          socket.onclose?.({});
+          FakeWebSocket.latest?.serverClose();
         },
         deliver(name, data) {
-          socket.onmessage?.({ data: JSON.stringify({ name, data }) });
+          const frame = name === 'event' ? data : { type: 'CUSTOM', name, value: data };
+          FakeWebSocket.latest?.serverSend(JSON.stringify(frame));
         },
         sent() {
-          return socket.sent.map(frame => JSON.parse(frame) as UseAIClientMessage);
+          return sent.map(frame => JSON.parse(frame) as UseAIClientMessage);
         },
       };
     },
@@ -767,22 +792,24 @@ describe('UseAIClient construction', () => {
     client.disconnect();
   });
 
-  test('disconnect() unsubscribes from the transport', () => {
-    let socket!: FakeWebSocket;
+  test('disconnect() unsubscribes from the transport', async () => {
+    FakeWebSocket.latest = null;
     const client = new UseAIClient(
-      new WebSocketTransport('wss://localhost:8081/ws', {
-        createWebSocket: () => (socket = new FakeWebSocket()),
+      new WebSocketTransport('wss://localhost:8081', {
+        WebSocket: FakeWebSocket as unknown as typeof WebSocket,
       }),
     );
     const stateChanges: boolean[] = [];
     client.onConnectionStateChange(connected => stateChanges.push(connected));
     client.connect();
-    socket.onopen?.({});
+    await waitUntil(() => FakeWebSocket.latest !== null);
+    const socket = FakeWebSocket.latest!;
+    socket.serverOpen();
 
     client.disconnect();
     // The transport is closed, but a late frame from the old socket must not
     // reach a client that has stopped listening.
-    socket.onclose?.({});
+    socket.serverClose();
 
     expect(stateChanges).toEqual([false, true]);
   });

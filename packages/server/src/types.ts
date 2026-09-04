@@ -135,15 +135,13 @@ export interface UseAIServerConfig<TAgents extends Record<string, import('./agen
    */
   idleTimeout?: number;
   /**
-   * Path that accepts plain WebSocket connections, served on the same port as Socket.IO.
-   *
-   * A client reaches it with `WebSocketTransport` rather than the default Socket.IO
-   * transport. Set to `null` to serve Socket.IO only.
-   *
-   * @default '/ws'
-   * @example '/agent'
+   * How clients connect.
+   * - 'socketio': Socket.IO, which the client's default `SocketIOTransport` speaks.
+   * - 'websocket': a plain WebSocket at `/`, carrying AG-UI events as JSON text frames.
+   *   Reach it with the client's `WebSocketTransport`. See docs/websocket-protocol.md.
+   * @default 'socketio'
    */
-  webSocketPath?: string | null;
+  transport?: 'socketio' | 'websocket';
   /**
    * The runtime to use for the server.
    * - 'auto': Automatically detect the runtime (Bun or Node.js)
