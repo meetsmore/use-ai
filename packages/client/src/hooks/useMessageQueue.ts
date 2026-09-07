@@ -146,6 +146,9 @@ export function useMessageQueue({
           checkReady();
         });
       }
+    } catch (error) {
+      pendingMessagesRef.current = [];
+      throw error;
     } finally {
       isProcessingQueueRef.current = false;
     }

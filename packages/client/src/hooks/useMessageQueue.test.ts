@@ -35,4 +35,43 @@ describe('useMessageQueue', () => {
     expect(sendFn).toHaveBeenNthCalledWith(1, 'fails', undefined, undefined);
     expect(sendFn).toHaveBeenNthCalledWith(2, 'second', undefined, undefined);
   });
+
+  test('clears a message queued behind a failing send instead of delivering it to a later caller', async () => {
+    let rejectA: (error: Error) => void = () => {};
+    const sendFn = mock((message: string) => {
+      if (message === 'A') {
+        return new Promise<void>((_resolve, reject) => {
+          rejectA = reject;
+        });
+      }
+      return Promise.resolve();
+    });
+
+    const { result } = renderHook(() => useMessageQueue(createOptions(sendFn)));
+
+    let sendAPromise: Promise<void> = Promise.resolve();
+    await act(async () => {
+      sendAPromise = result.current.sendMessage('A');
+      // Let the queue processor reach the in-flight sendFn('A') call.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    await act(async () => {
+      // Queued behind the in-flight 'A' drain; today this is unreachable until 'A' settles.
+      await result.current.sendMessage('B');
+    });
+
+    await act(async () => {
+      rejectA(new Error('upload failed'));
+      await expect(sendAPromise).rejects.toThrow('upload failed');
+    });
+
+    await act(async () => {
+      await result.current.sendMessage('C');
+    });
+
+    const sentMessages = sendFn.mock.calls.map((call) => call[0]);
+    expect(sentMessages).not.toContain('B');
+    expect(sentMessages).toEqual(['A', 'C']);
+  });
 });
