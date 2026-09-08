@@ -46,6 +46,13 @@ export interface UseMessageQueueReturn {
   sendMessage: (message: string, options?: SendMessageOptions) => Promise<void>;
 }
 
+interface QueuedMessage {
+  message: string;
+  options?: SendMessageOptions;
+  resolve: () => void;
+  reject: (error: unknown) => void;
+}
+
 /**
  * Hook for queuing and sending programmatic messages.
  *
@@ -64,7 +71,7 @@ export function useMessageQueue({
   loading,
   hasPendingApproval,
 }: UseMessageQueueOptions): UseMessageQueueReturn {
-  const pendingMessagesRef = useRef<Array<{ message: string; options?: SendMessageOptions }>>([]);
+  const pendingMessagesRef = useRef<QueuedMessage[]>([]);
   const isProcessingQueueRef = useRef(false);
 
   // Use refs for callbacks that may change between renders.
@@ -90,72 +97,87 @@ export function useMessageQueue({
     hasPendingApprovalRef.current = hasPendingApproval;
   }, [hasPendingApproval]);
 
+  const sendQueuedMessage = useCallback(async (message: string, options?: SendMessageOptions) => {
+    const { newChat = false, attachments = [], openChat = true, metadata, forwardedProps } = options ?? {};
+
+    if (newChat) {
+      await createNewChatRef.current({ metadata });
+    }
+
+    // Convert File[] to FileAttachment[]
+    const fileAttachments: FileAttachment[] = await Promise.all(
+      attachments.map(async (file) => {
+        let preview: string | undefined;
+        if (file.type.startsWith('image/')) {
+          preview = await new Promise<string | undefined>((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : undefined);
+            reader.onerror = () => resolve(undefined);
+            reader.readAsDataURL(file);
+          });
+        }
+        return {
+          id: crypto.randomUUID(),
+          file,
+          preview,
+        };
+      })
+    );
+
+    await sendFnRef.current(message, fileAttachments.length > 0 ? fileAttachments : undefined, forwardedProps);
+
+    if (openChat && setOpenRef.current) {
+      setOpenRef.current(true);
+    }
+  }, []);
+
+  const waitUntilIdle = useCallback(() => new Promise<void>((resolve) => {
+    const checkReady = () => {
+      setTimeout(() => {
+        if (!loadingRef.current && !hasPendingApprovalRef.current) {
+          resolve();
+        } else {
+          checkReady();
+        }
+      }, 100);
+    };
+    checkReady();
+  }), []);
+
+  // Each queued message settles its own caller's promise, so one failing send
+  // neither blocks nor discards the messages queued behind it.
   const processMessageQueue = useCallback(async () => {
-    if (isProcessingQueueRef.current || pendingMessagesRef.current.length === 0) {
+    if (isProcessingQueueRef.current) {
       return;
     }
 
     isProcessingQueueRef.current = true;
-
-    while (pendingMessagesRef.current.length > 0) {
-      const { message, options } = pendingMessagesRef.current.shift()!;
-      const { newChat = false, attachments = [], openChat = true, metadata, forwardedProps } = options ?? {};
-
-      if (newChat) {
-        await createNewChatRef.current({ metadata });
+    try {
+      while (pendingMessagesRef.current.length > 0) {
+        const entry = pendingMessagesRef.current.shift()!;
+        try {
+          await sendQueuedMessage(entry.message, entry.options);
+        } catch (error) {
+          entry.reject(error);
+          continue;
+        }
+        entry.resolve();
+        await waitUntilIdle();
       }
-
-      // Convert File[] to FileAttachment[]
-      const fileAttachments: FileAttachment[] = await Promise.all(
-        attachments.map(async (file) => {
-          let preview: string | undefined;
-          if (file.type.startsWith('image/')) {
-            preview = await new Promise<string | undefined>((resolve) => {
-              const reader = new FileReader();
-              reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : undefined);
-              reader.onerror = () => resolve(undefined);
-              reader.readAsDataURL(file);
-            });
-          }
-          return {
-            id: crypto.randomUUID(),
-            file,
-            preview,
-          };
-        })
-      );
-
-      await sendFnRef.current(message, fileAttachments.length > 0 ? fileAttachments : undefined, forwardedProps);
-
-      if (openChat && setOpenRef.current) {
-        setOpenRef.current(true);
-      }
-
-      // Wait for loading and pending approval to complete before processing next message
-      await new Promise<void>((resolve) => {
-        const checkReady = () => {
-          setTimeout(() => {
-            if (!loadingRef.current && !hasPendingApprovalRef.current) {
-              resolve();
-            } else {
-              checkReady();
-            }
-          }, 100);
-        };
-        checkReady();
-      });
+    } finally {
+      isProcessingQueueRef.current = false;
     }
+  }, [sendQueuedMessage, waitUntilIdle]);
 
-    isProcessingQueueRef.current = false;
-  }, []);
-
-  const sendMessage = useCallback(async (message: string, options?: SendMessageOptions): Promise<void> => {
+  const sendMessage = useCallback((message: string, options?: SendMessageOptions): Promise<void> => {
     if (!connected) {
-      throw new Error('Not connected to UseAI server');
+      return Promise.reject(new Error('Not connected to UseAI server'));
     }
 
-    pendingMessagesRef.current.push({ message, options });
-    await processMessageQueue();
+    return new Promise<void>((resolve, reject) => {
+      pendingMessagesRef.current.push({ message, options, resolve, reject });
+      void processMessageQueue();
+    });
   }, [connected, processMessageQueue]);
 
   return { sendMessage };
