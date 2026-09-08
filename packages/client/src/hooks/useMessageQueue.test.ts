@@ -36,7 +36,7 @@ describe('useMessageQueue', () => {
     expect(sendFn).toHaveBeenNthCalledWith(2, 'second', undefined, undefined);
   });
 
-  test('clears a message queued behind a failing send instead of delivering it to a later caller', async () => {
+  function queueBehindFailingSend() {
     let rejectA: (error: Error) => void = () => {};
     const sendFn = mock((message: string) => {
       if (message === 'A') {
@@ -46,32 +46,42 @@ describe('useMessageQueue', () => {
       }
       return Promise.resolve();
     });
-
     const { result } = renderHook(() => useMessageQueue(createOptions(sendFn)));
+    return { sendFn, result, rejectA: (error: Error) => rejectA(error) };
+  }
 
-    let sendAPromise: Promise<void> = Promise.resolve();
+  test('resolves a queued caller only once its message has been sent', async () => {
+    const { result } = queueBehindFailingSend();
+
+    let bSettled = false;
     await act(async () => {
-      sendAPromise = result.current.sendMessage('A');
-      // Let the queue processor reach the in-flight sendFn('A') call.
+      result.current.sendMessage('A').catch(() => {});
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      result.current.sendMessage('B').then(() => { bSettled = true; }, () => { bSettled = true; });
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
 
+    expect(bSettled).toBe(false);
+  });
+
+  test('delivers a message queued behind a failing send', async () => {
+    const { sendFn, result, rejectA } = queueBehindFailingSend();
+
+    let sendAPromise: Promise<void> = Promise.resolve();
+    let sendBPromise: Promise<void> = Promise.resolve();
     await act(async () => {
-      // Queued behind the in-flight 'A' drain; today this is unreachable until 'A' settles.
-      await result.current.sendMessage('B');
+      sendAPromise = result.current.sendMessage('A');
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      sendBPromise = result.current.sendMessage('B');
+      await new Promise((resolve) => setTimeout(resolve, 0));
     });
 
     await act(async () => {
       rejectA(new Error('upload failed'));
       await expect(sendAPromise).rejects.toThrow('upload failed');
+      await sendBPromise;
     });
 
-    await act(async () => {
-      await result.current.sendMessage('C');
-    });
-
-    const sentMessages = sendFn.mock.calls.map((call) => call[0]);
-    expect(sentMessages).not.toContain('B');
-    expect(sentMessages).toEqual(['A', 'C']);
+    expect(sendFn.mock.calls.map((call) => call[0])).toEqual(['A', 'B']);
   });
 });
