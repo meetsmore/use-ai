@@ -133,6 +133,19 @@ export interface ChatComposerSlotProps extends ChatSlotProps {
   onAbort?: () => void;
   onOpenFilePicker: () => void;
   onRemoveAttachment: (attachmentId: string) => void;
+  /**
+   * Takes files in through this chat's own file handling, so they end up on
+   * the message `onSend` sends. Use it for a way in the panel does not already
+   * provide: a paste, a composer-sized drop area, a screenshot button. Size,
+   * type and count validation, previews and transformers all run on the way
+   * in, and a rejection surfaces through `fileError`, so files can be handed
+   * over unfiltered.
+   *
+   * Files are taken in asynchronously, which is too late to decide whether to
+   * call `preventDefault()` on a paste or drop event. Decide that from the
+   * event itself.
+   */
+  onAddFiles: (files: FileList | File[]) => void;
   /** How the Enter key should behave; see `UseAIChatProps.submitMode`. */
   submitMode: SubmitMode;
   /** Per-attachment transformation progress (e.g. OCR), keyed by attachment id. */

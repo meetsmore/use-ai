@@ -24,6 +24,7 @@ export function DefaultComposer({
   onAbort,
   onOpenFilePicker,
   onRemoveAttachment,
+  onAddFiles,
   submitMode,
   attachmentProcessing,
   disclaimerVisible,
@@ -45,6 +46,14 @@ export function DefaultComposer({
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     onInputChange(e.target.value);
+  };
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    if (!fileUploadEnabled || e.clipboardData.files.length === 0) return;
+    if (!e.clipboardData.types.includes('text/plain')) {
+      e.preventDefault();
+    }
+    onAddFiles(e.clipboardData.files);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -126,6 +135,7 @@ export function DefaultComposer({
           value={input}
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
+          onPaste={handlePaste}
           placeholder={placeholder}
           disabled={!connected || loading || pendingApprovals.length > 0}
           rows={1}
