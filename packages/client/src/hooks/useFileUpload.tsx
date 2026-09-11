@@ -40,6 +40,23 @@ async function generateImagePreview(file: File): Promise<string | undefined> {
 }
 
 /**
+ * Gives a file a name when the browser did not provide one.
+ *
+ * Pasted screenshots arrive with an empty `name` in some browsers, which would
+ * render as a blank chip label. The name is only filled in when it is missing,
+ * so a real name coming from the OS is never replaced.
+ */
+function withFallbackName(file: File): File {
+  if (file.name) return file;
+
+  const subtype = file.type.split('/')[1] ?? '';
+  const extension = subtype ? `.${subtype}` : '';
+  const base = file.type.startsWith('image/') ? 'pasted-image' : 'pasted-file';
+
+  return new File([file], `${base}${extension}`, { type: file.type, lastModified: file.lastModified });
+}
+
+/**
  * Checks if a MIME type matches accepted types.
  */
 function isTypeAccepted(mimeType: string, acceptedTypes?: string[]): boolean {
@@ -228,9 +245,14 @@ export function useFileUpload({
   /**
    * Validates and adds files to attachments.
    * If a transformer matches the file type, transformation starts immediately.
+   *
+   * Rejected files are reported through `fileError`, so files can be passed in
+   * unfiltered.
    */
   const handleFiles = useCallback(async (files: FileList | File[]) => {
-    const fileArray = Array.from(files);
+    if (!enabled || disabled) return;
+
+    const fileArray = Array.from(files).map(withFallbackName);
 
     // Running attachment count to enforce the per-message limit (existing + accepted in this batch).
     // Only successfully added files count toward the limit.
@@ -283,7 +305,7 @@ export function useFileUpload({
         runTransformer(attachmentId, file, transformerKey);
       }
     }
-  }, [maxFileSize, acceptedTypes, maxAttachments, strings, transformers, runTransformer]);
+  }, [enabled, disabled, maxFileSize, acceptedTypes, maxAttachments, strings, transformers, runTransformer]);
 
   /**
    * Removes a file attachment by ID.

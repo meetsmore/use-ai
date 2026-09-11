@@ -238,10 +238,21 @@ function OrbitComposer({
   onAbort,
   onOpenFilePicker,
   onRemoveAttachment,
+  onAddFiles,
 }: ChatComposerSlotProps) {
   // ToolApproval is rendered independently by use-ai. Hide the composer while
   // an approval is pending to match the built-in interaction pattern.
   if (pendingApprovals.length > 0) return null;
+
+  // Files pasted into a replacement composer go through the chat's own file
+  // handling, so they end up on the message the panel sends.
+  const handlePaste = (event: React.ClipboardEvent) => {
+    if (!fileUploadEnabled || event.clipboardData.files.length === 0) return;
+    if (!event.clipboardData.types.includes('text/plain')) {
+      event.preventDefault();
+    }
+    onAddFiles(event.clipboardData.files);
+  };
 
   return (
     <footer className="orbit-composer-wrap" data-testid="orbit-composer">
@@ -260,6 +271,7 @@ function OrbitComposer({
           aria-label="Message Orbit"
           value={input}
           onChange={(event) => onInputChange(event.target.value)}
+          onPaste={handlePaste}
           onKeyDown={(event) => {
             if (event.key === 'Enter' && !event.shiftKey) {
               event.preventDefault();

@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, test, expect, mock } from 'bun:test';
-import { fireEvent, render } from '@testing-library/react';
+import { fireEvent, render, waitFor } from '@testing-library/react';
 import { UseAIChatPanel } from './UseAIChatPanel';
 import type {
   ChatComposerSlotProps,
@@ -235,5 +235,44 @@ describe('UseAIChat component slots', () => {
     fireEvent.click(getByTestId('custom-send'));
 
     expect(onSendMessage).toHaveBeenCalledWith('Hello', undefined);
+  });
+
+  test('sends files a custom Composer took in itself', async () => {
+    const onSendMessage = mock(() => {});
+    // A composer taking files in through its own UI: the file never goes
+    // through the panel's picker or drop zone.
+    const Composer = ({ canSend, onSend, attachments, onAddFiles }: ChatComposerSlotProps) => (
+      <div>
+        <button
+          data-testid="custom-attach"
+          onClick={() => onAddFiles([new File(['%PDF-1.4'], 'report.pdf', { type: 'application/pdf' })])}
+        >
+          Attach
+        </button>
+        <span data-testid="custom-attachments">
+          {attachments.map((attachment) => attachment.file.name).join(',')}
+        </span>
+        <button data-testid="custom-send" disabled={!canSend} onClick={onSend}>Send</button>
+      </div>
+    );
+
+    const { getByTestId } = renderPanel(
+      { Composer },
+      {
+        messages: [],
+        loading: false,
+        pendingApprovals: [],
+        onSendMessage,
+        fileUploadConfig: { acceptedTypes: ['application/pdf'] },
+      }
+    );
+
+    fireEvent.click(getByTestId('custom-attach'));
+    await waitFor(() => expect(getByTestId('custom-attachments')).toHaveTextContent('report.pdf'));
+
+    fireEvent.click(getByTestId('custom-send'));
+
+    const [, attachments] = onSendMessage.mock.calls[0] as unknown as [string, unknown[]];
+    expect(attachments).toHaveLength(1);
   });
 });

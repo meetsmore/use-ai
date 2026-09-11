@@ -12,6 +12,8 @@ export default function MultimodalPage() {
         <h2 style={docStyles.subtitle}>About</h2>
         <p style={docStyles.text}>
           Enable file uploads in chat with the <code style={docStyles.code}>fileUploadConfig</code> prop.
+          Files get in through the attach button, a drop anywhere on the chat panel, or a
+          paste into the input, all subject to the same limits.
           By default, files are base64-encoded and embedded in the message using{' '}
           <code style={docStyles.code}>EmbedFileUploadBackend</code>. Configure{' '}
           <code style={docStyles.code}>maxFileSize</code>,{' '}
@@ -89,8 +91,9 @@ export default function MultimodalPage() {
       <div style={docStyles.demoCard}>
         <h2 style={docStyles.subtitle}>Interactive Demo</h2>
         <p style={docStyles.text}>
-          This chat has file uploads enabled. Click the paperclip icon to attach an image
-          or PDF, then send it to the AI.
+          This chat has file uploads enabled. Attach an image or PDF with the paperclip
+          icon, drop one onto the chat, or copy a screenshot and paste it into the input,
+          then send it to the AI.
         </p>
         <UseAIProvider
           serverUrl="ws://localhost:8081"

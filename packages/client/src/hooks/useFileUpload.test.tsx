@@ -250,6 +250,39 @@ describe('useFileUpload', () => {
       expect(result.current.fileError).toBeNull();
     });
 
+    it('accepts nothing while file operations are disabled', async () => {
+      const { result } = renderHook(() =>
+        useFileUpload({ getCurrentChat: mockGetCurrentChat, config, disabled: true })
+      );
+
+      await act(async () => {
+        await result.current.handleFiles([new File(['test'], 'test.pdf', { type: 'application/pdf' })]);
+      });
+
+      expect(result.current.attachments).toHaveLength(0);
+    });
+
+    it('names a file the browser gave no name', async () => {
+      const { result } = renderHook(() => useFileUpload({ getCurrentChat: mockGetCurrentChat, config }));
+
+      await act(async () => {
+        await result.current.handleFiles([new File(['test'], '', { type: 'application/pdf' })]);
+      });
+
+      expect(result.current.attachments[0].file.name).toBe('pasted-file.pdf');
+    });
+
+    it('keeps the name the browser did provide', async () => {
+      const { result } = renderHook(() => useFileUpload({ getCurrentChat: mockGetCurrentChat, config }));
+
+      const named = new File(['test'], 'quarterly-report.pdf', { type: 'application/pdf' });
+      await act(async () => {
+        await result.current.handleFiles([named]);
+      });
+
+      expect(result.current.attachments[0].file).toBe(named);
+    });
+
     it('removes attachment by id', async () => {
       const { result } = renderHook(() => useFileUpload({ getCurrentChat: mockGetCurrentChat, config }));
 
