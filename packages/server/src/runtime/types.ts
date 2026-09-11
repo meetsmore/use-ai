@@ -7,6 +7,40 @@ import type { CorsOptions } from '../types';
 export type RuntimeType = 'bun' | 'node';
 
 /**
+ * A plain WebSocket connection, as the runtime adapters expose it.
+ * Text frames only; the framing above it is the caller's business.
+ */
+export interface RawWebSocket {
+  /** Remote address of the peer, when the runtime exposes one. */
+  readonly remoteAddress?: string;
+  /** Whether the connection is still open. */
+  readonly open: boolean;
+  /** Sends a text frame. */
+  send(data: string): void;
+  /** Closes the connection. */
+  close(): void;
+  /** Registers the handler for text frames arriving from the peer. */
+  onMessage(handler: (data: string) => void): void;
+  /** Registers the handler for the connection closing, for any reason. */
+  onClose(handler: () => void): void;
+}
+
+/** Hands the HTTP server's `/socket.io/` traffic to a Socket.IO server. */
+export interface SocketIOListener {
+  transport: 'socketio';
+  io: SocketIOServer;
+}
+
+/** Accepts plain WebSocket upgrades at `/`. */
+export interface WebSocketListener {
+  transport: 'websocket';
+  onConnection(connection: RawWebSocket): void;
+}
+
+/** What the HTTP server hands connections to. A server runs exactly one. */
+export type RuntimeListener = SocketIOListener | WebSocketListener;
+
+/**
  * Configuration for creating a runtime server.
  */
 export interface RuntimeServerConfig {
@@ -48,11 +82,11 @@ export interface RuntimeAdapter {
   readonly name: RuntimeType;
 
   /**
-   * Creates an HTTP server and binds Socket.IO to it.
+   * Creates an HTTP server and binds the listener to it.
    *
-   * @param io - Socket.IO server instance
+   * @param listener - Socket.IO server, or a plain WebSocket connection handler
    * @param config - Server configuration
    * @returns Handle to the running server
    */
-  createServer(io: SocketIOServer, config: RuntimeServerConfig): RuntimeServerHandle;
+  createServer(listener: RuntimeListener, config: RuntimeServerConfig): RuntimeServerHandle;
 }

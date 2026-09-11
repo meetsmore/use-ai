@@ -24,6 +24,7 @@ const maxHttpBufferSize = process.env.MAX_HTTP_BUFFER_SIZE
 const corsOrigin = process.env.CORS_ORIGIN;
 // Runtime adapter: 'auto' (default), 'bun', or 'node'
 const runtime = (process.env.RUNTIME as 'auto' | 'bun' | 'node') || 'auto';
+const transport = (process.env.TRANSPORT as 'socketio' | 'websocket') || 'socketio';
 
 /**
  * Create agents based on available API keys.
@@ -389,6 +390,7 @@ logger.info('Starting UseAI server', { logFormat });
           }
         : undefined,
       runtime,
+      transport,
     });
 
     // Initialize MCP endpoints
@@ -401,6 +403,7 @@ logger.info('Starting UseAI server', { logFormat });
       console.log(`✓ UseAI server is running on port ${port}`);
       console.log(`  WebSocket URL: ws://localhost:${port}`);
       console.log(`  Runtime: ${runtime} (set RUNTIME=bun or RUNTIME=node to change)`);
+      console.log(`  Transport: ${transport} (set TRANSPORT=websocket for a plain WebSocket)`);
       console.log(`  Log format: ${logFormat} (set LOG_FORMAT=json for structured logs)`);
       console.log('  Press Ctrl+C to stop');
     }

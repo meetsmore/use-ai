@@ -1,10 +1,33 @@
+import type { UseAITransport } from './transport/types';
+
 /**
- * Configuration for the UseAI client provider.
+ * How the provider reaches the server. Give one of the two.
+ *
+ * - `serverUrl` connects over Socket.IO, which the bundled server serves.
+ * - `transport` connects over anything that implements {@link UseAITransport}.
+ *
+ * @example
+ * ```tsx
+ * <UseAIProvider serverUrl="wss://your-server.com">
+ * <UseAIProvider transport={new WebSocketTransport('wss://your-server.com')}>
+ * ```
  */
-export interface UseAIConfig {
-  /** The WebSocket URL of the UseAI server */
-  serverUrl: string;
-}
+export type UseAIConfig =
+  | {
+      /** URL of a Socket.IO UseAI server. */
+      serverUrl: string;
+      transport?: never;
+    }
+  | {
+      /**
+       * Transport to reach the server with. The provider reads it once, on the first
+       * render, so an inline object does not reconnect the client on every render.
+       * Remount the provider to change transports. The context reports the
+       * transport's `url` as `serverUrl`.
+       */
+      transport: UseAITransport;
+      serverUrl?: never;
+    };
 
 /**
  * Toggles for optional chat UI features. Opt-out features default to enabled

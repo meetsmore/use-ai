@@ -135,6 +135,14 @@ export interface UseAIServerConfig<TAgents extends Record<string, import('./agen
    */
   idleTimeout?: number;
   /**
+   * How clients connect.
+   * - 'socketio': Socket.IO, which the client's default `SocketIOTransport` speaks.
+   * - 'websocket': a plain WebSocket at `/`, carrying AG-UI events as JSON text frames.
+   *   Reach it with the client's `WebSocketTransport`. See docs/websocket-protocol.md.
+   * @default 'socketio'
+   */
+  transport?: 'socketio' | 'websocket';
+  /**
    * The runtime to use for the server.
    * - 'auto': Automatically detect the runtime (Bun or Node.js)
    * - 'bun': Force Bun runtime (will throw if not running on Bun)

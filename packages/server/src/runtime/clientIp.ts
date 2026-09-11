@@ -42,6 +42,16 @@ export interface ClientIpTracker {
 }
 
 /**
+ * The client address behind a proxy: the first hop of `X-Forwarded-For`, else the fallback.
+ */
+export function forwardedClientIp(
+  forwardedFor: string | string[] | undefined,
+  fallback: string | undefined,
+): string | undefined {
+  return typeof forwardedFor === 'string' ? forwardedFor.split(',')[0].trim() : fallback;
+}
+
+/**
  * Creates a ClientIpTracker instance.
  *
  * @returns A new ClientIpTracker

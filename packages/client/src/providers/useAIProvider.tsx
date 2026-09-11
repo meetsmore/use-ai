@@ -122,7 +122,7 @@ export interface PromptsContextValue {
  * Contains connection state and methods for managing tools and prompts.
  */
 export interface UseAIContextValue {
-  /** The WebSocket URL of the UseAI server */
+  /** URL of the server. With an explicit `transport`, this is the transport's `url`. */
   serverUrl: string;
   /** Whether the client is connected to the server */
   connected: boolean;
@@ -260,7 +260,9 @@ export interface ChatPanelProps {
   onAgentChange?: (agentId: string | null) => void;
 }
 
-export interface UseAIProviderProps extends UseAIConfig {
+export type UseAIProviderProps = UseAIConfig & UseAIProviderOptions;
+
+export interface UseAIProviderOptions {
   children: ReactNode;
   systemPrompt?: string;
   CustomButton?: React.ComponentType<FloatingButtonProps> | null;
@@ -471,6 +473,7 @@ const DEFAULT_FILE_UPLOAD_CONFIG: FileUploadConfig = {
  */
 export function UseAIProvider({
   serverUrl,
+  transport,
   children,
   systemPrompt,
   CustomButton,
@@ -573,16 +576,20 @@ export function UseAIProvider({
   const handleDisconnectRef = useRef(serverEvents.handleDisconnect);
   handleDisconnectRef.current = serverEvents.handleDisconnect;
 
+  const resolvedServerUrl = transport?.url ?? serverUrl!;
+
   useEffect(() => {
-    console.log('[UseAIProvider] Initializing client with serverUrl:', serverUrl);
-    const client = new UseAIClient(serverUrl);
+    console.log('[UseAIProvider] Initializing client for', resolvedServerUrl);
+    // `transport` is deliberately not a dependency: an inline object must not
+    // re-create the client on every render.
+    const client = new UseAIClient(transport ?? serverUrl!);
 
     const unsubscribeConnection = client.onConnectionStateChange((isConnected) => {
       console.log('[UseAIProvider] Connection state changed:', isConnected);
       setConnected(isConnected);
       if (!isConnected) {
-        // The server destroys its session on disconnect (keyed by socket.id),
-        // so any in-flight run is unrecoverable even after Socket.IO reconnects.
+        // The server destroys its session on disconnect (keyed by connection id),
+        // so any in-flight run is unrecoverable even after the transport reconnects.
         // Reset UI state so the user can send a new message instead of being
         // stuck in a permanent "loading" state.
         handleDisconnectRef.current();
@@ -735,7 +742,7 @@ export function UseAIProvider({
   // ── Context Values ──────────────────────────────────────────────────────
 
   const value: UseAIContextValue = {
-    serverUrl,
+    serverUrl: resolvedServerUrl,
     connected,
     client: clientRef.current,
     tools: {
