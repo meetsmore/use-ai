@@ -71,7 +71,14 @@ export function Reasoning({
 
   const toggle = useCallback(() => setIsOpen(prev => !prev), []);
 
-  const allText = reasoningParts.map(p => p.text).join('\n\n');
+  // Parts can carry their own trailing blank lines (Claude's progress updates
+  // end with "\n\n"), which pre-wrap would stack on top of the separator.
+  // Trim for display only: the stored text is replayed to the provider and
+  // must stay byte-identical for signature verification.
+  const allText = reasoningParts
+    .map(p => p.text.trim())
+    .filter(Boolean)
+    .join('\n\n');
 
   const headerContent = isStreaming
     ? <ShimmerText text={strings.thinking.inProgress} theme={theme} />
