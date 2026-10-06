@@ -1,0 +1,39 @@
+name: Docker Build
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'apps/use-ai-server-app/**'
+      - 'packages/core/**'
+      - 'packages/client/**'
+      - 'packages/server/**'
+      - 'packages/plugin-workflows/**'
+      - 'package.json'
+      - 'bun.lock'
+      - 'turbo.json'
+      - 'tsconfig.json'
+      - '.github/workflows/docker-build.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  docker-build:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./apps/use-ai-server-app/Dockerfile
+          push: false
+          cache-from: type=gha
