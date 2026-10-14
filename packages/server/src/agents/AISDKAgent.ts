@@ -646,7 +646,11 @@ export class AISDKAgent implements Agent {
    * Creates a telemetry span and sets input from the last user message.
    */
   private startTelemetrySpan(ctx: RunContext): ReturnType<typeof startRunSpan> {
-    const span = startRunSpan({ runId: ctx.runId, sessionId: ctx.session.clientId });
+    const telemetryMetadata = (ctx.originalInput.forwardedProps as UseAIForwardedProps | undefined)?.telemetryMetadata;
+    const sessionId = typeof telemetryMetadata?.sessionId === 'string' && telemetryMetadata.sessionId !== ''
+      ? telemetryMetadata.sessionId
+      : ctx.session.clientId;
+    const span = startRunSpan({ runId: ctx.runId, sessionId });
 
     const lastUserMessage = [...ctx.messages].reverse().find(m => m.role === 'user');
     if (lastUserMessage) {

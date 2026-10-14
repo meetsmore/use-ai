@@ -1130,6 +1130,7 @@ root.render(
       },
       telemetryMetadata: {                  // optional: metadata forwarded to observability (e.g., Langfuse)
         userId: 'user-123',
+        sessionId: 'chat-42',               // optional: Langfuse session of the run (default: the socket client id)
       },
     })}
   >

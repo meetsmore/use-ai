@@ -1,6 +1,7 @@
 import { describe, expect, test, mock, spyOn } from 'bun:test';
 import { AISDKAgent } from './AISDKAgent';
 import { logger } from '../logger';
+import * as telemetry from '../telemetry';
 import type { AgentInput, EventEmitter, AGUIEventExtended } from './types';
 import { EventType, ErrorCode } from '../types';
 import type { ToolDefinition } from '../types';
@@ -2599,6 +2600,31 @@ describe('AISDKAgent', () => {
 
       // Restore original
       mock.module('../telemetry', () => telemetryModule);
+    });
+  });
+
+  describe('run span session id', () => {
+    async function runSpanSessionId(forwardedProps: Record<string, unknown>): Promise<string | undefined> {
+      const startSpy = spyOn(telemetry, 'startRunSpan');
+      try {
+        const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: createStreamingTextMockModel('Hi') }) } });
+        const base = createTestInput();
+        const input = createTestInput({ originalInput: { ...base.originalInput, forwardedProps } });
+        await agent.run(input, { emit: () => {} });
+        return startSpy.mock.calls[0]?.[0].sessionId;
+      } finally {
+        startSpy.mockRestore();
+      }
+    }
+
+    test('uses telemetryMetadata.sessionId when provided', async () => {
+      expect(await runSpanSessionId({ telemetryMetadata: { sessionId: 'chat-42' } })).toBe('chat-42');
+    });
+
+    test('falls back to the client id without telemetryMetadata.sessionId', async () => {
+      expect(await runSpanSessionId({})).toBe('client-1');
+      expect(await runSpanSessionId({ telemetryMetadata: { sessionId: '' } })).toBe('client-1');
+      expect(await runSpanSessionId({ telemetryMetadata: { sessionId: 7 } })).toBe('client-1');
     });
   });
 
