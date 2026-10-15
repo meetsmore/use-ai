@@ -366,4 +366,77 @@ describe('UseAIProvider forwardedPropsProvider', () => {
     expect(providerCalls).toEqual([{ chatId: firstChatId }]);
     expect(getLastRunAgentCall()!.data.forwardedProps.telemetryMetadata).toEqual({ chatId: firstChatId });
   });
+
+  test('sends the run on the same thread as the chatId given to forwardedPropsProvider when the chat changes during attachment processing', async () => {
+    let sendMessage: ((msg: string, opts?: { attachments?: File[] }) => Promise<void>) | null = null;
+    let createChat: (() => Promise<string>) | null = null;
+    let currentChatId: string | null = null;
+
+    let releaseUpload: () => void = () => {};
+    const uploadGate = new Promise<void>((resolve) => {
+      releaseUpload = resolve;
+    });
+
+    function Consumer() {
+      const { chat, connected } = useAIContext();
+      createChat = chat.create;
+      currentChatId = chat.currentId;
+      React.useEffect(() => {
+        if (connected) sendMessage = chat.sendMessage;
+      }, [connected, chat.sendMessage]);
+      return null;
+    }
+
+    render(
+      <UseAIProvider
+        serverUrl="http://localhost:8081"
+        forwardedPropsProvider={({ chatId }) => ({ telemetryMetadata: { sessionId: chatId } })}
+        fileUploadConfig={{
+          backend: {
+            prepareForSend: async () => {
+              await uploadGate;
+              return 'https://example.com/file.pdf';
+            },
+          },
+        }}
+        renderChat={false}
+      >
+        <Consumer />
+      </UseAIProvider>
+    );
+
+    await act(async () => {
+      mockSocket.connected = true;
+      emitSocketEvent('connect');
+    });
+    await waitFor(() => expect(sendMessage).not.toBeNull());
+
+    let firstChatId = '';
+    await act(async () => {
+      firstChatId = await createChat!();
+    });
+
+    let sendPromise: Promise<void> = Promise.resolve();
+    await act(async () => {
+      sendPromise = sendMessage!('Hello', {
+        attachments: [new File(['x'], 'a.pdf', { type: 'application/pdf' })],
+      });
+    });
+    await waitFor(() => expect(currentChatId).toBe(firstChatId));
+
+    await act(async () => {
+      await createChat!();
+    });
+
+    await act(async () => {
+      releaseUpload();
+      await sendPromise;
+    });
+
+    const runAgent = getLastRunAgentCall()! as unknown as {
+      data: { threadId: string; forwardedProps: UseAIForwardedProps };
+    };
+    expect(runAgent.data.forwardedProps.telemetryMetadata).toEqual({ sessionId: firstChatId });
+    expect(runAgent.data.threadId).toBe(firstChatId);
+  });
 });
