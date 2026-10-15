@@ -262,6 +262,17 @@ export interface ChatPanelProps {
 
 export type UseAIProviderProps = UseAIConfig & UseAIProviderOptions;
 
+/**
+ * Context passed to `forwardedPropsProvider` for each message send.
+ */
+export interface ForwardedPropsProviderContext {
+  /**
+   * ID of the chat the message belongs to, captured when the send starts.
+   * `null` when no chat is active.
+   */
+  chatId: string | null;
+}
+
 export interface UseAIProviderOptions {
   children: ReactNode;
   systemPrompt?: string;
@@ -279,6 +290,11 @@ export interface UseAIProviderOptions {
    * Called before each message is sent. Can be sync or async.
    * Props from this provider are merged with message-level forwardedProps,
    * with message-level taking precedence.
+   *
+   * Receives a {@link ForwardedPropsProviderContext} whose `chatId` is the chat the message
+   * is being sent from. Use it instead of reading the current chat from your own state:
+   * attachment processing can take a while, and the user may switch chats in the meantime.
+   * Providers that take no arguments keep working.
    *
    * @example
    * ```tsx
@@ -309,7 +325,9 @@ export interface UseAIProviderOptions {
    * </UseAIProvider>
    * ```
    */
-  forwardedPropsProvider?: () => UseAIForwardedProps | Promise<UseAIForwardedProps>;
+  forwardedPropsProvider?: (
+    context: ForwardedPropsProviderContext
+  ) => UseAIForwardedProps | Promise<UseAIForwardedProps>;
   /**
    * Configuration for file uploads.
    * File upload is enabled by default with EmbedFileUploadBackend, 10MB max size,
@@ -711,7 +729,7 @@ export function UseAIProvider({
       serverEvents.setLoading(true);
     }
 
-    const providerResult = forwardedPropsProvider ? forwardedPropsProvider() : {};
+    const providerResult = forwardedPropsProvider ? forwardedPropsProvider({ chatId: activeChatId }) : {};
     const providerProps = providerResult instanceof Promise ? await providerResult : providerResult;
 
     const mergedForwardedProps = {

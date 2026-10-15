@@ -1141,6 +1141,17 @@ root.render(
 
 [picomatch](https://github.com/micromatch/picomatch) is used for patterns, so you can use any `picomatch` compatible pattern.
 
+`forwardedPropsProvider` is called with `{ chatId }`, the id of the chat the message is being sent from (`null` if no chat is active). The id is captured when the send starts, so it stays correct even if the user switches chats while attachments are still being processed. Prefer it over reading the "current chat" from your own state when attaching per-chat props:
+
+```tsx
+<UseAIProvider
+  serverUrl="ws://localhost:8081"
+  forwardedPropsProvider={({ chatId }) => ({
+    telemetryMetadata: { sessionId: chatId ?? undefined },
+  })}
+>
+```
+
 The flow works like this:
 
 1. [client] The user sends a message to the AI.
