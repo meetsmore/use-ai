@@ -76,6 +76,7 @@ export type {
   ChatPanelProps,
   UseAIProviderProps,
   UseAIProviderOptions,
+  ForwardedPropsProviderContext,
 } from './providers/useAIProvider';
 export type { SendMessageOptions } from './hooks/useMessageQueue';
 export type { DefinedTool, ToolsDefinition, ToolOptions, ToolAnnotations, ToolExecutionContext } from './defineTool';
