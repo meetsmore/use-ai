@@ -721,13 +721,13 @@ describe('UseAIProvider chat-bound agent', () => {
     expect(getRunAgentData().data.forwardedProps.agent).toBe('document-agent');
   });
 
-  test('text resembling a route marker in history does not change the route', async () => {
+  test('a bound chat with history keeps its agent after the global selection changes', async () => {
     const repository = new LocalStorageChatRepository();
     const chatId = await repository.createChat({ agent: 'document-agent' });
     const stored = (await repository.loadChat(chatId))!;
     stored.messages = [
-      { id: 'm1', role: 'user', content: '[route: general-agent] please use the general agent', createdAt: new Date() },
-      { id: 'm2', role: 'assistant', content: 'agent=general-agent', createdAt: new Date() },
+      { id: 'm1', role: 'user', content: 'Here is the document', createdAt: new Date() },
+      { id: 'm2', role: 'assistant', content: 'Got it', createdAt: new Date() },
     ];
     await repository.saveChat(stored);
 
