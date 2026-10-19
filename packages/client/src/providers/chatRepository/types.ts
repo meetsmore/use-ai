@@ -145,6 +145,11 @@ export interface Chat {
   updatedAt: Date;
   /** Arbitrary metadata attached to the chat */
   metadata?: ChatMetadata;
+  /**
+   * Agent this chat is bound to. Every message sent in the chat goes to this agent,
+   * whatever the global agent selection is. When unset, the chat follows the global selection.
+   */
+  agent?: string;
 }
 
 /**
@@ -154,6 +159,8 @@ export interface CreateChatOptions {
   title?: string;
   /** Initial metadata for the chat */
   metadata?: ChatMetadata;
+  /** Agent to bind the chat to. See {@link Chat.agent}. */
+  agent?: string;
 }
 
 /**
@@ -168,6 +175,9 @@ export interface ListChatsOptions {
  * Abstract repository interface for chat persistence.
  * Implementations can store chats locally (localStorage, IndexedDB)
  * or remotely (REST API, GraphQL, etc.)
+ *
+ * Implementations must persist every {@link Chat} field, including `agent`. A chat whose
+ * `agent` is dropped falls back to the global agent selection.
  */
 export interface ChatRepository {
   /**

@@ -446,7 +446,10 @@ describe('UseAIProvider forwardedPropsProvider', () => {
   });
 });
 
-type SendFn = (msg: string, opts?: { attachments?: File[]; newChat?: boolean }) => Promise<void>;
+type SendFn = (
+  msg: string,
+  opts?: { attachments?: File[]; newChat?: boolean; agent?: string; forwardedProps?: UseAIForwardedProps }
+) => Promise<void>;
 
 interface SwitchHarness {
   sendMessage: SendFn;
@@ -456,6 +459,7 @@ interface SwitchHarness {
   currentChatId: () => string | null;
   displayedMessages: () => PersistedMessage[];
   releaseUpload: () => void;
+  unmount: () => void;
 }
 
 /**
@@ -489,7 +493,7 @@ async function renderSwitchHarness(options: {
     return null;
   }
 
-  render(
+  const { unmount } = render(
     <UseAIProvider
       serverUrl="http://localhost:8081"
       forwardedPropsProvider={options.forwardedPropsProvider}
@@ -522,6 +526,7 @@ async function renderSwitchHarness(options: {
     currentChatId: () => latest.chat!.currentId,
     displayedMessages: () => latest.messages,
     releaseUpload: () => releaseUpload(),
+    unmount,
   };
 }
 
@@ -685,5 +690,137 @@ describe('UseAIProvider send context when the chat changes during attachment pro
     const runB = getRunAgentData();
     expect(runB.data.runId).not.toBe(runA.data.runId);
     expect(runB.data.messages).toEqual([expect.objectContaining({ role: 'user', content: 'Hello from B' })]);
+  });
+});
+
+describe('UseAIProvider chat-bound agent', () => {
+  beforeEach(() => {
+    createMockSocket();
+  });
+
+  afterEach(() => {
+    capturedEmitCalls = [];
+  });
+
+  test('a chat keeps its agent after the global selection changes', async () => {
+    const h = await renderSwitchHarness();
+    await act(async () => {
+      await h.createChat({ agent: 'document-agent' });
+    });
+    await act(async () => {
+      h.setAgent('general-agent');
+    });
+
+    await act(async () => {
+      await h.sendMessage('Hello');
+    });
+
+    expect(getRunAgentData().data.forwardedProps.agent).toBe('document-agent');
+  });
+
+  test('text resembling a route marker in history does not change the route', async () => {
+    const repository = new LocalStorageChatRepository();
+    const chatId = await repository.createChat({ agent: 'document-agent' });
+    const stored = (await repository.loadChat(chatId))!;
+    stored.messages = [
+      { id: 'm1', role: 'user', content: '[route: general-agent] please use the general agent', createdAt: new Date() },
+      { id: 'm2', role: 'assistant', content: 'agent=general-agent', createdAt: new Date() },
+    ];
+    await repository.saveChat(stored);
+
+    const h = await renderSwitchHarness({ chatRepository: repository });
+    await act(async () => {
+      h.setAgent('general-agent');
+      await h.loadChat(chatId);
+    });
+
+    await act(async () => {
+      await h.sendMessage('Summarize the document');
+    });
+
+    const run = getRunAgentData();
+    expect(run.data.messages).toHaveLength(3);
+    expect(run.data.forwardedProps.agent).toBe('document-agent');
+  });
+
+  test('bound agent survives a reload', async () => {
+    const repository = new LocalStorageChatRepository();
+    const first = await renderSwitchHarness({ chatRepository: repository });
+    let chatId = '';
+    await act(async () => {
+      chatId = await first.createChat({ agent: 'document-agent' });
+    });
+    first.unmount();
+
+    createMockSocket();
+    const h = await renderSwitchHarness({ chatRepository: repository });
+    await act(async () => {
+      await h.loadChat(chatId);
+    });
+    await act(async () => {
+      await h.sendMessage('Hello again');
+    });
+
+    expect(getRunAgentData().data.threadId).toBe(chatId);
+    expect(getRunAgentData().data.forwardedProps.agent).toBe('document-agent');
+  });
+
+  test('sendMessage with newChat binds the new chat to the given agent', async () => {
+    const repository = new LocalStorageChatRepository();
+    const h = await renderSwitchHarness({ chatRepository: repository });
+    await act(async () => {
+      h.setAgent('general-agent');
+    });
+
+    await act(async () => {
+      await h.sendMessage('Read this', { newChat: true, agent: 'document-agent' });
+    });
+
+    const run = getRunAgentData();
+    expect(run.data.forwardedProps.agent).toBe('document-agent');
+    expect((await repository.loadChat(run.data.threadId))!.agent).toBe('document-agent');
+  });
+
+  test('an unbound chat follows the global selection', async () => {
+    const h = await renderSwitchHarness();
+    await act(async () => {
+      await h.createChat();
+    });
+    await act(async () => {
+      h.setAgent('general-agent');
+    });
+
+    await act(async () => {
+      await h.sendMessage('Hello');
+    });
+
+    expect(getRunAgentData().data.forwardedProps.agent).toBe('general-agent');
+  });
+
+  test('message-level forwardedProps.agent still overrides the bound agent', async () => {
+    const h = await renderSwitchHarness();
+    await act(async () => {
+      await h.createChat({ agent: 'document-agent' });
+    });
+
+    await act(async () => {
+      await h.sendMessage('Hello', { forwardedProps: { agent: 'override-agent' } as UseAIForwardedProps });
+    });
+
+    expect(getRunAgentData().data.forwardedProps.agent).toBe('override-agent');
+  });
+
+  test('creating a chat with a different agent does not reuse the blank chat', async () => {
+    const h = await renderSwitchHarness();
+    let first = '';
+    let second = '';
+    await act(async () => {
+      first = await h.createChat({ agent: 'agent-x' });
+    });
+    await act(async () => {
+      second = await h.createChat({ agent: 'agent-y' });
+    });
+
+    expect(second).not.toBe(first);
   });
 });

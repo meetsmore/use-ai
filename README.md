@@ -1023,6 +1023,18 @@ When multiple agents are configured, users can select which agent to use:
 const { selectedAgent, availableAgents, selectAgent } = useAgentSelection();
 ```
 
+A chat can be bound to one agent when it is created. Every message sent in that chat goes to that agent, whatever the global selection is, including after a reload. Use this instead of choosing the agent from the conversation text:
+
+```tsx
+const { chat } = useAIContext();
+
+await chat.create({ agent: 'document-agent' });
+// or
+await chat.sendMessage('Summarize this file', { newChat: true, agent: 'document-agent', attachments: [file] });
+```
+
+Chats created without `agent` follow the global selection. Message-level `forwardedProps.agent` still overrides both. A custom `ChatRepository` must persist the chat's `agent` field.
+
 ## Server
 
 ### 'Batteries included' server

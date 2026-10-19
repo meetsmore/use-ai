@@ -159,7 +159,8 @@ export function useChatManagement({
       const existingChat = await repository.loadChat(pendingChatId);
       const optionsMatch = existingChat
         && existingChat.title === options?.title
-        && deepEquals(existingChat.metadata, options?.metadata);
+        && deepEquals(existingChat.metadata, options?.metadata)
+        && existingChat.agent === options?.agent;
       if (optionsMatch) {
         console.log('[ChatManagement] Last created chat has matching options, reusing:', pendingChatId);
         return pendingChatId;

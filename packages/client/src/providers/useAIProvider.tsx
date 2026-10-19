@@ -699,6 +699,9 @@ export function UseAIProvider({
       agent: client.selectedAgent,
     };
     const chat = activeChatId ? await chatManagement.getChat(activeChatId) : null;
+    if (chat?.agent) {
+      runTarget.agent = chat.agent;
+    }
 
     let persistedContent: PersistedMessageContent = message;
     let multimodalContent: MultimodalContent[] | undefined;
