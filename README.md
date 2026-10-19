@@ -1033,7 +1033,7 @@ await chat.create({ agent: 'document-agent' });
 await chat.sendMessage('Summarize this file', { newChat: true, agent: 'document-agent', attachments: [file] });
 ```
 
-Chats created without `agent` follow the global selection. Message-level `forwardedProps.agent` still overrides both. A custom `ChatRepository` must persist the chat's `agent` field.
+Chats created without `agent` follow the global selection. An `agent` in forwarded props, from `forwardedPropsProvider` or from the message, still overrides both. A custom `ChatRepository` must persist the chat's `agent` field.
 
 ## Server
 
