@@ -46,6 +46,20 @@ export type ToolCallHandler = (
 ) => void;
 
 /**
+ * Where a run goes: its thread, the history it carries, and its agent.
+ * Pass it to {@link UseAIClient.sendPrompt} to dispatch a run for a thread other than the one
+ * the client currently shows.
+ */
+export interface RunTarget {
+  /** Thread (chat) id of the run. */
+  threadId: string;
+  /** Conversation history before the new user message. */
+  messages: Message[];
+  /** Agent for the run. `null` means the server default. */
+  agent: string | null;
+}
+
+/**
  * Client for communicating with the UseAI server.
  * Uses the AG-UI protocol (https://docs.ag-ui.com/), so will be compatible with other AG-UI compliant servers.
  *
@@ -356,8 +370,16 @@ export class UseAIClient {
    * @param multimodalContent - Optional multimodal content (text, images, files)
    * @param forwardedProps - Optional props to forward to the server (e.g., telemetryMetadata, mcpHeaders).
    *                         Internally merged with other forwardedProps.
+   * @param target - Optional thread, history and agent of the run. Without it, the run uses the
+   *                 client's current thread, messages and selected agent. With it, the client's
+   *                 message buffer is updated only when `target.threadId` is the current thread.
    */
-  async sendPrompt(prompt: string, multimodalContent?: MultimodalContent[], forwardedProps?: UseAIForwardedProps) {
+  async sendPrompt(
+    prompt: string,
+    multimodalContent?: MultimodalContent[],
+    forwardedProps?: UseAIForwardedProps,
+    target?: RunTarget
+  ) {
     // Build message content - use multimodal if provided, otherwise just the text
     let messageContent: UserMessageContent = prompt;
 
@@ -374,15 +396,31 @@ export class UseAIClient {
       // @ag-ui/core declares Message.content as `string`; the wire also carries MultimodalContent[].
       content: messageContent as string,
     };
-    this._messages.push(userMessage);
+
+    let threadId: string;
+    let messages: Message[];
+    let agent: string | null;
+    if (target) {
+      threadId = target.threadId;
+      messages = [...target.messages, userMessage];
+      agent = target.agent;
+      if (target.threadId === this._threadId) {
+        this._messages = messages;
+      }
+    } else {
+      this._messages.push(userMessage);
+      threadId = this.threadId; // Use getter to ensure non-null
+      messages = this._messages;
+      agent = this._selectedAgent;
+    }
 
     // Create RunAgentInput
     const runId = uuidv4();
     this._currentRunId = runId;
     const runInput: RunAgentInput = {
-      threadId: this.threadId, // Use getter to ensure non-null
+      threadId,
       runId,
-      messages: this._messages,
+      messages,
       tools: this._tools.map(t => ({
         name: t.name,
         description: t.description,
@@ -392,7 +430,7 @@ export class UseAIClient {
       state: this._state,
       context: [],
       forwardedProps: {
-        ...(this._selectedAgent ? { agent: this._selectedAgent } : {}),
+        ...(agent ? { agent } : {}),
         ...(forwardedProps || {}),
       },
     };

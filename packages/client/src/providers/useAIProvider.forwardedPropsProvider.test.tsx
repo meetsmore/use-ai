@@ -3,6 +3,8 @@ import { describe, test, expect, mock, beforeEach, afterEach } from 'bun:test';
 import { render, act, waitFor } from '@testing-library/react';
 import type { Socket } from 'socket.io-client';
 import type { UseAIForwardedProps } from '../types';
+import type { ForwardedPropsProviderContext } from './useAIProvider';
+import type { PersistedMessage } from './chatRepository/types';
 
 // Store event handlers and captured data
 let eventHandlers: Record<string, Function[]> = {};
@@ -55,6 +57,8 @@ mock.module('socket.io-client', () => ({
 
 // Import after mocking
 const { UseAIProvider, useAIContext } = await import('./useAIProvider');
+const { __UseAIChatContext } = await import('../components/UseAIChat');
+const { LocalStorageChatRepository } = await import('./chatRepository/LocalStorageChatRepository');
 
 // Test component that exposes sendMessage via context
 function TestConsumer({
@@ -294,7 +298,7 @@ describe('UseAIProvider forwardedPropsProvider', () => {
     let sendMessage: ((msg: string, opts?: { attachments?: File[] }) => Promise<void>) | null = null;
     let createChat: (() => Promise<string>) | null = null;
     let currentChatId: string | null = null;
-    const providerCalls: Array<{ chatId: string | null } | undefined> = [];
+    const providerCalls: Array<ForwardedPropsProviderContext | undefined> = [];
 
     let releaseUpload: () => void = () => {};
     const uploadGate = new Promise<void>((resolve) => {
@@ -363,7 +367,8 @@ describe('UseAIProvider forwardedPropsProvider', () => {
       await sendPromise;
     });
 
-    expect(providerCalls).toEqual([{ chatId: firstChatId }]);
+    expect(providerCalls).toHaveLength(1);
+    expect(providerCalls[0]?.chatId).toBe(firstChatId);
     expect(getLastRunAgentCall()!.data.forwardedProps.telemetryMetadata).toEqual({ chatId: firstChatId });
   });
 
@@ -438,5 +443,247 @@ describe('UseAIProvider forwardedPropsProvider', () => {
     };
     expect(runAgent.data.forwardedProps.telemetryMetadata).toEqual({ sessionId: firstChatId });
     expect(runAgent.data.threadId).toBe(firstChatId);
+  });
+});
+
+type SendFn = (msg: string, opts?: { attachments?: File[]; newChat?: boolean }) => Promise<void>;
+
+interface SwitchHarness {
+  sendMessage: SendFn;
+  createChat: (options?: { metadata?: Record<string, unknown>; agent?: string }) => Promise<string>;
+  loadChat: (chatId: string) => Promise<void>;
+  setAgent: (agentId: string | null) => void;
+  currentChatId: () => string | null;
+  displayedMessages: () => PersistedMessage[];
+  releaseUpload: () => void;
+}
+
+/**
+ * Renders a provider whose attachment upload blocks until `releaseUpload()` is called,
+ * so a test can switch chats while a send is still preparing.
+ */
+async function renderSwitchHarness(options: {
+  forwardedPropsProvider?: (context: ForwardedPropsProviderContext) => UseAIForwardedProps;
+  chatRepository?: InstanceType<typeof LocalStorageChatRepository>;
+} = {}): Promise<SwitchHarness> {
+  let releaseUpload: () => void = () => {};
+  const uploadGate = new Promise<void>((resolve) => {
+    releaseUpload = resolve;
+  });
+  const latest: {
+    sendMessage: SendFn | null;
+    chat: ReturnType<typeof useAIContext>['chat'] | null;
+    agents: ReturnType<typeof useAIContext>['agents'] | null;
+    messages: PersistedMessage[];
+  } = { sendMessage: null, chat: null, agents: null, messages: [] };
+
+  function Consumer() {
+    const { chat, agents, connected } = useAIContext();
+    const chatUI = React.useContext(__UseAIChatContext);
+    latest.chat = chat;
+    latest.agents = agents;
+    latest.messages = chatUI?.messages ?? [];
+    React.useEffect(() => {
+      if (connected) latest.sendMessage = chat.sendMessage;
+    }, [connected, chat.sendMessage]);
+    return null;
+  }
+
+  render(
+    <UseAIProvider
+      serverUrl="http://localhost:8081"
+      forwardedPropsProvider={options.forwardedPropsProvider}
+      chatRepository={options.chatRepository}
+      fileUploadConfig={{
+        backend: {
+          prepareForSend: async () => {
+            await uploadGate;
+            return 'https://example.com/file.pdf';
+          },
+        },
+      }}
+      renderChat={false}
+    >
+      <Consumer />
+    </UseAIProvider>
+  );
+
+  await act(async () => {
+    mockSocket.connected = true;
+    emitSocketEvent('connect');
+  });
+  await waitFor(() => expect(latest.sendMessage).not.toBeNull());
+
+  return {
+    sendMessage: (msg, opts) => latest.sendMessage!(msg, opts),
+    createChat: (opts) => latest.chat!.create(opts),
+    loadChat: (chatId) => latest.chat!.load(chatId),
+    setAgent: (agentId) => latest.agents!.set(agentId),
+    currentChatId: () => latest.chat!.currentId,
+    displayedMessages: () => latest.messages,
+    releaseUpload: () => releaseUpload(),
+  };
+}
+
+function getRunAgentData() {
+  return getLastRunAgentCall()! as unknown as {
+    data: {
+      threadId: string;
+      runId: string;
+      messages: Array<{ role: string; content: unknown }>;
+      forwardedProps: UseAIForwardedProps & { agent?: string };
+    };
+  };
+}
+
+function attachment() {
+  return [new File(['x'], 'a.pdf', { type: 'application/pdf' })];
+}
+
+/**
+ * Starts a send from `chatId` with a blocked upload, runs `whileUploading`, then lets the upload finish.
+ */
+async function sendDuringSwitch(
+  h: SwitchHarness,
+  chatId: string,
+  message: string,
+  whileUploading: () => Promise<void> | void
+) {
+  let sendPromise: Promise<void> = Promise.resolve();
+  await act(async () => {
+    sendPromise = h.sendMessage(message, { attachments: attachment() });
+  });
+  await waitFor(() => expect(h.currentChatId()).toBe(chatId));
+  await act(async () => {
+    await whileUploading();
+  });
+  await act(async () => {
+    h.releaseUpload();
+    await sendPromise;
+  });
+}
+
+async function finishRun(threadId: string, runId: string, text: string) {
+  await act(async () => {
+    emitSocketEvent('event', { type: 'RUN_STARTED', threadId, runId });
+    emitSocketEvent('event', { type: 'TEXT_MESSAGE_START', messageId: `${runId}-msg`, role: 'assistant' });
+    emitSocketEvent('event', { type: 'TEXT_MESSAGE_CONTENT', messageId: `${runId}-msg`, delta: text });
+    emitSocketEvent('event', { type: 'TEXT_MESSAGE_END', messageId: `${runId}-msg` });
+    emitSocketEvent('event', { type: 'RUN_FINISHED', threadId, runId });
+  });
+}
+
+describe('UseAIProvider send context when the chat changes during attachment processing', () => {
+  beforeEach(() => {
+    createMockSocket();
+  });
+
+  afterEach(() => {
+    capturedEmitCalls = [];
+  });
+
+  test('run carries the history of the chat the send started in', async () => {
+    const repository = new LocalStorageChatRepository();
+    const chatA = await repository.createChat();
+    const storedA = (await repository.loadChat(chatA))!;
+    storedA.messages = [
+      { id: 'a1', role: 'user', content: 'Earlier question', createdAt: new Date() },
+      { id: 'a2', role: 'assistant', content: 'Earlier answer', createdAt: new Date() },
+    ];
+    await repository.saveChat(storedA);
+
+    const h = await renderSwitchHarness({ chatRepository: repository });
+    await act(async () => {
+      await h.loadChat(chatA);
+    });
+
+    await sendDuringSwitch(h, chatA, 'Hello', async () => {
+      await h.createChat();
+    });
+
+    const run = getRunAgentData();
+    expect(run.data.threadId).toBe(chatA);
+    expect(run.data.messages.map((m) => m.role)).toEqual(['user', 'assistant', 'user']);
+    expect(run.data.messages[0].content).toBe('Earlier question');
+    expect(run.data.messages[1].content).toBe('Earlier answer');
+  });
+
+  test('user message is stored in its own chat and not shown in the chat the user switched to', async () => {
+    const repository = new LocalStorageChatRepository();
+    const h = await renderSwitchHarness({ chatRepository: repository });
+    let chatA = '';
+    await act(async () => {
+      chatA = await h.createChat();
+    });
+
+    let chatB = '';
+    await sendDuringSwitch(h, chatA, 'Hello from A', async () => {
+      chatB = await h.createChat();
+    });
+
+    const storedA = (await repository.loadChat(chatA))!;
+    expect(storedA.messages).toHaveLength(1);
+    expect(JSON.stringify(storedA.messages[0].content)).toContain('Hello from A');
+    expect((await repository.loadChat(chatB))!.messages).toHaveLength(0);
+    expect(h.displayedMessages()).toHaveLength(0);
+  });
+
+  test('forwardedPropsProvider receives the metadata of the chat the send started in', async () => {
+    const contexts: ForwardedPropsProviderContext[] = [];
+    const h = await renderSwitchHarness({
+      forwardedPropsProvider: (context) => {
+        contexts.push(context);
+        return {};
+      },
+    });
+    let chatA = '';
+    await act(async () => {
+      chatA = await h.createChat({ metadata: { document: 'a' } });
+    });
+
+    await sendDuringSwitch(h, chatA, 'Hello', async () => {
+      await h.createChat({ metadata: { document: 'b' } });
+    });
+
+    expect(contexts).toHaveLength(1);
+    expect(contexts[0].chat?.metadata).toEqual({ document: 'a' });
+  });
+
+  test('run uses the agent selected when the send started', async () => {
+    const h = await renderSwitchHarness();
+    let chatA = '';
+    await act(async () => {
+      chatA = await h.createChat();
+      h.setAgent('agent-x');
+    });
+
+    await sendDuringSwitch(h, chatA, 'Hello', () => {
+      h.setAgent('agent-y');
+    });
+
+    expect(getRunAgentData().data.forwardedProps.agent).toBe('agent-x');
+  });
+
+  test('a run that finishes after a switch does not leak into the next chat\'s first send', async () => {
+    const h = await renderSwitchHarness();
+    let chatA = '';
+    await act(async () => {
+      chatA = await h.createChat();
+    });
+
+    await sendDuringSwitch(h, chatA, 'Hello from A', async () => {
+      await h.createChat();
+    });
+    const runA = getRunAgentData();
+    expect(runA.data.threadId).toBe(chatA);
+    await finishRun(chatA, runA.data.runId, 'Answer for A');
+
+    await act(async () => {
+      await h.sendMessage('Hello from B');
+    });
+
+    const runB = getRunAgentData();
+    expect(runB.data.runId).not.toBe(runA.data.runId);
+    expect(runB.data.messages).toEqual([expect.objectContaining({ role: 'user', content: 'Hello from B' })]);
   });
 });

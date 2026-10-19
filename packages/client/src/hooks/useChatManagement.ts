@@ -71,6 +71,8 @@ export interface UseChatManagementReturn {
   reloadMessages: (chatId: string) => Promise<void>;
   /** Get the current chat object. Metadata is frozen to prevent accidental mutation. */
   getCurrentChat: () => Promise<Chat | null>;
+  /** Get a chat by ID. Metadata is frozen to prevent accidental mutation. */
+  getChat: (chatId: string) => Promise<Chat | null>;
   /** Update metadata for the current chat */
   updateMetadata: (metadata: ChatMetadata, overwrite?: boolean) => Promise<void>;
   /** Snapshot refs for use in event handlers */
@@ -233,18 +235,26 @@ export function useChatManagement({
   }, [currentChatId, repository, setMessages]);
 
   /**
+   * Gets a chat by ID (including metadata).
+   * Metadata is frozen to prevent accidental mutation.
+   */
+  const getChat = useCallback(async (chatId: string): Promise<Chat | null> => {
+    const chat = await repository.loadChat(chatId);
+    if (chat?.metadata) {
+      chat.metadata = Object.freeze({ ...chat.metadata });
+    }
+    return chat;
+  }, [repository]);
+
+  /**
    * Gets the current chat object (including metadata).
    * Metadata is frozen to prevent accidental mutation.
    */
   const getCurrentChat = useCallback(async (): Promise<Chat | null> => {
     const chatId = pendingChatId || currentChatId;
     if (!chatId) return null;
-    const chat = await repository.loadChat(chatId);
-    if (chat?.metadata) {
-      chat.metadata = Object.freeze({ ...chat.metadata });
-    }
-    return chat;
-  }, [pendingChatId, currentChatId, repository]);
+    return getChat(chatId);
+  }, [pendingChatId, currentChatId, getChat]);
 
   /** Updates metadata for the current chat. */
   const updateMetadata = useCallback(async (metadata: ChatMetadata, overwrite = false): Promise<void> => {
@@ -264,8 +274,9 @@ export function useChatManagement({
 
     console.log('[ChatManagement] Activating pending chat:', pendingChatId);
 
-    // Load existing messages into client for conversation history
-    if (clientRef.current && messages.length > 0) {
+    // Load the chat's messages into the client for conversation history, even when there are
+    // none: the client buffer may still hold a run that finished after the user switched away.
+    if (clientRef.current) {
       clientRef.current.loadMessages(transformMessagesToClientFormat(messages));
       console.log('[ChatManagement] Loaded', messages.length, 'existing messages into client');
     }
@@ -309,8 +320,11 @@ export function useChatManagement({
       await repository.saveChat(chat);
       console.log('[ChatManagement] Saved user message to storage');
 
-      // Append to local state directly (no reload round-trip)
-      setMessages(prev => [...prev, newMessage]);
+      // Append to local state directly if user is viewing this chat (no reload round-trip)
+      const displayedChatId = pendingChatIdSnapshot.current || currentChatIdSnapshot.current;
+      if (displayedChatId === chatId) {
+        setMessages(prev => [...prev, newMessage]);
+      }
       return true;
     } catch (error) {
       console.error('[ChatManagement] Failed to save user message:', error);
@@ -481,6 +495,7 @@ export function useChatManagement({
     saveAIResponse,
     reloadMessages,
     getCurrentChat,
+    getChat,
     updateMetadata,
     currentChatIdSnapshot,
     pendingChatIdSnapshot,

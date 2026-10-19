@@ -4,7 +4,7 @@ import { UseAIFloatingButton } from '../components/UseAIFloatingButton';
 import { UseAIChatPanel } from '../components/UseAIChatPanel';
 import { UseAIFloatingChatWrapper, CloseButton } from '../components/UseAIFloatingChatWrapper';
 import { __UseAIChatContext, type ChatUIContextValue } from '../components/UseAIChat';
-import { UseAIClient } from '../client';
+import { UseAIClient, type RunTarget } from '../client';
 import { convertToolsToDefinitions, type ToolsDefinition } from '../defineTool';
 import type { ChatRepository, Chat, ChatMetadata, CreateChatOptions, PersistedMessage, PersistedMessageContent } from './chatRepository/types';
 import { LocalStorageChatRepository } from './chatRepository/LocalStorageChatRepository';
@@ -271,6 +271,11 @@ export interface ForwardedPropsProviderContext {
    * `null` when no chat is active.
    */
   chatId: string | null;
+  /**
+   * That chat, loaded once by `chatId` when the send starts, with frozen metadata.
+   * Later metadata updates are not reflected. `null` when no chat is active or it was not found.
+   */
+  chat: Chat | null;
 }
 
 export interface UseAIProviderOptions {
@@ -291,8 +296,8 @@ export interface UseAIProviderOptions {
    * Props from this provider are merged with message-level forwardedProps,
    * with message-level taking precedence.
    *
-   * Receives a {@link ForwardedPropsProviderContext} whose `chatId` is the chat the message
-   * is being sent from. Use it instead of reading the current chat from your own state:
+   * Receives a {@link ForwardedPropsProviderContext} whose `chatId` and `chat` are the chat the
+   * message is being sent from. Use them instead of reading the current chat from your own state:
    * attachment processing can take a while, and the user may switch chats in the meantime.
    * Providers that take no arguments keep working.
    *
@@ -685,6 +690,16 @@ export function UseAIProvider({
 
     serverEvents.streamingChatIdRef.current = activeChatId;
 
+    // The run's chat, history and agent are captured here, before the first await. The user can
+    // switch chats while attachments are processed; everything below uses these values.
+    const client = clientRef.current;
+    const runTarget: RunTarget = {
+      threadId: activeChatId ?? client.threadId,
+      messages: [...client.messages],
+      agent: client.selectedAgent,
+    };
+    const chat = activeChatId ? await chatManagement.getChat(activeChatId) : null;
+
     let persistedContent: PersistedMessageContent = message;
     let multimodalContent: MultimodalContent[] | undefined;
 
@@ -694,7 +709,7 @@ export function UseAIProvider({
       let fileContent: MultimodalContent[];
       try {
         fileContent = await processAttachments(attachments, {
-          getCurrentChat: chatManagement.getCurrentChat,
+          getCurrentChat: async () => chat,
           backend: fileUploadConfig?.backend,
           transformers: fileUploadConfig?.transformers,
           onFileProgress: (_fileId, state) => {
@@ -729,7 +744,7 @@ export function UseAIProvider({
       serverEvents.setLoading(true);
     }
 
-    const providerResult = forwardedPropsProvider ? forwardedPropsProvider({ chatId: activeChatId }) : {};
+    const providerResult = forwardedPropsProvider ? forwardedPropsProvider({ chatId: activeChatId, chat }) : {};
     const providerProps = providerResult instanceof Promise ? await providerResult : providerResult;
 
     const mergedForwardedProps = {
@@ -737,12 +752,13 @@ export function UseAIProvider({
       ...messageForwardedProps,
     };
 
-    await clientRef.current.sendPrompt(
+    await client.sendPrompt(
       message,
       multimodalContent,
       Object.keys(mergedForwardedProps).length > 0
         ? mergedForwardedProps
-        : undefined
+        : undefined,
+      runTarget
     );
   }, [chatManagement, serverEvents, fileUploadConfig, forwardedPropsProvider]);
 
