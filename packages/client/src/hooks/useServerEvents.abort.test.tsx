@@ -32,14 +32,14 @@ function makeToolSystem(): UseToolSystemReturn {
  * is implemented. `finalizeRun` is exercised via a mock spy.
  */
 function makeClient(overrides: Partial<{
-  messages: unknown[];
+  runMessages: unknown[];
   currentMessageContent: string;
   currentReasoningBlocks: unknown[];
   currentRunId: string | null;
 }> = {}) {
   const finalizeRun = mock(() => {});
   const client = {
-    messages: overrides.messages ?? [],
+    runMessages: overrides.runMessages ?? [],
     currentMessageContent: overrides.currentMessageContent ?? '',
     currentReasoningBlocks: overrides.currentReasoningBlocks ?? [],
     currentRunId: overrides.currentRunId ?? null,
@@ -138,7 +138,7 @@ describe('useServerEvents — abort handling', () => {
       { id: 't1', role: 'tool' as const, content: '{"ok":true}', toolCallId: 'tc1' },
     ];
     const { client, finalizeRun } = makeClient({
-      messages: [],
+      runMessages: [],
       currentMessageContent: '',
       currentRunId: 'run-xyz',
     });
@@ -151,10 +151,10 @@ describe('useServerEvents — abort handling', () => {
         timestamp: Date.now(),
       } as never);
 
-      // After RUN_STARTED, the turn-start index is messages.length (here: 0
-      // because messages was empty). Simulate the flushed step messages
+      // After RUN_STARTED, the turn-start index is runMessages.length (here: 0
+      // because runMessages was empty). Simulate the flushed step messages
       // being added during the run.
-      (client as unknown as { messages: unknown[] }).messages = flushedMessages;
+      (client as unknown as { runMessages: unknown[] }).runMessages = flushedMessages;
 
       await result.current.handleServerEvent(client, {
         type: EventType.RUN_ERROR,

@@ -3,6 +3,7 @@ import { describe, test, expect, mock, beforeEach, afterEach } from 'bun:test';
 import { render, act, waitFor } from '@testing-library/react';
 import type { Socket } from 'socket.io-client';
 import type { UseAIForwardedProps } from '../types';
+import { z } from 'zod';
 import type { ForwardedPropsProviderContext } from './useAIProvider';
 import type { PersistedMessage } from './chatRepository/types';
 
@@ -59,6 +60,8 @@ mock.module('socket.io-client', () => ({
 const { UseAIProvider, useAIContext } = await import('./useAIProvider');
 const { __UseAIChatContext } = await import('../components/UseAIChat');
 const { LocalStorageChatRepository } = await import('./chatRepository/LocalStorageChatRepository');
+const { useAI } = await import('../useAI');
+const { defineTool } = await import('../defineTool');
 
 // Test component that exposes sendMessage via context
 function TestConsumer({
@@ -822,5 +825,162 @@ describe('UseAIProvider chat-bound agent', () => {
     });
 
     expect(second).not.toBe(first);
+  });
+});
+
+describe('UseAIProvider run in flight when the chat changes', () => {
+  beforeEach(() => {
+    createMockSocket();
+  });
+
+  afterEach(() => {
+    capturedEmitCalls = [];
+  });
+
+  async function renderWithTool(repository: InstanceType<typeof LocalStorageChatRepository>) {
+    const toolCalls: Array<{ note: string }> = [];
+    const latest: {
+      sendMessage: SendFn | null;
+      chat: ReturnType<typeof useAIContext>['chat'] | null;
+      messages: PersistedMessage[];
+    } = { sendMessage: null, chat: null, messages: [] };
+
+    function Consumer() {
+      const { chat, connected } = useAIContext();
+      const chatUI = React.useContext(__UseAIChatContext);
+      latest.chat = chat;
+      latest.messages = chatUI?.messages ?? [];
+      useAI({
+        prompt: 'Recorder',
+        tools: {
+          recordRun: defineTool('Record a run', z.object({ note: z.string() }), (input) => {
+            toolCalls.push(input);
+            return { recorded: true };
+          }),
+        },
+      });
+      React.useEffect(() => {
+        if (connected) latest.sendMessage = chat.sendMessage;
+      }, [connected, chat.sendMessage]);
+      return null;
+    }
+
+    render(
+      <UseAIProvider serverUrl="http://localhost:8081" chatRepository={repository} renderChat={false}>
+        <Consumer />
+      </UseAIProvider>
+    );
+    await act(async () => {
+      mockSocket.connected = true;
+      emitSocketEvent('connect');
+    });
+    await waitFor(() => expect(latest.sendMessage).not.toBeNull());
+    return { latest, toolCalls };
+  }
+
+  function toolResultCalls() {
+    return capturedEmitCalls.filter(
+      (call) => call.event === 'message' && (call.data as { type: string }).type === 'tool_result'
+    ) as Array<{ data: { data: { toolCallId: string; content: string } } }>;
+  }
+
+  test('a tool call survives a chat switch between TOOL_CALL_START and TOOL_CALL_END, and its turn stays in its own chat', async () => {
+    const repository = new LocalStorageChatRepository();
+    const { latest, toolCalls } = await renderWithTool(repository);
+
+    let chatA = '';
+    await act(async () => {
+      chatA = await latest.chat!.create();
+    });
+    await act(async () => {
+      await latest.sendMessage!('Run the tool');
+    });
+    const runA = getRunAgentData() as unknown as {
+      data: { threadId: string; runId: string; tools: Array<{ name: string }> };
+    };
+    expect(runA.data.threadId).toBe(chatA);
+    const toolName = runA.data.tools.find((t) => t.name.endsWith('recordRun'))!.name;
+
+    await act(async () => {
+      emitSocketEvent('event', { type: 'RUN_STARTED', threadId: chatA, runId: runA.data.runId });
+      emitSocketEvent('event', { type: 'TOOL_CALL_START', toolCallId: 't1', toolCallName: toolName });
+      emitSocketEvent('event', { type: 'TOOL_CALL_ARGS', toolCallId: 't1', delta: '{"note":"from A"}' });
+    });
+
+    let chatB = '';
+    await act(async () => {
+      chatB = await latest.chat!.create();
+    });
+    expect(chatB).not.toBe(chatA);
+
+    await act(async () => {
+      emitSocketEvent('event', { type: 'TOOL_CALL_END', toolCallId: 't1' });
+    });
+    await waitFor(() => expect(toolResultCalls()).toHaveLength(1));
+    expect(toolCalls).toEqual([{ note: 'from A' }]);
+    expect(toolResultCalls()[0].data.data.toolCallId).toBe('t1');
+
+    await act(async () => {
+      emitSocketEvent('event', { type: 'STEP_FINISHED', stepName: 'step-1' });
+      emitSocketEvent('event', { type: 'TEXT_MESSAGE_START', messageId: 'm-final', role: 'assistant' });
+      emitSocketEvent('event', { type: 'TEXT_MESSAGE_CONTENT', messageId: 'm-final', delta: 'Recorded for A' });
+      emitSocketEvent('event', { type: 'TEXT_MESSAGE_END', messageId: 'm-final' });
+      emitSocketEvent('event', { type: 'RUN_FINISHED', threadId: chatA, runId: runA.data.runId });
+    });
+
+    await waitFor(async () => {
+      const storedA = (await repository.loadChat(chatA))!;
+      expect(storedA.messages.map((m) => m.role)).toEqual(['user', 'assistant', 'tool', 'assistant']);
+    });
+    const storedA = (await repository.loadChat(chatA))!;
+    expect(storedA.messages[3].content).toBe('Recorded for A');
+    expect((await repository.loadChat(chatB))!.messages).toHaveLength(0);
+    expect(latest.messages).toHaveLength(0);
+
+    await act(async () => {
+      await latest.sendMessage!('Hello from B');
+    });
+    const runB = getRunAgentData();
+    expect(runB.data.threadId).toBe(chatB);
+    expect(runB.data.messages).toEqual([expect.objectContaining({ role: 'user', content: 'Hello from B' })]);
+  });
+
+  test('a run aborted after a chat switch still records its unanswered tool calls in its own chat', async () => {
+    const repository = new LocalStorageChatRepository();
+    const { latest } = await renderWithTool(repository);
+
+    let chatA = '';
+    await act(async () => {
+      chatA = await latest.chat!.create();
+    });
+    await act(async () => {
+      await latest.sendMessage!('Run a server tool');
+    });
+    const runA = getRunAgentData();
+
+    await act(async () => {
+      emitSocketEvent('event', { type: 'RUN_STARTED', threadId: chatA, runId: runA.data.runId });
+      emitSocketEvent('event', { type: 'TOOL_CALL_START', toolCallId: 't-server', toolCallName: 'notAClientTool' });
+      emitSocketEvent('event', { type: 'TOOL_CALL_ARGS', toolCallId: 't-server', delta: '{}' });
+      emitSocketEvent('event', { type: 'TOOL_CALL_END', toolCallId: 't-server' });
+    });
+
+    let chatB = '';
+    await act(async () => {
+      chatB = await latest.chat!.create();
+    });
+
+    await act(async () => {
+      emitSocketEvent('event', { type: 'RUN_ERROR', message: 'ABORTED' });
+    });
+
+    await waitFor(async () => {
+      const storedA = (await repository.loadChat(chatA))!;
+      expect(storedA.messages.map((m) => m.role)).toContain('tool');
+    });
+    const storedA = (await repository.loadChat(chatA))!;
+    const toolResult = storedA.messages.find((m) => m.role === 'tool')!;
+    expect(JSON.stringify(toolResult.content)).toContain('aborted');
+    expect((await repository.loadChat(chatB))!.messages).toHaveLength(0);
   });
 });
