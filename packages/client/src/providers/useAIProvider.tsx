@@ -56,11 +56,13 @@ export interface ChatContextValue {
   /** Get the current chat object. Metadata is frozen to prevent accidental mutation. */
   get: () => Promise<Chat | null>;
   /**
-   * Update metadata for the current chat.
+   * Update metadata for a chat, by default the current one.
    * @param metadata Metadata to set/merge
    * @param overwrite If true, replaces all metadata instead of merging (default: false)
+   * @param chatId Chat to update. Pass `context.chat.id` from a file transformer: the user may
+   *               have switched chats while the file was processed.
    */
-  updateMetadata: (metadata: ChatMetadata, overwrite?: boolean) => Promise<void>;
+  updateMetadata: (metadata: ChatMetadata, overwrite?: boolean, chatId?: string) => Promise<void>;
 }
 
 /**
@@ -272,8 +274,9 @@ export interface ForwardedPropsProviderContext {
    */
   chatId: string | null;
   /**
-   * That chat, loaded once by `chatId` when the send starts, with frozen metadata.
-   * Later metadata updates are not reflected. `null` when no chat is active or it was not found.
+   * That chat, loaded by `chatId`, with frozen metadata. When the send has attachments it is
+   * reloaded after they are processed, so it includes metadata written by file transformers.
+   * `null` when no chat is active or it was not found.
    */
   chat: Chat | null;
 }
@@ -747,7 +750,11 @@ export function UseAIProvider({
       serverEvents.setLoading(true);
     }
 
-    const providerResult = forwardedPropsProvider ? forwardedPropsProvider({ chatId: activeChatId, chat }) : {};
+    // Reload by the same id: a transformer may have updated the chat's metadata during the upload.
+    const chatForProps = activeChatId && attachments && attachments.length > 0
+      ? await chatManagement.getChat(activeChatId)
+      : chat;
+    const providerResult = forwardedPropsProvider ? forwardedPropsProvider({ chatId: activeChatId, chat: chatForProps }) : {};
     const providerProps = providerResult instanceof Promise ? await providerResult : providerResult;
 
     const mergedForwardedProps = {

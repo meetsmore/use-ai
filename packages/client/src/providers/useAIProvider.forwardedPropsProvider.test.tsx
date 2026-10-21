@@ -984,3 +984,125 @@ describe('UseAIProvider run in flight when the chat changes', () => {
     expect((await repository.loadChat(chatB))!.messages).toHaveLength(0);
   });
 });
+
+describe('UseAIProvider metadata written by a file transformer', () => {
+  beforeEach(() => {
+    createMockSocket();
+  });
+
+  afterEach(() => {
+    capturedEmitCalls = [];
+  });
+
+  /**
+   * Renders a provider whose PDF transformer blocks until `releaseUpload()` is called, then
+   * writes `{ documentId }` to the chat in its context with `chat.updateMetadata`.
+   */
+  async function renderWithMetadataTransformer(repository: InstanceType<typeof LocalStorageChatRepository>) {
+    let releaseUpload: () => void = () => {};
+    const uploadGate = new Promise<void>((resolve) => {
+      releaseUpload = resolve;
+    });
+    const contexts: ForwardedPropsProviderContext[] = [];
+    const transformerChatIds: Array<string | undefined> = [];
+    const latest: { chat: ReturnType<typeof useAIContext>['chat'] | null; sendMessage: SendFn | null } = {
+      chat: null,
+      sendMessage: null,
+    };
+
+    function Consumer() {
+      const { chat, connected } = useAIContext();
+      latest.chat = chat;
+      React.useEffect(() => {
+        if (connected) latest.sendMessage = chat.sendMessage;
+      }, [connected, chat.sendMessage]);
+      return null;
+    }
+
+    render(
+      <UseAIProvider
+        serverUrl="http://localhost:8081"
+        chatRepository={repository}
+        renderChat={false}
+        forwardedPropsProvider={(context) => {
+          contexts.push(context);
+          return {};
+        }}
+        fileUploadConfig={{
+          transformers: {
+            'application/pdf': {
+              transform: async (files, context) => {
+                transformerChatIds.push(context.chat?.id);
+                await uploadGate;
+                await latest.chat!.updateMetadata({ documentId: 'doc-1' }, false, context.chat?.id);
+                return files.map(() => 'TRANSFORMED');
+              },
+            },
+          },
+        }}
+      >
+        <Consumer />
+      </UseAIProvider>
+    );
+
+    await act(async () => {
+      mockSocket.connected = true;
+      emitSocketEvent('connect');
+    });
+    await waitFor(() => expect(latest.sendMessage).not.toBeNull());
+
+    return {
+      contexts,
+      transformerChatIds,
+      createChat: () => latest.chat!.create(),
+      sendMessage: (msg: string) => latest.sendMessage!(msg, { attachments: attachment() }),
+      releaseUpload: () => releaseUpload(),
+    };
+  }
+
+  test('lands on the chat the file is sent from after a switch', async () => {
+    const repository = new LocalStorageChatRepository();
+    const h = await renderWithMetadataTransformer(repository);
+    let chatA = '';
+    await act(async () => {
+      chatA = await h.createChat();
+    });
+
+    let sendPromise: Promise<void> = Promise.resolve();
+    await act(async () => {
+      sendPromise = h.sendMessage('Read this');
+    });
+    await waitFor(() => expect(h.transformerChatIds).toEqual([chatA]));
+    let chatB = '';
+    await act(async () => {
+      chatB = await h.createChat();
+    });
+    await act(async () => {
+      h.releaseUpload();
+      await sendPromise;
+    });
+
+    expect((await repository.loadChat(chatA))!.metadata).toEqual({ documentId: 'doc-1' });
+    expect((await repository.loadChat(chatB))!.metadata ?? {}).toEqual({});
+    expect(h.contexts[0].chatId).toBe(chatA);
+    expect(h.contexts[0].chat?.metadata).toEqual({ documentId: 'doc-1' });
+    expect(getRunAgentData().data.threadId).toBe(chatA);
+  });
+
+  test('is seen by forwardedPropsProvider in the same send', async () => {
+    const repository = new LocalStorageChatRepository();
+    const h = await renderWithMetadataTransformer(repository);
+    await act(async () => {
+      await h.createChat();
+    });
+
+    await act(async () => {
+      const sendPromise = h.sendMessage('Read this');
+      h.releaseUpload();
+      await sendPromise;
+    });
+
+    expect(h.contexts).toHaveLength(1);
+    expect(h.contexts[0].chat?.metadata).toEqual({ documentId: 'doc-1' });
+  });
+});

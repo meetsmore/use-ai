@@ -954,9 +954,17 @@ Files matching the same MIME pattern key are grouped together and passed as a si
 **Transformer Context:**
 
 Transformers receive a `context` object containing:
-- `chat`: The current chat object (includes metadata set via `chat.updateMetadata()`)
+- `chat`: The chat the file is sent from (includes metadata set via `chat.updateMetadata()`)
 
-This allows transformers to access chat metadata (e.g., document type hints).
+This allows transformers to access chat metadata (e.g., document type hints). To write metadata from a transformer, pass `context.chat.id` as the third argument of `chat.updateMetadata()`: the user may have switched chats while the file was processed, and without an id the update goes to the chat on screen.
+
+```typescript
+transform: async (files, context) => {
+  const documentId = await uploadDocument(files[0]);
+  await chat.updateMetadata({ documentId }, false, context.chat?.id);
+  return [`Document ${documentId}`];
+}
+```
 
 ### Theme Customization
 
@@ -1153,7 +1161,7 @@ root.render(
 
 [picomatch](https://github.com/micromatch/picomatch) is used for patterns, so you can use any `picomatch` compatible pattern.
 
-`forwardedPropsProvider` is called with `{ chatId, chat }`: the id of the chat the message is being sent from (`null` if no chat is active) and that chat, loaded once when the send starts (its metadata is frozen). Both are captured when the send starts, so they stay correct even if the user switches chats while attachments are still being processed. The run itself uses the same capture: its thread id, its history and its agent belong to the chat the send started in. Prefer them over reading the "current chat" from your own state when attaching per-chat props:
+`forwardedPropsProvider` is called with `{ chatId, chat }`: the id of the chat the message is being sent from (`null` if no chat is active) and that chat (its metadata is frozen; with attachments it is reloaded after they are processed, so it includes metadata written by file transformers). The id is captured when the send starts and the chat is loaded by that id, so both stay correct even if the user switches chats while attachments are still being processed. The run itself uses the same capture: its thread id, its history and its agent belong to the chat the send started in. Prefer them over reading the "current chat" from your own state when attaching per-chat props:
 
 ```tsx
 <UseAIProvider

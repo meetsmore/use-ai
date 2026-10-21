@@ -74,7 +74,7 @@ export interface UseChatManagementReturn {
   /** Get a chat by ID. Metadata is frozen to prevent accidental mutation. */
   getChat: (chatId: string) => Promise<Chat | null>;
   /** Update metadata for the current chat */
-  updateMetadata: (metadata: ChatMetadata, overwrite?: boolean) => Promise<void>;
+  updateMetadata: (metadata: ChatMetadata, overwrite?: boolean, chatId?: string) => Promise<void>;
   /** Snapshot refs for use in event handlers */
   currentChatIdSnapshot: React.MutableRefObject<string | null>;
   pendingChatIdSnapshot: React.MutableRefObject<string | null>;
@@ -257,9 +257,9 @@ export function useChatManagement({
     return getChat(chatId);
   }, [pendingChatId, currentChatId, getChat]);
 
-  /** Updates metadata for the current chat. */
-  const updateMetadata = useCallback(async (metadata: ChatMetadata, overwrite = false): Promise<void> => {
-    const chatId = pendingChatId || currentChatId;
+  /** Updates metadata for the given chat, or the current chat when no id is given. */
+  const updateMetadata = useCallback(async (metadata: ChatMetadata, overwrite = false, targetChatId?: string): Promise<void> => {
+    const chatId = targetChatId || pendingChatId || currentChatId;
     if (!chatId) {
       throw new Error('No active chat');
     }
