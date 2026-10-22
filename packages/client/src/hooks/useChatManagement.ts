@@ -71,7 +71,7 @@ export interface UseChatManagementReturn {
   reloadMessages: (chatId: string) => Promise<void>;
   /** Get the current chat object. Metadata is frozen to prevent accidental mutation. */
   getCurrentChat: () => Promise<Chat | null>;
-  /** Get a chat by ID. Metadata is frozen to prevent accidental mutation. */
+  /** Get a chat by ID. */
   getChat: (chatId: string) => Promise<Chat | null>;
   /** Update metadata for the current chat */
   updateMetadata: (metadata: ChatMetadata, overwrite?: boolean, chatId?: string) => Promise<void>;
@@ -247,10 +247,7 @@ export function useChatManagement({
     return chat;
   }, [repository]);
 
-  /**
-   * Gets the current chat object (including metadata).
-   * Metadata is frozen to prevent accidental mutation.
-   */
+  /** Gets the current chat object (including metadata). */
   const getCurrentChat = useCallback(async (): Promise<Chat | null> => {
     const chatId = pendingChatId || currentChatId;
     if (!chatId) return null;

@@ -274,8 +274,8 @@ export interface ForwardedPropsProviderContext {
    */
   chatId: string | null;
   /**
-   * That chat, loaded by `chatId`, with frozen metadata. When the send has attachments it is
-   * reloaded after they are processed, so it includes metadata written by file transformers.
+   * That chat, loaded by `chatId`. With attachments it is reloaded after they are processed,
+   * so it includes metadata written by file transformers.
    * `null` when no chat is active or it was not found.
    */
   chat: Chat | null;

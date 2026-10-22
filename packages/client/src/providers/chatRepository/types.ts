@@ -175,9 +175,6 @@ export interface ListChatsOptions {
  * Abstract repository interface for chat persistence.
  * Implementations can store chats locally (localStorage, IndexedDB)
  * or remotely (REST API, GraphQL, etc.)
- *
- * Implementations must persist every {@link Chat} field, including `agent`. A chat whose
- * `agent` is dropped falls back to the global agent selection.
  */
 export interface ChatRepository {
   /**
