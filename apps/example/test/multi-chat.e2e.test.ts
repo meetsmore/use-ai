@@ -229,10 +229,19 @@ async function expectDisplayed(page: Page, userTexts: string[], assistantCount: 
   throw new Error(`displayed ${actual}, expected ${expected}`);
 }
 
-/** The displayed chat shows neither the pending bubble nor the "Thinking..." placeholder. */
+/**
+ * While a run is in flight, the displayed chat shows neither the pending bubble nor the
+ * "Thinking..." placeholder. Sampled once, together with the stop button that proves the run is
+ * still in flight; fails as inconclusive when it is not.
+ */
 async function expectNoPendingRun(page: Page): Promise<void> {
-  await expect(page.getByTestId('chat-input')).not.toHaveAttribute('placeholder', /Thinking/, { timeout: 1000 });
-  await expect(page.locator('.dots')).toHaveCount(0, { timeout: 1000 });
+  if (!(await page.getByTestId('chat-stop-button').isVisible())) {
+    throw new Error('inconclusive: no run in flight to check against');
+  }
+  const placeholder = await page.getByTestId('chat-input').getAttribute('placeholder');
+  if (placeholder?.includes('Thinking')) throw new Error(`placeholder is "${placeholder}"`);
+  const bubbles = await page.locator('.dots').count();
+  if (bubbles > 0) throw new Error(`${bubbles} pending bubble(s) visible`);
 }
 
 /** Text of the pending indicator while a send-time file transformation runs. */
@@ -310,8 +319,6 @@ test.describe('Multi-chat', () => {
     await captions.check('chat B is empty while chat A runs', () => expectDisplayed(page, [], 0));
     await captions.check('chat B shows no pending bubble or "Thinking..." while chat A runs', () =>
       expectNoPendingRun(page));
-    await captions.check('chat A run still in flight after checking chat B', () =>
-      expect(page.getByTestId('chat-stop-button')).toBeVisible({ timeout: 1000 }));
 
     await captions.startScene('2. Chat A finishes off screen.');
     await waitForIdle(page);
