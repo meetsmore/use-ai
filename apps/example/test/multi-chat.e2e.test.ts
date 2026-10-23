@@ -8,16 +8,19 @@ import { test, expect, type Locator, type Page } from '@playwright/test';
  * messages, in the UI and in storage.
  *
  * Run it with scripts/record-multi-chat.sh, which records the video and copies it out.
- * MULTI_CHAT_CANNED_REPLIES=1 skips the checks on the reply text, for a server running the
- * mock agent (whose replies are fixed).
+ * MULTI_CHAT_CANNED_REPLIES=1 is for a server running the mock agent (whose replies are fixed):
+ * it skips the checks on the reply text and asks for the mock's slow answer.
  */
 
 const cannedReplies = !!process.env.MULTI_CHAT_CANNED_REPLIES;
 
-const PROMPT_A = 'Count from 1 to 30, one number per line. After the last number, write the single word ALPHA.';
-const PROMPT_B = 'Reply with the single word BRAVO and nothing else.';
+// Long answers keep each run in flight for several seconds, so the chat switches land mid-run.
+// The mock agent answers slowly only when asked for "long reasoning".
+const mockSuffix = cannedReplies ? ' Use long reasoning.' : '';
+const PROMPT_A = `Count from 1 to 300, one number per line. After the last number, write the single word ALPHA.${mockSuffix}`;
+const PROMPT_B = `Reply with the single word BRAVO and nothing else.${mockSuffix}`;
 const PROMPT_A_FOLLOW_UP =
-  'Which word did you write at the end of your previous answer? Then count from 1 to 15, one number per line.';
+  `Which word did you write at the end of your previous answer? Then count from 1 to 300, one number per line.${mockSuffix}`;
 
 test.use({
   viewport: { width: 1280, height: 720 },
@@ -94,9 +97,12 @@ async function openChat(page: Page, title: string): Promise<void> {
   await clickVisibly(page, item);
 }
 
-/** A run is in flight in the displayed chat while its answer is streaming. */
-async function waitForStreaming(page: Page): Promise<void> {
-  await expect(page.getByTestId('chat-message-assistant-streaming')).toBeVisible({ timeout: 60000 });
+/**
+ * A run is in flight while the stop button replaces the send button. The streaming answer is no
+ * signal: a provider that delivers the answer in one burst shows it for less than a frame.
+ */
+async function expectRunInFlight(page: Page, message: string): Promise<void> {
+  await expect(page.getByTestId('chat-stop-button'), message).toBeVisible({ timeout: 10000 });
 }
 
 /** No run is in flight once the send button is back (the stop button replaces it during a run). */
@@ -152,8 +158,9 @@ test.describe('Multi-chat', () => {
 
     await test.step('chat A: send, then open chat B while the answer streams', async () => {
       await typeAndSend(page, PROMPT_A);
-      await waitForStreaming(page);
+      await expectRunInFlight(page, 'chat A run started');
       await clickVisibly(page, page.getByTestId('new-chat-button'));
+      await expectRunInFlight(page, 'chat A run still in flight after opening chat B');
       await expectDisplayed(page, [], 0);
       await expect(page.getByTestId('chat-message-assistant-streaming')).toHaveCount(0);
     });
@@ -184,8 +191,9 @@ test.describe('Multi-chat', () => {
 
     await test.step('chat A: follow-up, switch to chat B mid-run and back', async () => {
       await typeAndSend(page, PROMPT_A_FOLLOW_UP);
-      await waitForStreaming(page);
+      await expectRunInFlight(page, 'chat A follow-up run started');
       await openChat(page, PROMPT_B.slice(0, 20));
+      await expectRunInFlight(page, 'chat A follow-up still in flight after opening chat B');
       await expectDisplayed(page, [PROMPT_B], 1);
       await expect(page.getByTestId('chat-message-assistant-streaming')).toHaveCount(0);
       await waitForIdle(page);
