@@ -832,6 +832,8 @@ export function UseAIProvider({
     ? serverEvents.streamingMessageId : null;
   const effectiveStreamingParts = serverEvents.streamingChatIdRef.current === chatManagement.displayedChatId
     ? serverEvents.streamingParts : EMPTY_STREAMING_PARTS;
+  const effectiveFileProcessing = serverEvents.streamingChatIdRef.current === chatManagement.displayedChatId
+    ? fileProcessingState : null;
 
   const chatUIContextValue: ChatUIContextValue = {
     connected,
@@ -843,7 +845,7 @@ export function UseAIProvider({
     streamingParts: effectiveStreamingParts,
     suggestions: promptState.aggregatedSuggestions,
     fileUploadConfig,
-    fileProcessing: fileProcessingState,
+    fileProcessing: effectiveFileProcessing,
     history: {
       currentId: chatManagement.displayedChatId,
       create: chatManagement.createNewChat,
@@ -908,7 +910,7 @@ export function UseAIProvider({
     selectedAgent,
     onAgentChange: setAgent,
     fileUploadConfig,
-    fileProcessing: fileProcessingState,
+    fileProcessing: effectiveFileProcessing,
     commands,
     onSaveCommand: saveCommand,
     enabledFeatures,

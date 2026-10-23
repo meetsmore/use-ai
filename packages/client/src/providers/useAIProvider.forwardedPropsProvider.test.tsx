@@ -1106,3 +1106,87 @@ describe('UseAIProvider metadata written by a file transformer', () => {
     expect(h.contexts[0].chat?.metadata).toEqual({ documentId: 'doc-1' });
   });
 });
+
+describe('UseAIProvider file processing indicator', () => {
+  beforeEach(() => {
+    createMockSocket();
+  });
+
+  afterEach(() => {
+    capturedEmitCalls = [];
+  });
+
+  test('shows only in the chat the file is sent from', async () => {
+    let releaseUpload: () => void = () => {};
+    const uploadGate = new Promise<void>((resolve) => {
+      releaseUpload = resolve;
+    });
+    const latest: {
+      chat: ReturnType<typeof useAIContext>['chat'] | null;
+      sendMessage: SendFn | null;
+      fileProcessing: unknown;
+    } = { chat: null, sendMessage: null, fileProcessing: null };
+
+    function Consumer() {
+      const { chat, connected } = useAIContext();
+      const chatUI = React.useContext(__UseAIChatContext);
+      latest.chat = chat;
+      latest.fileProcessing = chatUI?.fileProcessing ?? null;
+      React.useEffect(() => {
+        if (connected) latest.sendMessage = chat.sendMessage;
+      }, [connected, chat.sendMessage]);
+      return null;
+    }
+
+    render(
+      <UseAIProvider
+        serverUrl="http://localhost:8081"
+        chatRepository={new LocalStorageChatRepository()}
+        renderChat={false}
+        fileUploadConfig={{
+          transformers: {
+            'application/pdf': {
+              transform: async (files, _context, onProgress) => {
+                onProgress?.(40);
+                await uploadGate;
+                return files.map(() => 'TRANSFORMED');
+              },
+            },
+          },
+        }}
+      >
+        <Consumer />
+      </UseAIProvider>
+    );
+    await act(async () => {
+      mockSocket.connected = true;
+      emitSocketEvent('connect');
+    });
+    await waitFor(() => expect(latest.sendMessage).not.toBeNull());
+
+    let chatA = '';
+    await act(async () => {
+      chatA = await latest.chat!.create();
+    });
+    let sendPromise: Promise<void> = Promise.resolve();
+    await act(async () => {
+      sendPromise = latest.sendMessage!('Read this', { attachments: attachment() });
+    });
+    await waitFor(() => expect(latest.fileProcessing).toEqual({ status: 'processing', progress: 40 }));
+
+    await act(async () => {
+      await latest.chat!.create();
+    });
+    expect(latest.fileProcessing).toBeNull();
+
+    await act(async () => {
+      await latest.chat!.load(chatA);
+    });
+    expect(latest.fileProcessing).toEqual({ status: 'processing', progress: 40 });
+
+    await act(async () => {
+      releaseUpload();
+      await sendPromise;
+    });
+  });
+});
