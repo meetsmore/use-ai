@@ -19,6 +19,8 @@ export interface ChatUIContextValue {
   connected: boolean;
   /** Whether the AI is processing */
   loading: boolean;
+  /** Whether the AI is processing a run that belongs to the displayed chat */
+  loadingInCurrentChat: boolean;
   /** Send a message with optional file attachments */
   sendMessage: (message: string, attachments?: FileAttachment[]) => Promise<void>;
   /**
@@ -216,6 +218,7 @@ export function UseAIChat({ floating = false, submitMode, components }: UseAICha
     onSendMessage: ctx.sendMessage,
     messages: ctx.messages,
     loading: ctx.loading,
+    loadingInCurrentChat: ctx.loadingInCurrentChat,
     connected: ctx.connected,
     streamingMessageId: ctx.streamingMessageId,
     streamingParts: ctx.streamingParts,

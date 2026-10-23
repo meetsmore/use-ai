@@ -58,7 +58,7 @@ mock.module('socket.io-client', () => ({
 
 // Import after mocking
 const { UseAIProvider, useAIContext } = await import('./useAIProvider');
-const { __UseAIChatContext } = await import('../components/UseAIChat');
+const { UseAIChat, __UseAIChatContext } = await import('../components/UseAIChat');
 const { LocalStorageChatRepository } = await import('./chatRepository/LocalStorageChatRepository');
 const { useAI } = await import('../useAI');
 const { defineTool } = await import('../defineTool');
@@ -1188,5 +1188,71 @@ describe('UseAIProvider file processing indicator', () => {
       releaseUpload();
       await sendPromise;
     });
+  });
+});
+
+describe('UseAIProvider pending indicator', () => {
+  beforeEach(() => {
+    createMockSocket();
+  });
+
+  afterEach(() => {
+    capturedEmitCalls = [];
+  });
+
+  test('shows the pending bubble and "Thinking..." only in the chat the run belongs to', async () => {
+    const latest: { chat: ReturnType<typeof useAIContext>['chat'] | null; sendMessage: SendFn | null } = {
+      chat: null,
+      sendMessage: null,
+    };
+
+    function Consumer() {
+      const { chat, connected } = useAIContext();
+      latest.chat = chat;
+      React.useEffect(() => {
+        if (connected) latest.sendMessage = chat.sendMessage;
+      }, [connected, chat.sendMessage]);
+      return null;
+    }
+
+    const { container, getByTestId } = render(
+      <UseAIProvider
+        serverUrl="http://localhost:8081"
+        chatRepository={new LocalStorageChatRepository()}
+        renderChat={false}
+      >
+        <Consumer />
+        <UseAIChat />
+      </UseAIProvider>
+    );
+    await act(async () => {
+      mockSocket.connected = true;
+      emitSocketEvent('connect');
+    });
+    await waitFor(() => expect(latest.sendMessage).not.toBeNull());
+
+    let chatA = '';
+    await act(async () => {
+      chatA = await latest.chat!.create();
+    });
+    await act(async () => {
+      await latest.sendMessage!('Hello');
+    });
+    const pendingBubble = () => container.querySelector('.dots') !== null;
+    const placeholder = () => getByTestId('chat-input').getAttribute('placeholder');
+    await waitFor(() => expect(pendingBubble()).toBe(true));
+    expect(placeholder()).toBe('Thinking...');
+
+    await act(async () => {
+      await latest.chat!.create();
+    });
+    expect(pendingBubble()).toBe(false);
+    expect(placeholder()).not.toBe('Thinking...');
+
+    await act(async () => {
+      await latest.chat!.load(chatA);
+    });
+    expect(pendingBubble()).toBe(true);
+    expect(placeholder()).toBe('Thinking...');
   });
 });

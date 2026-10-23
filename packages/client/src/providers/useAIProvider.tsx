@@ -834,10 +834,13 @@ export function UseAIProvider({
     ? serverEvents.streamingParts : EMPTY_STREAMING_PARTS;
   const effectiveFileProcessing = serverEvents.streamingChatIdRef.current === chatManagement.displayedChatId
     ? fileProcessingState : null;
+  const loadingInCurrentChat = serverEvents.loading
+    && serverEvents.streamingChatIdRef.current === chatManagement.displayedChatId;
 
   const chatUIContextValue: ChatUIContextValue = {
     connected,
     loading: serverEvents.loading,
+    loadingInCurrentChat,
     sendMessage: handleSendMessage,
     abortRun,
     messages,
@@ -896,6 +899,7 @@ export function UseAIProvider({
     onAbort: abortRun,
     messages,
     loading: serverEvents.loading,
+    loadingInCurrentChat,
     connected,
     streamingMessageId: effectiveStreamingMessageId,
     streamingParts: effectiveStreamingParts,
