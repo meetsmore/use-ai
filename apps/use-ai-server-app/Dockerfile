@@ -75,8 +75,9 @@ COPY --from=build /app/apps/use-ai-server-app/dist ./apps/use-ai-server-app/dist
 COPY --from=build /app/apps/use-ai-server-app/package.json ./apps/use-ai-server-app/
 
 # Set up non-root user for security
-RUN addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 bunuser && \
+# The Debian 13 (trixie) base ships no adduser/addgroup; these flags reproduce what `adduser --system` created.
+RUN groupadd --system --gid 1001 nodejs && \
+    useradd --system --uid 1001 --gid nogroup --home-dir /nonexistent --no-create-home --shell /usr/sbin/nologin bunuser && \
     chown -R bunuser:nodejs /app
 
 USER bunuser
