@@ -229,6 +229,25 @@ async function expectDisplayed(page: Page, userTexts: string[], assistantCount: 
   throw new Error(`displayed ${actual}, expected ${expected}`);
 }
 
+/** Text of the pending indicator while a send-time file transformation runs. */
+const PROCESSING_FILE = 'Processing file...';
+/** How long the File Transformers page's PDF transformer runs. */
+const PDF_PROCESSING_MS = 4000;
+
+/**
+ * Samples for 1.5 seconds that the locator stays hidden. Fails as inconclusive when the sampling
+ * would start after `windowMs` from `since`: the thing it must not show is over by then.
+ */
+async function expectNeverVisible(page: Page, locator: Locator, since: number, windowMs: number): Promise<void> {
+  const remaining = since + windowMs - Date.now();
+  if (remaining < 1000) {
+    throw new Error(`inconclusive: only ${remaining}ms of the ${windowMs}ms window left to sample`);
+  }
+  for (const deadline = Date.now() + Math.min(1500, remaining); Date.now() < deadline; await page.waitForTimeout(100)) {
+    if (await locator.isVisible()) throw new Error(`${locator} is visible`);
+  }
+}
+
 async function expectLastReply(page: Page, word: string, notWord?: string): Promise<void> {
   const last = page.getByTestId('chat-message-assistant').last();
   await expect(last).toContainText(word, { timeout: 5000 });
@@ -310,8 +329,12 @@ test.describe('Multi-chat', () => {
     // Attached last, so the send itself waits for the transformer.
     await attachFile(page, pdf);
     await send(page);
+    const sentAt = Date.now();
     await expectRunInFlight(page, 'chat A follow-up started');
+    await expect(page.getByText(PROCESSING_FILE), 'file processing indicator in chat A').toBeVisible({ timeout: 3000 });
     await openChat(page, PROMPT_B.slice(0, 20));
+    await captions.check("chat B shows no file processing indicator while chat A's PDF is processed", () =>
+      expectNeverVisible(page, page.getByText(PROCESSING_FILE), sentAt, PDF_PROCESSING_MS));
     await captions.check('chat A follow-up still in flight at the switch', () =>
       expect(page.getByTestId('chat-stop-button')).toBeVisible({ timeout: 1000 }));
     // Checked once the run is over: without the fixes, chat A's follow-up shows up in chat B when
