@@ -4,7 +4,7 @@
 # Build argument for version (passed from CI or defaults to dev)
 ARG VERSION=dev
 
-FROM oven/bun:1.3.2-slim AS base
+FROM oven/bun:1.4.4-slim AS base
 WORKDIR /app
 
 # Install dependencies stage
@@ -44,7 +44,7 @@ COPY apps/use-ai-server-app ./apps/use-ai-server-app
 RUN bun run build
 
 # Production stage
-FROM oven/bun:1.3.2-slim AS production
+FROM oven/bun:1.4.4-slim AS production
 
 # Re-declare ARG after FROM to make it available
 ARG VERSION=dev
