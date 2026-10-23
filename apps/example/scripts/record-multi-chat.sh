@@ -2,8 +2,8 @@
 # Records the multi-chat e2e walkthrough (test/multi-chat.e2e.test.ts) as a video.
 #
 # Usage: ENV_FILE=/path/to/env apps/example/scripts/record-multi-chat.sh [extra playwright args]
-#   ENV_FILE  optional file exporting ANTHROPIC_API_KEY (and any other server variables).
-#             Without it, ANTHROPIC_API_KEY must already be set.
+#   ENV_FILE  optional file exporting AI_GATEWAY_API_KEY or ANTHROPIC_API_KEY (and any other server variables).
+#             Without it, one of those keys must already be set.
 #   OUT_DIR   where the video is copied (default: apps/example/videos).
 #   BROWSER_EXECUTABLE  headless shell to record with. By default the one Playwright expects,
 #             else the newest one already in the Playwright cache, else it is installed.
@@ -27,7 +27,8 @@ if [ -n "${ENV_FILE:-}" ]; then
   . "$ENV_FILE" || fail "could not load ENV_FILE: $ENV_FILE"
   set +a
 fi
-[ -n "${ANTHROPIC_API_KEY:-}" ] || fail "ANTHROPIC_API_KEY is not set (pass ENV_FILE=... or export it)"
+[ -n "${AI_GATEWAY_API_KEY:-}" ] || [ -n "${ANTHROPIC_API_KEY:-}" ] \
+  || fail "neither AI_GATEWAY_API_KEY nor ANTHROPIC_API_KEY is set (pass ENV_FILE=... or export one)"
 # The server rejects the example app's Socket.IO polling requests without a CORS origin.
 export CORS_ORIGIN="${CORS_ORIGIN:-http://localhost:3000}"
 
