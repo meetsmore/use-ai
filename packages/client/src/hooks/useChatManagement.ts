@@ -272,8 +272,8 @@ export function useChatManagement({
 
     console.log('[ChatManagement] Activating pending chat:', pendingChatId);
 
-    // Load the chat's messages into the client for conversation history, even when there are
-    // none: the client buffer may still hold a run that finished after the user switched away.
+    // Load the chat's messages into the client for conversation history, also when the chat has
+    // no messages, so the client's history is always the activated chat's.
     if (clientRef.current) {
       clientRef.current.loadMessages(transformMessagesToClientFormat(messages));
       console.log('[ChatManagement] Loaded', messages.length, 'existing messages into client');
