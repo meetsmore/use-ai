@@ -54,6 +54,13 @@ describe('LocalStorageChatRepository', () => {
       expect(chat!.title).toBe('Test Chat');
     });
 
+    it('should persist the agent the chat is bound to', async () => {
+      const chatId = await repository.createChat({ agent: 'document-agent' });
+
+      expect((await repository.loadChat(chatId))!.agent).toBe('document-agent');
+      expect((await repository.listChats())[0].agent).toBe('document-agent');
+    });
+
     it('should initialize chat with empty messages', async () => {
       const chatId = await repository.createChat();
       const chat = await repository.loadChat(chatId);

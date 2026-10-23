@@ -65,6 +65,12 @@ export interface UseAIChatPanelProps {
   onAbort?: () => void;
   messages: Message[];
   loading: boolean;
+  /**
+   * Whether the in-flight run belongs to the chat on screen. The pending
+   * indicator and the "Thinking..." placeholder show only then; sending stays
+   * blocked by `loading`. Defaults to `loading`.
+   */
+  loadingInCurrentChat?: boolean;
   connected: boolean;
   /**
    * The in-flight answer split into ordered parts, and the only form the
@@ -148,6 +154,7 @@ export function UseAIChatPanel({
   onAbort,
   messages,
   loading,
+  loadingInCurrentChat = loading,
   connected,
   streamingParts = EMPTY_STREAMING_PARTS,
   streamingMessageId = null,
@@ -312,7 +319,7 @@ export function UseAIChatPanel({
 
   const composerPlaceholder = !connected
     ? strings.input.connectingPlaceholder
-    : loading
+    : loadingInCurrentChat
       ? `${executingTool?.displayText ?? strings.input.thinking}...`
       : strings.input.placeholder;
   const canSend = !!(
@@ -408,7 +415,7 @@ export function UseAIChatPanel({
           />
         ))}
 
-        {loading && !provisionalMessage && !persistedStreamingAnswer && (
+        {loadingInCurrentChat && !provisionalMessage && !persistedStreamingAnswer && (
           <Slot
             component={components?.PendingIndicator}
             fallback={DefaultPendingIndicator}

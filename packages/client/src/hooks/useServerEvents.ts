@@ -207,7 +207,7 @@ export function useServerEvents({
     const reasoningParts = client.currentReasoningBlocks.length > 0
       ? [...client.currentReasoningBlocks]
       : undefined;
-    const turnMessages = extractTurnMessages(client.messages, messageCountAtRunStartRef.current);
+    const turnMessages = extractTurnMessages(client.runMessages, messageCountAtRunStartRef.current);
 
     if (opts.aborted) {
       // Abort keeps the partial response (and context) intact and adds a
@@ -256,9 +256,9 @@ export function useServerEvents({
 
     if (event.type === EventType.RUN_STARTED) {
       // Snapshot message count so we can extract turn messages at RUN_FINISHED.
-      // The user message was already pushed to client.messages by sendPrompt(),
+      // The user message was already pushed to client.runMessages by sendPrompt(),
       // so messages added after this point are from the AI turn.
-      messageCountAtRunStartRef.current = client.messages.length;
+      messageCountAtRunStartRef.current = client.runMessages.length;
       runIdAtRunStartRef.current = client.currentRunId ?? undefined;
       reasoningPartEndedRef.current = false;
       setStreamingParts([]);

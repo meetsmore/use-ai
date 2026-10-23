@@ -4,7 +4,7 @@ import { UseAIFloatingButton } from '../components/UseAIFloatingButton';
 import { UseAIChatPanel } from '../components/UseAIChatPanel';
 import { UseAIFloatingChatWrapper, CloseButton } from '../components/UseAIFloatingChatWrapper';
 import { __UseAIChatContext, type ChatUIContextValue } from '../components/UseAIChat';
-import { UseAIClient } from '../client';
+import { UseAIClient, type RunTarget } from '../client';
 import { convertToolsToDefinitions, type ToolsDefinition } from '../defineTool';
 import type { ChatRepository, Chat, ChatMetadata, CreateChatOptions, PersistedMessage, PersistedMessageContent } from './chatRepository/types';
 import { LocalStorageChatRepository } from './chatRepository/LocalStorageChatRepository';
@@ -56,11 +56,13 @@ export interface ChatContextValue {
   /** Get the current chat object. Metadata is frozen to prevent accidental mutation. */
   get: () => Promise<Chat | null>;
   /**
-   * Update metadata for the current chat.
+   * Update metadata for a chat, by default the current one.
    * @param metadata Metadata to set/merge
    * @param overwrite If true, replaces all metadata instead of merging (default: false)
+   * @param chatId Chat to update. Pass `context.chat.id` from a file transformer: the user may
+   *               have switched chats while the file was processed.
    */
-  updateMetadata: (metadata: ChatMetadata, overwrite?: boolean) => Promise<void>;
+  updateMetadata: (metadata: ChatMetadata, overwrite?: boolean, chatId?: string) => Promise<void>;
 }
 
 /**
@@ -262,6 +264,23 @@ export interface ChatPanelProps {
 
 export type UseAIProviderProps = UseAIConfig & UseAIProviderOptions;
 
+/**
+ * Context passed to `forwardedPropsProvider` for each message send.
+ */
+export interface ForwardedPropsProviderContext {
+  /**
+   * ID of the chat the message belongs to, captured when the send starts.
+   * `null` when no chat is active.
+   */
+  chatId: string | null;
+  /**
+   * That chat, loaded by `chatId`. With attachments it is reloaded after they are processed,
+   * so it includes metadata written by file transformers.
+   * `null` when no chat is active or it was not found.
+   */
+  chat: Chat | null;
+}
+
 export interface UseAIProviderOptions {
   children: ReactNode;
   systemPrompt?: string;
@@ -279,6 +298,11 @@ export interface UseAIProviderOptions {
    * Called before each message is sent. Can be sync or async.
    * Props from this provider are merged with message-level forwardedProps,
    * with message-level taking precedence.
+   *
+   * Receives a {@link ForwardedPropsProviderContext} whose `chatId` and `chat` are the chat the
+   * message is being sent from. Use them instead of reading the current chat from your own state:
+   * attachment processing can take a while, and the user may switch chats in the meantime.
+   * Providers that take no arguments keep working.
    *
    * @example
    * ```tsx
@@ -309,7 +333,9 @@ export interface UseAIProviderOptions {
    * </UseAIProvider>
    * ```
    */
-  forwardedPropsProvider?: () => UseAIForwardedProps | Promise<UseAIForwardedProps>;
+  forwardedPropsProvider?: (
+    context: ForwardedPropsProviderContext
+  ) => UseAIForwardedProps | Promise<UseAIForwardedProps>;
   /**
    * Configuration for file uploads.
    * File upload is enabled by default with EmbedFileUploadBackend, 10MB max size,
@@ -667,6 +693,19 @@ export function UseAIProvider({
 
     serverEvents.streamingChatIdRef.current = activeChatId;
 
+    // The run's chat, history and agent are captured here, before the first await. The user can
+    // switch chats while attachments are processed; everything below uses these values.
+    const client = clientRef.current;
+    const runTarget: RunTarget = {
+      threadId: activeChatId ?? client.threadId,
+      messages: [...client.messages],
+      agent: client.selectedAgent,
+    };
+    const chat = activeChatId ? await chatManagement.getChat(activeChatId) : null;
+    if (chat?.agent) {
+      runTarget.agent = chat.agent;
+    }
+
     let persistedContent: PersistedMessageContent = message;
     let multimodalContent: MultimodalContent[] | undefined;
 
@@ -676,7 +715,7 @@ export function UseAIProvider({
       let fileContent: MultimodalContent[];
       try {
         fileContent = await processAttachments(attachments, {
-          getCurrentChat: chatManagement.getCurrentChat,
+          getCurrentChat: async () => chat,
           backend: fileUploadConfig?.backend,
           transformers: fileUploadConfig?.transformers,
           onFileProgress: (_fileId, state) => {
@@ -711,7 +750,11 @@ export function UseAIProvider({
       serverEvents.setLoading(true);
     }
 
-    const providerResult = forwardedPropsProvider ? forwardedPropsProvider() : {};
+    // Reload by the same id: a transformer may have updated the chat's metadata during the upload.
+    const chatForProps = activeChatId && attachments && attachments.length > 0
+      ? await chatManagement.getChat(activeChatId)
+      : chat;
+    const providerResult = forwardedPropsProvider ? forwardedPropsProvider({ chatId: activeChatId, chat: chatForProps }) : {};
     const providerProps = providerResult instanceof Promise ? await providerResult : providerResult;
 
     const mergedForwardedProps = {
@@ -719,12 +762,13 @@ export function UseAIProvider({
       ...messageForwardedProps,
     };
 
-    await clientRef.current.sendPrompt(
+    await client.sendPrompt(
       message,
       multimodalContent,
       Object.keys(mergedForwardedProps).length > 0
         ? mergedForwardedProps
-        : undefined
+        : undefined,
+      runTarget
     );
   }, [chatManagement, serverEvents, fileUploadConfig, forwardedPropsProvider]);
 
@@ -788,10 +832,15 @@ export function UseAIProvider({
     ? serverEvents.streamingMessageId : null;
   const effectiveStreamingParts = serverEvents.streamingChatIdRef.current === chatManagement.displayedChatId
     ? serverEvents.streamingParts : EMPTY_STREAMING_PARTS;
+  const effectiveFileProcessing = serverEvents.streamingChatIdRef.current === chatManagement.displayedChatId
+    ? fileProcessingState : null;
+  const loadingInCurrentChat = serverEvents.loading
+    && serverEvents.streamingChatIdRef.current === chatManagement.displayedChatId;
 
   const chatUIContextValue: ChatUIContextValue = {
     connected,
     loading: serverEvents.loading,
+    loadingInCurrentChat,
     sendMessage: handleSendMessage,
     abortRun,
     messages,
@@ -799,7 +848,7 @@ export function UseAIProvider({
     streamingParts: effectiveStreamingParts,
     suggestions: promptState.aggregatedSuggestions,
     fileUploadConfig,
-    fileProcessing: fileProcessingState,
+    fileProcessing: effectiveFileProcessing,
     history: {
       currentId: chatManagement.displayedChatId,
       create: chatManagement.createNewChat,
@@ -850,6 +899,7 @@ export function UseAIProvider({
     onAbort: abortRun,
     messages,
     loading: serverEvents.loading,
+    loadingInCurrentChat,
     connected,
     streamingMessageId: effectiveStreamingMessageId,
     streamingParts: effectiveStreamingParts,
@@ -864,7 +914,7 @@ export function UseAIProvider({
     selectedAgent,
     onAgentChange: setAgent,
     fileUploadConfig,
-    fileProcessing: fileProcessingState,
+    fileProcessing: effectiveFileProcessing,
     commands,
     onSaveCommand: saveCommand,
     enabledFeatures,

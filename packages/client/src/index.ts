@@ -2,6 +2,7 @@ export { useAI } from './useAI';
 export { useAIWorkflow } from './useAIWorkflow';
 export { UseAIProvider, useAIContext } from './providers/useAIProvider';
 export { UseAIClient } from './client';
+export type { RunTarget } from './client';
 export { SocketIOTransport, WebSocketTransport } from './transport';
 export type { UseAITransport, WebSocketTransportOptions } from './transport';
 export { defineTool, executeDefinedTool, convertToolsToDefinitions } from './defineTool';
@@ -76,6 +77,7 @@ export type {
   ChatPanelProps,
   UseAIProviderProps,
   UseAIProviderOptions,
+  ForwardedPropsProviderContext,
 } from './providers/useAIProvider';
 export type { SendMessageOptions } from './hooks/useMessageQueue';
 export type { DefinedTool, ToolsDefinition, ToolOptions, ToolAnnotations, ToolExecutionContext } from './defineTool';

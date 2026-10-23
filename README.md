@@ -954,9 +954,17 @@ Files matching the same MIME pattern key are grouped together and passed as a si
 **Transformer Context:**
 
 Transformers receive a `context` object containing:
-- `chat`: The current chat object (includes metadata set via `chat.updateMetadata()`)
+- `chat`: The chat the file is sent from (includes metadata set via `chat.updateMetadata()`)
 
-This allows transformers to access chat metadata (e.g., document type hints).
+This allows transformers to access chat metadata (e.g., document type hints). To write metadata from a transformer, pass `context.chat.id` as the third argument of `chat.updateMetadata()`: the user may have switched chats while the file was processed, and without an id the update goes to the chat on screen.
+
+```typescript
+transform: async (files, context) => {
+  const documentId = await uploadDocument(files[0]);
+  await chat.updateMetadata({ documentId }, false, context.chat?.id);
+  return [`Document ${documentId}`];
+}
+```
 
 ### Theme Customization
 
@@ -1022,6 +1030,18 @@ When multiple agents are configured, users can select which agent to use:
 ```tsx
 const { selectedAgent, availableAgents, selectAgent } = useAgentSelection();
 ```
+
+A chat can be bound to one agent when it is created. Every message sent in that chat goes to that agent, whatever the global selection is, including after a reload. Use this instead of choosing the agent from the conversation text:
+
+```tsx
+const { chat } = useAIContext();
+
+await chat.create({ agent: 'document-agent' });
+// or
+await chat.sendMessage('Summarize this file', { newChat: true, agent: 'document-agent', attachments: [file] });
+```
+
+Chats created without `agent` follow the global selection. An `agent` in forwarded props, from `forwardedPropsProvider` or from the message, still overrides both. A custom `ChatRepository` must persist the chat's `agent` field.
 
 ## Server
 
@@ -1140,6 +1160,17 @@ root.render(
 ```
 
 [picomatch](https://github.com/micromatch/picomatch) is used for patterns, so you can use any `picomatch` compatible pattern.
+
+`forwardedPropsProvider` is called with `{ chatId, chat }`: the id of the chat the message is being sent from (`null` if no chat is active) and that chat (with attachments it is reloaded after they are processed, so it includes metadata written by file transformers). The id is captured when the send starts and the chat is loaded by that id, so both stay correct even if the user switches chats while attachments are still being processed. The run itself uses the same capture: its thread id, its history and its agent belong to the chat the send started in. Prefer them over reading the "current chat" from your own state when attaching per-chat props:
+
+```tsx
+<UseAIProvider
+  serverUrl="ws://localhost:8081"
+  forwardedPropsProvider={({ chatId }) => ({
+    telemetryMetadata: { sessionId: chatId ?? undefined },
+  })}
+>
+```
 
 The flow works like this:
 

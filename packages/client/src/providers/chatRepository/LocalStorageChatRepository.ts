@@ -57,6 +57,7 @@ export class LocalStorageChatRepository implements ChatRepository {
       createdAt: now,
       updatedAt: now,
       metadata: options?.metadata,
+      agent: options?.agent,
     };
 
     // Enforce max chats limit by deleting oldest chat if needed
