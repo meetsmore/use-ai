@@ -28,3 +28,6 @@ skills/
 
 # bun install cache file
 .bun-install-cache/
+
+# Recorded e2e videos
+apps/example/videos/
