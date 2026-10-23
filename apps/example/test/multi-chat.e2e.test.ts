@@ -229,6 +229,12 @@ async function expectDisplayed(page: Page, userTexts: string[], assistantCount: 
   throw new Error(`displayed ${actual}, expected ${expected}`);
 }
 
+/** The displayed chat shows neither the pending bubble nor the "Thinking..." placeholder. */
+async function expectNoPendingRun(page: Page): Promise<void> {
+  await expect(page.getByTestId('chat-input')).not.toHaveAttribute('placeholder', /Thinking/, { timeout: 1000 });
+  await expect(page.locator('.dots')).toHaveCount(0, { timeout: 1000 });
+}
+
 /** Text of the pending indicator while a send-time file transformation runs. */
 const PROCESSING_FILE = 'Processing file...';
 /** How long the File Transformers page's PDF transformer runs. */
@@ -294,7 +300,7 @@ test.describe('Multi-chat', () => {
 
     await captions.startScene(
       '1. Chat A asks for a long answer. Open a new chat B while it runs.',
-      'Chat B shows "Thinking..." while A runs: loading is shared by all chats (not part of the chat fixes).'
+      'Sending stays blocked in every chat while A runs (not part of the chat fixes).'
     );
     await type(page, PROMPT_A);
     await send(page);
@@ -302,6 +308,10 @@ test.describe('Multi-chat', () => {
     await clickVisibly(page, page.getByTestId('new-chat-button'));
     await expectRunInFlight(page, 'chat A run still in flight after opening chat B');
     await captions.check('chat B is empty while chat A runs', () => expectDisplayed(page, [], 0));
+    await captions.check('chat B shows no pending bubble or "Thinking..." while chat A runs', () =>
+      expectNoPendingRun(page));
+    await captions.check('chat A run still in flight after checking chat B', () =>
+      expect(page.getByTestId('chat-stop-button')).toBeVisible({ timeout: 1000 }));
 
     await captions.startScene('2. Chat A finishes off screen.');
     await waitForIdle(page);
