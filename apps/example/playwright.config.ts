@@ -2,10 +2,10 @@ import { defineConfig, devices } from '@playwright/test';
 
 process.loadEnvFile?.();
 
-// Ensure ANTHROPIC_API_KEY is set before running tests
-if (!process.env.ANTHROPIC_API_KEY) {
+// The server's Claude agent runs through the AI gateway when its key is set, else through Anthropic directly
+if (!process.env.AI_GATEWAY_API_KEY && !process.env.ANTHROPIC_API_KEY) {
   throw new Error(
-    'ANTHROPIC_API_KEY environment variable is required to run E2E tests.\n' +
+    'AI_GATEWAY_API_KEY or ANTHROPIC_API_KEY environment variable is required to run E2E tests.\n' +
     'Set it with: export ANTHROPIC_API_KEY=your_key_here'
   );
 }
@@ -47,7 +47,7 @@ export default defineConfig({
       stdout: 'pipe',
       stderr: 'pipe',
       env: {
-        ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY!,
+        ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || '',
         OPENAI_API_KEY: process.env.OPENAI_API_KEY || '',
         AI_GATEWAY_API_KEY: process.env.AI_GATEWAY_API_KEY || '',
         AI_GATEWAY_CLAUDE_MODEL: process.env.AI_GATEWAY_CLAUDE_MODEL || '',

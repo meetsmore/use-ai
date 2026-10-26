@@ -1,14 +1,21 @@
 /**
  * Mock AI model for UI development and testing.
  *
- * Classifies incoming user messages by fixed keyword and returns predetermined responses,
- * including reasoning (extended thinking) blocks and multi-step tool calls.
+ * Answers from the last user message, with a reasoning (extended thinking) block that quotes it,
+ * so each reply and its reasoning show which prompt they answer. Also simulates multi-step tool calls.
  * Runs through the full AISDKAgent pipeline so all production code paths are exercised.
  *
  * Keywords:
  *   "long reasoning"       → long reasoning block + text
  *   "multi-step reasoning" → reasoning + tool call + reasoning + text
  *   anything else          → short reasoning + text (default)
+ *
+ * Replies:
+ *   "count from N to M"                   → the numbers N to M, one per line
+ *   "write the single word W" (after it)  → W on the last line
+ *   "reply with the single word W"        → W
+ *   "previous answer"                     → the last word of the previous assistant reply
+ *   anything else                         → a reply that quotes the prompt
  *
  * Usage:
  *   import { createMockReasoningModel, AISDKAgent } from '@meetsmore-oss/use-ai-server';
@@ -23,32 +30,13 @@
 import { MockLanguageModelV3 } from 'ai/test';
 import { simulateReadableStream } from 'ai';
 
-/** Delay between chunks in ms — slow enough to observe streaming UI */
+/** Default delay between chunks in ms — slow enough to observe streaming UI */
 const CHUNK_DELAY_MS = 100;
 
 // --- Response templates ---
 
-const REASONING_SHORT = 'The user is asking a question. Let me think about this briefly and provide a clear answer.';
-
-const REASONING_LONG = `Let me think about this step by step.
-
-First, I need to understand what the user is asking. They want me to calculate the factorial of 15.
-
-The factorial of a number n (written as n!) is the product of all positive integers from 1 to n.
-
-So 15! = 15 × 14 × 13 × 12 × 11 × 10 × 9 × 8 × 7 × 6 × 5 × 4 × 3 × 2 × 1
-
-Let me compute this step by step:
-15 × 14 = 210
-210 × 13 = 2,730
-2,730 × 12 = 32,760
-32,760 × 11 = 360,360
-360,360 × 10 = 3,603,600
-3,603,600 × 9 = 32,432,400
-32,432,400 × 8 = 259,459,200
-259,459,200 × 7 = 1,816,214,400
-
-So 15! = 1,307,674,368,000`;
+/** Largest count the mock writes out for "count from N to M". */
+const MAX_COUNT = 1000;
 
 const REASONING_STEP_1 = `This is step 1 of my reasoning. The user wants to know the current server time and also add two numbers. I'll start by calling the getServerTime tool to get the current time.`;
 
@@ -114,9 +102,9 @@ function toolCallChunks(toolCallId: string, toolName: string, input: Record<stri
   ];
 }
 
-function makeStreamResponse(chunks: unknown[], content?: unknown) {
+function makeStreamResponse(chunks: unknown[], content?: unknown, chunkDelayInMs = CHUNK_DELAY_MS) {
   return {
-    stream: simulateReadableStream({ chunks, chunkDelayInMs: CHUNK_DELAY_MS }),
+    stream: simulateReadableStream({ chunks, chunkDelayInMs }),
     response: {
       id: `mock-response-${Date.now()}`,
       timestamp: new Date(),
@@ -131,40 +119,85 @@ function makeStreamResponse(chunks: unknown[], content?: unknown) {
 
 type ResponseType = 'reasoning-simple' | 'reasoning-long' | 'multi-step';
 
-function classifyMessages(params: Record<string, unknown>): ResponseType {
+type PromptMessage = { role: string; content: unknown };
+
+/** The text parts of a message; content is either a string or an array of parts. */
+function messageText(message: PromptMessage | undefined): string {
+  if (!message) return '';
+  if (typeof message.content === 'string') return message.content;
+  if (!Array.isArray(message.content)) return '';
+  return (message.content as Array<{ type?: string; text?: string }>)
+    .filter(p => p.type === 'text')
+    .map(p => p.text || '')
+    .join(' ');
+}
+
+function lastUserText(params: Record<string, unknown>): string {
   // AI SDK passes messages as `prompt` (array of { role, content }), not `messages`
-  const prompt = (params?.prompt || []) as Array<{ role: string; content: unknown }>;
-  const lastUserMsg = [...prompt].reverse().find(m => m.role === 'user');
-  if (!lastUserMsg) return 'reasoning-simple';
+  const prompt = (params?.prompt || []) as PromptMessage[];
+  return messageText([...prompt].reverse().find(m => m.role === 'user'));
+}
 
-  // content is either a string or an array of { type: 'text', text: string }
-  let text: string;
-  if (typeof lastUserMsg.content === 'string') {
-    text = lastUserMsg.content.toLowerCase();
-  } else if (Array.isArray(lastUserMsg.content)) {
-    text = (lastUserMsg.content as Array<{ type?: string; text?: string }>)
-      .filter(p => p.type === 'text')
-      .map(p => p.text || '')
-      .join(' ')
-      .toLowerCase();
-  } else {
-    text = '';
-  }
+/** Text of the last assistant reply before the last user message, or '' when there is none. */
+function previousAssistantText(params: Record<string, unknown>): string {
+  const prompt = (params?.prompt || []) as PromptMessage[];
+  const lastUser = prompt.map(m => m.role).lastIndexOf('user');
+  const previous = prompt.slice(0, Math.max(lastUser, 0)).reverse().find(m => m.role === 'assistant');
+  return messageText(previous).trim();
+}
 
+function classifyMessages(params: Record<string, unknown>): ResponseType {
+  const text = lastUserText(params).toLowerCase();
   if (text.includes('multi-step reasoning')) return 'multi-step';
   if (text.includes('long reasoning')) return 'reasoning-long';
   return 'reasoning-simple';
 }
 
+/** The reply to `text`, built from the request it makes. `previous` is the chat's previous reply. */
+function answerFor(text: string, previous: string): string {
+  const count = text.match(/count from (\d+) to (\d+)/i);
+  if (count) {
+    const from = Number(count[1]);
+    const to = Math.min(Number(count[2]), from + MAX_COUNT - 1);
+    const lines: string[] = [];
+    for (let n = from; n <= to; n++) lines.push(String(n));
+    const word = text.slice(count.index! + count[0].length).match(/write the single word (\w+)/i);
+    if (word) lines.push(word[1]);
+    return lines.join('\n');
+  }
+  const word = text.match(/reply with the single word (\w+)/i);
+  if (word) return word[1];
+  if (/previous answer/i.test(text)) {
+    const words = previous.split(/\s+/).filter(Boolean);
+    return words.length > 0 ? words[words.length - 1] : 'There is no previous answer in this chat.';
+  }
+  return `Mock reply to "${text}". Try "long reasoning" or "multi-step reasoning" for other patterns.`;
+}
+
+/** Reasoning that quotes the prompt; the long form adds one line per word of it. */
+function reasoningFor(text: string, long: boolean): string {
+  const lines = [`The user asked: "${text}"`, 'I will answer exactly that request.'];
+  if (long) {
+    text.split(/\s+/).filter(Boolean).forEach((word, index) => {
+      lines.push(`Step ${index + 1}: the request contains "${word}".`);
+    });
+    lines.push('That covers every word of the request.');
+  }
+  return lines.join('\n\n');
+}
+
 /**
  * Create a mock model that simulates reasoning/thinking responses.
+ *
+ * The reply and its reasoning are derived from the last user message (see the file comment).
  *
  * Keyword detection (case-insensitive, in user message):
  * - `"long reasoning"` → long reasoning block + text
  * - `"multi-step reasoning"` → reasoning + tool call + reasoning + text
  * - anything else → short reasoning + text (default)
  */
-export function createMockReasoningModel(): MockLanguageModelV3 {
+export function createMockReasoningModel(options: { chunkDelayInMs?: number } = {}): MockLanguageModelV3 {
+  const { chunkDelayInMs = CHUNK_DELAY_MS } = options;
   const doStream = async (params?: unknown) => {
     const p = (params || {}) as Record<string, unknown>;
     const responseType = classifyMessages(p);
@@ -191,6 +224,7 @@ export function createMockReasoningModel(): MockLanguageModelV3 {
             { type: 'text', text: 'Let me check the current server time first.' },
             { type: 'tool-call', toolCallId: 'tc-ms-1', toolName: 'getServerTime', input: {} },
           ],
+          chunkDelayInMs,
         );
       }
       if (toolResultCount === 1) {
@@ -206,6 +240,7 @@ export function createMockReasoningModel(): MockLanguageModelV3 {
             { type: 'text', text: 'Now let me add those numbers for you.' },
             { type: 'tool-call', toolCallId: 'tc-ms-2', toolName: 'addNumbers', input: { a: 42, b: 58 } },
           ],
+          chunkDelayInMs,
         );
       }
       // Step 3: reasoning + final text
@@ -213,23 +248,15 @@ export function createMockReasoningModel(): MockLanguageModelV3 {
         ...reasoningChunks(REASONING_STEP_3, MOCK_SIGNATURE),
         ...textChunks('Here are the results: the current server time has been retrieved, and 42 + 58 = 100.'),
         finishChunk(),
-      ]);
+      ], undefined, chunkDelayInMs);
     }
 
-    if (responseType === 'reasoning-long') {
-      return makeStreamResponse([
-        ...reasoningChunks(REASONING_LONG, MOCK_SIGNATURE),
-        ...textChunks('15! = 1,307,674,368,000'),
-        finishChunk(),
-      ]);
-    }
-
-    // Default: short reasoning
+    const text = lastUserText(p);
     return makeStreamResponse([
-      ...reasoningChunks(REASONING_SHORT, MOCK_SIGNATURE),
-      ...textChunks('This is a mock response with reasoning. Try "long reasoning" or "multi-step reasoning" for other patterns.'),
+      ...reasoningChunks(reasoningFor(text, responseType === 'reasoning-long'), MOCK_SIGNATURE),
+      ...textChunks(answerFor(text, previousAssistantText(p))),
       finishChunk(),
-    ]);
+    ], undefined, chunkDelayInMs);
   };
 
   return new MockLanguageModelV3({ doStream: doStream as never });

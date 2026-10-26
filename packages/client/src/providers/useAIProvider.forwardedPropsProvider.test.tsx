@@ -1256,3 +1256,99 @@ describe('UseAIProvider pending indicator', () => {
     expect(placeholder()).toBe('Thinking...');
   });
 });
+
+describe('UseAIProvider thinking and streamed answer', () => {
+  beforeEach(() => {
+    createMockSocket();
+  });
+
+  afterEach(() => {
+    capturedEmitCalls = [];
+  });
+
+  test('show only in the chat the run belongs to, while it streams and once it is saved', async () => {
+    const repository = new LocalStorageChatRepository();
+    const latest: { chat: ReturnType<typeof useAIContext>['chat'] | null; sendMessage: SendFn | null } = {
+      chat: null,
+      sendMessage: null,
+    };
+
+    function Consumer() {
+      const { chat, connected } = useAIContext();
+      latest.chat = chat;
+      React.useEffect(() => {
+        if (connected) latest.sendMessage = chat.sendMessage;
+      }, [connected, chat.sendMessage]);
+      return null;
+    }
+
+    const { container, queryAllByTestId } = render(
+      <UseAIProvider serverUrl="http://localhost:8081" chatRepository={repository} renderChat={false}>
+        <Consumer />
+        <UseAIChat />
+      </UseAIProvider>
+    );
+    await act(async () => {
+      mockSocket.connected = true;
+      emitSocketEvent('connect');
+    });
+    await waitFor(() => expect(latest.sendMessage).not.toBeNull());
+
+    let chatA = '';
+    await act(async () => {
+      chatA = await latest.chat!.create();
+    });
+    await act(async () => {
+      await latest.sendMessage!('Count to three');
+    });
+    const runA = getRunAgentData();
+    expect(runA.data.threadId).toBe(chatA);
+
+    const thinkingBlocks = () => queryAllByTestId('thinking-timeline').length;
+    const shows = (text: string) => container.textContent?.includes(text) ?? false;
+
+    await act(async () => {
+      emitSocketEvent('event', { type: 'RUN_STARTED', threadId: chatA, runId: runA.data.runId });
+      emitSocketEvent('event', { type: 'REASONING_MESSAGE_START', messageId: 'r1', role: 'assistant' });
+      emitSocketEvent('event', { type: 'REASONING_MESSAGE_CONTENT', messageId: 'r1', delta: 'Counting for A' });
+    });
+    await waitFor(() => expect(thinkingBlocks()).toBe(1));
+
+    let chatB = '';
+    await act(async () => {
+      chatB = await latest.chat!.create();
+    });
+    expect(chatB).not.toBe(chatA);
+    expect(thinkingBlocks()).toBe(0);
+
+    // Chat A's run keeps streaming while chat B is displayed.
+    await act(async () => {
+      emitSocketEvent('event', { type: 'REASONING_MESSAGE_CONTENT', messageId: 'r1', delta: ' up to three' });
+      emitSocketEvent('event', { type: 'REASONING_MESSAGE_END', messageId: 'r1' });
+      emitSocketEvent('event', { type: 'TEXT_MESSAGE_START', messageId: 'm1', role: 'assistant' });
+      emitSocketEvent('event', { type: 'TEXT_MESSAGE_CONTENT', messageId: 'm1', delta: '1 2 3 ALPHA' });
+    });
+    expect(thinkingBlocks()).toBe(0);
+    expect(shows('1 2 3 ALPHA')).toBe(false);
+
+    await act(async () => {
+      emitSocketEvent('event', { type: 'TEXT_MESSAGE_END', messageId: 'm1' });
+      emitSocketEvent('event', { type: 'RUN_FINISHED', threadId: chatA, runId: runA.data.runId });
+    });
+    await waitFor(async () => {
+      const storedA = (await repository.loadChat(chatA))!;
+      expect(storedA.messages.map((m) => m.role)).toEqual(['user', 'assistant']);
+    });
+    const storedA = (await repository.loadChat(chatA))!;
+    expect(storedA.messages[1].reasoningParts?.map((p) => p.text).join('')).toBe('Counting for A up to three');
+    expect((await repository.loadChat(chatB))!.messages).toHaveLength(0);
+    expect(thinkingBlocks()).toBe(0);
+    expect(shows('1 2 3 ALPHA')).toBe(false);
+
+    await act(async () => {
+      await latest.chat!.load(chatA);
+    });
+    await waitFor(() => expect(shows('1 2 3 ALPHA')).toBe(true));
+    expect(thinkingBlocks()).toBe(1);
+  });
+});
