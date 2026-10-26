@@ -18,20 +18,18 @@ import path from 'path';
  * Run it with scripts/record-multi-chat.sh, which records the video and copies it out.
  * MULTI_CHAT_LABEL: caption title, e.g. which build is under test.
  * MULTI_CHAT_CHECKS_FILE: where to write the check results as JSON.
- * MULTI_CHAT_CANNED_REPLIES=1 is for a server running the mock agent (whose replies are fixed):
- * it skips the checks on the reply text and asks for the mock's slow answer.
+ * MULTI_CHAT_MOCK_AGENT=1 is for a server running the mock agent, whose reasoning quotes the prompt
+ * it answers: each chat's thinking must then quote that chat's own question.
  */
 
-const cannedReplies = !!process.env.MULTI_CHAT_CANNED_REPLIES;
+const mockAgent = !!process.env.MULTI_CHAT_MOCK_AGENT;
 const label = process.env.MULTI_CHAT_LABEL || 'Multi-chat walkthrough';
 
-// Long answers keep each run in flight for several seconds, so the chat switches land mid-run.
-// The mock agent answers slowly only when asked for "long reasoning".
-const mockSuffix = cannedReplies ? ' Use long reasoning.' : '';
-const PROMPT_A = `Count from 1 to 300, one number per line. After the last number, write the single word ALPHA.${mockSuffix}`;
-const PROMPT_B = `Reply with the single word BRAVO and nothing else.${mockSuffix}`;
+// A long answer keeps chat A's first run in flight for several seconds, so the switch lands mid-run.
+const PROMPT_A = 'Count from 1 to 300, one number per line. After the last number, write the single word ALPHA.';
+const PROMPT_B = 'Reply with the single word BRAVO and nothing else.';
 const PROMPT_A_FOLLOW_UP =
-  `Which word did you write at the end of your previous answer in this chat? Reply with that word only.${mockSuffix}`;
+  'Which word did you write at the end of your previous answer in this chat? Reply with that word only.';
 
 test.use({
   viewport: { width: 1280, height: 720 },
@@ -263,6 +261,51 @@ async function expectNeverVisible(page: Page, locator: Locator, since: number, w
   }
 }
 
+/**
+ * Watches the displayed chat until the run in flight ends: it must never show that run's streaming
+ * answer, and never more thinking blocks than it had at the start (its own persisted replies).
+ * Fails as inconclusive when no run is in flight to watch.
+ */
+async function expectNothingFromRunInFlight(page: Page): Promise<void> {
+  const stop = page.getByTestId('chat-stop-button');
+  if (!(await stop.isVisible())) throw new Error('inconclusive: no run in flight to watch');
+  const thinking = page.getByTestId('thinking-timeline');
+  const ownThinking = await thinking.count();
+  for (const deadline = Date.now() + 90000; await stop.isVisible(); await page.waitForTimeout(100)) {
+    if (Date.now() > deadline) throw new Error('the run was still in flight after 90s');
+    const streaming = await page.getByTestId('chat-message-assistant-streaming').count();
+    if (streaming > 0) throw new Error('the run\'s streaming answer is visible');
+    const shown = await thinking.count();
+    if (shown > ownThinking) throw new Error(`${shown - ownThinking} thinking block(s) from the run are visible`);
+  }
+}
+
+/**
+ * Opens every thinking block of the displayed chat. Each must mention none of `foreignWords` (the
+ * other chat's request); with the mock agent, each must quote one of `ownPrompts`, and there must
+ * be one per reply.
+ */
+async function expectOwnThinking(page: Page, ownPrompts: string[], foreignWords: string[]): Promise<void> {
+  const toggles = page.getByTestId('thinking-toggle');
+  const count = await toggles.count();
+  if (mockAgent) {
+    const replies = await page.getByTestId('chat-message-assistant').count();
+    if (count !== replies) throw new Error(`${count} thinking block(s) for ${replies} replies`);
+  }
+  for (let index = 0; index < count; index++) {
+    await clickVisibly(page, toggles.nth(index));
+  }
+  const texts = await page.getByTestId('thinking-content').allTextContents();
+  if (texts.length !== count) throw new Error(`${texts.length} of ${count} thinking blocks opened`);
+  for (const text of texts) {
+    const foreign = foreignWords.find((word) => text.includes(word));
+    if (foreign) throw new Error(`thinking mentions "${foreign}": ${text.slice(0, 80)}`);
+    if (mockAgent && !ownPrompts.some((prompt) => text.includes(`"${prompt}`))) {
+      throw new Error(`thinking does not quote this chat's question: ${text.slice(0, 80)}`);
+    }
+  }
+}
+
 async function expectLastReply(page: Page, word: string, notWord?: string): Promise<void> {
   const last = page.getByTestId('chat-message-assistant').last();
   await expect(last).toContainText(word, { timeout: 5000 });
@@ -321,6 +364,8 @@ test.describe('Multi-chat', () => {
       expectNoPendingRun(page));
 
     await captions.startScene('2. Chat A finishes off screen.');
+    await captions.check("chat B shows no thinking or answer from chat A's run until it ends", () =>
+      expectNothingFromRunInFlight(page));
     await waitForIdle(page);
     await page.waitForTimeout(1000);
     await captions.check('chat B is still empty', () => expectDisplayed(page, [], 0));
@@ -330,16 +375,14 @@ test.describe('Multi-chat', () => {
     await send(page);
     await waitForIdle(page);
     await captions.check('chat B shows its own question and one reply', () => expectDisplayed(page, [PROMPT_B], 1));
-    if (!cannedReplies) {
-      await captions.check('chat B reply is BRAVO', () => expectLastReply(page, 'BRAVO', 'ALPHA'));
-    }
+    await captions.check('chat B reply is BRAVO', () => expectLastReply(page, 'BRAVO', 'ALPHA'));
+    await captions.check("chat B's thinking is about its own question", () =>
+      expectOwnThinking(page, [PROMPT_B], ['ALPHA', '300']));
 
     await captions.startScene('4. Back to chat A.');
     await openChat(page, PROMPT_A.slice(0, 20));
     await captions.check('chat A shows its own question and one reply', () => expectDisplayed(page, [PROMPT_A], 1));
-    if (!cannedReplies) {
-      await captions.check('chat A reply ends with ALPHA', () => expectLastReply(page, 'ALPHA'));
-    }
+    await captions.check('chat A reply ends with ALPHA', () => expectLastReply(page, 'ALPHA', 'BRAVO'));
 
     await captions.startScene('5. Chat A sends a follow-up with a PDF. Switch to chat B while the PDF is processed.');
     await type(page, PROMPT_A_FOLLOW_UP);
@@ -354,6 +397,8 @@ test.describe('Multi-chat', () => {
       expectNeverVisible(page, page.getByText(PROCESSING_FILE), sentAt, PDF_PROCESSING_MS));
     await captions.check('chat A follow-up still in flight at the switch', () =>
       expect(page.getByTestId('chat-stop-button')).toBeVisible({ timeout: 1000 }));
+    await captions.check("chat B shows no thinking or answer from chat A's follow-up run", () =>
+      expectNothingFromRunInFlight(page));
     // Checked once the run is over: without the fixes, chat A's follow-up shows up in chat B when
     // the send goes out after the PDF is processed, not at the switch.
     await waitForIdle(page);
@@ -364,10 +409,10 @@ test.describe('Multi-chat', () => {
     await openChat(page, PROMPT_A.slice(0, 20));
     await captions.check('chat A shows both its questions and two replies', () =>
       expectDisplayed(page, [PROMPT_A, PROMPT_A_FOLLOW_UP], 2));
-    if (!cannedReplies) {
-      // The follow-up only knows ALPHA if it ran with chat A's history.
-      await captions.check("the follow-up reply knows chat A's history (ALPHA)", () => expectLastReply(page, 'ALPHA'));
-    }
+    // The follow-up only knows ALPHA if it ran with chat A's history.
+    await captions.check("the follow-up reply knows chat A's history (ALPHA)", () => expectLastReply(page, 'ALPHA', 'BRAVO'));
+    await captions.check("chat A's thinking is about its own questions", () =>
+      expectOwnThinking(page, [PROMPT_A, PROMPT_A_FOLLOW_UP], ['BRAVO']));
 
     await captions.startScene('7. Storage: each chat holds only its own turns.');
     const chats = await storedChats(page);

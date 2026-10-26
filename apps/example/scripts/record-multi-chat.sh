@@ -8,11 +8,11 @@
 # Usage: ENV_FILE=/path/to/env apps/example/scripts/record-multi-chat.sh [extra playwright args]
 #   ENV_FILE  optional file exporting AI_GATEWAY_API_KEY or ANTHROPIC_API_KEY (and any other server variables).
 #             Without it, one of those keys must already be set.
-#   MOCK=1    use the server's mock agent instead: no key, no paid calls, reply texts not checked.
+#   MOCK=1    use the server's mock agent instead: no key, no paid calls.
 #   BASE_REF  ref whose merge-base with HEAD is the BEFORE build (default: origin/main).
 #   BASE_DIR  where the BEFORE build is extracted and kept between runs
 #             (default: $TMPDIR/use-ai-base-<sha>). Built once, reused after.
-#   AFTER_LABEL  caption of the AFTER video (default: "AFTER (PR #89 <sha>)").
+#   AFTER_LABEL  caption of the AFTER video (default: "AFTER (<sha>)").
 #   OUT_DIR   where the videos are copied (default: apps/example/videos).
 #   BROWSER_EXECUTABLE  headless shell to record with. By default the one Playwright expects,
 #             else the newest one already in the Playwright cache, else it is installed.
@@ -38,7 +38,7 @@ if [ -n "${ENV_FILE:-}" ]; then
 fi
 if [ -n "${MOCK:-}" ]; then
   CONFIG="playwright.mock.config.ts"
-  export MULTI_CHAT_CANNED_REPLIES=1
+  export MULTI_CHAT_MOCK_AGENT=1
   # Keeps apps/example/.env out of the Playwright process, whose environment reaches the servers.
   PLAYWRIGHT=(bunx --no-env-file playwright)
 else
@@ -83,7 +83,7 @@ BASE_SHORT="$(git -C "$ROOT_DIR" rev-parse --short "$BASE_SHA")"
 # The last commit that changed the packages: the build the AFTER video shows.
 AFTER_SHORT="$(git -C "$ROOT_DIR" log -1 --format=%h -- packages)"
 BEFORE_LABEL="BEFORE (base $BASE_SHORT)"
-AFTER_LABEL="${AFTER_LABEL:-AFTER (PR #89 $AFTER_SHORT)}"
+AFTER_LABEL="${AFTER_LABEL:-AFTER ($AFTER_SHORT)}"
 [ -n "$(git -C "$ROOT_DIR" diff --name-only "$BASE_SHA" HEAD -- packages)" ] \
   || fail "HEAD changes nothing under packages/ since $BASE_SHORT; BEFORE and AFTER would be the same build"
 
@@ -101,6 +101,12 @@ fi
 # The base runs today's walkthrough and server config.
 cp "$EXAMPLE_DIR/$SPEC" "$BASE_DIR/apps/example/$SPEC" || fail "could not copy the spec into $BASE_DIR"
 cp "$EXAMPLE_DIR/$CONFIG" "$BASE_DIR/apps/example/$CONFIG" || fail "could not copy $CONFIG into $BASE_DIR"
+if [ -n "${MOCK:-}" ]; then
+  # Both runs answer with today's mock agent, so only the client differs between them.
+  MOCK_MODEL="packages/server/src/agents/testing/MockReasoningModel.ts"
+  cp "$ROOT_DIR/$MOCK_MODEL" "$BASE_DIR/$MOCK_MODEL" || fail "could not copy the mock agent into $BASE_DIR"
+  (cd "$BASE_DIR/packages/server" && bun run build) || fail "BEFORE server build failed (output above)"
+fi
 
 echo "== Building AFTER ($AFTER_SHORT)"
 (cd "$ROOT_DIR" && bun run build) || fail "AFTER build failed (output above)"
