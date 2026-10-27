@@ -89,6 +89,18 @@ describe('UseAIChat', () => {
     expect(getByText('Thinking...')).toBeInTheDocument();
   });
 
+  test('says in the composer when the block on sending comes from another chat', () => {
+    const ctx = createContextValue({ loading: true, loadingInCurrentChat: false });
+
+    const { getByPlaceholderText } = render(
+      <__UseAIChatContext.Provider value={ctx}>
+        <UseAIChat />
+      </__UseAIChatContext.Provider>
+    );
+
+    expect(getByPlaceholderText('A reply is in progress in another chat...')).toBeInTheDocument();
+  });
+
   // Without the id the streaming bubble and the persisted one are different
   // elements, and a selection made while the answer streams is lost on
   // completion. See UseAIChatPanel.selection.test.tsx.

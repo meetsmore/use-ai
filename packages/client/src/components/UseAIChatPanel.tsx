@@ -321,7 +321,9 @@ export function UseAIChatPanel({
     ? strings.input.connectingPlaceholder
     : loadingInCurrentChat
       ? `${executingTool?.displayText ?? strings.input.thinking}...`
-      : strings.input.placeholder;
+      : loading
+        ? `${strings.input.busyInOtherChat}...`
+        : strings.input.placeholder;
   const canSend = !!(
     connected &&
     !loading &&
