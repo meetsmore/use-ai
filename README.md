@@ -1161,7 +1161,7 @@ root.render(
 
 [picomatch](https://github.com/micromatch/picomatch) is used for patterns, so you can use any `picomatch` compatible pattern.
 
-`forwardedPropsProvider` is called with `{ chatId, chat }`: the id of the chat the message is being sent from (`null` if no chat is active) and that chat (with attachments it is reloaded after they are processed, so it includes metadata written by file transformers). The id is captured when the send starts and the chat is loaded by that id, so both stay correct even if the user switches chats while attachments are still being processed. The run itself uses the same capture: its thread id, its history and its agent belong to the chat the send started in. Prefer them over reading the "current chat" from your own state when attaching per-chat props:
+`forwardedPropsProvider` is called with `{ chatId, chat }`, the chat the message is sent from (`chatId` is `null` if no chat is active). The chat is captured when the send starts, so both stay correct if the user switches chats while attachments are processed. With attachments, `chat` is reloaded after they are processed and includes metadata written by file transformers. The run uses the same capture for its thread id, history and agent. For per-chat props, use `chatId` instead of your own "current chat" state:
 
 ```tsx
 <UseAIProvider

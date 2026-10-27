@@ -235,10 +235,7 @@ export function useChatManagement({
     }
   }, [currentChatId, repository, setMessages]);
 
-  /**
-   * Gets a chat by ID (including metadata).
-   * Metadata is frozen to prevent accidental mutation.
-   */
+  /** Gets a chat by ID (including metadata). */
   const getChat = useCallback(async (chatId: string): Promise<Chat | null> => {
     const chat = await repository.loadChat(chatId);
     if (chat?.metadata) {
