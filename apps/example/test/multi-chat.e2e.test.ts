@@ -16,7 +16,7 @@ import path from 'path';
  * still records the whole walkthrough and shows where it goes wrong.
  *
  * Run it with scripts/record-multi-chat.sh, which records the video and copies it out.
- * MULTI_CHAT_LABEL: caption title, e.g. which build is under test.
+ * MULTI_CHAT_LABEL: caption title, e.g. which build is under test. Video is recorded only when it is set.
  * MULTI_CHAT_CHECKS_FILE: where to write the check results as JSON.
  * MULTI_CHAT_MOCK_AGENT=1 is for a server running the mock agent, whose reasoning quotes the prompt
  * it answers: each chat's thinking must then quote that chat's own question.
@@ -33,7 +33,8 @@ const PROMPT_A_FOLLOW_UP =
 
 test.use({
   viewport: { width: 1280, height: 720 },
-  video: { mode: 'on', size: { width: 1280, height: 720 } },
+  // Only the record script (it sets MULTI_CHAT_LABEL) records; a normal e2e run keeps the config's video setting.
+  ...(process.env.MULTI_CHAT_LABEL ? { video: { mode: 'on' as const, size: { width: 1280, height: 720 } } } : {}),
   // BROWSER_EXECUTABLE runs another headless shell build when the one Playwright expects is missing.
   // Google Chrome (channel: 'chrome') is not an option here: on macOS its video loses the bottom 88px.
   ...(process.env.BROWSER_EXECUTABLE ? { launchOptions: { executablePath: process.env.BROWSER_EXECUTABLE } } : {}),
