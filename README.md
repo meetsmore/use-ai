@@ -666,7 +666,7 @@ await chat.sendMessage('Process this in the background', { openChat: false });
 await chat.sendMessage('Draft a reply', { hiddenText: `Form input: ${JSON.stringify(form)}` });
 ```
 
-**Hidden text:** `hiddenText` is sent to the AI as a text part before the message and saved with it as a `hidden_text` part, so the AI sees it on every later turn of that chat. The built-in chat UI leaves it out of the message bubble, the chat title and the chat list. A custom message slot should skip `hidden_text` parts, and a custom `ChatRepository` must keep them. It is stored like any other message text, so do not put secrets in it.
+**Hidden text:** `hiddenText` is saved with the message as a `hidden_text` part and sent with later turns of that chat. The built-in chat UI does not show it; a custom `Message` slot should skip `hidden_text` parts.
 
 **Queueing:** If you call `sendMessage` while the AI is still responding, messages are automatically queued and processed one at a time.
 

@@ -22,7 +22,7 @@ export interface PersistedTextContent {
 }
 
 /**
- * Text part sent to the AI with a user message but not shown in the chat.
+ * Text part sent to the AI with a user message but not shown in the built-in chat UI.
  */
 export interface PersistedHiddenTextContent {
   type: 'hidden_text';

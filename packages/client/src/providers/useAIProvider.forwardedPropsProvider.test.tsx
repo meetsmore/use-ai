@@ -729,9 +729,11 @@ describe('UseAIProvider sendMessage hiddenText', () => {
   });
 
   test('comes before the attachments too', async () => {
-    const h = await renderSwitchHarness();
+    const repository = new LocalStorageChatRepository();
+    const h = await renderSwitchHarness({ chatRepository: repository });
+    let chatId = '';
     await act(async () => {
-      await h.createChat();
+      chatId = await h.createChat();
     });
     let sendPromise: Promise<void> = Promise.resolve();
     await act(async () => {
@@ -748,6 +750,8 @@ describe('UseAIProvider sendMessage hiddenText', () => {
       { type: 'text', text: 'Context' },
       { type: 'text', text: 'Question' },
     ]);
+    const stored = (await repository.loadChat(chatId))!.messages[0].content as Array<{ type: string }>;
+    expect(stored.map((part) => part.type)).toEqual(['hidden_text', 'text', 'file']);
   });
 
   test('reaches the AI again on later turns after a reload', async () => {
