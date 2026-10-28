@@ -683,7 +683,7 @@ export function UseAIProvider({
 
   // ── Message Sending ─────────────────────────────────────────────────────
 
-  const handleSendMessage = useCallback(async (message: string, attachments?: FileAttachment[], messageForwardedProps?: UseAIForwardedProps) => {
+  const handleSendMessage = useCallback(async (message: string, attachments?: FileAttachment[], messageForwardedProps?: UseAIForwardedProps, hiddenText?: string) => {
     if (!clientRef.current) return;
 
     serverEvents.clearStreamingParts();
@@ -734,21 +734,26 @@ export function UseAIProvider({
       // docs/plans/bugfix-transformed-file-persistence.md.
       persistedContent = buildPersistedParts(message, attachments, fileContent);
 
-      if (activeChatId) {
-        await chatManagement.saveUserMessage(activeChatId, persistedContent);
-      }
-
       multimodalContent = [];
       if (message.trim()) {
         multimodalContent.push({ type: 'text', text: message });
       }
       multimodalContent.push(...fileContent);
-    } else {
-      if (activeChatId) {
-        await chatManagement.saveUserMessage(activeChatId, persistedContent);
-      }
-      serverEvents.setLoading(true);
     }
+
+    if (hiddenText) {
+      const visibleText = message.trim() ? [{ type: 'text' as const, text: message }] : [];
+      persistedContent = [
+        { type: 'hidden_text', text: hiddenText },
+        ...(typeof persistedContent === 'string' ? visibleText : persistedContent),
+      ];
+      multimodalContent = [{ type: 'text', text: hiddenText }, ...(multimodalContent ?? visibleText)];
+    }
+
+    if (activeChatId) {
+      await chatManagement.saveUserMessage(activeChatId, persistedContent);
+    }
+    serverEvents.setLoading(true);
 
     // Reload by the same id: a transformer may have updated the chat's metadata during the upload.
     const chatForProps = activeChatId && attachments && attachments.length > 0

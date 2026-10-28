@@ -661,7 +661,12 @@ await chat.sendMessage('Please analyze this file', { attachments: [file] });
 
 // Send without opening the chat panel (background operation)
 await chat.sendMessage('Process this in the background', { openChat: false });
+
+// Give the AI context that the chat does not show (e.g. form input collected before the chat)
+await chat.sendMessage('Draft a reply', { hiddenText: `Form input: ${JSON.stringify(form)}` });
 ```
+
+`hiddenText` is sent to the AI as a text part before the message and saved with it, so the AI sees it on every later turn of that chat. It is not shown in the message bubble, the chat title or the chat list.
 
 **Queueing:** If you call `sendMessage` while the AI is still responding, messages are automatically queued and processed one at a time.
 

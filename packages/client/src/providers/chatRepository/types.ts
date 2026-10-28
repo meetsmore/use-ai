@@ -22,6 +22,14 @@ export interface PersistedTextContent {
 }
 
 /**
+ * Text part sent to the AI with a user message but not shown in the chat.
+ */
+export interface PersistedHiddenTextContent {
+  type: 'hidden_text';
+  text: string;
+}
+
+/**
  * File content part for persisted messages.
  * Only stores metadata, not the actual file data.
  */
@@ -69,10 +77,11 @@ export interface PersistedAttachmentRefContent {
 
 /**
  * Content part for persisted messages.
- * One of: text, file metadata, transformed file content, or a ref-backed attachment.
+ * One of: text, hidden text, file metadata, transformed file content, or a ref-backed attachment.
  */
 export type PersistedContentPart =
   | PersistedTextContent
+  | PersistedHiddenTextContent
   | PersistedFileContent
   | PersistedTransformedFileContent
   | PersistedAttachmentRefContent;

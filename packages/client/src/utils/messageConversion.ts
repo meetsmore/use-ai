@@ -44,7 +44,7 @@ export function transformMessagesToClientFormat(persistedMessages: PersistedMess
         // match what client.sendPrompt emits. AG-UI content is a different,
         // source-based shape, so this boundary cast is required.
         const parts = msg.content.flatMap((p): MultimodalContent[] => {
-          if (p.type === 'text') {
+          if (p.type === 'text' || p.type === 'hidden_text') {
             return [{ type: 'text', text: p.text }];
           }
           if (p.type === 'transformed_file') {

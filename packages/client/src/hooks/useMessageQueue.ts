@@ -22,11 +22,16 @@ export interface SendMessageOptions {
    * This is merged with provider-level forwardedProps (message-level takes precedence).
    */
   forwardedProps?: UseAIForwardedProps;
+  /**
+   * Text sent to the AI before `message`, but not shown in the chat bubble, title or chat list.
+   * It is saved with the message, so the AI sees it again on every later turn of the chat.
+   */
+  hiddenText?: string;
 }
 
 export interface UseMessageQueueOptions {
   /** The function that actually sends a message (the provider's handleSendMessage) */
-  sendFn: (message: string, attachments?: FileAttachment[], forwardedProps?: UseAIForwardedProps) => Promise<void>;
+  sendFn: (message: string, attachments?: FileAttachment[], forwardedProps?: UseAIForwardedProps, hiddenText?: string) => Promise<void>;
   /** Creates a new chat */
   createNewChat: (options?: CreateChatOptions) => Promise<string>;
   /** Callback to open/close the chat panel */
@@ -100,7 +105,7 @@ export function useMessageQueue({
   }, [hasPendingApproval]);
 
   const sendQueuedMessage = useCallback(async (message: string, options?: SendMessageOptions) => {
-    const { newChat = false, attachments = [], openChat = true, metadata, agent, forwardedProps } = options ?? {};
+    const { newChat = false, attachments = [], openChat = true, metadata, agent, forwardedProps, hiddenText } = options ?? {};
 
     if (newChat) {
       await createNewChatRef.current({ metadata, agent });
@@ -126,7 +131,7 @@ export function useMessageQueue({
       })
     );
 
-    await sendFnRef.current(message, fileAttachments.length > 0 ? fileAttachments : undefined, forwardedProps);
+    await sendFnRef.current(message, fileAttachments.length > 0 ? fileAttachments : undefined, forwardedProps, hiddenText);
 
     if (openChat && setOpenRef.current) {
       setOpenRef.current(true);

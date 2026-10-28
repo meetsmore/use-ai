@@ -93,6 +93,7 @@ export type {
   PersistedMessageContent,
   PersistedContentPart,
   PersistedTextContent,
+  PersistedHiddenTextContent,
   PersistedFileContent,
   PersistedTransformedFileContent,
   PersistedAttachmentRefContent,

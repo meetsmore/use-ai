@@ -6,6 +6,7 @@ import type { UseAIForwardedProps } from '../types';
 import { z } from 'zod';
 import type { ForwardedPropsProviderContext } from './useAIProvider';
 import type { PersistedMessage } from './chatRepository/types';
+import { getDisplayTextFromContent } from '../utils/messageContent';
 
 // Store event handlers and captured data
 let eventHandlers: Record<string, Function[]> = {};
@@ -451,7 +452,7 @@ describe('UseAIProvider forwardedPropsProvider', () => {
 
 type SendFn = (
   msg: string,
-  opts?: { attachments?: File[]; newChat?: boolean; agent?: string; forwardedProps?: UseAIForwardedProps }
+  opts?: { attachments?: File[]; newChat?: boolean; agent?: string; forwardedProps?: UseAIForwardedProps; hiddenText?: string }
 ) => Promise<void>;
 
 interface SwitchHarness {
@@ -693,6 +694,89 @@ describe('UseAIProvider send context when the chat changes during attachment pro
     const runB = getRunAgentData();
     expect(runB.data.runId).not.toBe(runA.data.runId);
     expect(runB.data.messages).toEqual([expect.objectContaining({ role: 'user', content: 'Hello from B' })]);
+  });
+});
+
+describe('UseAIProvider sendMessage hiddenText', () => {
+  beforeEach(() => {
+    createMockSocket();
+  });
+
+  afterEach(() => {
+    capturedEmitCalls = [];
+  });
+
+  test('is sent before the visible text, stored with the message and kept out of the bubble and title', async () => {
+    const repository = new LocalStorageChatRepository();
+    const h = await renderSwitchHarness({ chatRepository: repository });
+    let chatId = '';
+    await act(async () => {
+      chatId = await h.createChat();
+    });
+    await act(async () => {
+      await h.sendMessage('Question', { hiddenText: 'Context' });
+    });
+
+    expect(getRunAgentData().data.messages.at(-1)!.content).toEqual([
+      { type: 'text', text: 'Context' },
+      { type: 'text', text: 'Question' },
+    ]);
+    const stored = (await repository.loadChat(chatId))!;
+    expect(stored.messages[0].content).toEqual([
+      { type: 'hidden_text', text: 'Context' },
+      { type: 'text', text: 'Question' },
+    ]);
+    expect(stored.title).toBe('Question');
+    expect(getDisplayTextFromContent(h.displayedMessages()[0].content)).toBe('Question');
+  });
+
+  test('comes before the visible text and the attachments', async () => {
+    const h = await renderSwitchHarness();
+    await act(async () => {
+      await h.createChat();
+    });
+    let sendPromise: Promise<void> = Promise.resolve();
+    await act(async () => {
+      sendPromise = h.sendMessage('Question', { hiddenText: 'Context', attachments: attachment() });
+    });
+    await act(async () => {
+      h.releaseUpload();
+      await sendPromise;
+    });
+
+    const content = getRunAgentData().data.messages.at(-1)!.content as Array<{ type: string }>;
+    expect(content.map((part) => part.type)).toEqual(['text', 'text', 'file_url']);
+    expect(content.slice(0, 2)).toEqual([
+      { type: 'text', text: 'Context' },
+      { type: 'text', text: 'Question' },
+    ]);
+  });
+
+  test('reaches the AI again on later turns after a reload', async () => {
+    const repository = new LocalStorageChatRepository();
+    const first = await renderSwitchHarness({ chatRepository: repository });
+    let chatId = '';
+    await act(async () => {
+      chatId = await first.createChat();
+    });
+    await act(async () => {
+      await first.sendMessage('Question', { hiddenText: 'Context' });
+    });
+    first.unmount();
+
+    createMockSocket();
+    const h = await renderSwitchHarness({ chatRepository: repository });
+    await act(async () => {
+      await h.loadChat(chatId);
+    });
+    await act(async () => {
+      await h.sendMessage('Follow-up');
+    });
+
+    expect(getRunAgentData().data.messages[0].content).toEqual([
+      { type: 'text', text: 'Context' },
+      { type: 'text', text: 'Question' },
+    ]);
   });
 });
 

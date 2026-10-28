@@ -19,6 +19,14 @@ describe('getTextFromContent', () => {
     expect(getTextFromContent(content)).toBe('intro\nOCR body');
   });
 
+  it('includes hidden_text', () => {
+    const content: PersistedMessageContent = [
+      { type: 'hidden_text', text: 'context' },
+      { type: 'text', text: 'question' },
+    ];
+    expect(getTextFromContent(content)).toBe('context\nquestion');
+  });
+
   it('drops legacy metadata-only file parts without throwing', () => {
     const content: PersistedMessageContent = [
       { type: 'text', text: 'only text' },
@@ -47,6 +55,14 @@ describe('getDisplayTextFromContent', () => {
       },
     ];
     expect(getDisplayTextFromContent(content)).toBe('intro');
+  });
+
+  it('omits hidden_text', () => {
+    const content: PersistedMessageContent = [
+      { type: 'hidden_text', text: 'context' },
+      { type: 'text', text: 'question' },
+    ];
+    expect(getDisplayTextFromContent(content)).toBe('question');
   });
 
   it('drops legacy metadata-only file parts', () => {
