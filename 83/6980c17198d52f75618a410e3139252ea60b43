@@ -1,0 +1,46 @@
+packages/client/src/utils/messageConversion.test.ts
+  s_e87317347fe591::t_5975c2ced73281 43-55,58-59,61-62
+  s_e87317347fe591::t_96d787c6829b70 56-57,60
+packages/client/src/providers/useAIProvider.forwardedPropsProvider.test.tsx
+  s_e87317347fe591::t_74d20dac30327f 9,455,700-714,717-760,763-780
+  s_e87317347fe591::t_31c5f4cc5b6b4a 715-716,761-762
+  s_e87317347fe591::t_0a73e5ec875526 781-782
+packages/client/src/hooks/useMessageQueue.test.ts
+  s_e87317347fe591::t_496dc40e8c66e7 35-36
+packages/client/src/hooks/useMessageQueue.ts
+  s_e87317347fe591::t_f20406c35e506d 25-29,34,108,134
+packages/client/src/utils/messageContent.ts
+  s_e87317347fe591::t_f20406c35e506d 5,15,24-25
+packages/client/src/utils/messageConversion.ts
+  s_e87317347fe591::t_c19e507702b80f 47
+packages/client/src/providers/chatRepository/types.ts
+  s_e87317347fe591::t_f20406c35e506d 25-31,80,84
+  s_e87317347fe591::t_aaf3b4d26fb168 24
+packages/client/src/index.ts
+  s_e87317347fe591::t_f20406c35e506d 96
+README.md
+  s_e87317347fe591::t_1ff58a0a1b1634 664-666,669
+  s_e87317347fe591::t_0fedb1eae5b49f 670
+packages/client/src/providers/useAIProvider.tsx
+  s_e87317347fe591::t_f9dc6bccf9fec8 686,744-756
+  s_e87317347fe591::t_c7d8d1ea6e2ff6 757
+packages/client/src/utils/messageContent.test.ts
+  s_e87317347fe591::t_5975c2ced73281 22-29,60-66
+  s_e87317347fe591::t_08643e58e4ba52 67
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "836980c17198d52f75618a410e3139252ea60b43",
+  "prompts": {},
+  "sessions": {
+    "s_e87317347fe591": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0b858d37-03fa-4f4f-9aa1-3a2fdc608ddc",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "yuma.ito <yuma.ito@meetsmore.com>"
+    }
+  }
+}
