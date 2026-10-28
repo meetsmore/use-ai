@@ -706,6 +706,7 @@ export function UseAIProvider({
       runTarget.agent = chat.agent;
     }
 
+    const messageParts = message.trim() ? [{ type: 'text' as const, text: message }] : [];
     let persistedContent: PersistedMessageContent = message;
     let multimodalContent: MultimodalContent[] | undefined;
 
@@ -734,20 +735,15 @@ export function UseAIProvider({
       // docs/plans/bugfix-transformed-file-persistence.md.
       persistedContent = buildPersistedParts(message, attachments, fileContent);
 
-      multimodalContent = [];
-      if (message.trim()) {
-        multimodalContent.push({ type: 'text', text: message });
-      }
-      multimodalContent.push(...fileContent);
+      multimodalContent = [...messageParts, ...fileContent];
     }
 
-    if (hiddenText) {
-      const visibleText = message.trim() ? [{ type: 'text' as const, text: message }] : [];
+    if (hiddenText?.trim()) {
       persistedContent = [
         { type: 'hidden_text', text: hiddenText },
-        ...(typeof persistedContent === 'string' ? visibleText : persistedContent),
+        ...(Array.isArray(persistedContent) ? persistedContent : messageParts),
       ];
-      multimodalContent = [{ type: 'text', text: hiddenText }, ...(multimodalContent ?? visibleText)];
+      multimodalContent = [{ type: 'text', text: hiddenText }, ...(multimodalContent ?? messageParts)];
     }
 
     if (activeChatId) {

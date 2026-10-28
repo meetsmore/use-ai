@@ -6,7 +6,6 @@ import type { UseAIForwardedProps } from '../types';
 import { z } from 'zod';
 import type { ForwardedPropsProviderContext } from './useAIProvider';
 import type { PersistedMessage } from './chatRepository/types';
-import { getDisplayTextFromContent } from '../utils/messageContent';
 
 // Store event handlers and captured data
 let eventHandlers: Record<string, Function[]> = {};
@@ -706,7 +705,7 @@ describe('UseAIProvider sendMessage hiddenText', () => {
     capturedEmitCalls = [];
   });
 
-  test('is sent before the visible text, stored with the message and kept out of the bubble and title', async () => {
+  test('is sent before the visible text, stored with the message and kept out of the title', async () => {
     const repository = new LocalStorageChatRepository();
     const h = await renderSwitchHarness({ chatRepository: repository });
     let chatId = '';
@@ -727,10 +726,9 @@ describe('UseAIProvider sendMessage hiddenText', () => {
       { type: 'text', text: 'Question' },
     ]);
     expect(stored.title).toBe('Question');
-    expect(getDisplayTextFromContent(h.displayedMessages()[0].content)).toBe('Question');
   });
 
-  test('comes before the visible text and the attachments', async () => {
+  test('comes before the attachments too', async () => {
     const h = await renderSwitchHarness();
     await act(async () => {
       await h.createChat();

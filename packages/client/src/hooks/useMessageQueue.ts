@@ -23,7 +23,7 @@ export interface SendMessageOptions {
    */
   forwardedProps?: UseAIForwardedProps;
   /**
-   * Text sent to the AI before `message`, but not shown in the chat bubble, title or chat list.
+   * Text sent to the AI before `message`, but not shown in the built-in chat UI.
    * It is saved with the message, so the AI sees it again on every later turn of the chat.
    */
   hiddenText?: string;
