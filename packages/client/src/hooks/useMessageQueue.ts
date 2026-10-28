@@ -15,6 +15,8 @@ export interface SendMessageOptions {
   openChat?: boolean;
   /** Metadata to set on the new chat (only used when newChat: true) */
   metadata?: ChatMetadata;
+  /** Agent to bind the new chat to (only used when newChat: true). Every message in that chat goes to it. */
+  agent?: string;
   /**
    * Forwarded props for observability and configuration (e.g., telemetryMetadata, mcpHeaders).
    * This is merged with provider-level forwardedProps (message-level takes precedence).
@@ -98,10 +100,10 @@ export function useMessageQueue({
   }, [hasPendingApproval]);
 
   const sendQueuedMessage = useCallback(async (message: string, options?: SendMessageOptions) => {
-    const { newChat = false, attachments = [], openChat = true, metadata, forwardedProps } = options ?? {};
+    const { newChat = false, attachments = [], openChat = true, metadata, agent, forwardedProps } = options ?? {};
 
     if (newChat) {
-      await createNewChatRef.current({ metadata });
+      await createNewChatRef.current({ metadata, agent });
     }
 
     // Convert File[] to FileAttachment[]

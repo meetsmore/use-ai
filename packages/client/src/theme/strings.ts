@@ -45,6 +45,8 @@ export const defaultStrings = {
     connectingPlaceholder: 'Connecting...',
     /** Loading indicator text */
     thinking: 'Thinking',
+    /** Input placeholder in a chat without a run of its own while another chat's reply is in progress */
+    busyInOtherChat: 'A reply is in progress in another chat',
     /** File processing indicator text (shown during file transformation like OCR) */
     processingFile: 'Processing file...',
     /** Disclaimer shown under the input box once a conversation has started */

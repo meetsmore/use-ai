@@ -501,6 +501,28 @@ describe.each(HARNESSES)('UseAIClient over %s', (_name, createHarness) => {
       expect(client.currentRunId).toBeNull();
     });
 
+    test('clearConversation during a run keeps the run\'s tool call and turn out of the new conversation', async () => {
+      await harness.open();
+      const toolCalls: string[] = [];
+      client.onToolCall((toolCallId) => toolCalls.push(toolCallId));
+
+      client.sendPrompt('Add a todo');
+      emitEvent({ type: 'RUN_STARTED', threadId: 't', runId: 'r' });
+      emitEvent({ type: 'TOOL_CALL_START', toolCallId: 'tc1', toolCallName: 'addTodo' });
+      emitEvent({ type: 'TOOL_CALL_ARGS', toolCallId: 'tc1', delta: '{"text":"a"}' });
+
+      client.clearConversation();
+
+      emitEvent({ type: 'TOOL_CALL_END', toolCallId: 'tc1' });
+      client.sendToolResponse('tc1', { ok: 1 });
+      emitEvent({ type: 'STEP_FINISHED' });
+      emitEvent({ type: 'RUN_FINISHED', threadId: 't', runId: 'r' });
+
+      expect(toolCalls).toEqual(['tc1']);
+      expect(client.messages).toEqual([]);
+      expect(client.runMessages.map(m => m.role)).toEqual(['user', 'assistant', 'tool']);
+    });
+
     test('stopping while a tool is still running backfills results for the unanswered tool calls', async () => {
       await harness.open();
 

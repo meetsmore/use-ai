@@ -9,6 +9,7 @@ function createContextValue(overrides: Partial<ChatUIContextValue> = {}): ChatUI
   return {
     connected: true,
     loading: false,
+    loadingInCurrentChat: overrides.loading ?? false,
     sendMessage: mock(async () => {}),
     messages: [],
     streamingParts: [],
@@ -86,6 +87,18 @@ describe('UseAIChat', () => {
 
     expect(getByTestId('thinking-toggle')).toBeInTheDocument();
     expect(getByText('Thinking...')).toBeInTheDocument();
+  });
+
+  test('says in the composer when the block on sending comes from another chat', () => {
+    const ctx = createContextValue({ loading: true, loadingInCurrentChat: false });
+
+    const { getByPlaceholderText } = render(
+      <__UseAIChatContext.Provider value={ctx}>
+        <UseAIChat />
+      </__UseAIChatContext.Provider>
+    );
+
+    expect(getByPlaceholderText('A reply is in progress in another chat...')).toBeInTheDocument();
   });
 
   // Without the id the streaming bubble and the persisted one are different

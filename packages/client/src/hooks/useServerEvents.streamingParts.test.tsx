@@ -17,7 +17,7 @@ function makeToolSystem(): UseToolSystemReturn {
 
 function makeClient() {
   return {
-    messages: [],
+    runMessages: [],
     currentMessageContent: '',
     currentReasoningBlocks: [],
     currentRunId: 'run-1',

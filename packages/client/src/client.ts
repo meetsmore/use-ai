@@ -46,6 +46,20 @@ export type ToolCallHandler = (
 ) => void;
 
 /**
+ * Where a run goes: its thread, the history it carries, and its agent.
+ * Pass it to {@link UseAIClient.sendPrompt} to dispatch a run for a thread other than the one
+ * the client currently shows.
+ */
+export interface RunTarget {
+  /** Thread (chat) id of the run. */
+  threadId: string;
+  /** Conversation history before the new user message. */
+  messages: Message[];
+  /** Agent for the run. `null` means the server default. */
+  agent: string | null;
+}
+
+/**
  * Client for communicating with the UseAI server.
  * Uses the AG-UI protocol (https://docs.ag-ui.com/), so will be compatible with other AG-UI compliant servers.
  *
@@ -66,6 +80,9 @@ export class UseAIClient {
   private _threadId: string | null = null;
   private _tools: ToolDefinition[] = [];
   private _messages: Message[] = [];
+  // Message buffer of the in-flight run when it belongs to a thread other than the one shown
+  // (dispatched for another thread, or the thread changed mid-run). null: the run uses _messages.
+  private _runMessages: Message[] | null = null;
   private _state: unknown = null;
   // Tracks the in-flight run so abortRun() can target it. Set by sendPrompt
   // and cleared at RUN_FINISHED / RUN_ERROR.
@@ -294,10 +311,10 @@ export class UseAIClient {
           toolCalls: [...this._currentAssistantToolCalls],
           ...(reasoningParts ? { reasoningParts } : {}),
         };
-        this._messages.push(assistantMsg);
+        this.runMessages.push(assistantMsg);
 
         // Push tool results for this step
-        this._messages.push(...this._pendingToolResults);
+        this.runMessages.push(...this._pendingToolResults);
 
         // Reset for next step
         this._currentAssistantMessage = { id: uuidv4(), role: 'assistant', content: '' };
@@ -356,8 +373,16 @@ export class UseAIClient {
    * @param multimodalContent - Optional multimodal content (text, images, files)
    * @param forwardedProps - Optional props to forward to the server (e.g., telemetryMetadata, mcpHeaders).
    *                         Internally merged with other forwardedProps.
+   * @param target - Optional thread, history and agent of the run. Without it, the run uses the
+   *                 client's current thread, messages and selected agent. With it, the client's
+   *                 message buffer is updated only when `target.threadId` is the current thread.
    */
-  async sendPrompt(prompt: string, multimodalContent?: MultimodalContent[], forwardedProps?: UseAIForwardedProps) {
+  async sendPrompt(
+    prompt: string,
+    multimodalContent?: MultimodalContent[],
+    forwardedProps?: UseAIForwardedProps,
+    target?: RunTarget
+  ) {
     // Build message content - use multimodal if provided, otherwise just the text
     let messageContent: UserMessageContent = prompt;
 
@@ -374,15 +399,35 @@ export class UseAIClient {
       // @ag-ui/core declares Message.content as `string`; the wire also carries MultimodalContent[].
       content: messageContent as string,
     };
-    this._messages.push(userMessage);
+
+    let threadId: string;
+    let messages: Message[];
+    let agent: string | null;
+    if (target) {
+      threadId = target.threadId;
+      messages = [...target.messages, userMessage];
+      agent = target.agent;
+      if (target.threadId === this._threadId) {
+        this._messages = messages;
+        this._runMessages = null;
+      } else {
+        this._runMessages = messages;
+      }
+    } else {
+      this._messages.push(userMessage);
+      threadId = this.threadId; // Use getter to ensure non-null
+      messages = this._messages;
+      agent = this._selectedAgent;
+      this._runMessages = null;
+    }
 
     // Create RunAgentInput
     const runId = uuidv4();
     this._currentRunId = runId;
     const runInput: RunAgentInput = {
-      threadId: this.threadId, // Use getter to ensure non-null
+      threadId,
       runId,
-      messages: this._messages,
+      messages,
       tools: this._tools.map(t => ({
         name: t.name,
         description: t.description,
@@ -392,7 +437,7 @@ export class UseAIClient {
       state: this._state,
       context: [],
       forwardedProps: {
-        ...(this._selectedAgent ? { agent: this._selectedAgent } : {}),
+        ...(agent ? { agent } : {}),
         ...(forwardedProps || {}),
       },
     };
@@ -503,7 +548,7 @@ export class UseAIClient {
       const stepReasoning = this._currentReasoningBlocks.length > 0
         ? [...this._currentReasoningBlocks]
         : undefined;
-      this._messages.push({
+      this.runMessages.push({
         id: this._currentAssistantMessage.id || uuidv4(),
         role: 'assistant',
         content: this._currentMessageContent,
@@ -538,14 +583,14 @@ export class UseAIClient {
     // results for any tool_use blocks that never got a client response — else
     // the next sendPrompt produces an invalid Anthropic API payload.
     if (this._currentAssistantToolCalls.length > 0) {
-      this._messages.push({
+      this.runMessages.push({
         id: this._currentAssistantMessage.id || uuidv4(),
         role: 'assistant',
         content: this._currentMessageContent || '',
         toolCalls: [...this._currentAssistantToolCalls],
       });
 
-      this._messages.push(...this._pendingToolResults);
+      this.runMessages.push(...this._pendingToolResults);
 
       const respondedIds = new Set(
         this._pendingToolResults
@@ -554,7 +599,7 @@ export class UseAIClient {
       );
       for (const tc of this._currentAssistantToolCalls) {
         if (!respondedIds.has(tc.id)) {
-          this._messages.push({
+          this.runMessages.push({
             id: uuidv4(),
             role: 'tool',
             content: JSON.stringify({ aborted: true, reason: 'Cancelled by user before tool finished' }),
@@ -570,7 +615,7 @@ export class UseAIClient {
     } else if (this._currentMessageContent) {
       // Aborted mid-text (no tools in flight): push the partial text. Leave
       // `_currentMessageContent` populated so the persistence helper can read it.
-      this._messages.push({
+      this.runMessages.push({
         id: this._currentAssistantMessage.id || uuidv4(),
         role: 'assistant',
         content: this._currentMessageContent,
@@ -721,6 +766,15 @@ export class UseAIClient {
   }
 
   /**
+   * Gets the message history of the latest run: the history it was sent with, plus the turn
+   * messages added as it streams. Same as {@link messages} unless the run belongs to a thread
+   * other than the current one.
+   */
+  get runMessages(): Message[] {
+    return this._runMessages ?? this._messages;
+  }
+
+  /**
    * Gets the current state.
    */
   get state(): unknown {
@@ -803,6 +857,8 @@ export class UseAIClient {
   /**
    * Sets the thread ID for this session.
    * When the thread ID changes, conversation state is cleared to prevent history bleeding.
+   * A run still in flight keeps its own state and messages, so its tool calls still execute
+   * and its turn is not added to the new thread.
    * Use this when switching between different chat conversations.
    *
    * @param threadId - The thread/chat ID to use (typically the chatId)
@@ -815,12 +871,16 @@ export class UseAIClient {
       });
 
       // Clear conversation state when switching threads
+      if (this._currentRunId) {
+        this._runMessages ??= this._messages;
+      } else {
+        this._currentMessageContent = '';
+        this._currentMessageId = null;
+        this.currentToolCalls.clear();
+        this._currentAssistantMessage = null;
+        this._currentAssistantToolCalls = [];
+      }
       this._messages = [];
-      this._currentMessageContent = '';
-      this._currentMessageId = null;
-      this.currentToolCalls.clear();
-      this._currentAssistantMessage = null;
-      this._currentAssistantToolCalls = [];
     }
     this._threadId = threadId;
   }
@@ -835,16 +895,21 @@ export class UseAIClient {
 
   /**
    * Clears the conversation history and resets the thread.
+   * A run still in flight keeps its own state and messages, as with {@link setThreadId}.
    */
   clearConversation() {
+    if (this._currentRunId) {
+      this._runMessages ??= this._messages;
+    } else {
+      this._currentMessageContent = '';
+      this._currentMessageId = null;
+      this.currentToolCalls.clear();
+      this._currentAssistantMessage = null;
+      this._currentAssistantToolCalls = [];
+      this._pendingToolResults = [];
+    }
     this._messages = [];
     this._threadId = null;
-    this._currentMessageContent = '';
-    this._currentMessageId = null;
-    this.currentToolCalls.clear();
-    this._currentAssistantMessage = null;
-    this._currentAssistantToolCalls = [];
-    this._pendingToolResults = [];
   }
 
   send(message: UseAIClientMessage) {
