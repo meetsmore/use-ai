@@ -683,7 +683,7 @@ export function UseAIProvider({
 
   // ── Message Sending ─────────────────────────────────────────────────────
 
-  const handleSendMessage = useCallback(async (message: string, attachments?: FileAttachment[], messageForwardedProps?: UseAIForwardedProps) => {
+  const handleSendMessage = useCallback(async (message: string, attachments?: FileAttachment[], messageForwardedProps?: UseAIForwardedProps, hiddenText?: string) => {
     if (!clientRef.current) return;
 
     serverEvents.clearStreamingParts();
@@ -706,6 +706,7 @@ export function UseAIProvider({
       runTarget.agent = chat.agent;
     }
 
+    const messageParts = message.trim() ? [{ type: 'text' as const, text: message }] : [];
     let persistedContent: PersistedMessageContent = message;
     let multimodalContent: MultimodalContent[] | undefined;
 
@@ -734,21 +735,21 @@ export function UseAIProvider({
       // docs/plans/bugfix-transformed-file-persistence.md.
       persistedContent = buildPersistedParts(message, attachments, fileContent);
 
-      if (activeChatId) {
-        await chatManagement.saveUserMessage(activeChatId, persistedContent);
-      }
-
-      multimodalContent = [];
-      if (message.trim()) {
-        multimodalContent.push({ type: 'text', text: message });
-      }
-      multimodalContent.push(...fileContent);
-    } else {
-      if (activeChatId) {
-        await chatManagement.saveUserMessage(activeChatId, persistedContent);
-      }
-      serverEvents.setLoading(true);
+      multimodalContent = [...messageParts, ...fileContent];
     }
+
+    if (hiddenText?.trim()) {
+      persistedContent = [
+        { type: 'hidden_text', text: hiddenText },
+        ...(Array.isArray(persistedContent) ? persistedContent : messageParts),
+      ];
+      multimodalContent = [{ type: 'text', text: hiddenText }, ...(multimodalContent ?? messageParts)];
+    }
+
+    if (activeChatId) {
+      await chatManagement.saveUserMessage(activeChatId, persistedContent);
+    }
+    serverEvents.setLoading(true);
 
     // Reload by the same id: a transformer may have updated the chat's metadata during the upload.
     const chatForProps = activeChatId && attachments && attachments.length > 0

@@ -40,6 +40,26 @@ describe('transformMessagesToClientFormat', () => {
       });
     });
 
+    it('sends hidden_text as a text part, keeping the order', () => {
+      const persisted: PersistedMessage[] = [
+        {
+          id: 'u1',
+          role: 'user',
+          content: [
+            { type: 'hidden_text', text: 'context' },
+            { type: 'text', text: 'question' },
+          ],
+          createdAt: new Date(),
+        },
+      ];
+      const result = transformMessagesToClientFormat(persisted);
+      const parts = result[0].content as Array<{ type: string; text: string }>;
+      expect(parts).toEqual([
+        { type: 'text', text: 'context' },
+        { type: 'text', text: 'question' },
+      ]);
+    });
+
     it('drops legacy metadata-only file parts silently', () => {
       const persisted: PersistedMessage[] = [
         {

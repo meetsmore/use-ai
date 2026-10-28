@@ -137,6 +137,27 @@ describe('UseAIChat', () => {
     expect(container.querySelector('[data-testid="chat-message-assistant"]')).toBe(streamingBubble);
   });
 
+  test('leaves hidden_text out of the user bubble', () => {
+    const ctx = createContextValue({
+      messages: [{
+        id: 'msg-1',
+        role: 'user',
+        content: [{ type: 'hidden_text', text: 'Context' }, { type: 'text', text: 'Question' }],
+        createdAt: new Date(0),
+      }],
+    });
+
+    const { container } = render(
+      <__UseAIChatContext.Provider value={ctx}>
+        <UseAIChat />
+      </__UseAIChatContext.Provider>
+    );
+
+    const bubble = container.querySelector('.chat-message-user');
+    expect(bubble?.textContent).toContain('Question');
+    expect(bubble?.textContent).not.toContain('Context');
+  });
+
   describe('save command feature toggle', () => {
     const userMessage: PersistedMessage = {
       id: 'msg-1',

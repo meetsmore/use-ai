@@ -32,8 +32,8 @@ describe('useMessageQueue', () => {
     });
 
     expect(sendFn).toHaveBeenCalledTimes(2);
-    expect(sendFn).toHaveBeenNthCalledWith(1, 'fails', undefined, undefined);
-    expect(sendFn).toHaveBeenNthCalledWith(2, 'second', undefined, undefined);
+    expect(sendFn).toHaveBeenNthCalledWith(1, 'fails', undefined, undefined, undefined);
+    expect(sendFn).toHaveBeenNthCalledWith(2, 'second', undefined, undefined, undefined);
   });
 
   function queueBehindFailingSend() {
