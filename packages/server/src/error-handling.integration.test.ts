@@ -1,4 +1,4 @@
-import { describe, expect, test, beforeAll, afterAll, mock } from 'bun:test';
+import { describe, expect, test, beforeAll, afterAll } from 'bun:test';
 import { EventType, ErrorCode, TOOL_APPROVAL_REQUEST } from './types';
 import { v4 as uuidv4 } from 'uuid';
 import {
@@ -11,7 +11,11 @@ import { AISDKAgent } from './agents/AISDKAgent';
 import { RunAbortedByUser, RunAbortedByClientDisconnect } from './utils/abortReason';
 import type { Tool, ToolDefinition } from './types';
 import type { Agent, AgentInput, EventEmitter, AgentResult } from './agents/types';
-import { langfuse } from './instrumentation';
+import { _createLangfuseSpanProcessor, langfuse } from './instrumentation';
+import { context as otelContext } from '@opentelemetry/api';
+import { AsyncLocalStorageContextManager } from '@opentelemetry/context-async-hooks';
+import { BasicTracerProvider, InMemorySpanExporter } from '@opentelemetry/sdk-trace-node';
+import { setLangfuseTracerProvider, LangfuseOtelSpanAttributes as A } from '@langfuse/tracing';
 import {
   createServerConfig,
   TestCleanupManager,
@@ -463,19 +467,46 @@ describe('Abort cause labelling', () => {
 });
 
 describe('Error recording and abort handling', () => {
-  // Langfuse mock setup/teardown helpers
+  // Routes Langfuse error traces to an in-memory exporter
   function enableMockLangfuse() {
     const originalEnabled = langfuse.enabled;
     const originalClient = langfuse.client;
-    const mockSpan = mock(() => {});
-    const mockTrace = mock(() => ({ span: mockSpan }));
     langfuse.enabled = true;
-    // Include flushAsync and baseUrl so FeedbackPlugin (auto-initialized when env vars are set) works
-    langfuse.client = { trace: mockTrace, flushAsync: async () => {}, baseUrl: 'mock' } as any;
+    // FeedbackPlugin (auto-initialized when env vars are set) needs a client
+    langfuse.client = { score: { create: () => {} }, flush: async () => {} } as any;
+
+    const exporter = new InMemorySpanExporter();
+    const provider = new BasicTracerProvider({ spanProcessors: [_createLangfuseSpanProcessor({ exporter })] });
+    setLangfuseTracerProvider(provider);
+    const contextManagerRegistered = otelContext.setGlobalContextManager(new AsyncLocalStorageContextManager().enable());
+
     return {
-      mockTrace,
-      mockSpan,
-      restore: () => {
+      /** Exported `use-ai-error` traces with their ERROR child span. */
+      async errorTraces() {
+        await provider.forceFlush();
+        const spans = exporter.getFinishedSpans();
+        return spans
+          .filter(span => span.name === 'use-ai-error')
+          .map(root => {
+            const child = spans.find(span => span.parentSpanContext?.spanId === root.spanContext().spanId);
+            const metadataPrefix = `${A.TRACE_METADATA}.`;
+            const metadata = Object.fromEntries(
+              Object.entries(root.attributes)
+                .filter(([key]) => key.startsWith(metadataPrefix))
+                .map(([key, value]) => [key.slice(metadataPrefix.length), value]),
+            );
+            return {
+              tags: root.attributes[A.TRACE_TAGS],
+              output: JSON.parse(String(root.attributes[A.OBSERVATION_OUTPUT])),
+              metadata,
+              span: { name: child?.name, level: child?.attributes[A.OBSERVATION_LEVEL] },
+            };
+          });
+      },
+      restore: async () => {
+        if (contextManagerRegistered) otelContext.disable();
+        setLangfuseTracerProvider(null);
+        await provider.shutdown();
         langfuse.enabled = originalEnabled;
         langfuse.client = originalClient;
       },
@@ -513,15 +544,16 @@ describe('Error recording and abort handling', () => {
       expect(errorEvent.type).toBe(EventType.RUN_ERROR);
 
       // Verify recordErrorTrace was called with pre_stream_error
-      expect(lf.mockTrace).toHaveBeenCalledTimes(1);
-      const call = (lf.mockTrace.mock.calls as any[][])[0][0];
+      const traces = await lf.errorTraces();
+      expect(traces).toHaveLength(1);
+      const call = traces[0];
       expect(call.tags).toEqual(['error', 'pre_stream_error']);
       expect(call.output.error).toContain('Cache breakpoint error');
 
       socket.disconnect();
       server.close();
     } finally {
-      lf.restore();
+      await lf.restore();
     }
   });
 
@@ -604,12 +636,12 @@ describe('Error recording and abort handling', () => {
       expect(runResult!.success).toBe(false);
 
       // Post-streamText errors are NOT recorded via recordErrorTrace
-      expect(lf.mockTrace).not.toHaveBeenCalled();
+      expect(await lf.errorTraces()).toHaveLength(0);
 
       socket.disconnect();
       server.close();
     } finally {
-      lf.restore();
+      await lf.restore();
     }
   });
 
@@ -698,12 +730,12 @@ describe('Error recording and abort handling', () => {
       expect(runResult!.success).toBe(false);
 
       // Post-streamText errors are NOT recorded via recordErrorTrace
-      expect(lf.mockTrace).not.toHaveBeenCalled();
+      expect(await lf.errorTraces()).toHaveLength(0);
 
       socket.disconnect();
       server.close();
     } finally {
-      lf.restore();
+      await lf.restore();
     }
   });
 
@@ -735,8 +767,9 @@ describe('Error recording and abort handling', () => {
       const errorEvent = await waitForEventType(socket, EventType.RUN_ERROR);
       expect((errorEvent as any).message).toContain('not found');
 
-      expect(lf.mockTrace).toHaveBeenCalledTimes(1);
-      const call = (lf.mockTrace.mock.calls as any[][])[0][0];
+      const traces = await lf.errorTraces();
+      expect(traces).toHaveLength(1);
+      const call = traces[0];
       expect(call.tags).toEqual(['error', 'agent_not_found']);
       expect(call.output.error).toContain('not found');
       // Verify telemetryMetadata is included in trace metadata
@@ -744,15 +777,13 @@ describe('Error recording and abort handling', () => {
       expect(call.metadata.tenantId).toBe('tenant-abc');
 
       // Verify error span was created with ERROR level
-      expect(lf.mockSpan).toHaveBeenCalledTimes(1);
-      const spanCall = (lf.mockSpan.mock.calls as any[][])[0][0];
-      expect(spanCall.name).toBe('agent_not_found');
-      expect(spanCall.level).toBe('ERROR');
+      expect(call.span.name).toBe('agent_not_found');
+      expect(call.span.level).toBe('ERROR');
 
       socket.disconnect();
       server.close();
     } finally {
-      lf.restore();
+      await lf.restore();
     }
   });
 
@@ -774,9 +805,8 @@ describe('Error recording and abort handling', () => {
       sendRunAgent(socket, { prompt: 'first request', tools: [] });
       await waitForEventType(socket, EventType.RUN_FINISHED, 5000);
 
-      // Reset mocks after first request
-      lf.mockTrace.mockClear();
-      lf.mockSpan.mockClear();
+      // The successful first request records no error trace
+      expect(await lf.errorTraces()).toHaveLength(0);
 
       // Second request should be rate-limited (with telemetryMetadata)
       sendRunAgent(socket, {
@@ -789,21 +819,20 @@ describe('Error recording and abort handling', () => {
       const errorEvent = await waitForEventType(socket, EventType.RUN_ERROR);
       expect((errorEvent as any).message).toContain('Rate limit exceeded');
 
-      expect(lf.mockTrace).toHaveBeenCalledTimes(1);
-      const call = (lf.mockTrace.mock.calls as any[][])[0][0];
+      const traces = await lf.errorTraces();
+      expect(traces).toHaveLength(1);
+      const call = traces[0];
       expect(call.tags).toEqual(['error', 'rate_limit_exceeded']);
       // Verify telemetryMetadata is included
       expect(call.metadata.userId).toBe('rate-limited-user');
 
       // Verify error span was created
-      expect(lf.mockSpan).toHaveBeenCalledTimes(1);
-      const spanCall = (lf.mockSpan.mock.calls as any[][])[0][0];
-      expect(spanCall.level).toBe('ERROR');
+      expect(call.span.level).toBe('ERROR');
 
       socket.disconnect();
       server.close();
     } finally {
-      lf.restore();
+      await lf.restore();
     }
   });
 
@@ -840,8 +869,9 @@ describe('Error recording and abort handling', () => {
       expect(errorEvent.type).toBe(EventType.RUN_ERROR);
       expect((errorEvent as any).message).toContain('Unexpected agent failure');
 
-      expect(lf.mockTrace).toHaveBeenCalledTimes(1);
-      const call = (lf.mockTrace.mock.calls as any[][])[0][0];
+      const traces = await lf.errorTraces();
+      expect(traces).toHaveLength(1);
+      const call = traces[0];
       expect(call.tags).toEqual(['error', 'unhandled_error']);
       expect(call.output.error).toContain('Unexpected agent failure');
       // Verify telemetryMetadata is included
@@ -851,7 +881,7 @@ describe('Error recording and abort handling', () => {
       socket.disconnect();
       server.close();
     } finally {
-      lf.restore();
+      await lf.restore();
     }
   });
 });

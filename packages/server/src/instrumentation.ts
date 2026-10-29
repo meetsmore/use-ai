@@ -1,4 +1,6 @@
-import { Langfuse } from 'langfuse';
+import { LangfuseClient } from '@langfuse/client';
+import { propagateAttributes, startObservation } from '@langfuse/tracing';
+import { context as otelContext, ROOT_CONTEXT } from '@opentelemetry/api';
 import { logger } from './logger.js';
 
 /** OTel tracer name for spans created by use-ai (e.g. `use-ai.agent.run`). */
@@ -27,7 +29,7 @@ export const langfuse = _initializeLangfuse();
 export interface LangfuseApi {
   enabled: boolean;
   /** Langfuse SDK client for score operations */
-  client?: Langfuse;
+  client?: LangfuseClient;
 }
 
 /**
@@ -63,37 +65,41 @@ export interface ErrorTraceParams {
 }
 
 /**
- * Records a pre-streamText error as a Langfuse trace.
- * Uses the Langfuse SDK directly (same pattern as FeedbackPlugin).
+ * Records a pre-streamText error as its own Langfuse trace, exported through OTel tracing.
  * Fire-and-forget: errors are caught and logged, never propagated.
  */
 export function recordErrorTrace(params: ErrorTraceParams): void {
-  if (!langfuse.enabled || !langfuse.client) return;
+  if (!langfuse.enabled) return;
   try {
-    const trace = langfuse.client.trace({
-      id: params.runId,
-      name: 'use-ai-error',
-      sessionId: params.sessionId,
-      input: { threadId: params.threadId, errorCategory: params.errorCategory },
-      output: { error: params.errorMessage },
-      metadata: {
-        errorCategory: params.errorCategory,
-        ipAddress: params.ipAddress,
-        source: 'use-ai-server',
-        ...params.metadata,
-      },
-      tags: ['error', params.errorCategory],
-    });
+    const metadata: Record<string, string> = {};
+    for (const [key, value] of Object.entries({
+      runId: params.runId,
+      errorCategory: params.errorCategory,
+      ipAddress: params.ipAddress,
+      source: 'use-ai-server',
+      ...params.metadata,
+    })) {
+      if (value !== undefined) metadata[key] = typeof value === 'string' ? value : JSON.stringify(value);
+    }
+    const input = { threadId: params.threadId, errorCategory: params.errorCategory };
+    const output = { error: params.errorMessage };
 
-    // Create a child span with level: ERROR so the trace is surfaced as ERROR in Langfuse UI.
-    // Without this, the trace would remain at DEFAULT level since traces don't have a level property.
-    trace.span({
-      name: params.errorCategory,
-      level: 'ERROR',
-      statusMessage: params.errorMessage,
-      input: { threadId: params.threadId, errorCategory: params.errorCategory },
-      output: { error: params.errorMessage },
-    });
+    otelContext.with(ROOT_CONTEXT, () =>
+      propagateAttributes(
+        { traceName: 'use-ai-error', sessionId: params.sessionId, tags: ['error', params.errorCategory], metadata },
+        () => {
+          const root = startObservation('use-ai-error', { input, output });
+          // The ERROR child surfaces the trace as ERROR in the Langfuse UI.
+          root.startObservation(params.errorCategory, {
+            level: 'ERROR',
+            statusMessage: params.errorMessage,
+            input,
+            output,
+          }).end();
+          root.end();
+        },
+      ),
+    );
   } catch (error) {
     logger.debug('Failed to record error trace in Langfuse', {
       error: error instanceof Error ? error.message : String(error),
@@ -213,13 +219,11 @@ export function _initializeLangfuse(): LangfuseApi {
   }
 
   const baseUrl = process.env.LANGFUSE_BASE_URL || 'https://cloud.langfuse.com';
-  const release = process.env.LANGFUSE_RELEASE || 'use-ai';
 
-  const client = new Langfuse({
+  const client = new LangfuseClient({
     publicKey: process.env.LANGFUSE_PUBLIC_KEY!,
     secretKey: process.env.LANGFUSE_SECRET_KEY!,
     baseUrl,
-    release,
   });
 
   return {

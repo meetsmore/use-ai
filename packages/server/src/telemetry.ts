@@ -117,5 +117,5 @@ export function startRunSpan(config: StartRunSpanConfig): RunSpan {
  */
 export async function flushTelemetry(): Promise<void> {
   await flushTracing();
-  await langfuse.client?.flushAsync();
+  await langfuse.client?.flush();
 }
