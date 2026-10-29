@@ -17,17 +17,17 @@ import {
   sendRunAgent,
   collectEventsUntil,
 } from '../test/test-utils';
-import type { Langfuse } from 'langfuse';
+import type { LangfuseClient } from '@langfuse/client';
 
 // Mock Langfuse client factory
 const mockScore = mock(() => {});
-const mockFlushAsync = mock(() => Promise.resolve());
+const mockFlush = mock(() => Promise.resolve());
 
-function createMockLangfuseClient(): Langfuse {
+function createMockLangfuseClient(): LangfuseClient {
   return {
-    score: mockScore,
-    flushAsync: mockFlushAsync,
-  } as unknown as Langfuse;
+    score: { create: mockScore },
+    flush: mockFlush,
+  } as unknown as LangfuseClient;
 }
 
 const cleanup = new TestCleanupManager();
@@ -39,7 +39,7 @@ afterAll(() => {
 describe('Feedback Integration', () => {
   beforeEach(() => {
     mockScore.mockClear();
-    mockFlushAsync.mockClear();
+    mockFlush.mockClear();
   });
 
   describe('Client Configuration', () => {

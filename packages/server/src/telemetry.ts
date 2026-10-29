@@ -1,5 +1,5 @@
 import { trace, context as otelContext, SpanStatusCode } from '@opentelemetry/api';
-import { flushTracing, isTracingEnabled, langfuse, popTraceIdForRun, recordErrorTrace, type ErrorTraceParams } from './instrumentation';
+import { flushTracing, isTracingEnabled, langfuse, popTraceIdForRun, recordErrorTrace, USE_AI_TRACER_NAME, type ErrorTraceParams } from './instrumentation';
 
 /**
  * Backend-agnostic telemetry handle for a single agent run.
@@ -58,7 +58,7 @@ export function startRunSpan(config: StartRunSpanConfig): RunSpan {
     };
   }
 
-  const parentSpan = trace.getTracer('use-ai').startSpan('use-ai.agent.run', {
+  const parentSpan = trace.getTracer(USE_AI_TRACER_NAME).startSpan('use-ai.agent.run', {
     attributes: {
       'ai.telemetry.functionId': 'use-ai',
       'ai.telemetry.metadata.runId': runId,
@@ -117,5 +117,5 @@ export function startRunSpan(config: StartRunSpanConfig): RunSpan {
  */
 export async function flushTelemetry(): Promise<void> {
   await flushTracing();
-  await langfuse.client?.flushAsync();
+  await langfuse.client?.flush();
 }

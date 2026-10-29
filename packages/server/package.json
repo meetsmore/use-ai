@@ -32,10 +32,10 @@
   "dependencies": {
     "@ai-sdk/anthropic": "3.0.0-beta.59",
     "@ai-sdk/openai": "3.0.0-beta.66",
+    "@langfuse/client": "^5.14.0",
     "@meetsmore-oss/use-ai-core": "workspace:^",
     "@socket.io/bun-engine": "^0.1.0",
     "ai": "6.0.0-beta.116",
-    "langfuse": "^3.38.6",
     "picomatch": "^4.0.3",
     "socket.io": "^4.8.1",
     "uuid": "^11.1.0",
@@ -44,14 +44,15 @@
     "zod-to-json-schema": "^3.25.1"
   },
   "optionalDependencies": {
-    "@langfuse/otel": "^4.0.0",
-    "@langfuse/tracing": "^4.0.0",
+    "@langfuse/otel": "^5.14.0",
+    "@langfuse/tracing": "^5.14.0",
     "@opentelemetry/api": "^1.9.0",
     "@opentelemetry/sdk-node": "^0.217.0",
     "@opentelemetry/sdk-trace-node": "^2.2.0"
   },
   "devDependencies": {
     "@meetsmore-oss/use-ai-client": "workspace:^",
+    "@opentelemetry/context-async-hooks": "^2.2.0",
     "@types/bun": "^1.3.13",
     "@types/cors": "^2.8.17",
     "@types/json-schema": "^7.0.15",

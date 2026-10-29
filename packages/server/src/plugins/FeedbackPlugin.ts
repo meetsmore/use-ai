@@ -1,4 +1,4 @@
-import { Langfuse } from 'langfuse';
+import type { LangfuseClient } from '@langfuse/client';
 import type { UseAIServerPlugin, MessageHandler } from './types';
 import type { ClientSession } from '../agents/types';
 import type { UseAIClientMessage, FeedbackMessage } from '@meetsmore-oss/use-ai-core';
@@ -32,16 +32,16 @@ import { langfuse } from '../instrumentation';
  * ```
  */
 export class FeedbackPlugin implements UseAIServerPlugin {
-  private langfuseClient: Langfuse | null = null;
+  private langfuseClient: LangfuseClient | null = null;
 
-  constructor(client: Langfuse | undefined = langfuse.client) {
+  constructor(client: LangfuseClient | undefined = langfuse.client) {
     if (!client) {
       logger.debug('[FeedbackPlugin] Langfuse not enabled - feedback disabled');
       return
     }
 
     this.langfuseClient = client
-    logger.info('[FeedbackPlugin] Initialized', { baseUrl: client.baseUrl });
+    logger.info('[FeedbackPlugin] Initialized');
   }
 
   getName(): string {
@@ -91,7 +91,7 @@ export class FeedbackPlugin implements UseAIServerPlugin {
       // Use messageId + 'user-feedback' as idempotency key to allow updates
       const scoreId = `${messageId}-user-feedback`;
 
-      this.langfuseClient.score({
+      this.langfuseClient.score.create({
         traceId,
         name: 'user-feedback',
         value: feedback === 'upvote' ? 1 : 0,
@@ -119,7 +119,7 @@ export class FeedbackPlugin implements UseAIServerPlugin {
    */
   async close(): Promise<void> {
     if (this.langfuseClient) {
-      await this.langfuseClient.flushAsync();
+      await this.langfuseClient.flush();
       logger.debug('[FeedbackPlugin] Flushed Langfuse events');
     }
   }

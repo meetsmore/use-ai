@@ -2,8 +2,8 @@
  * Unit tests for instrumentation.ts trace ID storage functions and error tracing.
  */
 
-import { describe, expect, test, beforeEach, mock, spyOn } from 'bun:test';
-import { pushTraceIdForRun, popTraceIdForRun, recordErrorTrace, langfuse } from './instrumentation';
+import { describe, expect, test, beforeEach, afterEach } from 'bun:test';
+import { pushTraceIdForRun, popTraceIdForRun, recordErrorTrace, langfuse, _createLangfuseSpanProcessor } from './instrumentation';
 
 describe('Trace ID Storage', () => {
   // Use unique runIds per test to avoid cross-test pollution
@@ -79,108 +79,114 @@ describe('recordErrorTrace', () => {
     ipAddress: '127.0.0.1',
   };
 
-  test('is a no-op when Langfuse is disabled (does not throw)', () => {
-    const originalEnabled = langfuse.enabled;
-    const originalClient = langfuse.client;
-    try {
-      langfuse.enabled = false;
-      langfuse.client = undefined;
-      // Should not throw
-      expect(() => recordErrorTrace(baseParams)).not.toThrow();
-    } finally {
-      langfuse.enabled = originalEnabled;
-      langfuse.client = originalClient;
-    }
+  const { BasicTracerProvider, InMemorySpanExporter } = require('@opentelemetry/sdk-trace-node');
+  const { setLangfuseTracerProvider, LangfuseOtelSpanAttributes: A } = require('@langfuse/tracing');
+  const { AsyncLocalStorageContextManager } = require('@opentelemetry/context-async-hooks');
+  const { context: otelContext } = require('@opentelemetry/api');
+
+  let exporter: InstanceType<typeof InMemorySpanExporter>;
+  let provider: InstanceType<typeof BasicTracerProvider>;
+  let originalEnabled: boolean;
+  let contextManagerRegistered: boolean;
+  const finishedSpans = async () => {
+    await provider.forceFlush();
+    return exporter.getFinishedSpans();
+  };
+
+  beforeEach(() => {
+    exporter = new InMemorySpanExporter();
+    provider = new BasicTracerProvider({ spanProcessors: [_createLangfuseSpanProcessor({ exporter })] });
+    setLangfuseTracerProvider(provider);
+    originalEnabled = langfuse.enabled;
+    contextManagerRegistered = otelContext.setGlobalContextManager(new AsyncLocalStorageContextManager().enable());
   });
 
-  test('calls langfuse.client.trace() with correct arguments and creates error span', () => {
-    const originalEnabled = langfuse.enabled;
-    const originalClient = langfuse.client;
-    const mockSpan = mock(() => {});
-    const mockTrace = mock(() => ({ span: mockSpan }));
-    try {
-      langfuse.enabled = true;
-      langfuse.client = { trace: mockTrace } as any;
-
-      recordErrorTrace({
-        ...baseParams,
-        metadata: { requestedAgent: 'foo' },
-      });
-
-      expect(mockTrace).toHaveBeenCalledTimes(1);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const calls = mockTrace.mock.calls as any[][];
-      const call = calls[0][0];
-      expect(call.id).toBe('run-123');
-      expect(call.name).toBe('use-ai-error');
-      expect(call.sessionId).toBe('client-1');
-      expect(call.input).toEqual({ threadId: 'thread-abc', errorCategory: 'agent_not_found' });
-      expect(call.output).toEqual({ error: 'Agent "foo" not found' });
-      expect(call.tags).toEqual(['error', 'agent_not_found']);
-      expect(call.metadata.errorCategory).toBe('agent_not_found');
-      expect(call.metadata.ipAddress).toBe('127.0.0.1');
-      expect(call.metadata.source).toBe('use-ai-server');
-      expect(call.metadata.requestedAgent).toBe('foo');
-
-      // Verify child span was created with ERROR level
-      expect(mockSpan).toHaveBeenCalledTimes(1);
-      const spanCalls = mockSpan.mock.calls as any[][];
-      const spanCall = spanCalls[0][0];
-      expect(spanCall.name).toBe('agent_not_found');
-      expect(spanCall.level).toBe('ERROR');
-      expect(spanCall.statusMessage).toBe('Agent "foo" not found');
-    } finally {
-      langfuse.enabled = originalEnabled;
-      langfuse.client = originalClient;
-    }
+  afterEach(async () => {
+    if (contextManagerRegistered) otelContext.disable();
+    langfuse.enabled = originalEnabled;
+    setLangfuseTracerProvider(null);
+    await provider.shutdown();
   });
 
-  test('does not propagate errors when langfuse.client.trace() throws', () => {
-    const originalEnabled = langfuse.enabled;
-    const originalClient = langfuse.client;
-    const mockTrace = mock((): never => { throw new Error('Langfuse connection failed'); });
-    try {
-      langfuse.enabled = true;
-      langfuse.client = { trace: mockTrace } as any;
+  test('is a no-op when Langfuse is disabled', async () => {
+    langfuse.enabled = false;
 
-      // Should not throw even though trace() throws
-      expect(() => recordErrorTrace(baseParams)).not.toThrow();
-      expect(mockTrace).toHaveBeenCalledTimes(1);
-    } finally {
-      langfuse.enabled = originalEnabled;
-      langfuse.client = originalClient;
-    }
+    expect(() => recordErrorTrace(baseParams)).not.toThrow();
+    expect(await finishedSpans()).toHaveLength(0);
   });
 
-  test('does not propagate errors when trace.span() throws', () => {
-    const originalEnabled = langfuse.enabled;
-    const originalClient = langfuse.client;
-    const mockSpan = mock((): never => { throw new Error('Span creation failed'); });
-    const mockTrace = mock(() => ({ span: mockSpan }));
-    try {
-      langfuse.enabled = true;
-      langfuse.client = { trace: mockTrace } as any;
+  test('exports a use-ai-error trace with an ERROR child span', async () => {
+    langfuse.enabled = true;
 
-      // Should not throw even though span() throws
-      expect(() => recordErrorTrace(baseParams)).not.toThrow();
-      expect(mockTrace).toHaveBeenCalledTimes(1);
-      expect(mockSpan).toHaveBeenCalledTimes(1);
-    } finally {
-      langfuse.enabled = originalEnabled;
-      langfuse.client = originalClient;
-    }
+    recordErrorTrace({ ...baseParams, metadata: { requestedAgent: 'foo', toolCount: 3 } });
+
+    const spans = await finishedSpans();
+    const root = spans.find((s: { name: string }) => s.name === 'use-ai-error');
+    const child = spans.find((s: { name: string }) => s.name === 'agent_not_found');
+    expect(root).toBeDefined();
+    expect(child).toBeDefined();
+
+    expect(root.attributes[A.TRACE_NAME]).toBe('use-ai-error');
+    expect(root.attributes[A.TRACE_SESSION_ID]).toBe('client-1');
+    expect(root.attributes[A.TRACE_TAGS]).toEqual(['error', 'agent_not_found']);
+    expect(root.attributes[`${A.TRACE_METADATA}.runId`]).toBe('run-123');
+    expect(root.attributes[`${A.TRACE_METADATA}.errorCategory`]).toBe('agent_not_found');
+    expect(root.attributes[`${A.TRACE_METADATA}.ipAddress`]).toBe('127.0.0.1');
+    expect(root.attributes[`${A.TRACE_METADATA}.source`]).toBe('use-ai-server');
+    expect(root.attributes[`${A.TRACE_METADATA}.requestedAgent`]).toBe('foo');
+    expect(root.attributes[`${A.TRACE_METADATA}.toolCount`]).toBe('3');
+    expect(JSON.parse(root.attributes[A.OBSERVATION_INPUT])).toEqual({ threadId: 'thread-abc', errorCategory: 'agent_not_found' });
+    expect(JSON.parse(root.attributes[A.OBSERVATION_OUTPUT])).toEqual({ error: 'Agent "foo" not found' });
+
+    expect(child.attributes[A.OBSERVATION_LEVEL]).toBe('ERROR');
+    expect(child.attributes[A.OBSERVATION_STATUS_MESSAGE]).toBe('Agent "foo" not found');
+    expect(child.parentSpanContext.spanId).toBe(root.spanContext().spanId);
+    expect(child.spanContext().traceId).toBe(root.spanContext().traceId);
   });
 
-  test('is a no-op when enabled but client is undefined', () => {
-    const originalEnabled = langfuse.enabled;
-    const originalClient = langfuse.client;
-    try {
-      langfuse.enabled = true;
-      langfuse.client = undefined;
-      expect(() => recordErrorTrace(baseParams)).not.toThrow();
-    } finally {
-      langfuse.enabled = originalEnabled;
-      langfuse.client = originalClient;
-    }
+  test('starts a new trace even when called inside an active span', async () => {
+    langfuse.enabled = true;
+    const { trace } = require('@opentelemetry/api');
+    const outer = provider.getTracer('test').startSpan('outer');
+
+    otelContext.with(trace.setSpan(otelContext.active(), outer), () => recordErrorTrace(baseParams));
+    outer.end();
+
+    const root = (await finishedSpans()).find((s: { name: string }) => s.name === 'use-ai-error');
+    expect(root.parentSpanContext).toBeUndefined();
+    expect(root.spanContext().traceId).not.toBe(outer.spanContext().traceId);
+  });
+
+  test('does not propagate errors from the tracer', () => {
+    langfuse.enabled = true;
+    setLangfuseTracerProvider({ getTracer: () => { throw new Error('tracer failed'); } });
+
+    expect(() => recordErrorTrace(baseParams)).not.toThrow();
+  });
+});
+
+describe('Langfuse span processor', () => {
+  test('exports the use-ai.agent.run parent span with AI SDK spans nested under it', async () => {
+    const { BasicTracerProvider, InMemorySpanExporter } = require('@opentelemetry/sdk-trace-node');
+    const { context: otelContext, trace } = require('@opentelemetry/api');
+
+    const exporter = new InMemorySpanExporter();
+    const processor = _createLangfuseSpanProcessor({ exporter });
+    const provider = new BasicTracerProvider({ spanProcessors: [processor] });
+
+    const parent = provider.getTracer('use-ai').startSpan('use-ai.agent.run');
+    const parentContext = trace.setSpan(otelContext.active(), parent);
+    const child = provider.getTracer('ai').startSpan('ai.streamText', {}, parentContext);
+    child.end();
+    parent.end();
+    await processor.forceFlush();
+
+    const spans = exporter.getFinishedSpans();
+    const exportedParent = spans.find((s: { name: string }) => s.name === 'use-ai.agent.run');
+    const exportedChild = spans.find((s: { name: string }) => s.name === 'ai.streamText');
+    expect(exportedParent).toBeDefined();
+    expect(exportedChild).toBeDefined();
+    expect(exportedChild.parentSpanContext.spanId).toBe(exportedParent.spanContext().spanId);
+    await provider.shutdown();
   });
 });
