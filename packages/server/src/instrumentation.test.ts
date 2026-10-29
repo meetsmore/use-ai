@@ -3,7 +3,7 @@
  */
 
 import { describe, expect, test, beforeEach, mock, spyOn } from 'bun:test';
-import { pushTraceIdForRun, popTraceIdForRun, recordErrorTrace, langfuse } from './instrumentation';
+import { pushTraceIdForRun, popTraceIdForRun, recordErrorTrace, langfuse, _createLangfuseSpanProcessor } from './instrumentation';
 
 describe('Trace ID Storage', () => {
   // Use unique runIds per test to avoid cross-test pollution
@@ -182,5 +182,31 @@ describe('recordErrorTrace', () => {
       langfuse.enabled = originalEnabled;
       langfuse.client = originalClient;
     }
+  });
+});
+
+describe('Langfuse span processor', () => {
+  test('exports the use-ai.agent.run parent span with AI SDK spans nested under it', async () => {
+    const { BasicTracerProvider, InMemorySpanExporter } = require('@opentelemetry/sdk-trace-node');
+    const { context: otelContext, trace } = require('@opentelemetry/api');
+
+    const exporter = new InMemorySpanExporter();
+    const processor = _createLangfuseSpanProcessor({ exporter });
+    const provider = new BasicTracerProvider({ spanProcessors: [processor] });
+
+    const parent = provider.getTracer('use-ai').startSpan('use-ai.agent.run');
+    const parentContext = trace.setSpan(otelContext.active(), parent);
+    const child = provider.getTracer('ai').startSpan('ai.streamText', {}, parentContext);
+    child.end();
+    parent.end();
+    await processor.forceFlush();
+
+    const spans = exporter.getFinishedSpans();
+    const exportedParent = spans.find((s: { name: string }) => s.name === 'use-ai.agent.run');
+    const exportedChild = spans.find((s: { name: string }) => s.name === 'ai.streamText');
+    expect(exportedParent).toBeDefined();
+    expect(exportedChild).toBeDefined();
+    expect(exportedChild.parentSpanContext.spanId).toBe(exportedParent.spanContext().spanId);
+    await provider.shutdown();
   });
 });

@@ -1,6 +1,9 @@
 import { Langfuse } from 'langfuse';
 import { logger } from './logger.js';
 
+/** OTel tracer name for spans created by use-ai (e.g. `use-ai.agent.run`). */
+export const USE_AI_TRACER_NAME = 'use-ai';
+
 // Store trace IDs by runId for feedback linking
 const traceIdByRunId = new Map<string, string>();
 
@@ -151,13 +154,7 @@ export function startTracing(customProcessors: SpanProcessor[] = []): void {
     let langfuseSpanProcessor: SpanProcessor | undefined;
 
     if (langfuse.enabled) {
-      const { LangfuseSpanProcessor } = require('@langfuse/otel');
-      langfuseSpanProcessor = new LangfuseSpanProcessor({
-        publicKey: process.env.LANGFUSE_PUBLIC_KEY!,
-        secretKey: process.env.LANGFUSE_SECRET_KEY!,
-        baseUrl: process.env.LANGFUSE_BASE_URL || 'https://cloud.langfuse.com',
-        release: process.env.LANGFUSE_RELEASE || 'use-ai',
-      }) as SpanProcessor;
+      langfuseSpanProcessor = _createLangfuseSpanProcessor();
       spanProcessors.push(langfuseSpanProcessor);
     }
 
@@ -179,6 +176,25 @@ export function startTracing(customProcessors: SpanProcessor[] = []): void {
       error: error instanceof Error ? error.message : 'Unknown error',
     });
   }
+}
+
+/**
+ * Creates the Langfuse OTel span processor.
+ * Exports Langfuse's default span set (LLM-related spans) plus spans from the `use-ai` tracer,
+ * so AI SDK spans stay nested under `use-ai.agent.run`.
+ * `exporter` replaces the default OTLP exporter. Only exported for testing purposes.
+ */
+export function _createLangfuseSpanProcessor(options: { exporter?: unknown } = {}): SpanProcessor {
+  const { LangfuseSpanProcessor, isDefaultExportSpan } = require('@langfuse/otel');
+  return new LangfuseSpanProcessor({
+    publicKey: process.env.LANGFUSE_PUBLIC_KEY!,
+    secretKey: process.env.LANGFUSE_SECRET_KEY!,
+    baseUrl: process.env.LANGFUSE_BASE_URL || 'https://cloud.langfuse.com',
+    release: process.env.LANGFUSE_RELEASE || 'use-ai',
+    exporter: options.exporter,
+    shouldExportSpan: ({ otelSpan }: { otelSpan: { instrumentationScope: { name: string } } }) =>
+      isDefaultExportSpan(otelSpan) || otelSpan.instrumentationScope.name === USE_AI_TRACER_NAME,
+  }) as SpanProcessor;
 }
 
 /**

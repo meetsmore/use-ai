@@ -155,8 +155,8 @@
         "typescript": "^5.9.3",
       },
       "optionalDependencies": {
-        "@langfuse/otel": "^4.0.0",
-        "@langfuse/tracing": "^4.0.0",
+        "@langfuse/otel": "^5.14.0",
+        "@langfuse/tracing": "^5.14.0",
         "@opentelemetry/api": "^1.9.0",
         "@opentelemetry/sdk-node": "^0.217.0",
         "@opentelemetry/sdk-trace-node": "^2.2.0",
@@ -287,11 +287,11 @@
 
     "@kwsites/file-exists": ["@kwsites/file-exists@1.1.1", "", { "dependencies": { "debug": "^4.1.1" } }, "sha512-m9/5YGR18lIwxSFDwfE3oA7bWuq9kdau6ugN4H2rJeyhFQZcG9AgSHkQtSD15a8WvTgfz9aikZMrKPHvbpqFiw=="],
 
-    "@langfuse/core": ["@langfuse/core@4.6.1", "", { "peerDependencies": { "@opentelemetry/api": "^1.9.0" } }, "sha512-DtQoKWHQh0I0MsJxcKrBQVKAJ3fea6+raXlISVY3NDMFG/zSKkdkNouQvUXQtSCHBbOFupHMBw8imM30lbhq3g=="],
+    "@langfuse/core": ["@langfuse/core@5.14.0", "", { "peerDependencies": { "@opentelemetry/api": "^1.9.0" } }, "sha512-E64XSrRcfddqi76Y0bqi8UYQZfQcChPXb4Ezz4XbQysS3p9Zjqiip3Chv4+Lov374vprjGSorx3CjXjior2CmA=="],
 
-    "@langfuse/otel": ["@langfuse/otel@4.6.1", "", { "dependencies": { "@langfuse/core": "^4.6.1" }, "peerDependencies": { "@opentelemetry/api": "^1.9.0", "@opentelemetry/core": "^2.0.1", "@opentelemetry/exporter-trace-otlp-http": ">=0.202.0 <1.0.0", "@opentelemetry/sdk-trace-base": "^2.0.1" } }, "sha512-ZUa+nV5und6IYK2b5w1vXoNzU/Hfpl1MJ2uu9Woyb74ZBQi36nBwo7SeX+NLvy+n/UzKcJMetOYrA5ywlXvnuA=="],
+    "@langfuse/otel": ["@langfuse/otel@5.14.0", "", { "dependencies": { "@langfuse/core": "^5.14.0" }, "peerDependencies": { "@opentelemetry/api": "^1.9.0", "@opentelemetry/core": "^2.0.1", "@opentelemetry/exporter-trace-otlp-http": ">=0.202.0 <1.0.0", "@opentelemetry/otlp-exporter-base": ">=0.202.0 <1.0.0", "@opentelemetry/sdk-trace-base": "^2.0.1" } }, "sha512-GXgHCu1BIgILs+9/JpKC3siTs/ld7PsB5nGmcqyUehifDTY/znp52b0IvgqVnZVLOpZHOk6HwaxwaFVCIKZAwQ=="],
 
-    "@langfuse/tracing": ["@langfuse/tracing@4.6.1", "", { "dependencies": { "@langfuse/core": "^4.6.1" }, "peerDependencies": { "@opentelemetry/api": "^1.9.0" } }, "sha512-Ld1bPU6RxzifgGEDtN70Og8u2eL906jtnnEnt62BEOcML8UUiMgzwAKZDBbIjF2midnfac7Xnho3s546fcCDtQ=="],
+    "@langfuse/tracing": ["@langfuse/tracing@5.14.0", "", { "dependencies": { "@langfuse/core": "^5.14.0" }, "peerDependencies": { "@opentelemetry/api": "^1.9.0" } }, "sha512-EDheHLGnTkMb6leWXrsnUBacIydy1nITLenpHGgPye6b6K0Td8i3ydkEHSSltw5TKUEj/Kref93x6r29NvKQFg=="],
 
     "@lukeed/csprng": ["@lukeed/csprng@1.1.0", "", {}, "sha512-Z7C/xXCiGWsg0KuKsHTKJxbWhpI3Vs5GwLfOean7MGyVFGqdRgBbAjOCh6u4bbjPc/8MJ2pZmK/0DLdCbivLDA=="],
 
