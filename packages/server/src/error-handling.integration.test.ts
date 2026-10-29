@@ -16,6 +16,7 @@ import { context as otelContext } from '@opentelemetry/api';
 import { AsyncLocalStorageContextManager } from '@opentelemetry/context-async-hooks';
 import { BasicTracerProvider, InMemorySpanExporter } from '@opentelemetry/sdk-trace-node';
 import { setLangfuseTracerProvider, LangfuseOtelSpanAttributes as A } from '@langfuse/tracing';
+import type { LangfuseClient } from '@langfuse/client';
 import {
   createServerConfig,
   TestCleanupManager,
@@ -473,7 +474,7 @@ describe('Error recording and abort handling', () => {
     const originalClient = langfuse.client;
     langfuse.enabled = true;
     // FeedbackPlugin (auto-initialized when env vars are set) needs a client
-    langfuse.client = { score: { create: () => {} }, flush: async () => {} } as any;
+    langfuse.client = { score: { create: () => {} }, flush: async () => {} } as unknown as LangfuseClient;
 
     const exporter = new InMemorySpanExporter();
     const provider = new BasicTracerProvider({ spanProcessors: [_createLangfuseSpanProcessor({ exporter })] });
