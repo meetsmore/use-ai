@@ -4,17 +4,17 @@
 
 import { describe, expect, test, beforeEach, mock } from 'bun:test';
 import type { ClientSession } from '../agents/types';
-import type { Langfuse } from 'langfuse';
+import type { LangfuseClient } from '@langfuse/client';
 
 // Mock Langfuse client factory
 const mockScore = mock(() => {});
-const mockFlushAsync = mock(() => Promise.resolve());
+const mockFlush = mock(() => Promise.resolve());
 
-function createMockLangfuseClient(): Langfuse {
+function createMockLangfuseClient(): LangfuseClient {
   return {
-    score: mockScore,
-    flushAsync: mockFlushAsync,
-  } as unknown as Langfuse;
+    score: { create: mockScore },
+    flush: mockFlush,
+  } as unknown as LangfuseClient;
 }
 
 // Mock the instrumentation module with an enabled singleton
@@ -34,7 +34,7 @@ import { FeedbackPlugin } from './FeedbackPlugin';
 describe('FeedbackPlugin (singleton enabled)', () => {
   beforeEach(() => {
     mockScore.mockClear();
-    mockFlushAsync.mockClear();
+    mockFlush.mockClear();
   });
 
   describe('initialization', () => {
@@ -211,7 +211,51 @@ describe('FeedbackPlugin (singleton enabled)', () => {
       const plugin = new FeedbackPlugin();
       await plugin.close();
 
-      expect(mockFlushAsync).toHaveBeenCalled();
+      expect(mockFlush).toHaveBeenCalled();
     });
+  });
+});
+
+describe('FeedbackPlugin with a real LangfuseClient', () => {
+  test('sends the user-feedback score to the Langfuse API on close', async () => {
+    const { LangfuseClient } = await import('@langfuse/client');
+    const requests: Array<{ path: string; body: unknown }> = [];
+    const server = Bun.serve({
+      port: 0,
+      async fetch(req) {
+        requests.push({ path: new URL(req.url).pathname, body: await req.json() });
+        return Response.json({ successes: [], errors: [] }, { status: 207 });
+      },
+    });
+
+    try {
+      const client = new LangfuseClient({ publicKey: 'pk-test', secretKey: 'sk-test', baseUrl: server.url.origin });
+      const plugin = new FeedbackPlugin(client);
+      let feedbackHandler: Function;
+      plugin.registerHandlers({
+        registerMessageHandler: (type: string, handler: Function) => {
+          if (type === 'message_feedback') feedbackHandler = handler;
+        },
+      });
+
+      await feedbackHandler!({} as ClientSession, {
+        type: 'message_feedback',
+        data: { messageId: 'msg-real', traceId: 'trace-real', feedback: 'downvote' },
+      });
+      await plugin.close();
+
+      const events = requests.flatMap(r => (r.body as { batch: Array<{ type: string; body: unknown }> }).batch);
+      expect(events).toContainEqual(expect.objectContaining({
+        type: 'score-create',
+        body: expect.objectContaining({
+          id: 'msg-real-user-feedback',
+          traceId: 'trace-real',
+          name: 'user-feedback',
+          value: 0,
+        }),
+      }));
+    } finally {
+      server.stop(true);
+    }
   });
 });

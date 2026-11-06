@@ -5,17 +5,17 @@
 
 import { describe, expect, test, beforeEach, mock } from 'bun:test';
 import type { ClientSession } from '../agents/types';
-import type { Langfuse } from 'langfuse';
+import type { LangfuseClient } from '@langfuse/client';
 
 // Mock Langfuse client factory for explicit client tests
 const mockScore = mock(() => {});
-const mockFlushAsync = mock(() => Promise.resolve());
+const mockFlush = mock(() => Promise.resolve());
 
-function createMockLangfuseClient(): Langfuse {
+function createMockLangfuseClient(): LangfuseClient {
   return {
-    score: mockScore,
-    flushAsync: mockFlushAsync,
-  } as unknown as Langfuse;
+    score: { create: mockScore },
+    flush: mockFlush,
+  } as unknown as LangfuseClient;
 }
 
 // Mock the instrumentation module with a disabled singleton (no client)
@@ -34,7 +34,7 @@ import { FeedbackPlugin } from './FeedbackPlugin';
 describe('FeedbackPlugin (singleton disabled)', () => {
   beforeEach(() => {
     mockScore.mockClear();
-    mockFlushAsync.mockClear();
+    mockFlush.mockClear();
   });
 
   describe('initialization', () => {
@@ -100,7 +100,7 @@ describe('FeedbackPlugin (singleton disabled)', () => {
       const plugin = new FeedbackPlugin();
       await plugin.close();
 
-      expect(mockFlushAsync).not.toHaveBeenCalled();
+      expect(mockFlush).not.toHaveBeenCalled();
     });
   });
 });
