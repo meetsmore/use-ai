@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef, useMemo } from 'react';
 import type { UseAIConfig, AGUIEvent, AgentInfo, UseAIForwardedProps, EnabledFeatures } from '../types';
 import { UseAIFloatingButton } from '../components/UseAIFloatingButton';
 import { UseAIChatPanel } from '../components/UseAIChatPanel';
@@ -26,6 +26,7 @@ import { useMessageQueue, type SendMessageOptions } from '../hooks/useMessageQue
 import { ThemeContext, StringsContext, defaultTheme, defaultStrings } from '../theme';
 import type { UseAITheme, UseAIStrings } from '../theme';
 import type { UseAIChatComponentOverrides } from '../components/chatSlots';
+import { ChatRenderersContext, type UseAIChatRenderers } from '../components/chatRenderers';
 
 /** Stable identity so a hidden chat's streaming parts do not re-render consumers. */
 const EMPTY_STREAMING_PARTS: ChatStreamingPart[] = [];
@@ -289,6 +290,12 @@ export interface UseAIProviderOptions {
   /** Default component overrides for every built-in chat rendered by this provider. */
   chatComponents?: UseAIChatComponentOverrides;
   /**
+   * How things inside an answer are drawn, such as fenced code blocks by
+   * language. Applies to the built-in chat, to `CustomChat`, and to custom
+   * `Message` slots that render `DefaultMessage` or `MarkdownContent`.
+   */
+  chatRenderers?: UseAIChatRenderers;
+  /**
    * Custom chat repository for message persistence.
    * Defaults to LocalStorageChatRepository if not provided.
    */
@@ -505,6 +512,7 @@ export function UseAIProvider({
   CustomButton,
   CustomChat,
   chatComponents,
+  chatRenderers,
   chatRepository,
   forwardedPropsProvider,
   fileUploadConfig: fileUploadConfigProp,
@@ -891,6 +899,14 @@ export function UseAIProvider({
     components: chatComponents,
   };
 
+  // Keyed on the inner map, so an inline `chatRenderers={{ codeBlocks }}` does
+  // not hand every consumer a new context value on each provider render.
+  const codeBlockRenderers = chatRenderers?.codeBlocks;
+  const chatRenderersValue = useMemo<UseAIChatRenderers>(
+    () => ({ codeBlocks: codeBlockRenderers }),
+    [codeBlockRenderers],
+  );
+
   const isUIDisabled = CustomButton === null || CustomChat === null;
   const ButtonComponent = isUIDisabled ? null : (CustomButton || UseAIFloatingButton);
   const hasCustomChat = CustomChat !== undefined && CustomChat !== null;
@@ -985,8 +1001,10 @@ export function UseAIProvider({
       <StringsContext.Provider value={strings}>
         <__UseAIContext.Provider value={value}>
           <__UseAIChatContext.Provider value={chatUIContextValue}>
-            {children}
-            {renderBuiltInChat()}
+            <ChatRenderersContext.Provider value={chatRenderersValue}>
+              {children}
+              {renderBuiltInChat()}
+            </ChatRenderersContext.Provider>
           </__UseAIChatContext.Provider>
         </__UseAIContext.Provider>
       </StringsContext.Provider>

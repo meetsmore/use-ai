@@ -1,13 +1,98 @@
-import React from 'react';
+import React, { createContext, useContext } from 'react';
 import ReactMarkdown from 'react-markdown';
 import type { Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { useChatRenderers } from './chatRenderers';
 
-interface MarkdownContentProps {
+export interface MarkdownContentProps {
   content: string;
 }
 
 const REMARK_PLUGINS = [remarkGfm];
+
+/** The markdown being rendered, so a block can look at its own source text. */
+const MarkdownSourceContext = createContext('');
+
+/** The parts of a hast node that a fenced code block needs. */
+interface HastNode {
+  type: string;
+  tagName?: string;
+  value?: string;
+  properties?: { className?: unknown };
+  children?: HastNode[];
+  position?: { start: { offset?: number }; end: { offset?: number } };
+}
+
+function textOf(node: HastNode): string {
+  if (node.type === 'text') return node.value ?? '';
+  return (node.children ?? []).map(textOf).join('');
+}
+
+/** Reads the language and source of a `<pre><code class="language-x">` block. */
+function readCodeBlock(pre: HastNode | undefined): { language: string; code: string } | null {
+  const code = pre?.children?.find((child) => child.type === 'element' && child.tagName === 'code');
+  const classNames = code?.properties?.className;
+  if (!code || !Array.isArray(classNames)) return null;
+  const languageClass = classNames.find(
+    (name): name is string => typeof name === 'string' && name.startsWith('language-'),
+  );
+  if (!languageClass) return null;
+  return {
+    language: languageClass.slice('language-'.length),
+    // The fenced block's text always ends with the newline before the closing
+    // fence (or before the end of an unclosed one).
+    code: textOf(code).replace(/\n$/, ''),
+  };
+}
+
+const CLOSING_FENCE = /^ {0,3}(`{3,}|~{3,})[ \t]*$/;
+
+/**
+ * Whether a fenced block in `source` has its closing fence. CommonMark runs an
+ * unclosed fence to the end of the document, which is what a block looks like
+ * while it streams. Without position data there is nothing to check, so the
+ * block counts as complete.
+ */
+function isFenceClosed(pre: HastNode | undefined, source: string): boolean {
+  const start = pre?.position?.start.offset;
+  const end = pre?.position?.end.offset;
+  if (start === undefined || end === undefined) return true;
+  const lines = source.slice(start, end).replace(/\n+$/, '').split('\n');
+  if (lines.length < 2) return false;
+  const opening = lines[0].trimStart();
+  const closing = lines[lines.length - 1].match(CLOSING_FENCE);
+  // The closing fence uses the opening's character, at least as many of it.
+  return !!closing && closing[1][0] === opening[0] && closing[1].length >= (opening.match(/^(`+|~+)/)?.[1].length ?? 3);
+}
+
+const PRE_STYLE: React.CSSProperties = {
+  margin: '0.5em 0',
+  padding: '0.75em',
+  backgroundColor: 'rgba(0, 0, 0, 0.1)',
+  borderRadius: '6px',
+  overflow: 'auto',
+  fontSize: '0.85em',
+  fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Consolas, monospace',
+};
+
+/**
+ * A fenced code block. A language registered in `chatRenderers.codeBlocks`
+ * replaces the whole `<pre>`; anything else keeps the built-in look.
+ *
+ * Declared once at module level like the rest of `MARKDOWN_COMPONENTS`: it
+ * reads the renderers from context instead of closing over them, so the map
+ * never changes identity (see below).
+ */
+function CodeBlock({ node, children }: { node?: HastNode; children?: React.ReactNode }) {
+  const { codeBlocks } = useChatRenderers();
+  const source = useContext(MarkdownSourceContext);
+  const block = codeBlocks ? readCodeBlock(node) : null;
+  const Renderer = block ? codeBlocks?.[block.language] : undefined;
+  if (block && Renderer) {
+    return <Renderer code={block.code} language={block.language} complete={isFenceClosed(node, source)} />;
+  }
+  return <pre style={PRE_STYLE}>{children}</pre>;
+}
 
 /**
  * This map must stay a module-level constant.
@@ -57,21 +142,7 @@ const MARKDOWN_COMPONENTS: Components = {
       </code>
     );
   },
-  pre: ({ children }) => (
-    <pre
-      style={{
-        margin: '0.5em 0',
-        padding: '0.75em',
-        backgroundColor: 'rgba(0, 0, 0, 0.1)',
-        borderRadius: '6px',
-        overflow: 'auto',
-        fontSize: '0.85em',
-        fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Consolas, monospace',
-      }}
-    >
-      {children}
-    </pre>
-  ),
+  pre: CodeBlock as Components['pre'],
   blockquote: ({ children }) => (
     <blockquote
       style={{
@@ -170,8 +241,10 @@ const MARKDOWN_COMPONENTS: Components = {
  */
 export const MarkdownContent = React.memo(function MarkdownContent({ content }: MarkdownContentProps) {
   return (
-    <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={MARKDOWN_COMPONENTS}>
-      {content}
-    </ReactMarkdown>
+    <MarkdownSourceContext.Provider value={content}>
+      <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={MARKDOWN_COMPONENTS}>
+        {content}
+      </ReactMarkdown>
+    </MarkdownSourceContext.Provider>
   );
 });

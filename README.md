@@ -833,6 +833,35 @@ function Message(props: ChatMessageSlotProps) {
 A working example of every slot, including a turn rendered as a timeline, lives
 in `apps/example` at `/custom-slots-demo`.
 
+**Rendering code blocks by language:**
+
+To draw part of an answer differently without replacing the `Message` slot,
+register `chatRenderers` on the provider. A fenced code block whose language is
+registered in `codeBlocks` is rendered by your component instead of as code:
+
+````tsx
+import { UseAIProvider, type ChatCodeBlockRendererProps } from '@meetsmore-oss/use-ai-client';
+
+function VizBlock({ code, complete }: ChatCodeBlockRendererProps) {
+  // `complete` is false while the block is still streaming in.
+  return <Chart source={code} partial={!complete} />;
+}
+
+// Module level, so the block is not remounted on every streamed token.
+const codeBlocks = { viz: VizBlock };
+
+<UseAIProvider serverUrl="wss://your-server.com" chatRenderers={{ codeBlocks }}>
+  <App />
+</UseAIProvider>
+````
+
+An answer containing ```` ```viz ```` now shows `VizBlock`; other languages keep the
+built-in rendering. The renderers also apply inside a custom `Message` slot
+that renders `DefaultMessage` or `MarkdownContent`, so they combine with other
+slot overrides. `MarkdownContent`, `Reasoning`, `getTextFromContent` and
+`getDisplayTextFromContent` are exported for slots that build an answer from
+these pieces.
+
 You can also disable them by passing `null`:
 
 ```tsx
