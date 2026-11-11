@@ -1,0 +1,25 @@
+README.md
+  s_d272583522f141::t_c5db1ee6b4f9fd 845-847,864-869
+packages/client/src/components/MarkdownContent.tsx
+  s_d272583522f141::t_01f193cc5f0c4c 1,5,54-91,103-106,108,110,260-262
+packages/client/src/components/chatRenderers.test.tsx
+  s_d272583522f141::t_2e39e7741f19b2 13,36,46-158
+packages/client/src/components/chatRenderers.tsx
+  s_d272583522f141::t_3912f1ad2dbf86 6-9,28-31
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "4607270ff21da3f0555430467d666e900c97f85d",
+  "prompts": {},
+  "sessions": {
+    "s_d272583522f141": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1ca9b-8fe6-7aa1-9c46-6610fe6fdcb4",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "yuma.ito <yuma.ito@meetsmore.com>"
+    }
+  }
+}
