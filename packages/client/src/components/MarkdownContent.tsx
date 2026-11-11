@@ -4,7 +4,7 @@ import type { Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useChatRenderers, type ChatCodeBlockRendererProps } from './chatRenderers';
 
-export interface MarkdownContentProps {
+interface MarkdownContentProps {
   content: string;
 }
 
