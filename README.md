@@ -856,10 +856,7 @@ const codeBlocks = { viz: VizBlock };
 
 An answer containing ```` ```viz ```` now shows `VizBlock`; other languages keep the
 built-in rendering. The renderers also apply inside a custom `Message` slot
-that renders `DefaultMessage` or `MarkdownContent`, so they combine with other
-slot overrides. `MarkdownContent`, `Reasoning`, `getTextFromContent` and
-`getDisplayTextFromContent` are exported for slots that build an answer from
-these pieces.
+that renders `DefaultMessage`, so they combine with other slot overrides.
 
 The component receives `code` and `language`. `code` updates as the answer streams
 and may be incomplete; handle partial input in your renderer to draw progressively.
@@ -867,7 +864,7 @@ If rendering throws, that block falls back to the built-in code display while th
 rest of the answer remains visible. Rendering is retried when the block's code,
 language, or registered component changes.
 
-You can also disable them by passing `null`:
+You can disable the floating button and chat UI by passing `null`:
 
 ```tsx
 import { UseAIProvider } from '@meetsmore-oss/use-ai-client';

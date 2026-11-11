@@ -56,14 +56,8 @@ export {
   DefaultToolApproval,
   DefaultDisclaimer,
 } from './components/chatSlots';
-// Drawing inside an answer: renderers registered on the provider, and the
-// pieces DefaultMessage is built from, so a custom Message slot can reuse them.
+// Code block renderers registered on the provider.
 export type { UseAIChatRenderers, ChatCodeBlockRendererProps } from './components/chatRenderers';
-export { MarkdownContent } from './components/MarkdownContent';
-export type { MarkdownContentProps } from './components/MarkdownContent';
-export { Reasoning } from './components/Reasoning';
-export type { ReasoningProps } from './components/Reasoning';
-export { getTextFromContent, getDisplayTextFromContent } from './utils/messageContent';
 export type { SubmitMode } from './utils/keyboard';
 export type { MergedMessage } from './utils/mergeAssistantMessages';
 export {

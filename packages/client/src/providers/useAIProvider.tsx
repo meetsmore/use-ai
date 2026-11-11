@@ -292,7 +292,7 @@ export interface UseAIProviderOptions {
   /**
    * How things inside an answer are drawn, such as fenced code blocks by
    * language. Applies to the built-in chat, to `CustomChat`, and to custom
-   * `Message` slots that render `DefaultMessage` or `MarkdownContent`.
+   * `Message` slots that render `DefaultMessage`.
    */
   chatRenderers?: UseAIChatRenderers;
   /**
