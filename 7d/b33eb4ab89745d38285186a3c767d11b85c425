@@ -1,0 +1,19 @@
+packages/client/src/components/MarkdownContent.tsx
+  s_d272583522f141::t_f469b70043c1a9 7
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "7db33eb4ab89745d38285186a3c767d11b85c425",
+  "prompts": {},
+  "sessions": {
+    "s_d272583522f141": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1ca9b-8fe6-7aa1-9c46-6610fe6fdcb4",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "yuma.ito <yuma.ito@meetsmore.com>"
+    }
+  }
+}
