@@ -1,0 +1,23 @@
+README.md
+  s_d272583522f141::t_4b2eb9cedfe0e7 833-849
+packages/client/src/components/MarkdownContent.tsx
+  s_d272583522f141::t_47bec1b9ce39f1 6
+packages/client/src/index.ts
+  s_d272583522f141::t_1bc4fd4270f358 33-38
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e442b356630c1c9095e682cc4592130ca4fcfe94",
+  "prompts": {},
+  "sessions": {
+    "s_d272583522f141": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1ca9b-8fe6-7aa1-9c46-6610fe6fdcb4",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "yuma.ito <yuma.ito@meetsmore.com>"
+    }
+  }
+}
