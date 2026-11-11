@@ -830,6 +830,23 @@ function Message(props: ChatMessageSlotProps) {
 }
 ```
 
+**Building a custom message body:**
+
+If a custom `Message` slot needs to compose the answer itself, import these
+existing building blocks from `@meetsmore-oss/use-ai-client` instead of copying
+their implementations:
+
+| Export | Purpose |
+| --- | --- |
+| `MarkdownContent` | Render a Markdown string passed as `content`. |
+| `Reasoning` | Render `reasoningParts` with `theme`, `strings`, and optional `isStreaming`. |
+| `getTextFromContent` | Extract persisted text, including transformed-file text, for model/storage round-trips. |
+| `getDisplayTextFromContent` | Extract display text, omitting transformed-file text such as large OCR results. |
+
+`MarkdownContentProps` and `ReasoningProps` are also exported. Use the existing
+`getTextFromStreamingParts` and `getReasoningPartsFromStreamingParts` helpers
+when composing an answer that is still streaming.
+
 A working example of every slot, including a turn rendered as a timeline, lives
 in `apps/example` at `/custom-slots-demo`.
 
