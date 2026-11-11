@@ -3,19 +3,16 @@ import type React from 'react';
 
 /** Props for a component that renders one fenced code block in an answer. */
 export interface ChatCodeBlockRendererProps {
-  /** The block's source, without the fences and the trailing newline. */
+  /**
+   * The block's source, without the fences and the trailing newline.
+   * Updated as the answer streams; the code may be incomplete.
+   */
   code: string;
   /**
    * The language on the opening fence, e.g. `"viz"` for a block opened with
    * ```` ```viz ````.
    */
   language: string;
-  /**
-   * Whether the closing fence has arrived. While an answer streams, an
-   * unclosed fence runs to the end of the text, so `code` grows token by token
-   * until this turns true. Render progressively or wait, as the block allows.
-   */
-  complete: boolean;
 }
 
 /**
@@ -27,6 +24,10 @@ export interface UseAIChatRenderers {
    * Renders fenced code blocks by their language instead of as plain code. A
    * registered language replaces the whole `<pre>`; any other language keeps
    * the built-in rendering.
+   *
+   * Renderers receive incomplete code during streaming. If rendering throws,
+   * the block falls back to plain code and retries when its code, language,
+   * or registered component changes.
    *
    * Define the components at module level. A component created during render
    * is a new type each time, so React remounts the block on every streamed

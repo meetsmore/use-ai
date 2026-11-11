@@ -842,12 +842,11 @@ registered in `codeBlocks` is rendered by your component instead of as code:
 ````tsx
 import { UseAIProvider, type ChatCodeBlockRendererProps } from '@meetsmore-oss/use-ai-client';
 
-function VizBlock({ code, complete }: ChatCodeBlockRendererProps) {
-  // `complete` is false while the block is still streaming in.
-  return <Chart source={code} partial={!complete} />;
+// Module level, so the block is not remounted on every streamed token.
+function VizBlock({ code }: ChatCodeBlockRendererProps) {
+  return <Chart source={code} />;
 }
 
-// Module level, so the block is not remounted on every streamed token.
 const codeBlocks = { viz: VizBlock };
 
 <UseAIProvider serverUrl="wss://your-server.com" chatRenderers={{ codeBlocks }}>
@@ -861,6 +860,12 @@ that renders `DefaultMessage` or `MarkdownContent`, so they combine with other
 slot overrides. `MarkdownContent`, `Reasoning`, `getTextFromContent` and
 `getDisplayTextFromContent` are exported for slots that build an answer from
 these pieces.
+
+The component receives `code` and `language`. `code` updates as the answer streams
+and may be incomplete; handle partial input in your renderer to draw progressively.
+If rendering throws, that block falls back to the built-in code display while the
+rest of the answer remains visible. Rendering is retried when the block's code,
+language, or registered component changes.
 
 You can also disable them by passing `null`:
 

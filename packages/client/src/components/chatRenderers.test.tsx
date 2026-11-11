@@ -10,7 +10,7 @@ const rendered: ChatCodeBlockRendererProps[] = [];
 function VizBlock(props: ChatCodeBlockRendererProps) {
   rendered.push(props);
   return (
-    <div data-testid="viz" data-complete={String(props.complete)}>
+    <div data-testid="viz">
       {props.code}
     </div>
   );
@@ -33,7 +33,7 @@ describe('chatRenderers.codeBlocks', () => {
 
     expect(getByTestId('viz').textContent).toBe('<div>chart</div>');
     expect(container.querySelector('pre')).toBeNull();
-    expect(rendered.at(-1)).toEqual({ code: '<div>chart</div>', language: 'viz', complete: true });
+    expect(rendered.at(-1)).toEqual({ code: '<div>chart</div>', language: 'viz' });
   });
 
   test('keeps the built-in <pre> for a language that is not registered', () => {
@@ -41,6 +41,119 @@ describe('chatRenderers.codeBlocks', () => {
 
     expect(queryByTestId('viz')).toBeNull();
     expect(container.querySelector('pre code')?.textContent).toBe('SELECT 1\n');
+  });
+
+  for (const language of ['constructor', 'valueOf', '__proto__', 'toString']) {
+    test(`keeps plain code for the unregistered inherited name ${language}`, () => {
+      const { container, queryByTestId } = renderWithRenderers(`\`\`\`${language}\nx\n\`\`\``);
+
+      expect(queryByTestId('viz')).toBeNull();
+      expect(container.querySelector('pre code')?.textContent).toBe('x\n');
+    });
+
+    test(`renders an explicitly registered ${language} language`, () => {
+      const { container, getByTestId } = renderWithRenderers(`\`\`\`${language}\nx\n\`\`\``, {
+        codeBlocks: { [language]: VizBlock },
+      });
+
+      expect(getByTestId('viz').textContent).toBe('x');
+      expect(container.querySelector('pre')).toBeNull();
+    });
+  }
+
+  test('recovers from partial code while preserving the rest of the answer', () => {
+    function JsonBlock({ code }: ChatCodeBlockRendererProps) {
+      const value = JSON.parse(code) as { title: string };
+      return <div data-testid="json">{value.title}</div>;
+    }
+    const value = { codeBlocks: { viz: VizBlock, json: JsonBlock } };
+    const answer = (code: string) => (
+      <ChatRenderersContext.Provider value={value}>
+        <MarkdownContent content={`Before\n\n\`\`\`viz\nchart\n\`\`\`\n\n\`\`\`json\n${code}`} />
+      </ChatRenderersContext.Provider>
+    );
+    const { container, getByTestId, queryByTestId, getByText, rerender } = render(answer('{"title":'));
+    const otherBlock = getByTestId('viz');
+    const paragraph = getByText('Before');
+
+    expect(queryByTestId('json')).toBeNull();
+    expect(container.querySelector('pre code')?.textContent).toBe('{"title":\n');
+
+    rerender(answer('{"title":"Sales"'));
+    expect(queryByTestId('json')).toBeNull();
+    expect(container.querySelector('pre code')?.textContent).toBe('{"title":"Sales"\n');
+
+    // Valid input can render before the closing fence arrives.
+    rerender(answer('{"title":"Sales"}'));
+    const block = getByTestId('json');
+    expect(block.textContent).toBe('Sales');
+    expect(container.querySelector('pre')).toBeNull();
+
+    rerender(answer('{"title":"Sales"}\n\`\`\`\n\nAfter'));
+    expect(getByTestId('json')).toBe(block);
+    expect(getByText('After')).not.toBeNull();
+
+    // An already mounted renderer can also fail and recover on a later update.
+    rerender(answer('{"title":"Revenue"'));
+    expect(queryByTestId('json')).toBeNull();
+    expect(container.querySelector('pre code')?.textContent).toBe('{"title":"Revenue"\n');
+
+    rerender(answer('{"title":"Revenue"}\n\`\`\`'));
+    expect(getByTestId('json').textContent).toBe('Revenue');
+    expect(container.querySelector('pre')).toBeNull();
+    expect(getByTestId('viz')).toBe(otherBlock);
+    expect(getByText('Before')).toBe(paragraph);
+  });
+
+  test('keeps failed code visible and retries when its registered component changes', () => {
+    let attempts = 0;
+    function BrokenBlock(): React.ReactElement {
+      attempts++;
+      throw new Error('Cannot render this block');
+    }
+    const value = { codeBlocks: { viz: BrokenBlock } };
+    const content = '```viz\nchart\n```';
+    const { container, rerender, getByTestId, getByText } = renderWithRenderers(content, value);
+    const failedAttempts = attempts;
+
+    expect(failedAttempts).toBeGreaterThan(0);
+    expect(container.querySelector('pre code')?.textContent).toBe('chart\n');
+
+    rerender(
+      <ChatRenderersContext.Provider value={value}>
+        <MarkdownContent content={content + '\n\nMore text'} />
+      </ChatRenderersContext.Provider>
+    );
+    expect(getByText('More text')).not.toBeNull();
+    expect(container.querySelector('pre code')?.textContent).toBe('chart\n');
+    expect(attempts).toBe(failedAttempts);
+
+    rerender(
+      <ChatRenderersContext.Provider value={renderers}>
+        <MarkdownContent content={content + '\n\nMore text'} />
+      </ChatRenderersContext.Provider>
+    );
+    expect(getByTestId('viz').textContent).toBe('chart');
+    expect(container.querySelector('pre')).toBeNull();
+  });
+
+  test('retries when the language changes with the same source and component', () => {
+    function LanguageBlock({ code, language }: ChatCodeBlockRendererProps) {
+      if (language === 'pending') throw new Error('Language is still incomplete');
+      return <div data-testid="language">{code}</div>;
+    }
+    const value = { codeBlocks: { pending: LanguageBlock, ready: LanguageBlock } };
+    const { container, getByTestId, rerender } = renderWithRenderers('```pending\nchart\n```', value);
+
+    expect(container.querySelector('pre code')?.textContent).toBe('chart\n');
+
+    rerender(
+      <ChatRenderersContext.Provider value={value}>
+        <MarkdownContent content={'```ready\nchart\n```'} />
+      </ChatRenderersContext.Provider>
+    );
+    expect(getByTestId('language').textContent).toBe('chart');
+    expect(container.querySelector('pre')).toBeNull();
   });
 
   test('leaves inline code alone', () => {
@@ -54,22 +167,6 @@ describe('chatRenderers.codeBlocks', () => {
     const { container } = render(<MarkdownContent content={'```viz\nx\n```'} />);
 
     expect(container.querySelector('pre code')?.textContent).toBe('x\n');
-  });
-
-  test('reports an unclosed fence as incomplete and a closed one as complete', () => {
-    const completeOf = (content: string) => {
-      const { container, unmount } = renderWithRenderers(content);
-      const value = container.querySelector<HTMLElement>('[data-testid="viz"]')?.dataset.complete;
-      unmount();
-      return value;
-    };
-
-    expect(completeOf('```viz\n<div>par')).toBe('false');
-    expect(completeOf('```viz\n<div>part</div>\n``')).toBe('false');
-    expect(completeOf('```viz\n<div>part</div>\n```')).toBe('true');
-    expect(completeOf('~~~viz\nx\n~~~')).toBe('true');
-    // A closing fence needs at least as many backticks as the opening one.
-    expect(completeOf('````viz\nx\n```')).toBe('false');
   });
 
   test('keeps the block mounted while its source streams in', () => {
@@ -86,7 +183,6 @@ describe('chatRenderers.codeBlocks', () => {
       expect(getByTestId('viz')).toBe(block);
     }
     expect(block.textContent).toBe('<div>chart</div>');
-    expect(block.dataset.complete).toBe('true');
   });
 
   test('applies when a custom Message slot renders DefaultMessage itself', () => {

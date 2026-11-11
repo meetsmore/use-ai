@@ -1,17 +1,14 @@
-import React, { createContext, useContext } from 'react';
+import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import type { Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { useChatRenderers } from './chatRenderers';
+import { useChatRenderers, type ChatCodeBlockRendererProps } from './chatRenderers';
 
 export interface MarkdownContentProps {
   content: string;
 }
 
 const REMARK_PLUGINS = [remarkGfm];
-
-/** The markdown being rendered, so a block can look at its own source text. */
-const MarkdownSourceContext = createContext('');
 
 /** The parts of a hast node that a fenced code block needs. */
 interface HastNode {
@@ -20,7 +17,6 @@ interface HastNode {
   value?: string;
   properties?: { className?: unknown };
   children?: HastNode[];
-  position?: { start: { offset?: number }; end: { offset?: number } };
 }
 
 function textOf(node: HastNode): string {
@@ -45,26 +41,6 @@ function readCodeBlock(pre: HastNode | undefined): { language: string; code: str
   };
 }
 
-const CLOSING_FENCE = /^ {0,3}(`{3,}|~{3,})[ \t]*$/;
-
-/**
- * Whether a fenced block in `source` has its closing fence. CommonMark runs an
- * unclosed fence to the end of the document, which is what a block looks like
- * while it streams. Without position data there is nothing to check, so the
- * block counts as complete.
- */
-function isFenceClosed(pre: HastNode | undefined, source: string): boolean {
-  const start = pre?.position?.start.offset;
-  const end = pre?.position?.end.offset;
-  if (start === undefined || end === undefined) return true;
-  const lines = source.slice(start, end).replace(/\n+$/, '').split('\n');
-  if (lines.length < 2) return false;
-  const opening = lines[0].trimStart();
-  const closing = lines[lines.length - 1].match(CLOSING_FENCE);
-  // The closing fence uses the opening's character, at least as many of it.
-  return !!closing && closing[1][0] === opening[0] && closing[1].length >= (opening.match(/^(`+|~+)/)?.[1].length ?? 3);
-}
-
 const PRE_STYLE: React.CSSProperties = {
   margin: '0.5em 0',
   padding: '0.75em',
@@ -74,6 +50,44 @@ const PRE_STYLE: React.CSSProperties = {
   fontSize: '0.85em',
   fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Consolas, monospace',
 };
+
+interface CodeBlockErrorBoundaryProps extends ChatCodeBlockRendererProps {
+  Renderer: React.ComponentType<ChatCodeBlockRendererProps>;
+  fallback: React.ReactNode;
+}
+
+type CodeBlockErrorBoundaryState = Pick<CodeBlockErrorBoundaryProps, 'code' | 'language' | 'Renderer'> & {
+  hasError: boolean;
+};
+
+/** Isolates renderer errors and retries on new input without remounting healthy blocks. */
+class CodeBlockErrorBoundary extends React.Component<CodeBlockErrorBoundaryProps, CodeBlockErrorBoundaryState> {
+  state: CodeBlockErrorBoundaryState = {
+    code: this.props.code,
+    language: this.props.language,
+    Renderer: this.props.Renderer,
+    hasError: false,
+  };
+
+  static getDerivedStateFromProps(
+    props: CodeBlockErrorBoundaryProps,
+    state: CodeBlockErrorBoundaryState,
+  ): CodeBlockErrorBoundaryState | null {
+    if (props.code !== state.code || props.language !== state.language || props.Renderer !== state.Renderer) {
+      return { code: props.code, language: props.language, Renderer: props.Renderer, hasError: false };
+    }
+    return null;
+  }
+
+  static getDerivedStateFromError(): Partial<CodeBlockErrorBoundaryState> {
+    return { hasError: true };
+  }
+
+  render() {
+    const { Renderer, code, language, fallback } = this.props;
+    return this.state.hasError ? fallback : <Renderer code={code} language={language} />;
+  }
+}
 
 /**
  * A fenced code block. A language registered in `chatRenderers.codeBlocks`
@@ -85,13 +99,15 @@ const PRE_STYLE: React.CSSProperties = {
  */
 function CodeBlock({ node, children }: { node?: HastNode; children?: React.ReactNode }) {
   const { codeBlocks } = useChatRenderers();
-  const source = useContext(MarkdownSourceContext);
   const block = codeBlocks ? readCodeBlock(node) : null;
-  const Renderer = block ? codeBlocks?.[block.language] : undefined;
+  const Renderer = block && codeBlocks && Object.hasOwn(codeBlocks, block.language)
+    ? codeBlocks[block.language]
+    : undefined;
+  const fallback = <pre style={PRE_STYLE}>{children}</pre>;
   if (block && Renderer) {
-    return <Renderer code={block.code} language={block.language} complete={isFenceClosed(node, source)} />;
+    return <CodeBlockErrorBoundary code={block.code} language={block.language} Renderer={Renderer} fallback={fallback} />;
   }
-  return <pre style={PRE_STYLE}>{children}</pre>;
+  return fallback;
 }
 
 /**
@@ -241,10 +257,8 @@ const MARKDOWN_COMPONENTS: Components = {
  */
 export const MarkdownContent = React.memo(function MarkdownContent({ content }: MarkdownContentProps) {
   return (
-    <MarkdownSourceContext.Provider value={content}>
-      <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={MARKDOWN_COMPONENTS}>
-        {content}
-      </ReactMarkdown>
-    </MarkdownSourceContext.Provider>
+    <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={MARKDOWN_COMPONENTS}>
+      {content}
+    </ReactMarkdown>
   );
 });
