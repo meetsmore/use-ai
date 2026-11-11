@@ -1,0 +1,49 @@
+packages/client/src/index.ts
+  s_8c92ecb1a1d746::t_432bcbece396dc 59-66
+packages/client/src/components/chatRenderers.test.tsx
+  s_8c92ecb1a1d746::t_6b8ffc868e3c53 1-59,71,73-111
+  s_8c92ecb1a1d746::t_5666b75f080103 60-70,72
+README.md
+  s_8c92ecb1a1d746::t_4a6c64aa734f1b 836-864
+packages/client/src/components/MarkdownContent.tsx
+  s_8c92ecb1a1d746::t_0226961e577665 1,5,7,13-95
+  s_8c92ecb1a1d746::t_579b4ddcdaaf60 244-248
+  s_8c92ecb1a1d746::t_7377a37904df96 145
+  s_d56020b24c8120::t_2dbe5aa66b4b3a 96
+packages/client/src/components/chatRenderers.tsx
+  s_8c92ecb1a1d746::t_593442df27bbee 1-55
+packages/client/src/providers/useAIProvider.tsx
+  s_8c92ecb1a1d746::t_56ad713d20cfa8 1004-1007
+  s_8c92ecb1a1d746::t_a03da9585811bc 1
+  s_8c92ecb1a1d746::t_ee86b3a59b6708 29
+  s_8c92ecb1a1d746::t_ba531ba0d0ae46 293-297
+  s_8c92ecb1a1d746::t_9f138af137f3d5 515
+  s_8c92ecb1a1d746::t_92942f4745e5b9 902-909
+  s_8c92ecb1a1d746::t_8a3f99c33cfe36 292
+packages/client/src/providers/useAIProvider.chatRenderers.test.tsx
+  s_8c92ecb1a1d746::t_f3041c27805b0e 1-52
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "5d2710144116198b936228ffda242e368462f674",
+  "prompts": {},
+  "sessions": {
+    "s_8c92ecb1a1d746": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a0576597-e60d-432d-b95a-19f29fe49c3b",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "yuma.ito <yuma.ito@meetsmore.com>"
+    },
+    "s_d56020b24c8120": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0297f520-1aad-480c-a712-285e1f4e067d",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "yuma.ito <yuma.ito@meetsmore.com>"
+    }
+  }
+}
