@@ -2,12 +2,113 @@ import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import type { Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { useChatRenderers, type ChatCodeBlockRendererProps } from './chatRenderers';
 
 interface MarkdownContentProps {
   content: string;
 }
 
 const REMARK_PLUGINS = [remarkGfm];
+
+/** The parts of a hast node that a fenced code block needs. */
+interface HastNode {
+  type: string;
+  tagName?: string;
+  value?: string;
+  properties?: { className?: unknown };
+  children?: HastNode[];
+}
+
+function textOf(node: HastNode): string {
+  if (node.type === 'text') return node.value ?? '';
+  return (node.children ?? []).map(textOf).join('');
+}
+
+/** Reads the language and source of a `<pre><code class="language-x">` block. */
+function readCodeBlock(pre: HastNode | undefined): { language: string; code: string } | null {
+  const code = pre?.children?.find((child) => child.type === 'element' && child.tagName === 'code');
+  const classNames = code?.properties?.className;
+  if (!code || !Array.isArray(classNames)) return null;
+  const languageClass = classNames.find(
+    (name): name is string => typeof name === 'string' && name.startsWith('language-'),
+  );
+  if (!languageClass) return null;
+  return {
+    language: languageClass.slice('language-'.length),
+    // The fenced block's text always ends with the newline before the closing
+    // fence (or before the end of an unclosed one).
+    code: textOf(code).replace(/\n$/, ''),
+  };
+}
+
+const PRE_STYLE: React.CSSProperties = {
+  margin: '0.5em 0',
+  padding: '0.75em',
+  backgroundColor: 'rgba(0, 0, 0, 0.1)',
+  borderRadius: '6px',
+  overflow: 'auto',
+  fontSize: '0.85em',
+  fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Consolas, monospace',
+};
+
+interface CodeBlockErrorBoundaryProps extends ChatCodeBlockRendererProps {
+  Renderer: React.ComponentType<ChatCodeBlockRendererProps>;
+  fallback: React.ReactNode;
+}
+
+type CodeBlockErrorBoundaryState = Pick<CodeBlockErrorBoundaryProps, 'code' | 'language' | 'Renderer'> & {
+  hasError: boolean;
+};
+
+/** Isolates renderer errors and retries on new input without remounting healthy blocks. */
+class CodeBlockErrorBoundary extends React.Component<CodeBlockErrorBoundaryProps, CodeBlockErrorBoundaryState> {
+  state: CodeBlockErrorBoundaryState = {
+    code: this.props.code,
+    language: this.props.language,
+    Renderer: this.props.Renderer,
+    hasError: false,
+  };
+
+  static getDerivedStateFromProps(
+    props: CodeBlockErrorBoundaryProps,
+    state: CodeBlockErrorBoundaryState,
+  ): CodeBlockErrorBoundaryState | null {
+    if (props.code !== state.code || props.language !== state.language || props.Renderer !== state.Renderer) {
+      return { code: props.code, language: props.language, Renderer: props.Renderer, hasError: false };
+    }
+    return null;
+  }
+
+  static getDerivedStateFromError(): Partial<CodeBlockErrorBoundaryState> {
+    return { hasError: true };
+  }
+
+  render() {
+    const { Renderer, code, language, fallback } = this.props;
+    return this.state.hasError ? fallback : <Renderer code={code} language={language} />;
+  }
+}
+
+/**
+ * A fenced code block. A language registered in `chatRenderers.codeBlocks`
+ * replaces the whole `<pre>`; anything else keeps the built-in look.
+ *
+ * Declared once at module level like the rest of `MARKDOWN_COMPONENTS`: it
+ * reads the renderers from context instead of closing over them, so the map
+ * never changes identity (see below).
+ */
+function CodeBlock({ node, children }: { node?: HastNode; children?: React.ReactNode }) {
+  const { codeBlocks } = useChatRenderers();
+  const block = codeBlocks ? readCodeBlock(node) : null;
+  const Renderer = block && codeBlocks && Object.hasOwn(codeBlocks, block.language)
+    ? codeBlocks[block.language]
+    : undefined;
+  const fallback = <pre style={PRE_STYLE}>{children}</pre>;
+  if (block && Renderer) {
+    return <CodeBlockErrorBoundary code={block.code} language={block.language} Renderer={Renderer} fallback={fallback} />;
+  }
+  return fallback;
+}
 
 /**
  * This map must stay a module-level constant.
@@ -57,21 +158,7 @@ const MARKDOWN_COMPONENTS: Components = {
       </code>
     );
   },
-  pre: ({ children }) => (
-    <pre
-      style={{
-        margin: '0.5em 0',
-        padding: '0.75em',
-        backgroundColor: 'rgba(0, 0, 0, 0.1)',
-        borderRadius: '6px',
-        overflow: 'auto',
-        fontSize: '0.85em',
-        fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Consolas, monospace',
-      }}
-    >
-      {children}
-    </pre>
-  ),
+  pre: CodeBlock as Components['pre'],
   blockquote: ({ children }) => (
     <blockquote
       style={{

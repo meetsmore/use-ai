@@ -56,6 +56,8 @@ export {
   DefaultToolApproval,
   DefaultDisclaimer,
 } from './components/chatSlots';
+// Code block renderers registered on the provider.
+export type { UseAIChatRenderers, ChatCodeBlockRendererProps } from './components/chatRenderers';
 export type { SubmitMode } from './utils/keyboard';
 export type { MergedMessage } from './utils/mergeAssistantMessages';
 export {

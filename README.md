@@ -833,7 +833,38 @@ function Message(props: ChatMessageSlotProps) {
 A working example of every slot, including a turn rendered as a timeline, lives
 in `apps/example` at `/custom-slots-demo`.
 
-You can also disable them by passing `null`:
+**Rendering code blocks by language:**
+
+To draw part of an answer differently without replacing the `Message` slot,
+register `chatRenderers` on the provider. A fenced code block whose language is
+registered in `codeBlocks` is rendered by your component instead of as code:
+
+````tsx
+import { UseAIProvider, type ChatCodeBlockRendererProps } from '@meetsmore-oss/use-ai-client';
+
+// Module level, so the block is not remounted on every streamed token.
+function VizBlock({ code }: ChatCodeBlockRendererProps) {
+  return <Chart source={code} />;
+}
+
+const codeBlocks = { viz: VizBlock };
+
+<UseAIProvider serverUrl="wss://your-server.com" chatRenderers={{ codeBlocks }}>
+  <App />
+</UseAIProvider>
+````
+
+An answer containing ```` ```viz ```` now shows `VizBlock`; other languages keep the
+built-in rendering. The renderers also apply inside a custom `Message` slot
+that renders `DefaultMessage`, so they combine with other slot overrides.
+
+The component receives `code` and `language`. `code` updates as the answer streams
+and may be incomplete; handle partial input in your renderer to draw progressively.
+If rendering throws, that block falls back to the built-in code display while the
+rest of the answer remains visible. Rendering is retried when the block's code,
+language, or registered component changes.
+
+You can disable the floating button and chat UI by passing `null`:
 
 ```tsx
 import { UseAIProvider } from '@meetsmore-oss/use-ai-client';
