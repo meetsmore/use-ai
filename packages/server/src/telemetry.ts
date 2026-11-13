@@ -1,4 +1,5 @@
-import { trace, context as otelContext, SpanStatusCode } from '@opentelemetry/api';
+import { trace, context as otelContext, SpanStatusCode, type AttributeValue } from '@opentelemetry/api';
+import { propagateAttributes } from '@langfuse/tracing';
 import { flushTracing, isTracingEnabled, langfuse, popTraceIdForRun, recordErrorTrace, USE_AI_TRACER_NAME, type ErrorTraceParams } from './instrumentation';
 
 /**
@@ -35,8 +36,10 @@ export interface RunSpan {
 interface StartRunSpanConfig {
   runId: string;
   sessionId: string;
-  attributes?: Record<string, string>;
+  attributes?: Record<string, AttributeValue>;
 }
+
+const RUN_SPAN_NAME = 'use-ai.agent.run';
 
 /**
  * Creates a `RunSpan` that groups all step iterations under one OTEL trace.
@@ -58,15 +61,17 @@ export function startRunSpan(config: StartRunSpanConfig): RunSpan {
     };
   }
 
-  const parentSpan = trace.getTracer(USE_AI_TRACER_NAME).startSpan('use-ai.agent.run', {
+  // Langfuse span processors copy propagated trace attributes onto every span started in this context.
+  const runContext = propagateAttributes({ traceName: RUN_SPAN_NAME }, () => otelContext.active());
+  const parentSpan = trace.getTracer(USE_AI_TRACER_NAME).startSpan(RUN_SPAN_NAME, {
     attributes: {
+      ...config.attributes,
       'ai.telemetry.functionId': 'use-ai',
       'ai.telemetry.metadata.runId': runId,
       'ai.telemetry.metadata.sessionId': sessionId,
-      ...config.attributes,
     },
-  });
-  const parentOtelContext = trace.setSpan(otelContext.active(), parentSpan);
+  }, runContext);
+  const parentOtelContext = trace.setSpan(runContext, parentSpan);
 
   return {
     active: true,
