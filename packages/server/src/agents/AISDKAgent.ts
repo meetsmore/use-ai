@@ -652,7 +652,7 @@ export class AISDKAgent implements Agent {
       : ctx.session.clientId;
     const attributes: Record<string, AttributeValue> = {};
     for (const [key, value] of Object.entries(telemetryMetadata ?? {})) {
-      if (value != null) attributes[`ai.telemetry.metadata.${key}`] = value as AttributeValue;
+      if (value != null && key !== 'runId' && key !== 'sessionId') attributes[`ai.telemetry.metadata.${key}`] = value as AttributeValue;
     }
     const span = startRunSpan({ runId: ctx.runId, sessionId, attributes });
 

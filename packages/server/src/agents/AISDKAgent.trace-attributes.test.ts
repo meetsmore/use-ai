@@ -2,13 +2,14 @@ import { describe, expect, test, beforeEach, afterEach } from 'bun:test';
 import { context as otelContext, trace } from '@opentelemetry/api';
 import { AsyncLocalStorageContextManager } from '@opentelemetry/context-async-hooks';
 import { BasicTracerProvider, InMemorySpanExporter, type ReadableSpan } from '@opentelemetry/sdk-trace-node';
-import { LangfuseOtelSpanAttributes as A } from '@langfuse/tracing';
+import { LangfuseOtelSpanAttributes as A, propagateAttributes } from '@langfuse/tracing';
 import { MockLanguageModelV3 } from 'ai/test';
 import { simulateReadableStream } from 'ai';
 import { v4 as uuidv4 } from 'uuid';
 import { AISDKAgent } from './AISDKAgent';
 import type { AgentInput } from './types';
-import { _createLangfuseSpanProcessor, langfuse, type SpanProcessor } from '../instrumentation';
+import { _createLangfuseSpanProcessor, langfuse, USE_AI_TRACER_NAME, type SpanProcessor } from '../instrumentation';
+import { startRunSpan } from '../telemetry';
 
 /**
  * Host span processor that derives Langfuse tags from AI SDK telemetry metadata at span start,
@@ -125,5 +126,41 @@ describe('AISDKAgent trace-level attributes', () => {
 
     const root = exporter.getFinishedSpans().find(s => s.name === 'use-ai.agent.run');
     expect(root?.attributes['ai.telemetry.metadata.sessionId']).toBe('client-1');
+  });
+
+  test('startRunSpan config.attributes override the default run span attributes', async () => {
+    const span = startRunSpan({
+      runId: 'run-1',
+      sessionId: 'session-1',
+      attributes: {
+        'ai.telemetry.functionId': 'custom-agent',
+        'ai.telemetry.metadata.runId': 'run-override',
+        'ai.telemetry.metadata.sessionId': 'session-override',
+      },
+    });
+    span.end();
+    await provider.forceFlush();
+
+    const root = exporter.getFinishedSpans().find(s => s.name === 'use-ai.agent.run');
+    expect(root?.attributes).toMatchObject({
+      'ai.telemetry.functionId': 'custom-agent',
+      'ai.telemetry.metadata.runId': 'run-override',
+      'ai.telemetry.metadata.sessionId': 'session-override',
+    });
+  });
+
+  test('a trace name propagated by the caller wins over use-ai.agent.run', async () => {
+    propagateAttributes({ traceName: 'host-trace' }, () => {
+      const span = startRunSpan({ runId: 'run-1', sessionId: 'session-1' });
+      span.wrap(() => trace.getTracer(USE_AI_TRACER_NAME).startSpan('child').end());
+      span.end();
+    });
+    await provider.forceFlush();
+
+    const names = exporter.getFinishedSpans().map(s => ({ span: s.name, traceName: s.attributes[A.TRACE_NAME] }));
+    expect(names).toEqual(expect.arrayContaining([
+      { span: 'use-ai.agent.run', traceName: 'host-trace' },
+      { span: 'child', traceName: 'host-trace' },
+    ]));
   });
 });
