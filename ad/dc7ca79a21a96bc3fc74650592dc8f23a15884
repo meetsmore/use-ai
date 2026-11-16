@@ -1,0 +1,71 @@
+packages/client/src/index.ts
+  s_1853915a2b576c::t_39e9cc9f026e4b 5,67-70,195
+packages/client/src/hooks/useLatestToolCall.test.tsx
+  s_1853915a2b576c::t_98dc86b6ca1585 1-54
+packages/client/src/hooks/useServerEvents.abort.test.tsx
+  s_1853915a2b576c::t_c0315f7e067c8f 27
+packages/client/src/hooks/useToolSystem.ts
+  s_1853915a2b576c::t_38630624ca1a5c 90-94,137-144,320,329-330,477
+  s_1853915a2b576c::t_aa5689c78d6ce1 6,31-39,321,353,358,365,376,380,382-387
+  s_1853915a2b576c::t_11701ca2eef6bc 322
+packages/client/src/hooks/useServerEvents.streamingParts.test.tsx
+  s_1853915a2b576c::t_40008004cb94b4 100
+  s_1853915a2b576c::t_c0315f7e067c8f 15-16
+packages/client/src/providers/useAIProvider.tsx
+  s_1853915a2b576c::t_fb944e6e06340c 648
+  s_1853915a2b576c::t_29f6bb258ee1bc 640-641
+  s_1853915a2b576c::t_49164922c2a0ae 642
+packages/client/src/defineTool.ts
+  s_1853915a2b576c::t_9e79049a8ed199 12-41
+packages/client/src/hooks/useServerEvents.streamingId.test.tsx
+  s_1853915a2b576c::t_c0315f7e067c8f 15-16
+packages/client/src/hooks/useLatestToolCall.ts
+  s_1853915a2b576c::t_4f6af80b26dd17 3-4,23,57-69,71-72,84
+  s_1853915a2b576c::t_ed18ee57fd3e62 1-2,5-22,24-56,70,73-83,85
+packages/client/src/hooks/useServerEvents.toolCallStatus.test.tsx
+  s_1853915a2b576c::t_256cf1725fb99f 1-170,173-177
+  s_1853915a2b576c::t_16f1314e0157a7 171-172
+packages/client/src/hooks/useServerEvents.disconnect.test.tsx
+  s_1853915a2b576c::t_c0315f7e067c8f 26
+packages/client/src/hooks/useToolSystem.signal.test.tsx
+  s_1853915a2b576c::t_d1c36cb23e364e 1-59
+packages/client/src/utils/toolCalls.ts
+  s_1853915a2b576c::t_ea0081cf8295ad 5-22,30,36,41
+  s_1853915a2b576c::t_1cd898ad6323e0 1-4,23-29,31-35,37-40,42-91
+packages/client/src/useAIWorkflow.ts
+  s_1853915a2b576c::t_b40798a0123b80 191-192,194-195
+packages/client/src/client.ts
+  s_1853915a2b576c::t_9b4d46a86057e0 49-56
+  s_1853915a2b576c::t_29f6bb258ee1bc 307,492,606,652,699,720-726
+  s_1853915a2b576c::t_a50ecdcbd79815 295-300
+  s_1853915a2b576c::t_0ec370248559cd 700-719,727-731
+  s_1853915a2b576c::t_e6329df600029c 646-649
+  s_1853915a2b576c::t_f354c3acfe9ebc 109-110
+  s_1853915a2b576c::t_6fb32477380445 48
+packages/client/src/hooks/useServerEvents.ts
+  s_1853915a2b576c::t_aa5689c78d6ce1 19,94-95,469,474-475
+  s_1853915a2b576c::t_26d103b33faf43 378
+  s_1853915a2b576c::t_9e9e6ad72510c9 1,23,127-131,326-328,467-468,470-473,476-479,487-488
+  s_1853915a2b576c::t_ba751400016bb2 55-92
+  s_1853915a2b576c::t_29f6bb258ee1bc 224-228,231,237,251,362,385
+  s_1853915a2b576c::t_c7776e13948f10 229-230,232-236,238-250,252-253
+  s_1853915a2b576c::t_0330f8d9b33f4b 93
+packages/client/src/utils/toolCalls.test.ts
+  s_1853915a2b576c::t_f08dd87937badf 1-54
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "addc7ca79a21a96bc3fc74650592dc8f23a15884",
+  "prompts": {},
+  "sessions": {
+    "s_1853915a2b576c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6a4c6489-1831-4973-b930-ec3736dfc8aa",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "yuma.ito <yuma.ito@meetsmore.com>"
+    }
+  }
+}
