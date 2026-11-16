@@ -3,6 +3,7 @@ import type { ToolAnnotations, ToolApprovalRequestEvent } from '../types';
 import type { UseAIClient } from '../client';
 import type { ToolsDefinition, ToolExecutionContext } from '../defineTool';
 import { executeDefinedTool } from '../defineTool';
+import { isErrorResult } from '../utils/toolCalls';
 
 // ── Registry Types ──────────────────────────────────────────────────────────
 
@@ -25,6 +26,15 @@ export interface PendingToolApproval {
   message?: string;
   /** Optional metadata for the approval request (runtime approval) */
   metadata?: Record<string, unknown>;
+}
+
+/**
+ * Whether a pending approval belongs to a tool call: the call's own approval
+ * (`destructiveHint`, keyed by its `toolCallId`), or one the tool asked for
+ * with `ctx.requestApproval`, keyed `${toolCallId}-runtime-${timestamp}`.
+ */
+export function isApprovalForToolCall(approval: PendingToolApproval, toolCallId: string): boolean {
+  return approval.toolCallId === toolCallId || approval.toolCallId.startsWith(`${toolCallId}-runtime-`);
 }
 
 // ── Hook Options & Return ───────────────────────────────────────────────────
@@ -77,6 +87,11 @@ export interface UseToolSystemReturn {
   approveAll: () => Promise<void>;
   /** Reject all pending tool calls with optional reason */
   rejectAll: (reason?: string) => void;
+  /**
+   * Aborts the `ctx.signal` handed to the current run's tool calls and starts
+   * a fresh one for the next run. Called when a run ends, however it ends.
+   */
+  abortRunSignal: () => void;
 }
 
 /**
@@ -118,6 +133,14 @@ export function useToolSystem({
 
   /** Resolvers for runtime approval requests (from ctx.requestApproval) */
   const runtimeApprovalResolversRef = useRef<Map<string, (result: { approved: boolean; reason?: string }) => void>>(new Map());
+
+  /** One controller per run: every tool call of the run gets its signal as `ctx.signal`. */
+  const runAbortControllerRef = useRef(new AbortController());
+
+  const abortRunSignal = useCallback(() => {
+    runAbortControllerRef.current.abort();
+    runAbortControllerRef.current = new AbortController();
+  }, []);
 
   // ── Registry Methods ────────────────────────────────────────────────────
 
@@ -294,12 +317,17 @@ export function useToolSystem({
       return;
     }
 
+    const signal = runAbortControllerRef.current.signal;
+    let response: { result: unknown; state?: unknown };
+
     try {
       const ownerId = toolOwnershipRef.current.get(name);
       console.log(`[useToolSystem] Tool "${name}" owned by component:`, ownerId);
 
       // Build ToolExecutionContext with requestApproval for runtime approvals
       const ctx: ToolExecutionContext = {
+        toolCallId,
+        signal,
         requestApproval: ({ message, metadata }) => {
           return new Promise<{ approved: boolean; reason?: string }>((resolve) => {
             const approvalId = `${toolCallId}-runtime-${Date.now()}`;
@@ -322,20 +350,19 @@ export function useToolSystem({
       console.log('[useToolSystem] Executing tool...');
       const result = await executeDefinedTool(aggregatedToolsRef.current, name, input, ctx);
 
-      const isErrorResult = result && typeof result === 'object' &&
-        ('error' in result || (result as Record<string, unknown>).success === false);
+      const isError = isErrorResult(result);
 
       const ownerIsInvisible = ownerId ? isInvisible(ownerId) : false;
 
       // Wait for prompt to update (via waiter registered by useAI) unless it's an error or invisible
-      if (ownerId && !isErrorResult && !ownerIsInvisible) {
+      if (ownerId && !isError && !ownerIsInvisible) {
         const waiter = getWaiter(ownerId);
         if (waiter) {
           console.log(`[useToolSystem] Waiting for prompt change from ${ownerId}...`);
           await waiter();
           console.log('[useToolSystem] Prompt change wait complete');
         }
-      } else if (isErrorResult) {
+      } else if (isError) {
         console.log('[useToolSystem] Tool returned error, skipping prompt wait');
       } else if (ownerIsInvisible) {
         console.log('[useToolSystem] Component is invisible, skipping prompt wait');
@@ -346,16 +373,18 @@ export function useToolSystem({
       await waitForToolsToStabilize();
       console.log('[useToolSystem] Tools stabilized');
 
-      const updatedState = buildState();
+      response = { result, state: buildState() };
       console.log(`[useToolSystem] Updated state (aggregated from all hooks)`);
-
-      client.sendToolResponse(toolCallId, result, updatedState);
     } catch (err) {
       console.error('Tool execution error:', err);
-      client.sendToolResponse(toolCallId, {
-        error: err instanceof Error ? err.message : 'Unknown error',
-      });
+      response = { result: { error: err instanceof Error ? err.message : 'Unknown error' } };
     }
+
+    // The run ended while the tool worked (e.g. a question gave up waiting on
+    // `ctx.signal`). The server no longer waits for the result, and when the
+    // user stopped the run the client has already recorded the call as aborted.
+    if (signal.aborted) return;
+    client.sendToolResponse(toolCallId, response.result, response.state);
   }, [clientRef, isInvisible, getWaiter, waitForToolsToStabilize, buildState]);
 
   const storePendingToolCall = useCallback((
@@ -445,5 +474,6 @@ export function useToolSystem({
     storePendingToolCall,
     approveAll,
     rejectAll,
+    abortRunSignal,
   };
 }

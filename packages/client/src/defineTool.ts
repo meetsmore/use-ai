@@ -10,6 +10,36 @@ export type { ToolAnnotations };
  */
 export interface ToolExecutionContext {
   /**
+   * Id of this tool call, the same `toolCallId` the chat's tool call part
+   * (`ChatStreamingPart`) and `useLatestToolCall` carry. Use it to connect the
+   * call to what the chat shows for it, e.g. to resolve a question with the
+   * answer the user picks in the question's card.
+   * @example "toolu_01abc123"
+   */
+  toolCallId: string;
+  /**
+   * Aborted when the run this call belongs to ends: stopped by the user,
+   * failed, disconnected or finished. A tool that waits on the user should
+   * stop waiting then; the call is already recorded as aborted, so what it
+   * returns afterwards is dropped.
+   *
+   * @example
+   * ```typescript
+   * const askUser = defineTool(
+   *   'Ask the user to pick one option',
+   *   z.object({ options: z.array(z.string()) }),
+   *   (input, ctx) => new Promise((resolve) => {
+   *     questions.open(ctx.toolCallId, input.options, (answer) => resolve({ answer }));
+   *     ctx.signal.addEventListener('abort', () => {
+   *       questions.close(ctx.toolCallId);
+   *       resolve({ aborted: true });
+   *     });
+   *   })
+   * );
+   * ```
+   */
+  signal: AbortSignal;
+  /**
    * Request user approval during tool execution.
    * Use this for conditional approval based on runtime values
    * (e.g., API endpoint, input values, computed risk).
