@@ -352,6 +352,18 @@ describe.each(HARNESSES)('UseAIClient over %s', (_name, createHarness) => {
       expect(lastSent()).toMatchObject({ type: 'tool_result', data: { toolCallId: 'toolu_1' } });
       expect(consoleErrorSpy).toHaveBeenCalledWith('[UseAI] onToolResult handler threw:', expect.any(Error));
     });
+
+    // JSON.stringify(undefined) is undefined, which a saved chat cannot read back.
+    test('records a tool that returns nothing as null', async () => {
+      await harness.open();
+      const handler = mock(() => {});
+      client.onToolResult(handler);
+
+      client.sendToolResponse('toolu_1', undefined);
+
+      expect(handler).toHaveBeenCalledWith('toolu_1', 'null');
+      expect(lastSent()).toMatchObject({ type: 'tool_result', data: { content: 'null' } });
+    });
   });
 
   describe('message ordering after tool call turn', async () => {

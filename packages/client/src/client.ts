@@ -476,7 +476,9 @@ export class UseAIClient {
       data: {
         messageId: uuidv4(),
         toolCallId,
-        content: JSON.stringify(result),
+        // A tool that returns nothing (`() => { ... }`) is recorded as `null`:
+        // JSON.stringify(undefined) is undefined, which the history cannot read back.
+        content: JSON.stringify(result ?? null),
         role: 'tool',
         // use-ai extension: include current tools and state for mid-run updates
         // (e.g., when navigation causes new components to mount)

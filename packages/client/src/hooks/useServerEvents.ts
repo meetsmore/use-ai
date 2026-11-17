@@ -430,9 +430,12 @@ export function useServerEvents({
       const errorCode = errorEvent.message as ErrorCode;
 
       if (errorCode === ErrorCode.ABORTED) {
-        // User stopped generation. Flush the aborted step into _messages
-        // (synthesizing tool_results for unanswered tool_use blocks, dropping
-        // signature-incomplete reasoning), then persist via the shared path.
+        // User stopped generation. Abort the tools' signal first, so a tool
+        // that finishes while the turn is being saved does not send a second
+        // result. Then flush the aborted step into _messages (synthesizing
+        // tool_results for unanswered tool_use blocks, dropping
+        // signature-incomplete reasoning) and persist via the shared path.
+        ts.abortRunSignal();
         client.finalizeRun({ aborted: true });
         await persistFinalResponse(client, { aborted: true, traceId: runIdAtRunStartRef.current });
       } else {

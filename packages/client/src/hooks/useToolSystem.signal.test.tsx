@@ -5,7 +5,7 @@ import { defineTool, type ToolExecutionContext } from '../defineTool';
 import type { UseAIClient } from '../client';
 
 function setup() {
-  const client = { sendToolResponse: mock() } as unknown as UseAIClient;
+  const client = { sendToolResponse: mock(), sendToolApprovalResponse: mock() } as unknown as UseAIClient;
   const hook = renderHook(() => useToolSystem({ clientRef: { current: client }, buildState: () => ({}) }));
   const contexts: ToolExecutionContext[] = [];
   let release: (value: unknown) => void = () => {};
@@ -41,6 +41,22 @@ describe('useToolSystem — ctx.toolCallId and ctx.signal', () => {
     release({ aborted: true });
     await act(async () => { await execution; });
     expect(client.sendToolResponse).not.toHaveBeenCalled();
+  });
+
+  it('keeps the signal of the run a call arrived in when it is approved later', async () => {
+    const { hook, client, contexts } = setup();
+    act(() => {
+      hook.result.current.storePendingToolCall('tc1', 'wait', {}, { name: 'wait', args: '{}' });
+      hook.result.current.handleApprovalRequest({ toolCallId: 'tc1', toolCallName: 'wait', toolCallArgs: {} } as never);
+    });
+
+    // The run ends before the user answers the approval card.
+    act(() => hook.result.current.abortRunSignal());
+    act(() => { void hook.result.current.approveAll(); });
+    await act(async () => { await Promise.resolve(); });
+
+    expect(client.sendToolApprovalResponse).toHaveBeenCalledWith('tc1', true);
+    expect(contexts[0].signal.aborted).toBe(true);
   });
 
   it('gives the next run a fresh signal', async () => {

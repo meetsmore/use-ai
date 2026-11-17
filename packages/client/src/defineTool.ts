@@ -21,7 +21,8 @@ export interface ToolExecutionContext {
    * Aborted when the run this call belongs to ends: stopped by the user,
    * failed, disconnected or finished. A tool that waits on the user should
    * stop waiting then; the call is already recorded as aborted, so what it
-   * returns afterwards is dropped.
+   * returns afterwards is dropped. A tool run by `useAIWorkflow` gets a
+   * signal that never aborts, as a workflow cannot be stopped.
    *
    * @example
    * ```typescript

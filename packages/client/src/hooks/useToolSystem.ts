@@ -80,7 +80,11 @@ export interface UseToolSystemReturn {
   /** Handle a tool approval request event from the server */
   handleApprovalRequest: (event: ToolApprovalRequestEvent) => void;
   /** Execute a tool call and send the response to the server */
-  executeToolCall: (toolCallId: string, name: string, input: unknown) => Promise<void>;
+  /**
+   * Execute a tool call and send the response to the server. `signal` is the
+   * run's `ctx.signal`; it defaults to the current run's.
+   */
+  executeToolCall: (toolCallId: string, name: string, input: unknown, signal?: AbortSignal) => Promise<void>;
   /** Store a tool call as pending approval (deferred execution) */
   storePendingToolCall: (toolCallId: string, name: string, input: unknown, toolCallData: { name: string; args: string }) => void;
   /** Approve all pending tool calls and execute them */
@@ -129,7 +133,9 @@ export function useToolSystem({
   // ── Execution State ─────────────────────────────────────────────────────
 
   const [pendingApprovals, setPendingApprovals] = useState<PendingToolApproval[]>([]);
-  const pendingApprovalToolCallsRef = useRef<Map<string, { name: string; input: unknown; toolCallData: { name: string; args: string } }>>(new Map());
+  // `signal` is taken when the call arrives: approving it after its run ended
+  // must not hand it the next run's signal.
+  const pendingApprovalToolCallsRef = useRef<Map<string, { name: string; input: unknown; signal: AbortSignal; toolCallData: { name: string; args: string } }>>(new Map());
 
   /** Resolvers for runtime approval requests (from ctx.requestApproval) */
   const runtimeApprovalResolversRef = useRef<Map<string, (result: { approved: boolean; reason?: string }) => void>>(new Map());
@@ -309,15 +315,14 @@ export function useToolSystem({
   const executeToolCall = useCallback(async (
     toolCallId: string,
     name: string,
-    input: unknown
+    input: unknown,
+    signal: AbortSignal = runAbortControllerRef.current.signal,
   ) => {
     const client = clientRef.current;
     if (!client) {
       console.error('[useToolSystem] No client available for tool execution');
       return;
     }
-
-    const signal = runAbortControllerRef.current.signal;
     let response: { result: unknown; state?: unknown };
 
     try {
@@ -394,7 +399,7 @@ export function useToolSystem({
     toolCallData: { name: string; args: string }
   ) => {
     console.log(`[useToolSystem] Storing pending tool call "${name}" for approval`);
-    pendingApprovalToolCallsRef.current.set(toolCallId, { name, input, toolCallData });
+    pendingApprovalToolCallsRef.current.set(toolCallId, { name, input, signal: runAbortControllerRef.current.signal, toolCallData });
   }, []);
 
   const executePendingToolAfterApproval = useCallback(async (toolCallId: string) => {
@@ -405,7 +410,7 @@ export function useToolSystem({
     }
 
     pendingApprovalToolCallsRef.current.delete(toolCallId);
-    await executeToolCall(toolCallId, pendingTool.name, pendingTool.input);
+    await executeToolCall(toolCallId, pendingTool.name, pendingTool.input, pendingTool.signal);
   }, [executeToolCall]);
 
   const approveAll = useCallback(async () => {

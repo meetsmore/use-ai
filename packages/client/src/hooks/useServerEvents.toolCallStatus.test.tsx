@@ -163,6 +163,19 @@ describe('useServerEvents — tool call status and result', () => {
     expect(toolPart(hook.result.current.streamingParts, 'tc1')).toMatchObject({ status: 'running' });
   });
 
+  it('aborts the tool signal before a stopped run is recorded and saved', async () => {
+    const { client, toolSystem, emit } = setup();
+    const order: string[] = [];
+    (toolSystem.abortRunSignal as ReturnType<typeof mock>).mockImplementation(() => { order.push('abort'); });
+    spyOn(client, 'finalizeRun').mockImplementation(() => { order.push('finalize'); });
+
+    await emit({ type: EventType.RUN_STARTED, threadId: 't', runId: 'run-1' });
+    await emit({ type: EventType.RUN_ERROR, message: 'ABORTED' });
+
+    expect(order[0]).toBe('abort');
+    expect(order).toContain('finalize');
+  });
+
   it('aborts the tool signal whenever the run ends', async () => {
     const { hook, toolSystem, emit } = setup();
     await emit({ type: EventType.RUN_STARTED, threadId: 't', runId: 'run-1' }, { type: EventType.RUN_FINISHED, threadId: 't', runId: 'run-1' });
