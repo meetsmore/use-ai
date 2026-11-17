@@ -30,6 +30,12 @@ export { UseAIFloatingChatWrapper, CloseButton } from './components/UseAIFloatin
 export { UseAIFloatingButton } from './components/UseAIFloatingButton';
 export { UseAIChat } from './components/UseAIChat';
 export type { UseAIChatProps } from './components/UseAIChat';
+// Building blocks for custom Message slots.
+export { MarkdownContent } from './components/MarkdownContent';
+export type { MarkdownContentProps } from './components/MarkdownContent';
+export { Reasoning } from './components/Reasoning';
+export type { ReasoningProps } from './components/Reasoning';
+export { getTextFromContent, getDisplayTextFromContent } from './utils/messageContent';
 export type {
   ChatSlotProps,
   ChatHeaderSlotProps,
