@@ -1,0 +1,22 @@
+packages/client/src/utils/mergeAssistantMessages.ts
+  s_1853915a2b576c::t_3ee84f92cf5c1b 72-76,78
+packages/client/src/utils/mergeAssistantMessages.test.ts
+  s_1853915a2b576c::t_3ee84f92cf5c1b 3,232-247
+  s_1853915a2b576c::t_1432e13ef7be9b 248-249
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "27c18486ba7f2dd9c48aa3fba860f4f55c465e46",
+  "prompts": {},
+  "sessions": {
+    "s_1853915a2b576c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6a4c6489-1831-4973-b930-ec3736dfc8aa",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "yuma.ito <yuma.ito@meetsmore.com>"
+    }
+  }
+}
