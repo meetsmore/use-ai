@@ -188,11 +188,8 @@ export function useAIWorkflow(runner: string, workflowId: string): UseAIWorkflow
 
         try {
           // Execute the tool
-          // Workflows are headless — no UI for runtime approval, so provide a no-op context.
-          // A workflow has no stop, so its signal never aborts.
+          // Workflows are headless — no UI for runtime approval, so provide a no-op context
           const noopCtx = {
-            toolCallId,
-            signal: new AbortController().signal,
             requestApproval: async () => ({ approved: true }),
           };
           const result = await executeDefinedTool(currentWorkflow.tools, toolName, toolArgs, noopCtx);

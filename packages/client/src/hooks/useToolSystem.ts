@@ -80,22 +80,13 @@ export interface UseToolSystemReturn {
   /** Handle a tool approval request event from the server */
   handleApprovalRequest: (event: ToolApprovalRequestEvent) => void;
   /** Execute a tool call and send the response to the server */
-  /**
-   * Execute a tool call and send the response to the server. `signal` is the
-   * run's `ctx.signal`; it defaults to the current run's.
-   */
-  executeToolCall: (toolCallId: string, name: string, input: unknown, signal?: AbortSignal) => Promise<void>;
+  executeToolCall: (toolCallId: string, name: string, input: unknown) => Promise<void>;
   /** Store a tool call as pending approval (deferred execution) */
   storePendingToolCall: (toolCallId: string, name: string, input: unknown, toolCallData: { name: string; args: string }) => void;
   /** Approve all pending tool calls and execute them */
   approveAll: () => Promise<void>;
   /** Reject all pending tool calls with optional reason */
   rejectAll: (reason?: string) => void;
-  /**
-   * Aborts the `ctx.signal` handed to the current run's tool calls and starts
-   * a fresh one for the next run. Called when a run ends, however it ends.
-   */
-  abortRunSignal: () => void;
 }
 
 /**
@@ -133,20 +124,10 @@ export function useToolSystem({
   // ── Execution State ─────────────────────────────────────────────────────
 
   const [pendingApprovals, setPendingApprovals] = useState<PendingToolApproval[]>([]);
-  // `signal` is taken when the call arrives: approving it after its run ended
-  // must not hand it the next run's signal.
-  const pendingApprovalToolCallsRef = useRef<Map<string, { name: string; input: unknown; signal: AbortSignal; toolCallData: { name: string; args: string } }>>(new Map());
+  const pendingApprovalToolCallsRef = useRef<Map<string, { name: string; input: unknown; toolCallData: { name: string; args: string } }>>(new Map());
 
   /** Resolvers for runtime approval requests (from ctx.requestApproval) */
   const runtimeApprovalResolversRef = useRef<Map<string, (result: { approved: boolean; reason?: string }) => void>>(new Map());
-
-  /** One controller per run: every tool call of the run gets its signal as `ctx.signal`. */
-  const runAbortControllerRef = useRef(new AbortController());
-
-  const abortRunSignal = useCallback(() => {
-    runAbortControllerRef.current.abort();
-    runAbortControllerRef.current = new AbortController();
-  }, []);
 
   // ── Registry Methods ────────────────────────────────────────────────────
 
@@ -315,15 +296,13 @@ export function useToolSystem({
   const executeToolCall = useCallback(async (
     toolCallId: string,
     name: string,
-    input: unknown,
-    signal: AbortSignal = runAbortControllerRef.current.signal,
+    input: unknown
   ) => {
     const client = clientRef.current;
     if (!client) {
       console.error('[useToolSystem] No client available for tool execution');
       return;
     }
-    let response: { result: unknown; state?: unknown };
 
     try {
       const ownerId = toolOwnershipRef.current.get(name);
@@ -331,8 +310,6 @@ export function useToolSystem({
 
       // Build ToolExecutionContext with requestApproval for runtime approvals
       const ctx: ToolExecutionContext = {
-        toolCallId,
-        signal,
         requestApproval: ({ message, metadata }) => {
           return new Promise<{ approved: boolean; reason?: string }>((resolve) => {
             const approvalId = `${toolCallId}-runtime-${Date.now()}`;
@@ -378,18 +355,16 @@ export function useToolSystem({
       await waitForToolsToStabilize();
       console.log('[useToolSystem] Tools stabilized');
 
-      response = { result, state: buildState() };
+      const updatedState = buildState();
       console.log(`[useToolSystem] Updated state (aggregated from all hooks)`);
+
+      client.sendToolResponse(toolCallId, result, updatedState);
     } catch (err) {
       console.error('Tool execution error:', err);
-      response = { result: { error: err instanceof Error ? err.message : 'Unknown error' } };
+      client.sendToolResponse(toolCallId, {
+        error: err instanceof Error ? err.message : 'Unknown error',
+      });
     }
-
-    // The run ended while the tool worked (e.g. a question gave up waiting on
-    // `ctx.signal`). The server no longer waits for the result, and when the
-    // user stopped the run the client has already recorded the call as aborted.
-    if (signal.aborted) return;
-    client.sendToolResponse(toolCallId, response.result, response.state);
   }, [clientRef, isInvisible, getWaiter, waitForToolsToStabilize, buildState]);
 
   const storePendingToolCall = useCallback((
@@ -399,7 +374,7 @@ export function useToolSystem({
     toolCallData: { name: string; args: string }
   ) => {
     console.log(`[useToolSystem] Storing pending tool call "${name}" for approval`);
-    pendingApprovalToolCallsRef.current.set(toolCallId, { name, input, signal: runAbortControllerRef.current.signal, toolCallData });
+    pendingApprovalToolCallsRef.current.set(toolCallId, { name, input, toolCallData });
   }, []);
 
   const executePendingToolAfterApproval = useCallback(async (toolCallId: string) => {
@@ -410,7 +385,7 @@ export function useToolSystem({
     }
 
     pendingApprovalToolCallsRef.current.delete(toolCallId);
-    await executeToolCall(toolCallId, pendingTool.name, pendingTool.input, pendingTool.signal);
+    await executeToolCall(toolCallId, pendingTool.name, pendingTool.input);
   }, [executeToolCall]);
 
   const approveAll = useCallback(async () => {
@@ -479,6 +454,5 @@ export function useToolSystem({
     storePendingToolCall,
     approveAll,
     rejectAll,
-    abortRunSignal,
   };
 }
