@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach, afterEach, spyOn } from 'bun:test';
+import { describe, test, expect, beforeEach, afterEach, spyOn, mock } from 'bun:test';
 import type { UseAIClientMessage } from './types';
 import { installSocketIOMock } from '../test/socketIOMock';
 import { FakeWebSocket, FakeWebSocketConstructor, waitUntil } from '../test/fakeWebSocket';
@@ -332,21 +332,25 @@ describe.each(HARNESSES)('UseAIClient over %s', (_name, createHarness) => {
   });
 
   describe('onToolResult()', () => {
+    let consoleErrorSpy: ReturnType<typeof spyOn>;
+    beforeEach(() => {
+      consoleErrorSpy = spyOn(console, 'error').mockImplementation(() => {});
+    });
+    afterEach(() => {
+      consoleErrorSpy.mockRestore();
+    });
+
     test('a throwing handler stops neither the other handlers nor sending the result', async () => {
       await harness.open();
-      const consoleErrorSpy = spyOn(console, 'error').mockImplementation(() => {});
-      const received: string[] = [];
+      const second = mock(() => {});
       client.onToolResult(() => { throw new Error('handler failed'); });
-      client.onToolResult((toolCallId, content) => received.push(`${toolCallId} ${content}`));
+      client.onToolResult(second);
 
       client.sendToolResponse('toolu_1', { ok: true });
 
-      expect(received).toEqual(['toolu_1 {"ok":true}']);
-      const message = lastSent();
-      expect(message.type).toBe('tool_result');
-      expect((message.data as { toolCallId: string }).toolCallId).toBe('toolu_1');
-      expect(consoleErrorSpy).toHaveBeenCalled();
-      consoleErrorSpy.mockRestore();
+      expect(second).toHaveBeenCalledWith('toolu_1', '{"ok":true}');
+      expect(lastSent()).toMatchObject({ type: 'tool_result', data: { toolCallId: 'toolu_1' } });
+      expect(consoleErrorSpy).toHaveBeenCalledWith('[UseAI] onToolResult handler threw:', expect.any(Error));
     });
   });
 
