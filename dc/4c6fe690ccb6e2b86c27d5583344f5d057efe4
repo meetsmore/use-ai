@@ -1,0 +1,23 @@
+packages/client/src/hooks/useToolSystem.ts
+  s_8b85f3f6460908::t_06d7c404747582 83,127,299,358,360-361,364-366,377,388
+packages/client/src/useAIWorkflow.ts
+  s_8b85f3f6460908::t_06d7c404747582 191
+packages/client/src/hooks/useServerEvents.ts
+  s_8b85f3f6460908::t_06d7c404747582 430-432
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "dc4c6fe690ccb6e2b86c27d5583344f5d057efe4",
+  "prompts": {},
+  "sessions": {
+    "s_8b85f3f6460908": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "77c3f5db-2b99-4985-b2e9-54b6aa52a4b6",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "yuma.ito <yuma.ito@meetsmore.com>"
+    }
+  }
+}
