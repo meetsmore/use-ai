@@ -700,7 +700,8 @@ export class UseAIClient {
    * Listens for tool call results as they are recorded for the conversation
    * history, once per call. The content is exactly what the history keeps, so
    * a UI that reads results from here shows the same result before and after
-   * the chat is saved and reloaded.
+   * the chat is saved and reloaded. A handler that throws stops neither the
+   * recording nor the sending of the result; the error is logged.
    *
    * @example
    * ```ts
@@ -725,7 +726,13 @@ export class UseAIClient {
   private recordToolResult(target: Message[], toolCallId: string, content: string, id: string = uuidv4()): void {
     target.push({ id, role: 'tool', content, toolCallId });
     for (const handler of this.toolResultHandlers) {
-      handler(toolCallId, content);
+      // A throwing handler must not stop the caller: sendToolResponse records
+      // first and sends after, so the server would never get the result.
+      try {
+        handler(toolCallId, content);
+      } catch (error) {
+        console.error('[UseAI] onToolResult handler threw:', error);
+      }
     }
   }
 
