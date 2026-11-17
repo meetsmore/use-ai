@@ -12,6 +12,7 @@ function makeToolSystem(): UseToolSystemReturn {
     executeToolCall: mock(async () => undefined),
     storePendingToolCall: mock(),
     handleApprovalRequest: mock(),
+    abortRunSignal: mock(),
   } as unknown as UseToolSystemReturn;
 }
 
