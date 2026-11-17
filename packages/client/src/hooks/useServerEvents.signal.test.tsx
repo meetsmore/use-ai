@@ -14,6 +14,7 @@ function setup() {
     executeToolCall: mock(async () => undefined),
     storePendingToolCall: mock(),
     handleApprovalRequest: mock(),
+    pendingApprovals: [],
     abortRunSignal: mock(() => { order.push('abort'); }),
   } as unknown as UseToolSystemReturn;
   const client = {

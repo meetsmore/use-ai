@@ -9,10 +9,10 @@ import type { UseAIClient } from '../client';
 function makeToolSystem(): UseToolSystemReturn {
   return {
     aggregatedToolsRef: { current: {} },
+    abortRunSignal: mock(),
     executeToolCall: mock(async () => undefined),
     storePendingToolCall: mock(),
     handleApprovalRequest: mock(),
-    abortRunSignal: mock(),
   } as unknown as UseToolSystemReturn;
 }
 
