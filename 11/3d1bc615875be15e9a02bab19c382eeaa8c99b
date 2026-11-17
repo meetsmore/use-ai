@@ -1,0 +1,20 @@
+packages/client/src/client.test.ts
+  s_1853915a2b576c::t_d99b9457d0d17b 335-342
+  s_1853915a2b576c::t_e7da9535a19b2c 1,345,347,351-353
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "113d1bc615875be15e9a02bab19c382eeaa8c99b",
+  "prompts": {},
+  "sessions": {
+    "s_1853915a2b576c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6a4c6489-1831-4973-b930-ec3736dfc8aa",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "yuma.ito <yuma.ito@meetsmore.com>"
+    }
+  }
+}
