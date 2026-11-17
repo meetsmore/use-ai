@@ -1,0 +1,23 @@
+packages/client/src/hooks/useServerEvents.streamingParts.test.tsx
+  s_8b85f3f6460908::t_9cca98be641f5d 12
+packages/client/src/hooks/useServerEvents.signal.test.tsx
+  s_8b85f3f6460908::t_9cca98be641f5d 17
+packages/client/src/hooks/useServerEvents.streamingId.test.tsx
+  s_8b85f3f6460908::t_9cca98be641f5d 12
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "521a8de078902c240d12ae3c45909f3dafbd8ec9",
+  "prompts": {},
+  "sessions": {
+    "s_8b85f3f6460908": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "77c3f5db-2b99-4985-b2e9-54b6aa52a4b6",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "yuma.ito <yuma.ito@meetsmore.com>"
+    }
+  }
+}
