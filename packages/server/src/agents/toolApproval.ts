@@ -104,10 +104,19 @@ export function validateModifiedArgs(toolDef: ToolDefinition, args: unknown): st
 }
 
 /**
- * Builds the tool result returned to the AI when the user's edited arguments
- * fail the tool's input schema. The tool does not run.
+ * Validates edited arguments for a tool the server executes.
+ *
+ * @returns the error result to give the AI when they are invalid (the tool must
+ * not run), otherwise undefined
  */
-export function invalidModifiedArgsResult(errorText: string): { error: true; message: string } {
+export function denyInvalidModifiedArgs(
+  toolDef: ToolDefinition,
+  modifiedArgs: ToolArguments,
+  toolCallId: string
+): { error: true; message: string } | undefined {
+  const errorText = validateModifiedArgs(toolDef, modifiedArgs);
+  if (errorText === undefined) return undefined;
+  logger.info('Edited tool arguments rejected', { toolCallId, toolName: toolDef.name, errorText });
   return {
     error: true,
     message: `Tool execution denied: Edited arguments are invalid: ${errorText}`,
@@ -166,11 +175,8 @@ export function createApprovalWrapper(
       if (modifiedArgs === undefined) {
         return actualExecutor(args, options);
       }
-      const errorText = validateModifiedArgs(toolDef, modifiedArgs);
-      if (errorText !== undefined) {
-        logger.info('Edited tool arguments rejected', { toolCallId: options.toolCallId, errorText });
-        return invalidModifiedArgsResult(errorText);
-      }
+      const invalid = denyInvalidModifiedArgs(toolDef, modifiedArgs, options.toolCallId);
+      if (invalid) return invalid;
       return actualExecutor(modifiedArgs, options);
     } else {
       logger.info('Tool rejected by user', {

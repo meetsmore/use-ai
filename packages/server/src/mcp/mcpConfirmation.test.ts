@@ -6,7 +6,7 @@ import {
 } from './mcpConfirmation';
 import type { UseAIInternalResponse } from './useAIInternalResponse';
 import type { ClientSession, EventEmitter } from '../agents/types';
-import type { RemoteMcpToolsProvider } from './RemoteMcpToolsProvider';
+import type { RemoteMcpToolsProvider, RemoteToolDefinition } from './RemoteMcpToolsProvider';
 import { TOOL_APPROVAL_REQUEST } from '../types';
 import type { ToolDefinition } from '../types';
 
@@ -108,6 +108,12 @@ describe('handleMcpConfirmation', () => {
     properties: { to: { type: 'string' }, amount: { type: 'number' } },
     required: ['to', 'amount'],
   };
+  const remoteTool = (provider: RemoteMcpToolsProvider): RemoteToolDefinition => ({
+    name: 'ns_transfer',
+    description: 'Transfer money',
+    parameters: inputSchema,
+    _remote: { provider, originalName: 'transfer' },
+  });
   const confirmation: McpConfirmationResponse = {
     _use_ai_internal: true,
     _use_ai_type: 'confirmation_required',
@@ -124,8 +130,8 @@ describe('handleMcpConfirmation', () => {
     const provider = createMockProvider();
 
     const promise = handleMcpConfirmation(
-      confirmation, 'tool-call-1', 'ns_transfer', 'transfer',
-      originalArgs, inputSchema, provider, session, events
+      confirmation, 'tool-call-1', remoteTool(provider),
+      originalArgs, session, events
     );
 
     expect(events.emittedEvents).toHaveLength(1);
@@ -148,8 +154,8 @@ describe('handleMcpConfirmation', () => {
     const provider = createMockProvider({ success: true, message: 'Transferred' });
 
     const promise = handleMcpConfirmation(
-      confirmation, 'tool-call-1', 'ns_transfer', 'transfer',
-      originalArgs, inputSchema, provider, session, events
+      confirmation, 'tool-call-1', remoteTool(provider),
+      originalArgs, session, events
     );
 
     session.pendingToolApprovals.get('tool-call-1')!({ approved: true });
@@ -175,8 +181,8 @@ describe('handleMcpConfirmation', () => {
     };
 
     const promise = handleMcpConfirmation(
-      noColumnsConfirmation, 'tool-call-1', 'ns_transfer', 'transfer',
-      originalArgs, inputSchema, provider, session, events
+      noColumnsConfirmation, 'tool-call-1', remoteTool(provider),
+      originalArgs, session, events
     );
 
     session.pendingToolApprovals.get('tool-call-1')!({ approved: true });
@@ -191,8 +197,8 @@ describe('handleMcpConfirmation', () => {
     const provider = createMockProvider();
 
     const promise = handleMcpConfirmation(
-      confirmation, 'tool-call-1', 'ns_transfer', 'transfer',
-      originalArgs, inputSchema, provider, session, events
+      confirmation, 'tool-call-1', remoteTool(provider),
+      originalArgs, session, events
     );
 
     session.pendingToolApprovals.get('tool-call-1')!({ approved: false, reason: 'Too expensive' });
@@ -211,8 +217,8 @@ describe('handleMcpConfirmation', () => {
     const provider = createMockProvider();
 
     const promise = handleMcpConfirmation(
-      confirmation, 'tool-call-1', 'ns_transfer', 'transfer',
-      originalArgs, inputSchema, provider, session, events
+      confirmation, 'tool-call-1', remoteTool(provider),
+      originalArgs, session, events
     );
 
     session.pendingToolApprovals.get('tool-call-1')!({ approved: false });
@@ -232,8 +238,8 @@ describe('handleMcpConfirmation', () => {
     } as unknown as RemoteMcpToolsProvider;
 
     const promise = handleMcpConfirmation(
-      confirmation, 'tool-call-1', 'ns_transfer', 'transfer',
-      originalArgs, inputSchema, provider, session, events
+      confirmation, 'tool-call-1', remoteTool(provider),
+      originalArgs, session, events
     );
 
     session.pendingToolApprovals.get('tool-call-1')!({ approved: true });
@@ -258,8 +264,8 @@ describe('handleMcpConfirmation', () => {
     } as unknown as RemoteMcpToolsProvider;
 
     const promise = handleMcpConfirmation(
-      confirmation, 'tool-call-1', 'ns_transfer', 'transfer',
-      originalArgs, inputSchema, provider, session, events, mcpHeaders
+      confirmation, 'tool-call-1', remoteTool(provider),
+      originalArgs, session, events, mcpHeaders
     );
 
     session.pendingToolApprovals.get('tool-call-1')!({ approved: true });
@@ -295,8 +301,8 @@ describe('handleMcpConfirmation', () => {
     const { provider, executedCalls } = createSequencedProvider([reconfirmation, { success: true }]);
 
     const promise = handleMcpConfirmation(
-      confirmation, 'tool-call-1', 'ns_transfer', 'transfer',
-      originalArgs, inputSchema, provider, session, events
+      confirmation, 'tool-call-1', remoteTool(provider),
+      originalArgs, session, events
     );
 
     session.pendingToolApprovals.get('tool-call-1')!({
@@ -327,8 +333,8 @@ describe('handleMcpConfirmation', () => {
     const { provider, executedCalls } = createSequencedProvider([{ success: true, message: 'Done' }]);
 
     const promise = handleMcpConfirmation(
-      confirmation, 'tool-call-1', 'ns_transfer', 'transfer',
-      originalArgs, inputSchema, provider, session, events
+      confirmation, 'tool-call-1', remoteTool(provider),
+      originalArgs, session, events
     );
 
     session.pendingToolApprovals.get('tool-call-1')!({
@@ -346,8 +352,8 @@ describe('handleMcpConfirmation', () => {
     const { provider, executedCalls } = createSequencedProvider([confirmation]);
 
     const promise = handleMcpConfirmation(
-      confirmation, 'tool-call-1', 'ns_transfer', 'transfer',
-      originalArgs, inputSchema, provider, session, events
+      confirmation, 'tool-call-1', remoteTool(provider),
+      originalArgs, session, events
     );
 
     session.pendingToolApprovals.get('tool-call-1')!({ approved: true, modifiedArgs: { to: 'Carol', amount: 2 } });
@@ -364,8 +370,8 @@ describe('handleMcpConfirmation', () => {
     const provider = createMockProvider({ success: true });
 
     const promise = handleMcpConfirmation(
-      confirmation, 'tool-call-1', 'ns_transfer', 'transfer',
-      originalArgs, inputSchema, provider, session, events
+      confirmation, 'tool-call-1', remoteTool(provider),
+      originalArgs, session, events
     );
 
     session.pendingToolApprovals.get('tool-call-1')!({

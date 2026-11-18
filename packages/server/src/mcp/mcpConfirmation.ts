@@ -10,9 +10,8 @@
 import type { ClientSession, EventEmitter } from '../agents/types';
 import type { ToolApprovalRequestEvent } from '../types';
 import { TOOL_APPROVAL_REQUEST } from '../types';
-import { waitForApproval, invalidModifiedArgsResult } from '../agents/toolApproval';
-import { validateJsonSchemaArgs } from '../agents/validateToolArgs';
-import type { RemoteMcpToolsProvider } from './RemoteMcpToolsProvider';
+import { waitForApproval, denyInvalidModifiedArgs } from '../agents/toolApproval';
+import type { RemoteToolDefinition } from './RemoteMcpToolsProvider';
 import type { McpHeadersMap } from '@meetsmore-oss/use-ai-core';
 import { isMcpConfirmationResponse, type McpConfirmationResponse } from '@meetsmore-oss/use-ai-core';
 import { logger } from '../logger';
@@ -27,8 +26,8 @@ export {
  * 1. Emits TOOL_APPROVAL_REQUEST to the client
  * 2. Waits for user approval via waitForApproval()
  * 3. If approved → re-calls the same tool with { ...originalArgs, ...additional_columns }.
- *    When the approval carries modifiedArgs, they are validated against `inputSchema`
- *    (JSON Schema 2020-12; invalid ones return an error result) and phase 1 runs again
+ *    When the approval carries modifiedArgs, they are validated against the tool's
+ *    input schema (JSON Schema 2020-12; invalid ones return an error result) and phase 1 runs again
  *    with them. A new confirmation_required starts this flow over with the edited args;
  *    any other result is returned. Phase 2 only ever runs args phase 1 confirmed.
  * 4. If rejected → returns error result
@@ -38,16 +37,14 @@ export {
 export async function handleMcpConfirmation(
   confirmation: McpConfirmationResponse,
   toolCallId: string,
-  toolCallName: string,
-  originalToolName: string,
+  tool: RemoteToolDefinition,
   originalArgs: Record<string, unknown>,
-  inputSchema: object,
-  provider: RemoteMcpToolsProvider,
   session: ClientSession,
   events: EventEmitter,
   mcpHeaders?: McpHeadersMap
 ): Promise<unknown> {
   const { message, metadata, additional_columns } = confirmation._use_ai_metadata;
+  const { name: toolCallName, _remote: { provider, originalName: originalToolName } } = tool;
 
   logger.info('[MCP] Tool returned confirmation_required', {
     toolCallId,
@@ -97,11 +94,8 @@ export async function handleMcpConfirmation(
 
   const { modifiedArgs } = approvalResult;
   if (modifiedArgs !== undefined) {
-    const errorText = validateJsonSchemaArgs(inputSchema, modifiedArgs, '2020-12');
-    if (errorText !== undefined) {
-      logger.info('[MCP] Edited tool arguments rejected', { toolCallId, errorText });
-      return invalidModifiedArgsResult(errorText);
-    }
+    const invalid = denyInvalidModifiedArgs(tool, modifiedArgs, toolCallId);
+    if (invalid) return invalid;
 
     // Phase 1 again: the MCP server confirms the edited args itself, so phase 2
     // never runs args phase 1 did not see.
@@ -109,8 +103,7 @@ export async function handleMcpConfirmation(
     const result = await callTool(modifiedArgs, 'phase 1');
     if (isMcpConfirmationResponse(result)) {
       return handleMcpConfirmation(
-        result, toolCallId, toolCallName, originalToolName,
-        modifiedArgs, inputSchema, provider, session, events, mcpHeaders
+        result, toolCallId, tool, modifiedArgs, session, events, mcpHeaders
       );
     }
     return result;
