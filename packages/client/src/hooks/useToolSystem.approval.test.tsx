@@ -30,7 +30,7 @@ function setup() {
     result.current.registerTools('component', { createItem }, { invisible: true });
   });
 
-  const requestApproval = (toolCallId: string, title: string) => {
+  const requestApproval = (toolCallId: string, title: string, server: 'accepts-edits' | 'no-edits' = 'accepts-edits') => {
     act(() => {
       result.current.storePendingToolCall(toolCallId, 'createItem', { title }, {
         name: 'createItem',
@@ -43,6 +43,7 @@ function setup() {
         toolCallArgs: { title },
         timestamp: 0,
         metadata: { preview: true },
+        ...(server === 'accepts-edits' && { acceptsModifiedArgs: true }),
       });
     });
   };
@@ -105,10 +106,28 @@ describe('useToolSystem approval with edited arguments', () => {
     expect(response.error).toContain('expected string, received number');
   });
 
-  it('keeps the approval metadata on the pending approval', () => {
+  it('keeps the approval metadata and whether it accepts edits on the pending approval', () => {
     const { result, requestApproval } = setup();
     requestApproval('tc-1', 'Original');
+    requestApproval('tc-2', 'Other', 'no-edits');
 
     expect(result.current.pendingApprovals[0].metadata).toEqual({ preview: true });
+    expect(result.current.pendingApprovals[0].acceptsModifiedArgs).toBe(true);
+    expect(result.current.pendingApprovals[1].acceptsModifiedArgs).toBeUndefined();
+  });
+
+  it('approveWithArgs refuses edits for an approval that does not accept them and approves nothing', async () => {
+    const { result, client, executed, requestApproval } = setup();
+    requestApproval('tc-1', 'Original', 'no-edits');
+
+    let error: unknown;
+    await act(async () => {
+      await result.current.approveWithArgs({ 'tc-1': { title: 'Edited' } }).catch((e: unknown) => { error = e; });
+    });
+
+    expect((error as Error).message).toContain('tc-1 does not accept edited arguments');
+    expect(client.sendToolApprovalResponse).not.toHaveBeenCalled();
+    expect(executed).toEqual([]);
+    expect(result.current.pendingApprovals).toHaveLength(1);
   });
 });

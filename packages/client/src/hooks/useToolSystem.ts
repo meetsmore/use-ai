@@ -25,6 +25,8 @@ export interface PendingToolApproval {
   message?: string;
   /** Optional metadata for the approval request (runtime approval) */
   metadata?: Record<string, unknown>;
+  /** True when edited arguments sent with an approval of this request are applied */
+  acceptsModifiedArgs?: boolean;
 }
 
 /** Edited tool arguments, keyed by the toolCallId of the pending approval. */
@@ -80,7 +82,8 @@ export interface UseToolSystemReturn {
   approveAll: () => Promise<void>;
   /**
    * Approve all pending tool calls. A call whose toolCallId is a key of
-   * `modifiedArgs` runs with those arguments instead of the AI's.
+   * `modifiedArgs` runs with those arguments instead of the AI's. Rejects, and
+   * approves nothing, when a key names an approval without `acceptsModifiedArgs`.
    */
   approveWithArgs: (modifiedArgs: ModifiedToolArgs) => Promise<void>;
   /** Reject all pending tool calls with optional reason */
@@ -287,6 +290,7 @@ export function useToolSystem({
         annotations: event.annotations,
         message: event.message,
         metadata: event.metadata,
+        acceptsModifiedArgs: event.acceptsModifiedArgs,
       },
     ]);
   }, []);
@@ -392,6 +396,12 @@ export function useToolSystem({
 
   const approve = useCallback(async (modifiedArgsByToolCallId?: ModifiedToolArgs) => {
     if (!clientRef.current) return;
+    for (const toolCallId of Object.keys(modifiedArgsByToolCallId ?? {})) {
+      const pending = pendingApprovals.find(approval => approval.toolCallId === toolCallId);
+      if (!pending?.acceptsModifiedArgs) {
+        throw new Error(`[useToolSystem] Approval ${toolCallId} does not accept edited arguments`);
+      }
+    }
     console.log('[useToolSystem] Approving all tool calls:', pendingApprovals.length);
 
     const pendingTools = [...pendingApprovals];

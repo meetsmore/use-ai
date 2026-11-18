@@ -16,6 +16,11 @@ export interface ChatToolApproval {
   message?: string;
   /** Data the tool attached to the approval request (runtime and MCP `confirmation_required` approvals) */
   metadata?: Record<string, unknown>;
+  /**
+   * True when the call can be approved with edited arguments via `onApproveWithArgs`.
+   * Unset for runtime approvals (`ctx.requestApproval`) and with servers that predate edits.
+   */
+  acceptsModifiedArgs?: boolean;
 }
 
 /** Common contract for chat component overrides. */
@@ -185,7 +190,8 @@ export interface ChatToolApprovalSlotProps extends ChatSlotProps {
    * Approves all pending calls; a call whose toolCallId is a key of `modifiedArgs`
    * runs with those arguments instead of the AI's. Server and MCP tools validate them
    * against their input schema on the server; client tools validate them with their own
-   * schema. Not applied to runtime approvals requested with `ctx.requestApproval`.
+   * schema. Only approvals with `acceptsModifiedArgs` take edits; a key naming any other
+   * approval makes the call throw without approving anything.
    * Provided when the chat is driven by `UseAIProvider`.
    */
   onApproveWithArgs?: (modifiedArgs: ModifiedToolArgs) => void;

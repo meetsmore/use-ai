@@ -108,6 +108,7 @@ export interface ChatUIContextValue {
         annotations?: ToolAnnotations;
         message?: string;
         metadata?: Record<string, unknown>;
+        acceptsModifiedArgs?: boolean;
       }>;
       /** Approve all pending tool calls */
       approveAll: () => void;
