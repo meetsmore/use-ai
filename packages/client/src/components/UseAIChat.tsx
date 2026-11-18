@@ -9,6 +9,7 @@ import type { SavedCommand } from '../commands/types';
 import type { Chat } from '../providers/chatRepository/types';
 import type { UseAIChatComponentOverrides } from './chatSlots';
 import type { ChatStreamingPart, ExecutingToolDisplay } from '../hooks/useServerEvents';
+import type { ModifiedToolArgs } from '../hooks/useToolSystem';
 
 /**
  * Internal context value for chat UI state.
@@ -105,9 +106,13 @@ export interface ChatUIContextValue {
         toolCallName: string;
         toolCallArgs: Record<string, unknown>;
         annotations?: ToolAnnotations;
+        message?: string;
+        metadata?: Record<string, unknown>;
       }>;
       /** Approve all pending tool calls */
       approveAll: () => void;
+      /** Approve all pending tool calls, running the keyed ones with edited arguments */
+      approveWithArgs?: (modifiedArgs: ModifiedToolArgs) => void;
       /** Reject all pending tool calls with optional reason */
       rejectAll: (reason?: string) => void;
     };
@@ -245,6 +250,7 @@ export function UseAIChat({ floating = false, submitMode, components }: UseAICha
     onFeedback: ctx.feedback?.submit,
     pendingApprovals: ctx.tools.pending.tools,
     onApproveToolCall: ctx.tools.pending.tools.length > 0 ? ctx.tools.pending.approveAll : undefined,
+    onApproveToolCallWithArgs: ctx.tools.pending.tools.length > 0 ? ctx.tools.pending.approveWithArgs : undefined,
     onRejectToolCall: ctx.tools.pending.tools.length > 0 ? ctx.tools.pending.rejectAll : undefined,
     onAbort: ctx.abortRun,
     components: mergedComponents,

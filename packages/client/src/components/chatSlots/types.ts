@@ -4,6 +4,7 @@ import type { Chat, PersistedMessage } from '../../providers/chatRepository/type
 import type { FileAttachment, FileProcessingState } from '../../fileUpload/types';
 import type { ChatStreamingPart, ExecutingToolDisplay } from '../../hooks/useServerEvents';
 import type { SubmitMode } from '../../utils/keyboard';
+import type { ModifiedToolArgs } from '../../hooks/useToolSystem';
 
 /** A tool call that is waiting for user approval. */
 export interface ChatToolApproval {
@@ -11,6 +12,10 @@ export interface ChatToolApproval {
   toolCallName: string;
   toolCallArgs: Record<string, unknown>;
   annotations?: ToolAnnotations;
+  /** Text explaining why approval is needed (runtime and MCP `confirmation_required` approvals) */
+  message?: string;
+  /** Data the tool attached to the approval request (runtime and MCP `confirmation_required` approvals) */
+  metadata?: Record<string, unknown>;
 }
 
 /** Common contract for chat component overrides. */
@@ -176,6 +181,14 @@ export interface ChatSlashCommands {
 export interface ChatToolApprovalSlotProps extends ChatSlotProps {
   approvals: ChatToolApproval[];
   onApprove: () => void;
+  /**
+   * Approves all pending calls; a call whose toolCallId is a key of `modifiedArgs`
+   * runs with those arguments instead of the AI's. Server and MCP tools validate them
+   * against their input schema on the server; client tools validate them with their own
+   * schema. Ignored for runtime approvals requested with `ctx.requestApproval`.
+   * Provided when the chat is driven by `UseAIProvider`.
+   */
+  onApproveWithArgs?: (modifiedArgs: ModifiedToolArgs) => void;
   onReject: (reason?: string) => void;
 }
 

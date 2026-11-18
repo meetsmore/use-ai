@@ -27,6 +27,9 @@ export interface PendingToolApproval {
   metadata?: Record<string, unknown>;
 }
 
+/** Edited tool arguments, keyed by the toolCallId of the pending approval. */
+export type ModifiedToolArgs = Record<string, Record<string, unknown>>;
+
 // ── Hook Options & Return ───────────────────────────────────────────────────
 
 export interface UseToolSystemOptions {
@@ -75,6 +78,11 @@ export interface UseToolSystemReturn {
   storePendingToolCall: (toolCallId: string, name: string, input: unknown, toolCallData: { name: string; args: string }) => void;
   /** Approve all pending tool calls and execute them */
   approveAll: () => Promise<void>;
+  /**
+   * Approve all pending tool calls. A call whose toolCallId is a key of
+   * `modifiedArgs` runs with those arguments instead of the AI's.
+   */
+  approveWithArgs: (modifiedArgs: ModifiedToolArgs) => Promise<void>;
   /** Reject all pending tool calls with optional reason */
   rejectAll: (reason?: string) => void;
 }
@@ -368,7 +376,10 @@ export function useToolSystem({
     pendingApprovalToolCallsRef.current.set(toolCallId, { name, input, toolCallData });
   }, []);
 
-  const executePendingToolAfterApproval = useCallback(async (toolCallId: string) => {
+  const executePendingToolAfterApproval = useCallback(async (
+    toolCallId: string,
+    modifiedArgs?: Record<string, unknown>
+  ) => {
     const pendingTool = pendingApprovalToolCallsRef.current.get(toolCallId);
     if (!pendingTool) {
       console.warn(`[useToolSystem] No pending tool found for ${toolCallId}`);
@@ -376,10 +387,10 @@ export function useToolSystem({
     }
 
     pendingApprovalToolCallsRef.current.delete(toolCallId);
-    await executeToolCall(toolCallId, pendingTool.name, pendingTool.input);
+    await executeToolCall(toolCallId, pendingTool.name, modifiedArgs ?? pendingTool.input);
   }, [executeToolCall]);
 
-  const approveAll = useCallback(async () => {
+  const approve = useCallback(async (modifiedArgsByToolCallId?: ModifiedToolArgs) => {
     if (!clientRef.current) return;
     console.log('[useToolSystem] Approving all tool calls:', pendingApprovals.length);
 
@@ -394,11 +405,18 @@ export function useToolSystem({
         runtimeResolver({ approved: true });
       } else {
         // Server-side approval (destructiveHint flow)
-        clientRef.current.sendToolApprovalResponse(pending.toolCallId, true);
-        await executePendingToolAfterApproval(pending.toolCallId);
+        const modifiedArgs = modifiedArgsByToolCallId?.[pending.toolCallId];
+        clientRef.current.sendToolApprovalResponse(pending.toolCallId, true, undefined, modifiedArgs);
+        await executePendingToolAfterApproval(pending.toolCallId, modifiedArgs);
       }
     }
   }, [clientRef, pendingApprovals, executePendingToolAfterApproval]);
+
+  const approveAll = useCallback(() => approve(), [approve]);
+  const approveWithArgs = useCallback(
+    (modifiedArgs: ModifiedToolArgs) => approve(modifiedArgs),
+    [approve]
+  );
 
   const rejectAll = useCallback((reason?: string) => {
     if (!clientRef.current) return;
@@ -444,6 +462,7 @@ export function useToolSystem({
     executeToolCall,
     storePendingToolCall,
     approveAll,
+    approveWithArgs,
     rejectAll,
   };
 }

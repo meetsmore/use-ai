@@ -111,6 +111,37 @@ describe('UseAIChat component slots', () => {
     expect(onRejectToolCall).toHaveBeenCalledWith('Not now');
   });
 
+  test('gives the ToolApproval slot the approval metadata and an approve-with-edited-args callback', () => {
+    const onApproveToolCallWithArgs = mock((_modifiedArgs: Record<string, Record<string, unknown>>) => {});
+    const ToolApproval = ({ approvals, onApproveWithArgs }: ChatToolApprovalSlotProps) => (
+      <div data-testid="custom-approval" data-message={approvals[0].message}>
+        {String(approvals[0].metadata?.chartType)}
+        <button
+          data-testid="custom-approve-edited"
+          onClick={() => onApproveWithArgs?.({ [approvals[0].toolCallId]: { field: 'email' } })}
+        >
+          Approve edited
+        </button>
+      </div>
+    );
+
+    const { getByTestId } = renderPanel({ ToolApproval }, {
+      pendingApprovals: [{
+        toolCallId: 'tool-1',
+        toolCallName: 'fillForm',
+        toolCallArgs: { field: 'name' },
+        message: 'Create this chart?',
+        metadata: { chartType: 'line' },
+      }],
+      onApproveToolCallWithArgs,
+    });
+
+    expect(getByTestId('custom-approval')).toHaveTextContent('line');
+    expect(getByTestId('custom-approval')).toHaveAttribute('data-message', 'Create this chart?');
+    fireEvent.click(getByTestId('custom-approve-edited'));
+    expect(onApproveToolCallWithArgs).toHaveBeenCalledWith({ 'tool-1': { field: 'email' } });
+  });
+
   test('routes the streaming answer through the Message slot', () => {
     const Message = ({ message: slotMessage, streaming, streamingParts, isLast }: ChatMessageSlotProps) => (
       <div
