@@ -311,7 +311,7 @@ export class RemoteMcpToolsProvider {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
 
-    const contentType = response.headers?.get('content-type') ?? '';
+    const contentType = response.headers.get('content-type')?.toLowerCase() ?? '';
     if (contentType.includes('text/event-stream')) {
       try {
         return await readSseResponse(response.body, id);
@@ -395,13 +395,18 @@ async function readSseResponse(
   if (body) {
     const reader = body.pipeThrough(new TextDecoderStream()).getReader();
     let buffer = '';
+    let afterCr = false;
     for (;;) {
       const { value, done } = await reader.read();
-      buffer += done ? '\n\n' : value;
-      // A trailing CR may be the first half of a CRLF split across chunks.
-      const end = buffer.endsWith('\r') ? buffer.length - 1 : buffer.length;
-      const lines = buffer.slice(0, end).split(/\r\n|\r|\n/);
-      buffer = lines.pop()! + buffer.slice(end);
+      let chunk = done ? '\n\n' : value;
+      // An LF right after a CR that ended the previous chunk is the second half of a CRLF.
+      if (afterCr && chunk.startsWith('\n')) chunk = chunk.slice(1);
+      afterCr = chunk.endsWith('\r');
+      if (chunk === '') continue;
+      buffer += chunk;
+      if (!/[\r\n]/.test(chunk)) continue;
+      const lines = buffer.split(/\r\n|\r|\n/);
+      buffer = lines.pop()!;
       for (const line of lines) {
         const message = readLine(line);
         if (message) return message;

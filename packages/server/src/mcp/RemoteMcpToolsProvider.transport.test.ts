@@ -172,6 +172,41 @@ describe('RemoteMcpToolsProvider over Streamable HTTP', () => {
       expect(closed).toBe(true);
     });
 
+    test.each([
+      ['CR-only line endings in one chunk', (event: string) => [event.replace(/\n/g, '\r')]],
+      ['a CRLF split across chunks then an LF blank line', (event: string) => [event.slice(0, -2) + '\r', '\n', '\n']],
+    ])('tools/call reads an event with %s on a stream the server keeps open', async (_case, chunksOf) => {
+      reply = ({ id }) => {
+        const encoder = new TextEncoder();
+        const event = `data: ${JSON.stringify({ jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: 'ok' }] } })}\n\n`;
+        const stream = new ReadableStream<Uint8Array>({
+          async start(controller) {
+            for (const chunk of chunksOf(event)) {
+              controller.enqueue(encoder.encode(chunk));
+              await Bun.sleep(20);
+            }
+          },
+        });
+        return new Response(stream, { headers: { 'Content-Type': 'text/event-stream' } });
+      };
+
+      const result = await new RemoteMcpToolsProvider({ url, timeout: 1000 }).executeTool('echo', {});
+
+      expect(result).toEqual({ result: 'ok' });
+    });
+
+    test('the text/event-stream media type is matched case-insensitively', async () => {
+      reply = ({ id }) =>
+        new Response(
+          `data: ${JSON.stringify({ jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: 'ok' }] } })}\n\n`,
+          { headers: { 'Content-Type': 'Text/Event-Stream' } }
+        );
+
+      const result = await new RemoteMcpToolsProvider({ url }).executeTool('echo', {});
+
+      expect(result).toEqual({ result: 'ok' });
+    });
+
     test('application/json responses still work', async () => {
       reply = ({ id }) => json({ jsonrpc: '2.0', id, result: toolsResult });
 
