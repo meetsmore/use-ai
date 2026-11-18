@@ -111,6 +111,25 @@ describe('RemoteMcpToolsProvider', () => {
       });
     });
 
+    test('carries $defs and definitions of the input schema into the parameters', async () => {
+      const inputSchema = {
+        type: 'object',
+        properties: { item: { $ref: '#/$defs/Item' }, legacy: { $ref: '#/definitions/Legacy' } },
+        required: ['item'],
+        $defs: { Item: { type: 'number' } },
+        definitions: { Legacy: { type: 'string' } },
+      };
+      globalThis.fetch = mock(() => Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ result: { tools: [{ name: 'refs', description: 'Refs', inputSchema }] } }),
+      } as Response)) as unknown as typeof fetch;
+      const provider = new RemoteMcpToolsProvider({ url: 'http://mcp.test/rpc' });
+
+      const tools = await provider.fetchToolsWithHeaders();
+
+      expect(tools[0].parameters).toEqual(inputSchema as typeof tools[0]['parameters']);
+    });
+
     test('applies namespace prefix to tool names', async () => {
       const provider = new RemoteMcpToolsProvider({
         url: 'http://mcp.test/rpc',

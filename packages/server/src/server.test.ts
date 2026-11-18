@@ -732,6 +732,14 @@ describe('handleToolApprovalResponse - modifiedArgs', () => {
     expect(results[0]).not.toHaveProperty('modifiedArgs');
   });
 
+  test('denies an approval whose modifiedArgs is not an object', () => {
+    for (const [index, modifiedArgs] of [null, ['a'], 'text', 3].entries()) {
+      const { results, respond } = setup(19014 + index);
+      respond({ approved: true, modifiedArgs });
+      expect(results).toEqual([{ approved: false, reason: 'modifiedArgs must be a JSON object' }]);
+    }
+  });
+
   test('drops modifiedArgs of a rejection', () => {
     const { results, respond } = setup(19013);
     respond({ approved: false, reason: 'No', modifiedArgs: { title: 'Edited' } });

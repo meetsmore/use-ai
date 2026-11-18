@@ -1,3 +1,4 @@
+import type { ZodType } from 'zod';
 import type { ToolDefinition, ToolAnnotations } from '../types';
 import type { ClientSession } from '../agents/types';
 
@@ -51,6 +52,8 @@ export interface ServerToolConfig {
   };
   /** The function to execute when the AI calls this tool */
   execute: ServerToolExecuteFn;
+  /** The Zod input schema (set by defineServerTool); validates arguments the user edits on approval */
+  schema?: ZodType;
   /** MCP-aligned annotations for tool behavior hints */
   annotations?: ToolAnnotations;
 }
@@ -64,5 +67,7 @@ export interface ServerToolDefinition extends ToolDefinition {
   _server: {
     /** The execute function to call when the AI invokes this tool */
     execute: ServerToolExecuteFn;
+    /** The Zod input schema, when the tool was made with defineServerTool */
+    schema?: ZodType;
   };
 }

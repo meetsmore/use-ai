@@ -153,6 +153,8 @@ export class RemoteMcpToolsProvider {
           type: 'object',
           properties: tool.inputSchema.properties,
           required: tool.inputSchema.required,
+          ...(tool.inputSchema.$defs !== undefined && { $defs: tool.inputSchema.$defs as Record<string, unknown> }),
+          ...(tool.inputSchema.definitions !== undefined && { definitions: tool.inputSchema.definitions as Record<string, unknown> }),
         },
         // Mark with remote execution metadata
         _remote: {

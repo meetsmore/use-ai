@@ -136,6 +136,7 @@ describe('handleMcpConfirmation', () => {
     expect(emitted.message).toBe('Transfer $5000 to Bob. Are you sure?');
     expect(emitted.metadata).toEqual({ amount: 5000, to: 'Bob' });
     expect(emitted.toolCallArgs).toEqual({ to: 'Bob', amount: 5000 });
+    expect(emitted.acceptsModifiedArgs).toBe(true);
 
     session.pendingToolApprovals.get('tool-call-1')!({ approved: true });
     await promise;

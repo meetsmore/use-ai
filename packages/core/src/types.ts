@@ -116,6 +116,10 @@ export interface ToolDefinition {
     type: 'object';
     properties: Record<string, unknown>;
     required?: string[];
+    /** Subschemas referenced by `$ref` (JSON Schema 2019-09 and later) */
+    $defs?: Record<string, unknown>;
+    /** Subschemas referenced by `$ref` (JSON Schema draft-07 and earlier) */
+    definitions?: Record<string, unknown>;
   };
   /** MCP-aligned annotations for tool behavior hints */
   annotations?: ToolAnnotations;
@@ -297,6 +301,11 @@ export interface ToolApprovalRequestEvent {
   message?: string;
   /** Optional metadata for the approval request (runtime approval) */
   metadata?: Record<string, unknown>;
+  /**
+   * True when the server applies `modifiedArgs` sent with an approval of this
+   * request. Absent for runtime approvals, and from servers that predate edits.
+   */
+  acceptsModifiedArgs?: boolean;
 }
 
 /**

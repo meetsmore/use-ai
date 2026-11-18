@@ -11,7 +11,7 @@ import type { ClientSession, EventEmitter } from '../agents/types';
 import type { ToolApprovalRequestEvent } from '../types';
 import { TOOL_APPROVAL_REQUEST } from '../types';
 import { waitForApproval, invalidModifiedArgsResult } from '../agents/toolApproval';
-import { validateToolArgs } from '../agents/validateToolArgs';
+import { validateJsonSchemaArgs } from '../agents/validateToolArgs';
 import type { RemoteMcpToolsProvider } from './RemoteMcpToolsProvider';
 import type { McpHeadersMap } from '@meetsmore-oss/use-ai-core';
 import type { McpConfirmationResponse } from '@meetsmore-oss/use-ai-core';
@@ -28,7 +28,7 @@ export {
  * 2. Waits for user approval via waitForApproval()
  * 3. If approved → re-calls the same tool with { ...originalArgs, ...additional_columns }.
  *    When the approval carries modifiedArgs, they replace originalArgs after passing
- *    `inputSchema`; invalid ones return an error result and phase 2 does not run.
+ *    `inputSchema` (JSON Schema 2020-12); invalid ones return an error result and phase 2 does not run.
  * 4. If rejected → returns error result
  *
  * Phase-2 results are returned as-is (no re-interception).
@@ -63,10 +63,11 @@ export async function handleMcpConfirmation(
     message,
     metadata,
     timestamp: Date.now(),
+    acceptsModifiedArgs: true,
   });
 
   // Wait for user response
-  const approvalResult = await waitForApproval(session, toolCallId);
+  const approvalResult = await waitForApproval(session, toolCallId, { acceptsModifiedArgs: true });
 
   if (!approvalResult.approved) {
     logger.info('[MCP] Confirmation rejected by user', {
@@ -81,7 +82,7 @@ export async function handleMcpConfirmation(
 
   const { modifiedArgs } = approvalResult;
   if (modifiedArgs !== undefined) {
-    const errorText = validateToolArgs(inputSchema, modifiedArgs);
+    const errorText = validateJsonSchemaArgs(inputSchema, modifiedArgs, '2020-12');
     if (errorText !== undefined) {
       logger.info('[MCP] Edited tool arguments rejected', { toolCallId, errorText });
       return invalidModifiedArgsResult(errorText);

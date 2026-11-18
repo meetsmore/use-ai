@@ -191,6 +191,7 @@ export class UseAIServer {
         annotations: toolConfig.annotations,
         _server: {
           execute: toolConfig.execute,
+          schema: toolConfig.schema,
         },
       }));
       logger.info('[Server Tools] Registered server tools', {
@@ -914,9 +915,14 @@ export class UseAIServer {
     const resolver = session.pendingToolApprovals.get(toolCallId);
 
     if (resolver) {
-      resolver(approved && modifiedArgs !== undefined
-        ? { approved, reason, modifiedArgs }
-        : { approved, reason });
+      if (approved && modifiedArgs !== undefined) {
+        const isObject = typeof modifiedArgs === 'object' && modifiedArgs !== null && !Array.isArray(modifiedArgs);
+        resolver(isObject
+          ? { approved, reason, modifiedArgs }
+          : { approved: false, reason: 'modifiedArgs must be a JSON object' });
+      } else {
+        resolver({ approved, reason });
+      }
       session.pendingToolApprovals.delete(toolCallId);
       logger.info('Tool approval response received', {
         clientId: session.clientId,

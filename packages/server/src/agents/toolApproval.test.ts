@@ -1,4 +1,9 @@
-import { describe, expect, test } from 'bun:test';
+import { describe, expect, test, afterAll } from 'bun:test';
+import { z } from 'zod';
+import { UseAIServer } from '../server';
+import { AISDKAgent } from './AISDKAgent';
+import { defineServerTool } from '../tools';
+import { createSequentialMockModel } from '../../test/integration-test-utils';
 import { waitForApproval, createApprovalWrapper, type ToolArguments } from './toolApproval';
 import { abortRun, RunAbortedByUser, RunAbortedByClientDisconnect } from '../utils/abortReason';
 import type { ClientSession, EventEmitter } from './types';
@@ -245,5 +250,113 @@ describe('createApprovalWrapper with modifiedArgs', () => {
 
     await promise;
     expect(calls).toEqual([{ title: 'Edited' }]);
+  });
+});
+
+describe('createApprovalWrapper modifiedArgs validation by tool kind', () => {
+  function run(toolDef: ToolDefinition, modifiedArgs: Record<string, unknown>) {
+    const session = createTestSession({ abortController: new AbortController() });
+    const calls: ToolArguments[] = [];
+    const execute = createApprovalWrapper(toolDef, session, { emit: () => {} }, async (args) => {
+      calls.push(args);
+      return { ok: true };
+    });
+    const promise = execute({}, { toolCallId: 'tc-1' });
+    session.pendingToolApprovals.get('tc-1')!({ approved: true, modifiedArgs });
+    return promise.then((result) => ({ result: result as { error?: boolean; message?: string }, calls }));
+  }
+
+  function serverToolFrom(schema: z.ZodType): ServerToolDefinition {
+    const server = new UseAIServer({
+      port: 19021 + serversToClose.length,
+      agents: { test: new AISDKAgent({ hooks: { loadConfig: () => ({ model: createSequentialMockModel([{ text: 'OK' }]) }) } }) },
+      defaultAgent: 'test',
+      tools: {
+        edit_item: defineServerTool('Edit an item', schema, async () => ({ ok: true }), {
+          annotations: { destructiveHint: true },
+        }),
+      },
+    });
+    serversToClose.push(server);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (server as any).serverTools[0];
+  }
+
+  const serversToClose: UseAIServer[] = [];
+  afterAll(async () => {
+    await Promise.all(serversToClose.map((server) => server.close()));
+  });
+
+  test('runs a defineServerTool tool with an edit inside exclusive numeric bounds', async () => {
+    const tool = serverToolFrom(z.object({ amount: z.number().positive().lt(100) }));
+    const { result, calls } = await run(tool, { amount: 5 });
+    expect(result).toEqual({ ok: true });
+    expect(calls).toEqual([{ amount: 5 }]);
+  });
+
+  test('denies a defineServerTool edit that fails a Zod refinement, naming the field', async () => {
+    const tool = serverToolFrom(
+      z.object({ code: z.string().refine((value) => value.startsWith('A'), 'must start with A') })
+    );
+    const { result, calls } = await run(tool, { code: 'B1' });
+    expect(calls).toEqual([]);
+    expect(result.error).toBe(true);
+    expect(result.message).toContain('args/code must start with A');
+  });
+
+  test('runs an MCP tool with an edit that matches $defs refs and 2020-12 keywords', async () => {
+    const tool: RemoteToolDefinition = {
+      name: 'ns_refs',
+      description: 'Refs',
+      parameters: {
+        type: 'object',
+        properties: {
+          item: { $ref: '#/$defs/Item' },
+          pair: { type: 'array', prefixItems: [{ type: 'string' }], items: false },
+        },
+        $defs: { Item: { type: 'number' } },
+      },
+      _remote: {
+        provider: {} as RemoteToolDefinition['_remote']['provider'],
+        originalName: 'refs',
+        annotations: { destructiveHint: true },
+      },
+    };
+    const valid = await run(tool, { item: 3, pair: ['a'] });
+    expect(valid.calls).toEqual([{ item: 3, pair: ['a'] }]);
+
+    const invalid = await run(tool, { item: 'x', pair: ['a', 'b'] });
+    expect(invalid.calls).toEqual([]);
+    expect(invalid.result.message).toContain('args/item must be number');
+  });
+});
+
+describe('approval requests that accept edited arguments', () => {
+  test('createApprovalWrapper marks its approval request as accepting modifiedArgs', async () => {
+    const session = createTestSession({ abortController: new AbortController() });
+    const emitted: Record<string, unknown>[] = [];
+    const tool: ToolDefinition = {
+      name: 'x', description: 'x', parameters: { type: 'object', properties: {} }, annotations: { destructiveHint: true },
+    };
+    const promise = createApprovalWrapper(tool, session, { emit: (e: unknown) => { emitted.push(e as Record<string, unknown>); } } as EventEmitter, async () => 'ok')({}, { toolCallId: 'tc-1' });
+    session.pendingToolApprovals.get('tc-1')!({ approved: true });
+    await promise;
+    expect(emitted[0].acceptsModifiedArgs).toBe(true);
+  });
+
+  test('waitForApproval denies an approval carrying modifiedArgs unless the request accepts them', async () => {
+    const session = createTestSession({ abortController: new AbortController() });
+    const promise = waitForApproval(session, 'tc-1');
+    session.pendingToolApprovals.get('tc-1')!({ approved: true, modifiedArgs: { title: 'Edited' } });
+    const result = await promise;
+    expect(result.approved).toBe(false);
+    expect(result.reason).toContain('does not accept edited arguments');
+  });
+
+  test('waitForApproval passes modifiedArgs through when the request accepts them', async () => {
+    const session = createTestSession({ abortController: new AbortController() });
+    const promise = waitForApproval(session, 'tc-1', { acceptsModifiedArgs: true });
+    session.pendingToolApprovals.get('tc-1')!({ approved: true, modifiedArgs: { title: 'Edited' } });
+    expect(await promise).toEqual({ approved: true, modifiedArgs: { title: 'Edited' } });
   });
 });

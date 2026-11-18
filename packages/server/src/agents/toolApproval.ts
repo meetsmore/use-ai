@@ -8,7 +8,7 @@ import type { ToolDefinition, ToolApprovalRequestEvent } from '../types';
 import { TOOL_APPROVAL_REQUEST } from '../types';
 import { getToolAnnotations } from '../utils';
 import { isRemoteTool, isServerTool } from '../utils/toolFilters';
-import { validateToolArgs } from './validateToolArgs';
+import { validateJsonSchemaArgs, validateZodArgs } from './validateToolArgs';
 import { createAbortError } from '../utils/abortReason';
 import { logger } from '../logger';
 
@@ -39,17 +39,26 @@ export function toolNeedsApproval(toolDef: ToolDefinition): boolean {
   return annotations?.destructiveHint === true;
 }
 
+/** Reason given when an approval carries edits its request does not accept. */
+export const EDITS_NOT_ACCEPTED_REASON =
+  'This approval does not accept edited arguments, so the action was not run';
+
 /**
  * Waits for user approval of a tool call.
  * Returns a promise that resolves when the client responds with approval/rejection.
  *
+ * An approval carrying `modifiedArgs` resolves as a denial unless
+ * `options.acceptsModifiedArgs` is true, so edits are never silently dropped.
+ *
  * @param session - The client session containing pendingToolApprovals map
  * @param toolCallId - The ID of the tool call awaiting approval
+ * @param options - `acceptsModifiedArgs`: the caller applies edited arguments
  * @returns Promise that resolves with approval result
  */
 export function waitForApproval(
   session: ClientSession,
-  toolCallId: string
+  toolCallId: string,
+  options: { acceptsModifiedArgs?: boolean } = {}
 ): Promise<ToolApprovalResult> {
   return new Promise((resolve, reject) => {
     const signal = session.abortController?.signal;
@@ -59,7 +68,13 @@ export function waitForApproval(
       return;
     }
 
-    session.pendingToolApprovals.set(toolCallId, resolve);
+    session.pendingToolApprovals.set(toolCallId, (result) => {
+      if (result.modifiedArgs !== undefined && !options.acceptsModifiedArgs) {
+        resolve({ approved: false, reason: EDITS_NOT_ACCEPTED_REASON });
+        return;
+      }
+      resolve(result);
+    });
 
     // Listen for abort signal to reject the promise (client disconnect or explicit abort)
     signal?.addEventListener('abort', () => {
@@ -67,6 +82,25 @@ export function waitForApproval(
       reject(createAbortError(signal));
     }, { once: true });
   });
+}
+
+/**
+ * Validates arguments the user edited on approval, for tools the server executes:
+ * server tools made with defineServerTool use their Zod schema, MCP tools their
+ * input schema as JSON Schema 2020-12, other server tools their parameters as draft-07.
+ *
+ * @returns undefined when valid or when the client validates (client tools), otherwise an error text
+ */
+export function validateModifiedArgs(toolDef: ToolDefinition, args: unknown): string | undefined {
+  if (isServerTool(toolDef)) {
+    return toolDef._server.schema
+      ? validateZodArgs(toolDef._server.schema, args)
+      : validateJsonSchemaArgs(toolDef.parameters, args, 'draft-07');
+  }
+  if (isRemoteTool(toolDef)) {
+    return validateJsonSchemaArgs(toolDef.parameters, args, '2020-12');
+  }
+  return undefined;
 }
 
 /**
@@ -117,10 +151,11 @@ export function createApprovalWrapper(
       toolCallArgs: args,
       annotations,
       timestamp: Date.now(),
+      acceptsModifiedArgs: true,
     });
 
     // Wait for approval from client
-    const approvalResult = await waitForApproval(session, options.toolCallId);
+    const approvalResult = await waitForApproval(session, options.toolCallId, { acceptsModifiedArgs: true });
 
     if (approvalResult.approved) {
       const { modifiedArgs } = approvalResult;
@@ -131,12 +166,10 @@ export function createApprovalWrapper(
       if (modifiedArgs === undefined) {
         return actualExecutor(args, options);
       }
-      if (isServerTool(toolDef) || isRemoteTool(toolDef)) {
-        const errorText = validateToolArgs(toolDef.parameters, modifiedArgs);
-        if (errorText !== undefined) {
-          logger.info('Edited tool arguments rejected', { toolCallId: options.toolCallId, errorText });
-          return invalidModifiedArgsResult(errorText);
-        }
+      const errorText = validateModifiedArgs(toolDef, modifiedArgs);
+      if (errorText !== undefined) {
+        logger.info('Edited tool arguments rejected', { toolCallId: options.toolCallId, errorText });
+        return invalidModifiedArgsResult(errorText);
       }
       return actualExecutor(modifiedArgs, options);
     } else {
