@@ -248,9 +248,6 @@ export function useServerEvents({
     // (e.g., stream truncated by token limit, or aborted mid-tool).
     setExecutingTool(null);
     setLoading(false);
-    // However the run ended, a tool still working for it (a question waiting
-    // for the user's answer) has nobody left to answer.
-    toolSystemRef.current.abortRunSignal();
   }, []);
 
   const handleServerEvent = useCallback(async (client: UseAIClient, event: AGUIEvent) => {
@@ -358,20 +355,24 @@ export function useServerEvents({
     } else if (event.type === EventType.RUN_FINISHED) {
       // client.ts handleEvent already called finalizeRun({ aborted: false })
       // for RUN_FINISHED; this branch only persists the resulting state.
+      // Every way a run ends aborts the tools' signal first, before any await:
+      // a tool still working for the run (a question waiting for the user's
+      // answer) has nobody left to answer.
+      ts.abortRunSignal();
       const finishedEvent = event as RunFinishedEvent;
       await persistFinalResponse(client, { aborted: false, traceId: finishedEvent.runId });
       resetRunUiState();
     } else if (event.type === EventType.RUN_ERROR) {
+      // Abort before recording the aborted results and saving, so a tool that
+      // finishes meanwhile does not send a second result.
+      ts.abortRunSignal();
       const errorEvent = event as RunErrorEvent;
       const errorCode = errorEvent.message as ErrorCode;
 
       if (errorCode === ErrorCode.ABORTED) {
-        // User stopped generation. Abort the tools' signal first, so a tool
-        // that finishes while the turn is being saved does not send a second
-        // result. Then flush the aborted step into _messages (synthesizing
-        // tool_results for unanswered tool_use blocks, dropping
-        // signature-incomplete reasoning) and persist via the shared path.
-        ts.abortRunSignal();
+        // User stopped generation. Flush the aborted step into _messages
+        // (synthesizing tool_results for unanswered tool_use blocks, dropping
+        // signature-incomplete reasoning), then persist via the shared path.
         client.finalizeRun({ aborted: true });
         await persistFinalResponse(client, { aborted: true, traceId: runIdAtRunStartRef.current });
       } else {
@@ -392,6 +393,7 @@ export function useServerEvents({
     const strs = stringsRef.current;
     const message = strs.errors[ErrorCode.CONNECTION_LOST] || strs.errors[ErrorCode.UNKNOWN_ERROR];
 
+    toolSystemRef.current.abortRunSignal();
     saveAIResponseRef.current(message, 'error');
     resetRunUiState();
   }, [resetRunUiState]);

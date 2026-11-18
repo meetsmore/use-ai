@@ -314,8 +314,6 @@ export function useToolSystem({
       return;
     }
 
-    let response: { result: unknown; state?: unknown };
-
     try {
       const ownerId = toolOwnershipRef.current.get(name);
       console.log(`[useToolSystem] Tool "${name}" owned by component:`, ownerId);
@@ -345,6 +343,10 @@ export function useToolSystem({
 
       console.log('[useToolSystem] Executing tool...');
       const result = await executeDefinedTool(aggregatedToolsRef.current, name, input, ctx);
+      // The run ended while the tool worked (e.g. a question gave up waiting on
+      // `ctx.signal`). Nothing is left to receive the result, so skip waiting
+      // for the prompt to update as well.
+      if (signal.aborted) return;
 
       const isErrorResult = result && typeof result === 'object' &&
         ('error' in result || (result as Record<string, unknown>).success === false);
@@ -370,18 +372,19 @@ export function useToolSystem({
       await waitForToolsToStabilize();
       console.log('[useToolSystem] Tools stabilized');
 
-      response = { result, state: buildState() };
+      const updatedState = buildState();
       console.log(`[useToolSystem] Updated state (aggregated from all hooks)`);
+
+      // The run may also have ended during the waits above.
+      if (signal.aborted) return;
+      client.sendToolResponse(toolCallId, result, updatedState);
     } catch (err) {
       console.error('Tool execution error:', err);
-      response = { result: { error: err instanceof Error ? err.message : 'Unknown error' } };
+      if (signal.aborted) return;
+      client.sendToolResponse(toolCallId, {
+        error: err instanceof Error ? err.message : 'Unknown error',
+      });
     }
-
-    // The run ended while the tool worked (e.g. a question gave up waiting on
-    // `ctx.signal`). The server no longer waits for the result, and when the
-    // user stopped the run the client has already recorded the call as aborted.
-    if (signal.aborted) return;
-    client.sendToolResponse(toolCallId, response.result, response.state);
   }, [clientRef, isInvisible, getWaiter, waitForToolsToStabilize, buildState]);
 
   const storePendingToolCall = useCallback((

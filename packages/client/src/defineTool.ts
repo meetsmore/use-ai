@@ -20,9 +20,10 @@ export interface ToolExecutionContext {
   /**
    * Aborted when the run this call belongs to ends: stopped by the user,
    * failed, disconnected or finished. A tool that waits on the user should
-   * stop waiting then; the call is already recorded as aborted, so what it
-   * returns afterwards is dropped. A tool run by `useAIWorkflow` gets a
-   * signal that never aborts, as a workflow cannot be stopped.
+   * stop waiting then: what it returns afterwards is dropped, as the run is
+   * over (after a user stop the call is recorded as aborted). A tool run by
+   * `useAIWorkflow` gets a signal that never aborts, as a workflow cannot be
+   * stopped.
    *
    * @example
    * ```typescript
@@ -30,10 +31,16 @@ export interface ToolExecutionContext {
    *   'Ask the user to pick one option',
    *   z.object({ options: z.array(z.string()) }),
    *   (input, ctx) => new Promise((resolve) => {
-   *     questions.open(ctx.toolCallId, input.options, (answer) => resolve({ answer }));
-   *     ctx.signal.addEventListener('abort', () => {
+   *     // The signal also aborts when an answered run finishes normally,
+   *     // so stop listening once the user has answered.
+   *     const onAbort = () => {
    *       questions.close(ctx.toolCallId);
    *       resolve({ aborted: true });
+   *     };
+   *     ctx.signal.addEventListener('abort', onAbort, { once: true });
+   *     questions.open(ctx.toolCallId, input.options, (answer) => {
+   *       ctx.signal.removeEventListener('abort', onAbort);
+   *       resolve({ answer });
    *     });
    *   })
    * );

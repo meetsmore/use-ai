@@ -4,7 +4,7 @@ import { useToolSystem } from './useToolSystem';
 import { defineTool, type ToolExecutionContext } from '../defineTool';
 import type { UseAIClient } from '../client';
 
-function setup() {
+function setup({ invisible = true }: { invisible?: boolean } = {}) {
   const client = { sendToolResponse: mock(), sendToolApprovalResponse: mock() } as unknown as UseAIClient;
   const hook = renderHook(() => useToolSystem({ clientRef: { current: client }, buildState: () => ({}) }));
   const contexts: ToolExecutionContext[] = [];
@@ -14,7 +14,7 @@ function setup() {
     return new Promise(resolve => { release = resolve; });
   });
   act(() => {
-    hook.result.current.registerTools('owner', { wait: tool }, { invisible: true });
+    hook.result.current.registerTools('owner', { wait: tool }, { invisible });
     hook.result.current.signalReady('owner');
   });
   return { hook, client, contexts, release: (value: unknown) => release(value) };
@@ -57,6 +57,39 @@ describe('useToolSystem — ctx.toolCallId and ctx.signal', () => {
 
     expect(client.sendToolApprovalResponse).toHaveBeenCalledWith('tc1', true);
     expect(contexts[0].signal.aborted).toBe(true);
+  });
+
+  it('skips waiting for the prompt to update when the run ended while the tool worked', async () => {
+    const { hook, client, release } = setup({ invisible: false });
+    const waiter = mock(async () => {});
+    act(() => hook.result.current.registerWaiter('owner', waiter));
+
+    let execution: Promise<void> = Promise.resolve();
+    act(() => { execution = hook.result.current.executeToolCall('tc1', 'wait', {}); });
+    await act(async () => { await Promise.resolve(); });
+    act(() => hook.result.current.abortRunSignal());
+    release({ ok: true });
+    await act(async () => { await execution; });
+
+    expect(waiter).not.toHaveBeenCalled();
+    expect(client.sendToolResponse).not.toHaveBeenCalled();
+  });
+
+  it('sends an error result when sending the tool result throws', async () => {
+    const { hook, client, release } = setup();
+    const errorSpy = spyOn(console, 'error').mockImplementation(() => {});
+    (client.sendToolResponse as ReturnType<typeof mock>).mockImplementationOnce(() => {
+      throw new TypeError('Do not know how to serialize a BigInt');
+    });
+
+    let execution: Promise<void> = Promise.resolve();
+    act(() => { execution = hook.result.current.executeToolCall('tc1', 'wait', {}); });
+    await act(async () => { await Promise.resolve(); });
+    release({ id: 1n });
+    await act(async () => { await execution; });
+
+    expect(client.sendToolResponse).toHaveBeenLastCalledWith('tc1', { error: 'Do not know how to serialize a BigInt' });
+    errorSpy.mockRestore();
   });
 
   it('gives the next run a fresh signal', async () => {
