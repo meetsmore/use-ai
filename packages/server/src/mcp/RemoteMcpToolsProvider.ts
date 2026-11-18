@@ -294,6 +294,7 @@ export class RemoteMcpToolsProvider {
       };
     }
 
+    const finished = new AbortController();
     const response = await fetch(this.url, {
       method: 'POST',
       headers: requestHeaders,
@@ -303,7 +304,7 @@ export class RemoteMcpToolsProvider {
         ...(requestParams ? { params: requestParams } : {}),
         id,
       }),
-      signal,
+      signal: AbortSignal.any([signal, finished.signal]),
     });
 
     if (!response.ok) {
@@ -312,7 +313,12 @@ export class RemoteMcpToolsProvider {
 
     const contentType = response.headers?.get('content-type') ?? '';
     if (contentType.includes('text/event-stream')) {
-      return readSseResponse(response.body, id);
+      try {
+        return await readSseResponse(response.body, id);
+      } finally {
+        // Closes the connection when the server keeps the stream open after the response.
+        finished.abort();
+      }
     }
     return (await response.json()) as Record<string, unknown>;
   }
@@ -360,8 +366,9 @@ function encodeMcpHeaderValue(value: string): string {
 }
 
 /**
- * Reads a `text/event-stream` body until the JSON-RPC response with the given id arrives,
- * then cancels the stream. Events without data, comment lines and notifications are skipped.
+ * Reads a `text/event-stream` body until the JSON-RPC response with the given id arrives.
+ * Events with empty data (such as priming events), comment lines and notifications are skipped.
+ * Unlike the event-stream spec, an unterminated last event at the end of the stream is still read.
  * @see https://html.spec.whatwg.org/multipage/server-sent-events.html#event-stream-interpretation
  */
 async function readSseResponse(
@@ -372,9 +379,10 @@ async function readSseResponse(
 
   const readLine = (line: string): Record<string, unknown> | undefined => {
     if (line === '') {
-      if (data.length === 0) return undefined;
-      const message = JSON.parse(data.join('\n')) as Record<string, unknown>;
+      const text = data.join('\n');
       data = [];
+      if (text === '') return undefined;
+      const message = JSON.parse(text) as Record<string, unknown>;
       return message.id === id && ('result' in message || 'error' in message) ? message : undefined;
     }
     if (line === 'data' || line.startsWith('data:')) {
@@ -387,23 +395,18 @@ async function readSseResponse(
   if (body) {
     const reader = body.pipeThrough(new TextDecoderStream()).getReader();
     let buffer = '';
-    try {
-      for (;;) {
-        const { value, done } = await reader.read();
-        // At the end, an unterminated last line and event are still read.
-        buffer += done ? '\n\n' : value;
-        // A trailing CR may be the first half of a CRLF split across chunks.
-        const end = buffer.endsWith('\r') ? buffer.length - 1 : buffer.length;
-        const lines = buffer.slice(0, end).split(/\r\n|\r|\n/);
-        buffer = lines.pop()! + buffer.slice(end);
-        for (const line of lines) {
-          const message = readLine(line);
-          if (message) return message;
-        }
-        if (done) break;
+    for (;;) {
+      const { value, done } = await reader.read();
+      buffer += done ? '\n\n' : value;
+      // A trailing CR may be the first half of a CRLF split across chunks.
+      const end = buffer.endsWith('\r') ? buffer.length - 1 : buffer.length;
+      const lines = buffer.slice(0, end).split(/\r\n|\r|\n/);
+      buffer = lines.pop()! + buffer.slice(end);
+      for (const line of lines) {
+        const message = readLine(line);
+        if (message) return message;
       }
-    } finally {
-      reader.cancel().catch(() => {});
+      if (done) break;
     }
   }
 

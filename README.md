@@ -1164,7 +1164,7 @@ const server = new UseAIServer({
     namespace: 'my-app',
     timeout: 30_000,
     toolsCacheTtl: 60_000, // cache tool definitions for 60s
-    protocolVersion: '2026-07-28', // optional: send MCP 2026-07-28 request headers and _meta
+    protocolVersion: '2026-07-28', // optional: send MCP 2026-07-28 request headers and _meta (x-mcp-header is not supported)
   }],
 });
 ```

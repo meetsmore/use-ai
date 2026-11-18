@@ -4,6 +4,7 @@ import { RemoteMcpToolsProvider } from './RemoteMcpToolsProvider';
 
 interface RecordedRequest {
   headers: Headers;
+  signal: AbortSignal;
   body: {
     jsonrpc: string;
     id: number;
@@ -41,7 +42,7 @@ describe('RemoteMcpToolsProvider over Streamable HTTP', () => {
       port: 0,
       async fetch(req) {
         const body = (await req.json()) as RecordedRequest['body'];
-        requests.push({ headers: req.headers, body });
+        requests.push({ headers: req.headers, signal: req.signal, body });
         return reply(body);
       },
     });
@@ -132,6 +133,43 @@ describe('RemoteMcpToolsProvider over Streamable HTTP', () => {
       const result = await new RemoteMcpToolsProvider({ url, timeout: 1000 }).executeTool('echo', {});
 
       expect(result).toEqual({ result: 'done' });
+    });
+
+    test('tools/call skips a priming event with empty data before the response', async () => {
+      reply = ({ id }) =>
+        sse([
+          'id: prime-1\ndata: \n\n',
+          'id: prime-2\ndata\n\n',
+          `data: ${JSON.stringify({ jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: 'ok' }] } })}\n\n`,
+        ]);
+
+      const result = await new RemoteMcpToolsProvider({ url }).executeTool('echo', {});
+
+      expect(result).toEqual({ result: 'ok' });
+    });
+
+    test('tools/call closes the connection once the response arrives on a stream the server keeps open', async () => {
+      reply = ({ id }) => {
+        const encoder = new TextEncoder();
+        const stream = new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify({ jsonrpc: '2.0', id, result: { content: [] } })}\n\n`)
+            );
+          },
+        });
+        return new Response(stream, { headers: { 'Content-Type': 'text/event-stream' } });
+      };
+
+      await new RemoteMcpToolsProvider({ url, timeout: 5000 }).executeTool('echo', {});
+
+      const { signal } = requests[0];
+      const closed = await new Promise<boolean>((resolve) => {
+        if (signal.aborted) return resolve(true);
+        signal.addEventListener('abort', () => resolve(true));
+        setTimeout(() => resolve(false), 500);
+      });
+      expect(closed).toBe(true);
     });
 
     test('application/json responses still work', async () => {

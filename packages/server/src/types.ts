@@ -65,6 +65,8 @@ export interface McpEndpointConfig {
    * `'2026-07-28'` sends the `MCP-Protocol-Version`, `Mcp-Method` and `Mcp-Name` headers
    * and the `io.modelcontextprotocol/*` fields in `params._meta`.
    * Default: unset (no protocol metadata is sent).
+   * `x-mcp-header` parameter mirroring (`Mcp-Param-*`) is not implemented, so a server whose
+   * tools declare `x-mcp-header` will reject `tools/call` with `HeaderMismatch`.
    * @see https://modelcontextprotocol.io/specification/2026-07-28/basic/transports/streamable-http#request-metadata
    */
   protocolVersion?: '2026-07-28';
