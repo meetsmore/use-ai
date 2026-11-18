@@ -44,6 +44,13 @@ describe('useLatestToolCall', () => {
     });
   });
 
+  it('keeps the null result of a tool that returned nothing', () => {
+    const latest = render([], [
+      { kind: 'tool_call', toolCallId: 'void', name: 'update_todos', args: '{"items":[]}', status: 'done', result: 'null' },
+    ]);
+    expect(latest?.result).toBeNull();
+  });
+
   it('matches the tool name exactly', () => {
     expect(render(savedTurn, [], 'todos')).toBeNull();
   });

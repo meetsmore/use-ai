@@ -73,7 +73,10 @@ export function useLatestToolCall<Args = unknown, Result = unknown>(toolName: st
   return useMemo(() => {
     if (!part) return null;
 
-    const result = part.result === undefined ? undefined : (parseJson(part.result) ?? part.result);
+    // parseJson returns undefined only for text that is not JSON; a tool that
+    // returned nothing is recorded as "null" and must stay null here.
+    const parsedResult = part.result === undefined ? undefined : parseJson(part.result);
+    const result = parsedResult === undefined ? part.result : parsedResult;
     return {
       toolCallId: part.toolCallId,
       status: part.status,

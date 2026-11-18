@@ -64,7 +64,9 @@ export function getTurnParts(sourceMessages: PersistedMessage[]): ChatStreamingP
   const results = new Map<string, string>();
   for (const message of sourceMessages) {
     if (message.role === 'tool' && message.toolCallId) {
-      results.set(message.toolCallId, getTextFromContent(message.content));
+      // Chats saved before tools that return nothing were recorded as "null"
+      // have tool messages without content.
+      results.set(message.toolCallId, message.content === undefined ? '' : getTextFromContent(message.content));
     }
   }
 

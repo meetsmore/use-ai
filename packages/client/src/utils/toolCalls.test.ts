@@ -43,6 +43,16 @@ describe('getTurnParts', () => {
     ]);
   });
 
+  it('reads a saved result without content (chats saved before null was recorded) as an empty result', () => {
+    const turn = [
+      { id: 'a1', role: 'assistant', content: '', createdAt: at, toolCalls: [call('tc1', 'logout', '{}')] },
+      { id: 't1', role: 'tool', toolCallId: 'tc1', createdAt: at },
+    ] as unknown as PersistedMessage[];
+    expect(getTurnParts(turn)).toEqual([
+      { kind: 'tool_call', toolCallId: 'tc1', name: 'logout', args: '{}', status: 'done', result: '' },
+    ]);
+  });
+
   it('reads a call with no result as aborted', () => {
     const turn: PersistedMessage[] = [
       { id: 'a1', role: 'assistant', content: '', createdAt: at, toolCalls: [call('tc1', 'ask', '{}')] },
