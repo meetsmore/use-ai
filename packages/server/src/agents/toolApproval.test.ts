@@ -168,6 +168,7 @@ describe('createApprovalWrapper with modifiedArgs', () => {
     _remote: {
       provider: {} as RemoteToolDefinition['_remote']['provider'],
       originalName: 'create_item',
+      inputSchema: parameters,
       annotations,
     },
   };
@@ -305,20 +306,22 @@ describe('createApprovalWrapper modifiedArgs validation by tool kind', () => {
   });
 
   test('runs an MCP tool with an edit that matches $defs refs and 2020-12 keywords', async () => {
+    const parameters: RemoteToolDefinition['parameters'] = {
+      type: 'object',
+      properties: {
+        item: { $ref: '#/$defs/Item' },
+        pair: { type: 'array', prefixItems: [{ type: 'string' }], items: false },
+      },
+      $defs: { Item: { type: 'number' } },
+    };
     const tool: RemoteToolDefinition = {
       name: 'ns_refs',
       description: 'Refs',
-      parameters: {
-        type: 'object',
-        properties: {
-          item: { $ref: '#/$defs/Item' },
-          pair: { type: 'array', prefixItems: [{ type: 'string' }], items: false },
-        },
-        $defs: { Item: { type: 'number' } },
-      },
+      parameters,
       _remote: {
         provider: {} as RemoteToolDefinition['_remote']['provider'],
         originalName: 'refs',
+        inputSchema: parameters,
         annotations: { destructiveHint: true },
       },
     };
@@ -328,6 +331,38 @@ describe('createApprovalWrapper modifiedArgs validation by tool kind', () => {
     const invalid = await run(tool, { item: 'x', pair: ['a', 'b'] });
     expect(invalid.calls).toEqual([]);
     expect(invalid.result.message).toContain('args/item must be number');
+  });
+
+  test('denies an MCP edit that breaks a top-level constraint of the complete input schema', async () => {
+    const inputSchema = {
+      type: 'object',
+      properties: { title: { type: 'string' } },
+      required: ['title'],
+      additionalProperties: false,
+    };
+    const tool: RemoteToolDefinition = {
+      name: 'ns_strict',
+      description: 'Strict',
+      parameters: { type: 'object', properties: inputSchema.properties, required: inputSchema.required },
+      _remote: {
+        provider: {} as RemoteToolDefinition['_remote']['provider'],
+        originalName: 'strict',
+        inputSchema,
+        annotations: { destructiveHint: true },
+      },
+    };
+    const { result, calls } = await run(tool, { title: 'Edited', admin: true });
+    expect(calls).toEqual([]);
+    expect(result.error).toBe(true);
+    expect(result.message).toContain('args must NOT have additional properties');
+  });
+
+  test('denies a defineServerTool edit with a key its strict Zod schema forbids', async () => {
+    const tool = serverToolFrom(z.object({ title: z.string() }).strict());
+    const { result, calls } = await run(tool, { title: 'Edited', admin: true });
+    expect(calls).toEqual([]);
+    expect(result.error).toBe(true);
+    expect(result.message).toContain('Edited arguments are invalid');
   });
 });
 

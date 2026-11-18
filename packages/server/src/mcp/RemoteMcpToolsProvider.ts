@@ -37,6 +37,8 @@ export interface RemoteToolDefinition extends ToolDefinition {
     provider: RemoteMcpToolsProvider;
     /** The original tool name (before namespace prefix) */
     originalName: string;
+    /** The tool's complete input schema as the MCP server advertised it; edited arguments are validated against it */
+    inputSchema: object;
     /** MCP tool annotations (title, hints, etc.) */
     annotations?: ToolAnnotations;
   };
@@ -160,6 +162,7 @@ export class RemoteMcpToolsProvider {
         _remote: {
           provider: this,
           originalName: tool.name,
+          inputSchema: tool.inputSchema,
           annotations: tool.annotations,
         },
       };

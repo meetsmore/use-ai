@@ -585,6 +585,7 @@ describe('handleToolResult - MCP tool preservation', () => {
       _remote: {
         provider: { executeTool: mock(() => Promise.resolve({ success: true })) } as unknown as RemoteToolDefinition['_remote']['provider'],
         originalName: 'search',
+        inputSchema: { type: 'object', properties: {}, required: [] },
       },
     };
 
@@ -663,6 +664,7 @@ describe('handleToolResult - MCP tool preservation', () => {
       _remote: {
         provider: { executeTool: mock(() => Promise.resolve({ success: true })) } as unknown as RemoteToolDefinition['_remote']['provider'],
         originalName: 'search',
+        inputSchema: { type: 'object', properties: {}, required: [] },
       },
     };
 

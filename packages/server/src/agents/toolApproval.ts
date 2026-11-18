@@ -98,7 +98,7 @@ export function validateModifiedArgs(toolDef: ToolDefinition, args: unknown): st
       : validateJsonSchemaArgs(toolDef.parameters, args, 'draft-07');
   }
   if (isRemoteTool(toolDef)) {
-    return validateJsonSchemaArgs(toolDef.parameters, args, '2020-12');
+    return validateJsonSchemaArgs(toolDef._remote.inputSchema, args, '2020-12');
   }
   return undefined;
 }

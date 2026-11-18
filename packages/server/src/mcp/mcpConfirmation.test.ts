@@ -112,7 +112,7 @@ describe('handleMcpConfirmation', () => {
     name: 'ns_transfer',
     description: 'Transfer money',
     parameters: inputSchema,
-    _remote: { provider, originalName: 'transfer' },
+    _remote: { provider, originalName: 'transfer', inputSchema },
   });
   const confirmation: McpConfirmationResponse = {
     _use_ai_internal: true,

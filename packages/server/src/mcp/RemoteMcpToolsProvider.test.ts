@@ -130,6 +130,25 @@ describe('RemoteMcpToolsProvider', () => {
       expect(tools[0].parameters).toEqual(inputSchema as typeof tools[0]['parameters']);
     });
 
+    test('keeps the complete input schema, top-level constraints included, on _remote', async () => {
+      const inputSchema = {
+        type: 'object',
+        properties: { title: { type: 'string' } },
+        required: ['title'],
+        additionalProperties: false,
+        minProperties: 1,
+      };
+      globalThis.fetch = mock(() => Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ result: { tools: [{ name: 'strict', description: 'Strict', inputSchema }] } }),
+      } as Response)) as unknown as typeof fetch;
+      const provider = new RemoteMcpToolsProvider({ url: 'http://mcp.test/rpc' });
+
+      const tools = await provider.fetchToolsWithHeaders();
+
+      expect(tools[0]._remote.inputSchema).toEqual(inputSchema);
+    });
+
     test('applies namespace prefix to tool names', async () => {
       const provider = new RemoteMcpToolsProvider({
         url: 'http://mcp.test/rpc',
