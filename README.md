@@ -600,10 +600,10 @@ function EditableApproval({ approvals, onApprove, onApproveWithArgs, onReject }:
 ```
 
 - Server tools and MCP tools: the server validates the edited arguments against the tool's input schema. Invalid ones do not run the tool; the AI receives an error result that names each failing field.
-- MCP `confirmation_required` tools: phase 2 is called with `{ ...editedArgs, ...additional_columns }`.
+- MCP `confirmation_required` tools: phase 2 is called with `{ ...editedArgs, ...additional_columns }`. Phase 1 is not re-run, so the `message`, `metadata` and `additional_columns` it returned describe the original arguments; the MCP server must treat the phase-2 arguments as authoritative.
 - Client tools: the browser runs the tool with the edited arguments, and the tool's Zod schema validates them. Invalid ones return the validation error to the AI.
 - Omitting the edited arguments (`onApprove`, or no entry for a call) behaves exactly as a plain approval.
-- Runtime approvals requested with `ctx.requestApproval` in a client tool ignore edited arguments.
+- Runtime approvals requested with `ctx.requestApproval` do not apply edited arguments.
 - The AI's history keeps the arguments it proposed, followed by the result of the edited call, so return what was actually done in the tool result.
 - Over the wire this is an optional `modifiedArgs` field on the `tool_approval_response` message, honored only when `approved` is `true`. `UseAIClient.sendToolApprovalResponse(toolCallId, approved, reason, modifiedArgs)` sends it outside the chat slots.
 
