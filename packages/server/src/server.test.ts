@@ -715,9 +715,11 @@ describe('handleToolApprovalResponse - modifiedArgs', () => {
         ['tc-1', (result: unknown) => { results.push(result); }],
       ]),
     };
+    const serverInternals = server as unknown as {
+      handleToolApprovalResponse(session: unknown, message: unknown): void;
+    };
     const respond = (data: Record<string, unknown>) =>
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (server as any).handleToolApprovalResponse(session, { type: 'tool_approval_response', data: { toolCallId: 'tc-1', ...data } });
+      serverInternals.handleToolApprovalResponse(session, { type: 'tool_approval_response', data: { toolCallId: 'tc-1', ...data } });
     return { results, respond };
   }
 

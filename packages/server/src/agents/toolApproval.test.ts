@@ -279,8 +279,7 @@ describe('createApprovalWrapper modifiedArgs validation by tool kind', () => {
       },
     });
     serversToClose.push(server);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (server as any).serverTools[0];
+    return (server as unknown as { serverTools: ServerToolDefinition[] }).serverTools[0];
   }
 
   const serversToClose: UseAIServer[] = [];
