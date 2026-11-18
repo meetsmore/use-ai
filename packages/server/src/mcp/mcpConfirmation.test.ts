@@ -267,10 +267,32 @@ describe('handleMcpConfirmation', () => {
 
     expect(capturedHeaders).toBe(mcpHeaders);
   });
-  test('calls phase-2 with modifiedArgs merged with additional_columns when approved with edits', async () => {
+  function createSequencedProvider(results: unknown[]) {
+    const executedCalls: { toolName: string; args: unknown }[] = [];
+    const provider = {
+      executeTool: async (toolName: string, args: unknown) => {
+        executedCalls.push({ toolName, args });
+        return results[executedCalls.length - 1];
+      },
+    } as unknown as RemoteMcpToolsProvider;
+    return { provider, executedCalls };
+  }
+
+  const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+  test('re-runs phase 1 with edited args and asks again before phase 2 runs them', async () => {
     const session = createTestSession();
     const events = createMockEmitter();
-    const provider = createMockProvider({ success: true });
+    const reconfirmation: McpConfirmationResponse = {
+      _use_ai_internal: true,
+      _use_ai_type: 'confirmation_required',
+      _use_ai_metadata: {
+        message: 'Transfer $300 to Carol. Are you sure?',
+        metadata: { amount: 300, to: 'Carol' },
+        additional_columns: { token: 'token_for_carol' },
+      },
+    };
+    const { provider, executedCalls } = createSequencedProvider([reconfirmation, { success: true }]);
 
     const promise = handleMcpConfirmation(
       confirmation, 'tool-call-1', 'ns_transfer', 'transfer',
@@ -281,12 +303,59 @@ describe('handleMcpConfirmation', () => {
       approved: true,
       modifiedArgs: { to: 'Carol', amount: 300 },
     });
-    await promise;
+    await tick();
 
-    expect(provider.executedCalls).toHaveLength(1);
-    expect(provider.executedCalls[0].args).toEqual({
-      to: 'Carol', amount: 300, token: 'random_fixed_token',
+    expect(executedCalls).toEqual([{ toolName: 'transfer', args: { to: 'Carol', amount: 300 } }]);
+    expect(events.emittedEvents).toHaveLength(2);
+    const second = events.emittedEvents[1] as Record<string, unknown>;
+    expect(second.message).toBe('Transfer $300 to Carol. Are you sure?');
+    expect(second.toolCallArgs).toEqual({ to: 'Carol', amount: 300 });
+
+    session.pendingToolApprovals.get('tool-call-1')!({ approved: true });
+    const result = await promise;
+
+    expect(executedCalls[1]).toEqual({
+      toolName: 'transfer',
+      args: { to: 'Carol', amount: 300, token: 'token_for_carol' },
     });
+    expect(result).toEqual({ success: true });
+  });
+
+  test('returns the re-run phase-1 result when the edited args need no confirmation', async () => {
+    const session = createTestSession();
+    const events = createMockEmitter();
+    const { provider, executedCalls } = createSequencedProvider([{ success: true, message: 'Done' }]);
+
+    const promise = handleMcpConfirmation(
+      confirmation, 'tool-call-1', 'ns_transfer', 'transfer',
+      originalArgs, inputSchema, provider, session, events
+    );
+
+    session.pendingToolApprovals.get('tool-call-1')!({
+      approved: true,
+      modifiedArgs: { to: 'Carol', amount: 1 },
+    });
+
+    expect(await promise).toEqual({ success: true, message: 'Done' });
+    expect(executedCalls).toEqual([{ toolName: 'transfer', args: { to: 'Carol', amount: 1 } }]);
+  });
+
+  test('a re-confirmation that is rejected runs nothing further', async () => {
+    const session = createTestSession();
+    const events = createMockEmitter();
+    const { provider, executedCalls } = createSequencedProvider([confirmation]);
+
+    const promise = handleMcpConfirmation(
+      confirmation, 'tool-call-1', 'ns_transfer', 'transfer',
+      originalArgs, inputSchema, provider, session, events
+    );
+
+    session.pendingToolApprovals.get('tool-call-1')!({ approved: true, modifiedArgs: { to: 'Carol', amount: 2 } });
+    await tick();
+    session.pendingToolApprovals.get('tool-call-1')!({ approved: false, reason: 'Changed my mind' });
+
+    expect(await promise).toEqual({ error: true, message: 'Tool execution denied by user: Changed my mind' });
+    expect(executedCalls).toHaveLength(1);
   });
 
   test('does not call phase-2 when modifiedArgs fail the input schema', async () => {
