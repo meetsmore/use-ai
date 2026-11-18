@@ -699,3 +699,42 @@ describe('handleToolResult - MCP tool preservation', () => {
     expect(session.tools.map(t => t.name).sort()).toEqual(['mcp_search', 'navigate']);
   });
 });
+
+describe('handleToolApprovalResponse - modifiedArgs', () => {
+  function setup(port: number) {
+    const mockModel = createSequentialMockModel([{ text: 'OK' }]);
+    const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
+    const server = new UseAIServer({ port, agents: { test: agent }, defaultAgent: 'test' });
+    cleanup.trackServer(server);
+    const results: unknown[] = [];
+    const session = {
+      clientId: 'test-client',
+      pendingToolApprovals: new Map<string, (result: unknown) => void>([
+        ['tc-1', (result: unknown) => { results.push(result); }],
+      ]),
+    };
+    const respond = (data: Record<string, unknown>) =>
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (server as any).handleToolApprovalResponse(session, { type: 'tool_approval_response', data: { toolCallId: 'tc-1', ...data } });
+    return { results, respond };
+  }
+
+  test('forwards modifiedArgs of an approval to the waiting tool', () => {
+    const { results, respond } = setup(19011);
+    respond({ approved: true, modifiedArgs: { title: 'Edited' } });
+    expect(results).toEqual([{ approved: true, reason: undefined, modifiedArgs: { title: 'Edited' } }]);
+  });
+
+  test('resolves without modifiedArgs when the approval carries none', () => {
+    const { results, respond } = setup(19012);
+    respond({ approved: true });
+    expect(results).toEqual([{ approved: true, reason: undefined }]);
+    expect(results[0]).not.toHaveProperty('modifiedArgs');
+  });
+
+  test('drops modifiedArgs of a rejection', () => {
+    const { results, respond } = setup(19013);
+    respond({ approved: false, reason: 'No', modifiedArgs: { title: 'Edited' } });
+    expect(results[0]).not.toHaveProperty('modifiedArgs');
+  });
+});

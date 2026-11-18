@@ -910,11 +910,13 @@ export class UseAIServer {
   }
 
   private handleToolApprovalResponse(session: ClientSession, message: ToolApprovalResponseMessage) {
-    const { toolCallId, approved, reason } = message.data;
+    const { toolCallId, approved, reason, modifiedArgs } = message.data;
     const resolver = session.pendingToolApprovals.get(toolCallId);
 
     if (resolver) {
-      resolver({ approved, reason });
+      resolver(approved && modifiedArgs !== undefined
+        ? { approved, reason, modifiedArgs }
+        : { approved, reason });
       session.pendingToolApprovals.delete(toolCallId);
       logger.info('Tool approval response received', {
         clientId: session.clientId,

@@ -1,7 +1,10 @@
 import { describe, expect, test } from 'bun:test';
-import { waitForApproval } from './toolApproval';
+import { waitForApproval, createApprovalWrapper, type ToolArguments } from './toolApproval';
 import { abortRun, RunAbortedByUser, RunAbortedByClientDisconnect } from '../utils/abortReason';
-import type { ClientSession } from './types';
+import type { ClientSession, EventEmitter } from './types';
+import type { ToolDefinition } from '../types';
+import type { ServerToolDefinition } from '../tools/types';
+import type { RemoteToolDefinition } from '../mcp';
 
 /**
  * Helper to create a minimal session for testing
@@ -134,5 +137,113 @@ describe('waitForApproval', () => {
 
     const result = await approvalPromise;
     expect(result).toEqual({ approved: true });
+  });
+});
+
+describe('createApprovalWrapper with modifiedArgs', () => {
+  const parameters: ToolDefinition['parameters'] = {
+    type: 'object',
+    properties: { title: { type: 'string' }, count: { type: 'number' } },
+    required: ['title'],
+  };
+  const annotations = { destructiveHint: true };
+
+  const serverTool: ServerToolDefinition = {
+    name: 'create_item',
+    description: 'Create an item',
+    parameters,
+    annotations,
+    _server: { execute: async () => ({ ok: true }) },
+  };
+
+  const remoteTool: RemoteToolDefinition = {
+    name: 'ns_create_item',
+    description: 'Create an item',
+    parameters,
+    _remote: {
+      provider: {} as RemoteToolDefinition['_remote']['provider'],
+      originalName: 'create_item',
+      annotations,
+    },
+  };
+
+  const clientTool: ToolDefinition = {
+    name: 'create_item',
+    description: 'Create an item',
+    parameters,
+    annotations,
+  };
+
+  function setup(toolDef: ToolDefinition) {
+    const session = createTestSession({ abortController: new AbortController() });
+    const events: EventEmitter = { emit: () => {} };
+    const calls: ToolArguments[] = [];
+    const execute = createApprovalWrapper(toolDef, session, events, async (args) => {
+      calls.push(args);
+      return { ok: true };
+    });
+    return { session, calls, execute };
+  }
+
+  const originalArgs = { title: 'Original', count: 1 };
+
+  test('runs with the original args when the approval carries no modifiedArgs', async () => {
+    const { session, calls, execute } = setup(serverTool);
+    const promise = execute(originalArgs, { toolCallId: 'tc-1' });
+    session.pendingToolApprovals.get('tc-1')!({ approved: true });
+
+    expect(await promise).toEqual({ ok: true });
+    expect(calls).toEqual([originalArgs]);
+  });
+
+  test('runs a server tool with valid modifiedArgs instead of the original args', async () => {
+    const { session, calls, execute } = setup(serverTool);
+    const promise = execute(originalArgs, { toolCallId: 'tc-1' });
+    session.pendingToolApprovals.get('tc-1')!({ approved: true, modifiedArgs: { title: 'Edited', count: 2 } });
+
+    expect(await promise).toEqual({ ok: true });
+    expect(calls).toEqual([{ title: 'Edited', count: 2 }]);
+  });
+
+  test('runs an MCP tool with valid modifiedArgs instead of the original args', async () => {
+    const { session, calls, execute } = setup(remoteTool);
+    const promise = execute(originalArgs, { toolCallId: 'tc-1' });
+    session.pendingToolApprovals.get('tc-1')!({ approved: true, modifiedArgs: { title: 'Edited' } });
+
+    await promise;
+    expect(calls).toEqual([{ title: 'Edited' }]);
+  });
+
+  test('does not run a server tool when modifiedArgs fail its input schema', async () => {
+    const { session, calls, execute } = setup(serverTool);
+    const promise = execute(originalArgs, { toolCallId: 'tc-1' });
+    session.pendingToolApprovals.get('tc-1')!({ approved: true, modifiedArgs: { count: 'two' } });
+
+    const result = await promise as { error: boolean; message: string };
+    expect(calls).toEqual([]);
+    expect(result.error).toBe(true);
+    expect(result.message).toContain('Edited arguments are invalid');
+    expect(result.message).toContain("must have required property 'title'");
+    expect(result.message).toContain('args/count must be number');
+  });
+
+  test('does not run an MCP tool when modifiedArgs fail its input schema', async () => {
+    const { session, calls, execute } = setup(remoteTool);
+    const promise = execute(originalArgs, { toolCallId: 'tc-1' });
+    session.pendingToolApprovals.get('tc-1')!({ approved: true, modifiedArgs: { title: 42 } });
+
+    const result = await promise as { error: boolean; message: string };
+    expect(calls).toEqual([]);
+    expect(result.error).toBe(true);
+    expect(result.message).toContain('args/title must be string');
+  });
+
+  test('passes modifiedArgs of a client tool through, since the client executes and validates it', async () => {
+    const { session, calls, execute } = setup(clientTool);
+    const promise = execute(originalArgs, { toolCallId: 'tc-1' });
+    session.pendingToolApprovals.get('tc-1')!({ approved: true, modifiedArgs: { title: 'Edited' } });
+
+    await promise;
+    expect(calls).toEqual([{ title: 'Edited' }]);
   });
 });

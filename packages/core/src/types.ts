@@ -311,6 +311,13 @@ export interface ToolApprovalResponseMessage {
     approved: boolean;
     /** Optional reason for rejection (shown to AI) */
     reason?: string;
+    /**
+     * Arguments edited by the user. Only read when `approved` is true: the tool
+     * runs with these instead of the arguments the AI proposed. Tools executed
+     * on the server (server tools, MCP tools) validate them against their input
+     * schema; client tools validate them with their own schema when they run.
+     */
+    modifiedArgs?: Record<string, unknown>;
   };
 }
 

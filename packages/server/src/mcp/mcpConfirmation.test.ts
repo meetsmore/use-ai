@@ -8,6 +8,7 @@ import type { UseAIInternalResponse } from './useAIInternalResponse';
 import type { ClientSession, EventEmitter } from '../agents/types';
 import type { RemoteMcpToolsProvider } from './RemoteMcpToolsProvider';
 import { TOOL_APPROVAL_REQUEST } from '../types';
+import type { ToolDefinition } from '../types';
 
 function createTestSession(overrides: Partial<ClientSession> = {}): ClientSession {
   return {
@@ -102,6 +103,11 @@ describe('isMcpConfirmationResponse', () => {
 
 describe('handleMcpConfirmation', () => {
   const originalArgs = { to: 'Bob', amount: 5000 };
+  const inputSchema: ToolDefinition['parameters'] = {
+    type: 'object',
+    properties: { to: { type: 'string' }, amount: { type: 'number' } },
+    required: ['to', 'amount'],
+  };
   const confirmation: McpConfirmationResponse = {
     _use_ai_internal: true,
     _use_ai_type: 'confirmation_required',
@@ -119,7 +125,7 @@ describe('handleMcpConfirmation', () => {
 
     const promise = handleMcpConfirmation(
       confirmation, 'tool-call-1', 'ns_transfer', 'transfer',
-      originalArgs, provider, session, events
+      originalArgs, inputSchema, provider, session, events
     );
 
     expect(events.emittedEvents).toHaveLength(1);
@@ -142,7 +148,7 @@ describe('handleMcpConfirmation', () => {
 
     const promise = handleMcpConfirmation(
       confirmation, 'tool-call-1', 'ns_transfer', 'transfer',
-      originalArgs, provider, session, events
+      originalArgs, inputSchema, provider, session, events
     );
 
     session.pendingToolApprovals.get('tool-call-1')!({ approved: true });
@@ -169,7 +175,7 @@ describe('handleMcpConfirmation', () => {
 
     const promise = handleMcpConfirmation(
       noColumnsConfirmation, 'tool-call-1', 'ns_transfer', 'transfer',
-      originalArgs, provider, session, events
+      originalArgs, inputSchema, provider, session, events
     );
 
     session.pendingToolApprovals.get('tool-call-1')!({ approved: true });
@@ -185,7 +191,7 @@ describe('handleMcpConfirmation', () => {
 
     const promise = handleMcpConfirmation(
       confirmation, 'tool-call-1', 'ns_transfer', 'transfer',
-      originalArgs, provider, session, events
+      originalArgs, inputSchema, provider, session, events
     );
 
     session.pendingToolApprovals.get('tool-call-1')!({ approved: false, reason: 'Too expensive' });
@@ -205,7 +211,7 @@ describe('handleMcpConfirmation', () => {
 
     const promise = handleMcpConfirmation(
       confirmation, 'tool-call-1', 'ns_transfer', 'transfer',
-      originalArgs, provider, session, events
+      originalArgs, inputSchema, provider, session, events
     );
 
     session.pendingToolApprovals.get('tool-call-1')!({ approved: false });
@@ -226,7 +232,7 @@ describe('handleMcpConfirmation', () => {
 
     const promise = handleMcpConfirmation(
       confirmation, 'tool-call-1', 'ns_transfer', 'transfer',
-      originalArgs, provider, session, events
+      originalArgs, inputSchema, provider, session, events
     );
 
     session.pendingToolApprovals.get('tool-call-1')!({ approved: true });
@@ -252,12 +258,55 @@ describe('handleMcpConfirmation', () => {
 
     const promise = handleMcpConfirmation(
       confirmation, 'tool-call-1', 'ns_transfer', 'transfer',
-      originalArgs, provider, session, events, mcpHeaders
+      originalArgs, inputSchema, provider, session, events, mcpHeaders
     );
 
     session.pendingToolApprovals.get('tool-call-1')!({ approved: true });
     await promise;
 
     expect(capturedHeaders).toBe(mcpHeaders);
+  });
+  test('calls phase-2 with modifiedArgs merged with additional_columns when approved with edits', async () => {
+    const session = createTestSession();
+    const events = createMockEmitter();
+    const provider = createMockProvider({ success: true });
+
+    const promise = handleMcpConfirmation(
+      confirmation, 'tool-call-1', 'ns_transfer', 'transfer',
+      originalArgs, inputSchema, provider, session, events
+    );
+
+    session.pendingToolApprovals.get('tool-call-1')!({
+      approved: true,
+      modifiedArgs: { to: 'Carol', amount: 300 },
+    });
+    await promise;
+
+    expect(provider.executedCalls).toHaveLength(1);
+    expect(provider.executedCalls[0].args).toEqual({
+      to: 'Carol', amount: 300, token: 'random_fixed_token',
+    });
+  });
+
+  test('does not call phase-2 when modifiedArgs fail the input schema', async () => {
+    const session = createTestSession();
+    const events = createMockEmitter();
+    const provider = createMockProvider({ success: true });
+
+    const promise = handleMcpConfirmation(
+      confirmation, 'tool-call-1', 'ns_transfer', 'transfer',
+      originalArgs, inputSchema, provider, session, events
+    );
+
+    session.pendingToolApprovals.get('tool-call-1')!({
+      approved: true,
+      modifiedArgs: { to: 'Carol', amount: 'a lot' },
+    });
+    const result = await promise as { error: boolean; message: string };
+
+    expect(provider.executedCalls).toHaveLength(0);
+    expect(result.error).toBe(true);
+    expect(result.message).toContain('Edited arguments are invalid');
+    expect(result.message).toContain('args/amount must be number');
   });
 });

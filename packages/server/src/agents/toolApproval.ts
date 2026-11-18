@@ -3,10 +3,12 @@
  * Implements user confirmation flow before executing tools with destructiveHint annotation.
  */
 
-import type { ClientSession, EventEmitter } from './types';
+import type { ClientSession, EventEmitter, ToolApprovalResult } from './types';
 import type { ToolDefinition, ToolApprovalRequestEvent } from '../types';
 import { TOOL_APPROVAL_REQUEST } from '../types';
 import { getToolAnnotations } from '../utils';
+import { isRemoteTool, isServerTool } from '../utils/toolFilters';
+import { validateToolArgs } from './validateToolArgs';
 import { createAbortError } from '../utils/abortReason';
 import { logger } from '../logger';
 
@@ -48,7 +50,7 @@ export function toolNeedsApproval(toolDef: ToolDefinition): boolean {
 export function waitForApproval(
   session: ClientSession,
   toolCallId: string
-): Promise<{ approved: boolean; reason?: string }> {
+): Promise<ToolApprovalResult> {
   return new Promise((resolve, reject) => {
     const signal = session.abortController?.signal;
     // Check if already aborted (e.g., client disconnected before approval requested)
@@ -68,8 +70,24 @@ export function waitForApproval(
 }
 
 /**
+ * Builds the tool result returned to the AI when the user's edited arguments
+ * fail the tool's input schema. The tool does not run.
+ */
+export function invalidModifiedArgsResult(errorText: string): { error: true; message: string } {
+  return {
+    error: true,
+    message: `Tool execution denied: Edited arguments are invalid: ${errorText}`,
+  };
+}
+
+/**
  * Creates an executor wrapper that handles user approval before execution.
  * Emits TOOL_APPROVAL_REQUEST, waits for user response, then proceeds or returns error.
+ *
+ * An approval may carry `modifiedArgs`: the tool then runs with them instead of the
+ * AI's arguments. For server and MCP tools they are validated against the tool's
+ * input schema first, and invalid ones return an error result without running the
+ * tool. Client tools run in the browser, which validates them with the tool's own schema.
  *
  * @param toolDef - The tool definition (for name and annotations)
  * @param session - The client session for approval state
@@ -105,9 +123,22 @@ export function createApprovalWrapper(
     const approvalResult = await waitForApproval(session, options.toolCallId);
 
     if (approvalResult.approved) {
-      logger.info('Tool approved by user', { toolCallId: options.toolCallId });
-      // Continue with actual execution
-      return actualExecutor(args, options);
+      const { modifiedArgs } = approvalResult;
+      logger.info('Tool approved by user', {
+        toolCallId: options.toolCallId,
+        modifiedArgs: modifiedArgs !== undefined,
+      });
+      if (modifiedArgs === undefined) {
+        return actualExecutor(args, options);
+      }
+      if (isServerTool(toolDef) || isRemoteTool(toolDef)) {
+        const errorText = validateToolArgs(toolDef.parameters, modifiedArgs);
+        if (errorText !== undefined) {
+          logger.info('Edited tool arguments rejected', { toolCallId: options.toolCallId, errorText });
+          return invalidModifiedArgsResult(errorText);
+        }
+      }
+      return actualExecutor(modifiedArgs, options);
     } else {
       logger.info('Tool rejected by user', {
         toolCallId: options.toolCallId,

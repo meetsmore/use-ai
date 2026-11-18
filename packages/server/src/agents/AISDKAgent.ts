@@ -1606,6 +1606,7 @@ export class AISDKAgent implements Agent {
                   remoteTool.name,
                   remoteTool._remote.originalName,
                   args as Record<string, unknown>,
+                  remoteTool.parameters,
                   remoteTool._remote.provider,
                   session,
                   events,

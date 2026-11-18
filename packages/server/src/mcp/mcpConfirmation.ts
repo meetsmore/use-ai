@@ -3,13 +3,15 @@
  *
  * When an MCP tool returns this type the server shows an approval dialog.
  * If the user approves, the server re-calls the same tool with
- * `{ ...originalArgs, ...additional_columns }`.
+ * `{ ...originalArgs, ...additional_columns }`, or with
+ * `{ ...modifiedArgs, ...additional_columns }` when the approval carried edited arguments.
  */
 
 import type { ClientSession, EventEmitter } from '../agents/types';
 import type { ToolApprovalRequestEvent } from '../types';
 import { TOOL_APPROVAL_REQUEST } from '../types';
-import { waitForApproval } from '../agents/toolApproval';
+import { waitForApproval, invalidModifiedArgsResult } from '../agents/toolApproval';
+import { validateToolArgs } from '../agents/validateToolArgs';
 import type { RemoteMcpToolsProvider } from './RemoteMcpToolsProvider';
 import type { McpHeadersMap } from '@meetsmore-oss/use-ai-core';
 import type { McpConfirmationResponse } from '@meetsmore-oss/use-ai-core';
@@ -24,7 +26,9 @@ export {
  * Handles an MCP confirmation response:
  * 1. Emits TOOL_APPROVAL_REQUEST to the client
  * 2. Waits for user approval via waitForApproval()
- * 3. If approved → re-calls the same tool with { ...originalArgs, ...additional_columns }
+ * 3. If approved → re-calls the same tool with { ...originalArgs, ...additional_columns }.
+ *    When the approval carries modifiedArgs, they replace originalArgs after passing
+ *    `inputSchema`; invalid ones return an error result and phase 2 does not run.
  * 4. If rejected → returns error result
  *
  * Phase-2 results are returned as-is (no re-interception).
@@ -35,6 +39,7 @@ export async function handleMcpConfirmation(
   toolCallName: string,
   originalToolName: string,
   originalArgs: Record<string, unknown>,
+  inputSchema: object,
   provider: RemoteMcpToolsProvider,
   session: ClientSession,
   events: EventEmitter,
@@ -74,10 +79,20 @@ export async function handleMcpConfirmation(
     };
   }
 
-  // Phase 2: re-call the same tool with original args merged with additional_columns
+  const { modifiedArgs } = approvalResult;
+  if (modifiedArgs !== undefined) {
+    const errorText = validateToolArgs(inputSchema, modifiedArgs);
+    if (errorText !== undefined) {
+      logger.info('[MCP] Edited tool arguments rejected', { toolCallId, errorText });
+      return invalidModifiedArgsResult(errorText);
+    }
+  }
+  const baseArgs = modifiedArgs ?? originalArgs;
+
+  // Phase 2: re-call the same tool with the args merged with additional_columns
   const phase2Args = additional_columns
-    ? { ...originalArgs, ...additional_columns }
-    : originalArgs;
+    ? { ...baseArgs, ...additional_columns }
+    : baseArgs;
 
   logger.info('[MCP] Confirmation approved, executing phase 2', {
     toolCallId,
