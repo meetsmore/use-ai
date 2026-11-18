@@ -1,0 +1,25 @@
+packages/client/src/utils/toolCalls.test.ts
+  s_8b85f3f6460908::t_862aa064d4525e 46-55
+packages/client/src/hooks/useLatestToolCall.test.tsx
+  s_8b85f3f6460908::t_862aa064d4525e 47-53
+packages/client/src/utils/toolCalls.ts
+  s_8b85f3f6460908::t_58badb210fa87a 67-69
+packages/client/src/hooks/useLatestToolCall.ts
+  s_8b85f3f6460908::t_58badb210fa87a 76-79
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "1fc990ed238c24459a5decda2cd276811dc4eb53",
+  "prompts": {},
+  "sessions": {
+    "s_8b85f3f6460908": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "77c3f5db-2b99-4985-b2e9-54b6aa52a4b6",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "yuma.ito <yuma.ito@meetsmore.com>"
+    }
+  }
+}
