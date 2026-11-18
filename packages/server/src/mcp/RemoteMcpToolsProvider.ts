@@ -52,6 +52,8 @@ export interface RemoteToolDefinition extends ToolDefinition {
 export class RemoteMcpToolsProvider {
   private readonly url: string;
   private readonly config: McpEndpointConfig;
+  /** `x-mcp-header` parameters of each listed tool, by original tool name. */
+  private readonly paramHeaders = new Map<string, McpParamHeader[]>();
 
   constructor(config: McpEndpointConfig) {
     this.config = config;
@@ -126,7 +128,19 @@ export class RemoteMcpToolsProvider {
    * Converts MCP tool schemas to RemoteToolDefinition format.
    */
   private convertToToolDefinitions(schema: McpSchemaResponse): RemoteToolDefinition[] {
-    return schema.tools.map((tool) => {
+    const tools = this.config.protocolVersion
+      ? schema.tools.filter((tool) => {
+          const paramHeaders = readMcpParamHeaders(tool.inputSchema);
+          if (typeof paramHeaders === 'string') {
+            logger.warn(`[MCP] Excluding tool "${tool.name}" from ${this.url}: ${paramHeaders}`);
+            return false;
+          }
+          this.paramHeaders.set(tool.name, paramHeaders);
+          return true;
+        })
+      : schema.tools;
+
+    return tools.map((tool) => {
       // Apply namespace prefix if configured
       const name = this.config.namespace ? `${this.config.namespace}_${tool.name}` : tool.name;
 
@@ -285,6 +299,17 @@ export class RemoteMcpToolsProvider {
       if (typeof params.name === 'string') {
         requestHeaders['Mcp-Name'] = encodeMcpHeaderValue(params.name);
       }
+      if (method === 'tools/call' && typeof params.name === 'string') {
+        for (const { header, path } of this.paramHeaders.get(params.name) ?? []) {
+          let value: unknown = params.arguments;
+          for (const key of path) {
+            value = value !== null && typeof value === 'object' ? (value as Record<string, unknown>)[key] : undefined;
+          }
+          if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+            requestHeaders[`Mcp-Param-${header}`] = encodeMcpHeaderValue(String(value));
+          }
+        }
+      }
       requestParams = {
         ...params,
         _meta: {
@@ -351,8 +376,71 @@ export class RemoteMcpToolsProvider {
   }
 }
 
+interface McpParamHeader {
+  /** Name portion of the `Mcp-Param-{name}` header */
+  header: string;
+  /** Chain of `properties` keys from the schema root to the annotated property */
+  path: string[];
+}
+
+const HTTP_TOKEN = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
+const HEADER_TYPES = new Set(['string', 'integer', 'boolean']);
+
 /**
- * Encodes a value for the `Mcp-Name` header: plain when it is printable ASCII without
+ * Collects the `x-mcp-header` annotations of a tool input schema.
+ * Returns the reason when an annotation breaks a constraint of the spec: not an HTTP token,
+ * not case-insensitively unique, not on a string, integer or boolean property, or not
+ * statically reachable from the root through `properties` keys only.
+ * @see https://modelcontextprotocol.io/specification/2026-07-28/server/tools#x-mcp-header
+ */
+function readMcpParamHeaders(schema: unknown): McpParamHeader[] | string {
+  const found: McpParamHeader[] = [];
+  const seen = new Set<string>();
+  let reachable = 0;
+
+  const visitProperties = (node: unknown, path: string[]): string | undefined => {
+    const properties = (node as { properties?: unknown } | null)?.properties;
+    if (properties === null || typeof properties !== 'object') return undefined;
+    for (const [key, property] of Object.entries(properties)) {
+      if (property === null || typeof property !== 'object') continue;
+      if ('x-mcp-header' in property) {
+        reachable++;
+        const header = (property as Record<string, unknown>)['x-mcp-header'];
+        const type = (property as Record<string, unknown>).type;
+        if (typeof header !== 'string' || !HTTP_TOKEN.test(header)) {
+          return `x-mcp-header ${JSON.stringify(header)} is not an HTTP header token`;
+        }
+        if (seen.has(header.toLowerCase())) return `x-mcp-header "${header}" is not unique`;
+        if (typeof type !== 'string' || !HEADER_TYPES.has(type)) {
+          return `x-mcp-header "${header}" is on a property of type ${JSON.stringify(type)}`;
+        }
+        seen.add(header.toLowerCase());
+        found.push({ header, path: [...path, key] });
+      }
+      const error = visitProperties(property, [...path, key]);
+      if (error) return error;
+    }
+    return undefined;
+  };
+
+  const countAll = (node: unknown, isPropertiesMap = false): number => {
+    if (node === null || typeof node !== 'object') return 0;
+    let count = 0;
+    for (const [key, value] of Object.entries(node)) {
+      if (key === 'x-mcp-header' && !isPropertiesMap && !Array.isArray(node)) count++;
+      count += countAll(value, key === 'properties' && !isPropertiesMap && !Array.isArray(node));
+    }
+    return count;
+  };
+
+  const error = visitProperties(schema, []);
+  if (error) return error;
+  if (countAll(schema) > reachable) return 'x-mcp-header is on a property that is not statically reachable';
+  return found;
+}
+
+/**
+ * Encodes a value for the `Mcp-Name` or `Mcp-Param-*` header: plain when it is printable ASCII without
  * leading or trailing whitespace and does not look like the sentinel, otherwise
  * `=?base64?{UTF-8 bytes in Base64}?=`.
  * @see https://modelcontextprotocol.io/specification/2026-07-28/basic/transports/streamable-http#value-encoding

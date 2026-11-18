@@ -276,4 +276,84 @@ describe('RemoteMcpToolsProvider over Streamable HTTP', () => {
       expect(body.params).toEqual({ name: 'echo', arguments: { text: 'hi' } });
     });
   });
+
+  describe('x-mcp-header parameters', () => {
+    const tool = (name: string, properties: Record<string, unknown>, extra: Record<string, unknown> = {}) => ({
+      name,
+      description: name,
+      inputSchema: { type: 'object', properties, ...extra },
+    });
+
+    const annotated = tool('query', {
+      region: { type: 'string', 'x-mcp-header': 'Region' },
+      limit: { type: 'integer', 'x-mcp-header': 'Limit' },
+      dryRun: { type: 'boolean', 'x-mcp-header': 'Dry-Run' },
+      target: {
+        type: 'object',
+        properties: { tenant: { type: 'string', 'x-mcp-header': 'Tenant' } },
+      },
+      note: { type: 'string', 'x-mcp-header': 'Note' },
+      sql: { type: 'string' },
+    });
+
+    const invalid = [
+      tool('empty', { a: { type: 'string', 'x-mcp-header': '' } }),
+      tool('notToken', { a: { type: 'string', 'x-mcp-header': 'Bad Name' } }),
+      tool('duplicate', {
+        a: { type: 'string', 'x-mcp-header': 'Same' },
+        b: { type: 'string', 'x-mcp-header': 'same' },
+      }),
+      tool('numberType', { a: { type: 'number', 'x-mcp-header': 'A' } }),
+      tool('objectType', { a: { type: 'object', 'x-mcp-header': 'A' } }),
+      tool('inItems', { a: { type: 'array', items: { type: 'string', 'x-mcp-header': 'A' } } }),
+      tool('inAnyOf', { a: { anyOf: [{ type: 'string', 'x-mcp-header': 'A' }] } }),
+      tool('inDefs', { a: { $ref: '#/$defs/a' } }, { $defs: { a: { type: 'string', 'x-mcp-header': 'A' } } }),
+    ];
+
+    beforeEach(() => {
+      reply = ({ id, method }) =>
+        json({
+          jsonrpc: '2.0',
+          id,
+          result: method === 'tools/list' ? { tools: [annotated, ...invalid] } : { content: [] },
+        });
+    });
+
+    test('tools/list excludes tools whose x-mcp-header annotations are invalid', async () => {
+      const tools = await new RemoteMcpToolsProvider({ url, protocolVersion: '2026-07-28' }).fetchToolsWithHeaders();
+
+      expect(tools.map((t) => t.name)).toEqual(['query']);
+    });
+
+    test('tools/call mirrors annotated arguments into Mcp-Param headers', async () => {
+      const provider = new RemoteMcpToolsProvider({ url, protocolVersion: '2026-07-28' });
+      await provider.fetchToolsWithHeaders();
+
+      await provider.executeTool('query', {
+        region: 'us-west1',
+        limit: 42,
+        dryRun: false,
+        target: { tenant: 'Hello, 世界' },
+        note: null,
+        sql: 'SELECT 1',
+      });
+
+      const { headers } = requests[1];
+      expect(headers.get('Mcp-Param-Region')).toBe('us-west1');
+      expect(headers.get('Mcp-Param-Limit')).toBe('42');
+      expect(headers.get('Mcp-Param-Dry-Run')).toBe('false');
+      expect(headers.get('Mcp-Param-Tenant')).toBe('=?base64?SGVsbG8sIOS4lueVjA==?=');
+      expect(headers.get('Mcp-Param-Note')).toBeNull();
+      expect([...headers.keys()].filter((key) => key.startsWith('mcp-param-'))).toHaveLength(4);
+    });
+
+    test('without protocolVersion annotations are ignored', async () => {
+      const provider = new RemoteMcpToolsProvider({ url });
+      const tools = await provider.fetchToolsWithHeaders();
+      await provider.executeTool('query', { region: 'us-west1' });
+
+      expect(tools).toHaveLength(1 + invalid.length);
+      expect([...requests[1].headers.keys()].filter((key) => key.startsWith('mcp-param-'))).toEqual([]);
+    });
+  });
 });
