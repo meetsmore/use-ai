@@ -576,6 +576,37 @@ const deleteTodo = defineTool(
 );
 ```
 
+**Editing arguments before approval:**
+
+A custom `ToolApproval` slot can let the user correct the proposed arguments (for example in a form) and approve in one step. `onApproveWithArgs` takes edited arguments keyed by `toolCallId`; those calls run with the edited arguments instead of the AI's, and calls without an entry run unchanged. The slot also receives the request's `message` and `metadata` (set by MCP `confirmation_required` responses and runtime approvals).
+
+```tsx
+import type { ChatToolApprovalSlotProps } from '@meetsmore-oss/use-ai-client';
+
+function EditableApproval({ approvals, onApprove, onApproveWithArgs, onReject }: ChatToolApprovalSlotProps) {
+  const pending = approvals[0];
+  const [args, setArgs] = useState(pending.toolCallArgs);
+  return (
+    <div>
+      <p>{pending.message}</p>
+      {/* form fields that update args, e.g. from pending.metadata */}
+      <button onClick={() => onApproveWithArgs?.({ [pending.toolCallId]: args })}>Approve</button>
+      <button onClick={() => onReject()}>Deny</button>
+    </div>
+  );
+}
+
+<UseAIProvider serverUrl="ws://localhost:8081" chatComponents={{ ToolApproval: EditableApproval }}>
+```
+
+- Server tools and MCP tools: the server validates the edited arguments against the tool's input schema. Invalid ones do not run the tool; the AI receives an error result that names each failing field.
+- MCP `confirmation_required` tools: phase 2 is called with `{ ...editedArgs, ...additional_columns }`.
+- Client tools: the browser runs the tool with the edited arguments, and the tool's Zod schema validates them. Invalid ones return the validation error to the AI.
+- Omitting the edited arguments (`onApprove`, or no entry for a call) behaves exactly as a plain approval.
+- Runtime approvals requested with `ctx.requestApproval` in a client tool ignore edited arguments.
+- The AI's history keeps the arguments it proposed, followed by the result of the edited call, so return what was actually done in the tool result.
+- Over the wire this is an optional `modifiedArgs` field on the `tool_approval_response` message, honored only when `approved` is `true`. `UseAIClient.sendToolApprovalResponse(toolCallId, approved, reason, modifiedArgs)` sends it outside the chat slots.
+
 ### Chat History
 
 By default, there is locally stored chat history for up to 20 chats.
