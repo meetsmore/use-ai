@@ -185,7 +185,7 @@ export interface ChatToolApprovalSlotProps extends ChatSlotProps {
    * Approves all pending calls; a call whose toolCallId is a key of `modifiedArgs`
    * runs with those arguments instead of the AI's. Server and MCP tools validate them
    * against their input schema on the server; client tools validate them with their own
-   * schema. Ignored for runtime approvals requested with `ctx.requestApproval`.
+   * schema. Not applied to runtime approvals requested with `ctx.requestApproval`.
    * Provided when the chat is driven by `UseAIProvider`.
    */
   onApproveWithArgs?: (modifiedArgs: ModifiedToolArgs) => void;
