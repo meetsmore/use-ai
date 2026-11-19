@@ -1,0 +1,21 @@
+packages/client/src/utils/toolCalls.test.ts
+  s_b69d1187d3639f::t_16dc87d92b4f89 12-13
+packages/client/src/utils/toolCalls.ts
+  s_b69d1187d3639f::t_16dc87d92b4f89 16-17,20-22
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "3518414f408bd3ff00f8badc486001fac1467778",
+  "prompts": {},
+  "sessions": {
+    "s_b69d1187d3639f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "87820056-b7dc-4655-bea9-964b3d815a6b",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "yuma.ito <yuma.ito@meetsmore.com>"
+    }
+  }
+}
