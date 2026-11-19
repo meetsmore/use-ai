@@ -484,7 +484,9 @@ export interface TextContent {
  * Image content part for multimodal messages. One of two variants, since a part
  * carries either a usable URL or a storage ref, never both:
  *
- * - `image_url`: a directly usable `url` (a data URL / base64, or a remote URL).
+ * - `image_url`: a directly usable `url` (a data URL / base64). The server drops
+ *   client-sent remote URLs (http(s), file:, ...) so it is never made to fetch
+ *   them; a remote URL reaches the model only when returned by {@link ResolveAttachments}.
  * - `image_ref`: an opaque, durable storage `ref` (e.g. an S3 key). It is not
  *   usable as-is; before a run, the host's {@link ResolveAttachments} resolves it
  *   into an `image_url`. Unlike a url it does not go stale, so it survives history
