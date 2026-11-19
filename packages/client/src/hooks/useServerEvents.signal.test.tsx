@@ -15,7 +15,7 @@ function setup() {
     storePendingToolCall: mock(),
     handleApprovalRequest: mock(),
     pendingApprovals: [],
-    abortRunSignal: mock(() => { order.push('abort'); }),
+    endRun: mock(() => { order.push('abort'); }),
   } as unknown as UseToolSystemReturn;
   const client = {
     runMessages: [],
@@ -48,7 +48,7 @@ describe('useServerEvents — ctx.signal of the run', () => {
     act(() => hook.result.current.setLoading(true));
     act(() => hook.result.current.handleDisconnect());
 
-    expect(toolSystem.abortRunSignal).toHaveBeenCalledTimes(3);
+    expect(toolSystem.endRun).toHaveBeenCalledTimes(3);
   });
 
   it('aborts the tool signal before a stopped run is recorded and saved', async () => {

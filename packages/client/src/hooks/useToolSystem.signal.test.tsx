@@ -34,7 +34,7 @@ describe('useToolSystem — ctx.toolCallId and ctx.signal', () => {
     expect(contexts[0].toolCallId).toBe('tc1');
     expect(contexts[0].signal.aborted).toBe(false);
 
-    act(() => hook.result.current.abortRunSignal());
+    act(() => hook.result.current.endRun());
     expect(contexts[0].signal.aborted).toBe(true);
 
     // The tool gives up after the run ended; its result has nowhere to go.
@@ -43,20 +43,47 @@ describe('useToolSystem — ctx.toolCallId and ctx.signal', () => {
     expect(client.sendToolResponse).not.toHaveBeenCalled();
   });
 
-  it('keeps the signal of the run a call arrived in when it is approved later', async () => {
+  it('drops a call still waiting for approval when the run ends, so approving later runs nothing', async () => {
     const { hook, client, contexts } = setup();
     act(() => {
       hook.result.current.storePendingToolCall('tc1', 'wait', {}, { name: 'wait', args: '{}' });
       hook.result.current.handleApprovalRequest({ toolCallId: 'tc1', toolCallName: 'wait', toolCallArgs: {} } as never);
     });
+    expect(hook.result.current.pendingApprovals).toHaveLength(1);
 
-    // The run ends before the user answers the approval card.
-    act(() => hook.result.current.abortRunSignal());
-    act(() => { void hook.result.current.approveAll(); });
+    // The run ends (stopped, failed or disconnected) before the user answers.
+    act(() => hook.result.current.endRun());
+    expect(hook.result.current.pendingApprovals).toHaveLength(0);
+
+    await act(async () => { await hook.result.current.approveAll(); });
+    expect(client.sendToolApprovalResponse).not.toHaveBeenCalled();
+    expect(contexts).toHaveLength(0);
+  });
+
+  it('answers a tool waiting in ctx.requestApproval with not approved when the run ends', async () => {
+    const client = { sendToolResponse: mock(), sendToolApprovalResponse: mock() } as unknown as UseAIClient;
+    const hook = renderHook(() => useToolSystem({ clientRef: { current: client }, buildState: () => ({}) }));
+    let answer: { approved: boolean; reason?: string } | undefined;
+    const tool = defineTool('Asks for approval at runtime', async (ctx) => {
+      answer = await ctx.requestApproval({ message: 'Go?' });
+      return { done: true };
+    });
+    act(() => {
+      hook.result.current.registerTools('owner', { ask: tool }, { invisible: true });
+      hook.result.current.signalReady('owner');
+    });
+
+    let execution: Promise<void> = Promise.resolve();
+    act(() => { execution = hook.result.current.executeToolCall('tc1', 'ask', {}); });
     await act(async () => { await Promise.resolve(); });
+    expect(hook.result.current.pendingApprovals).toHaveLength(1);
 
-    expect(client.sendToolApprovalResponse).toHaveBeenCalledWith('tc1', true);
-    expect(contexts[0].signal.aborted).toBe(true);
+    act(() => hook.result.current.endRun());
+    await act(async () => { await execution; });
+
+    expect(answer).toEqual({ approved: false, reason: 'The run ended before the user answered' });
+    expect(hook.result.current.pendingApprovals).toHaveLength(0);
+    expect(client.sendToolResponse).not.toHaveBeenCalled();
   });
 
   it('skips waiting for the prompt to update when the run ended while the tool worked', async () => {
@@ -67,7 +94,7 @@ describe('useToolSystem — ctx.toolCallId and ctx.signal', () => {
     let execution: Promise<void> = Promise.resolve();
     act(() => { execution = hook.result.current.executeToolCall('tc1', 'wait', {}); });
     await act(async () => { await Promise.resolve(); });
-    act(() => hook.result.current.abortRunSignal());
+    act(() => hook.result.current.endRun());
     release({ ok: true });
     await act(async () => { await execution; });
 
@@ -94,7 +121,7 @@ describe('useToolSystem — ctx.toolCallId and ctx.signal', () => {
 
   it('gives the next run a fresh signal', async () => {
     const { hook, client, contexts, release } = setup();
-    act(() => hook.result.current.abortRunSignal());
+    act(() => hook.result.current.endRun());
 
     let execution: Promise<void> = Promise.resolve();
     act(() => { execution = hook.result.current.executeToolCall('tc2', 'wait', {}); });
