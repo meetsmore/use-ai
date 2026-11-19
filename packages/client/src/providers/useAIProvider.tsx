@@ -643,6 +643,10 @@ export function UseAIProvider({
       unsubscribeConnection();
       unsubscribe();
       client.disconnect();
+      // The connection subscription is already gone, so handleDisconnect does
+      // not run here. A tool still working for this client's run (a question
+      // waiting for the user) would otherwise wait forever.
+      toolSystem.abortRunSignal();
     };
   }, [serverUrl]);
 

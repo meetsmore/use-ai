@@ -31,6 +31,8 @@ export interface ToolExecutionContext {
    *   'Ask the user to pick one option',
    *   z.object({ options: z.array(z.string()) }),
    *   (input, ctx) => new Promise((resolve) => {
+   *     // A call approved after its run ended gets an already aborted signal.
+   *     if (ctx.signal.aborted) return resolve({ aborted: true });
    *     // The signal also aborts when an answered run finishes normally,
    *     // so stop listening once the user has answered.
    *     const onAbort = () => {
