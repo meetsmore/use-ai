@@ -17,7 +17,7 @@ function createRemoteTool(name = 'mcp_tool'): RemoteToolDefinition {
     name,
     description: 'An MCP tool',
     parameters: { type: 'object', properties: {} },
-    _remote: { provider: {} as never, originalName: name },
+    _remote: { provider: {} as never, originalName: name, inputSchema: { type: 'object', properties: {} } },
   };
 }
 

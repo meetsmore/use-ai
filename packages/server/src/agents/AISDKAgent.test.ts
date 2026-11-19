@@ -1405,6 +1405,7 @@ describe('AISDKAgent', () => {
             executeTool: mock(() => Promise.resolve({ success: true })),
           } as unknown as RemoteToolDefinition['_remote']['provider'],
           originalName: name,
+          inputSchema: { type: 'object', properties: {}, required: [] },
         },
       };
     }
@@ -2031,6 +2032,7 @@ describe('AISDKAgent', () => {
         _remote: {
           provider: { executeTool: mock(() => Promise.resolve({ success: true })) } as unknown as RemoteToolDefinition['_remote']['provider'],
           originalName: 'search',
+          inputSchema: { type: 'object', properties: {}, required: [] },
         },
       };
 
@@ -2131,6 +2133,7 @@ describe('AISDKAgent', () => {
             executeTool: mock(() => Promise.resolve(mcpResult)),
           } as unknown as RemoteToolDefinition['_remote']['provider'],
           originalName: 'get_weather',
+          inputSchema: { type: 'object', properties: { location: { type: 'string' } }, required: ['location'] },
         },
       };
 
@@ -2309,6 +2312,7 @@ describe('AISDKAgent', () => {
             executeTool: mock(() => Promise.reject(executionError)),
           } as unknown as RemoteToolDefinition['_remote']['provider'],
           originalName: 'search_jobs',
+          inputSchema: { type: 'object', properties: { sortField: { type: 'string' } } },
         },
       };
 

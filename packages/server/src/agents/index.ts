@@ -3,7 +3,7 @@
  * Provides pluggable AI agent backends that emit AG-UI protocol events.
  */
 
-export type { Agent, AgentInput, EventEmitter, AgentResult, ClientSession } from './types';
+export type { Agent, AgentInput, EventEmitter, AgentResult, ClientSession, ToolApprovalResult } from './types';
 export { AISDKAgent, type AISDKAgentConfig, type AISDKAgentHooks, type AISDKRunConfig } from './AISDKAgent';
 export { createMockReasoningModel } from './testing/MockReasoningModel';
 export {
