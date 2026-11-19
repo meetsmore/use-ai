@@ -124,6 +124,19 @@ describe.each(RUNTIMES)('WebSocketTransport against a real server: %s runtime', 
     expect(response.ok).toBe(true);
   });
 
+  test('a null frame is discarded and the server keeps serving', async () => {
+    const raw = new WebSocket(`ws://localhost:${port}`);
+    await new Promise<void>((resolve) => { raw.onopen = () => resolve(); });
+    raw.send('null');
+    // Give the server a moment to process the frame before checking it is still up.
+    await new Promise((r) => setTimeout(r, 100));
+    raw.close();
+
+    const { client } = await connectClient(port);
+    await waitFor(() => client.availableAgents.length > 0, 'the agents payload');
+    client.disconnect();
+  });
+
   test('two plain WebSocket clients get isolated sessions', async () => {
     const first = await connectClient(port);
     const second = await connectClient(port);
