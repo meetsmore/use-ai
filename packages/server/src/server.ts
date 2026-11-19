@@ -315,8 +315,19 @@ export class UseAIServer {
       ipAddress: session.ipAddress,
     });
 
-    connection.onMessage((message) => {
-      void this.receiveClientMessage(session, message);
+    connection.onMessage((message: unknown) => {
+      // Client input is untrusted: a message without a string `type` (e.g. `null`) cannot be dispatched.
+      if (typeof message !== 'object' || message === null || typeof (message as { type?: unknown }).type !== 'string') {
+        logger.warn('Discarding malformed message', { clientId: session.clientId });
+        return;
+      }
+      // A rejection escaping here would be unhandled and terminate the process for every tenant.
+      this.receiveClientMessage(session, message as UseAIClientMessage).catch((error: unknown) => {
+        logger.error('Unhandled error while handling message', {
+          error: error instanceof Error ? error.message : 'Unknown error',
+          clientId: session.clientId,
+        });
+      });
     });
 
     connection.onClose(() => {
