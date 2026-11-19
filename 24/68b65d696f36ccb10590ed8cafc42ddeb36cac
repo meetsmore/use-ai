@@ -1,0 +1,23 @@
+packages/client/src/defineTool.ts
+  s_b69d1187d3639f::t_5c04fea3307667 34-35
+packages/client/src/providers/useAIProvider.signal.test.tsx
+  s_b69d1187d3639f::t_42ff7d955a1154 1-68
+packages/client/src/providers/useAIProvider.tsx
+  s_b69d1187d3639f::t_502f13b3d0e620 646-649
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2468b65d696f36ccb10590ed8cafc42ddeb36cac",
+  "prompts": {},
+  "sessions": {
+    "s_b69d1187d3639f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "87820056-b7dc-4655-bea9-964b3d815a6b",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "yuma.ito <yuma.ito@meetsmore.com>"
+    }
+  }
+}
