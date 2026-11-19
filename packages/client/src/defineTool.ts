@@ -54,6 +54,10 @@ export interface ToolExecutionContext {
    * Use this for conditional approval based on runtime values
    * (e.g., API endpoint, input values, computed risk).
    *
+   * If the run ends before the user answers (stopped, failed, disconnected),
+   * this resolves with `{ approved: false }` and `ctx.signal` is already
+   * aborted: check `ctx.signal.aborted` to tell that apart from a rejection.
+   *
    * @param input - Approval request details
    * @returns Promise resolving with approval decision
    *
