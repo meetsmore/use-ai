@@ -9,6 +9,8 @@ describe('getToolCallStatus', () => {
     ['{"error":"Not found"}', 'error'],
     ['{"error":true,"message":"MCP confirmation execution failed"}', 'error'],
     ['{"success":false}', 'error'],
+    ['{"data":[1],"error":null}', 'done'],
+    ['{"error":false}', 'done'],
     ['{"success":true}', 'done'],
     ['"hi"', 'done'],
     ['[1,2]', 'done'],

@@ -13,11 +13,13 @@ export function parseJson(text: string): unknown {
 
 /**
  * Whether a tool's result reports a failure: `{ error: ... }` (what a thrown
- * tool comes back as) or `{ success: false }`.
+ * tool comes back as) or `{ success: false }`. An `error` of `null`, `undefined`
+ * or `false` means no error, so a result like `{ data, error: null }` succeeded.
  */
 export function isErrorResult(value: unknown): boolean {
-  return !!value && typeof value === 'object' &&
-    ('error' in value || (value as Record<string, unknown>).success === false);
+  if (!value || typeof value !== 'object') return false;
+  const record = value as Record<string, unknown>;
+  return (record.error != null && record.error !== false) || record.success === false;
 }
 
 /**
