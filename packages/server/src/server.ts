@@ -2,7 +2,7 @@ import { Server as SocketIOServer } from 'socket.io';
 import { ModelMessage, ToolModelMessage } from 'ai';
 import { createHash } from 'crypto';
 import { EventType, type McpHeadersMap, type UseAIForwardedProps, type ResolveAttachments } from '@meetsmore-oss/use-ai-core';
-import { resolveAttachmentParts, countRefParts } from './attachmentResolution';
+import { resolveAttachmentParts, countRefParts, dropRemoteUrlParts } from './attachmentResolution';
 import type {
   UseAIServerConfig,
   McpEndpointConfig,
@@ -624,12 +624,21 @@ export class UseAIServer {
       return '';
     };
 
+    // Before resolving refs, so that urls from the trusted resolver are not filtered.
+    const { messages: safeMessages, dropped: droppedUrlParts } = dropRemoteUrlParts(messages);
+    if (droppedUrlParts > 0) {
+      logger.warn('Dropped client-supplied attachment urls that would be fetched by the server', {
+        runId,
+        droppedUrlParts,
+      });
+    }
+
     // Resolve refs once at run start, before AI SDK conversion (not per step; see ResolveAttachments for the contract).
-    let resolvedMessages = messages;
+    let resolvedMessages = safeMessages;
     let resolveErrored = false;
     if (this.resolveAttachments) {
       try {
-        resolvedMessages = await resolveAttachmentParts(messages, this.resolveAttachments, { forwardedProps });
+        resolvedMessages = await resolveAttachmentParts(safeMessages, this.resolveAttachments, { forwardedProps });
       } catch (error) {
         // A resolver failure must not bring down the whole run. Degrade and continue unresolved
         // (respond with text only), dropping the attachment; the WARN below records it.
@@ -638,7 +647,7 @@ export class UseAIServer {
           runId,
           error: error instanceof Error ? error.message : String(error),
         });
-        resolvedMessages = messages;
+        resolvedMessages = safeMessages;
       }
     }
 
