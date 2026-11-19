@@ -60,6 +60,26 @@ describe('useToolSystem — ctx.toolCallId and ctx.signal', () => {
     expect(contexts).toHaveLength(0);
   });
 
+  it('stops approving the rest when the run ends while an approved tool runs', async () => {
+    const { hook, client, release } = setup();
+    act(() => {
+      hook.result.current.storePendingToolCall('tc1', 'wait', {}, { name: 'wait', args: '{}' });
+      hook.result.current.storePendingToolCall('tc2', 'wait', {}, { name: 'wait', args: '{}' });
+      hook.result.current.handleApprovalRequest({ toolCallId: 'tc1', toolCallName: 'wait', toolCallArgs: {} } as never);
+      hook.result.current.handleApprovalRequest({ toolCallId: 'tc2', toolCallName: 'wait', toolCallArgs: {} } as never);
+    });
+
+    let approving: Promise<void> = Promise.resolve();
+    act(() => { approving = hook.result.current.approveAll(); });
+    await act(async () => { await Promise.resolve(); });
+    act(() => hook.result.current.endRun());
+    release({ ok: true });
+    await act(async () => { await approving; });
+
+    expect(client.sendToolApprovalResponse).toHaveBeenCalledTimes(1);
+    expect(client.sendToolApprovalResponse).toHaveBeenCalledWith('tc1', true);
+  });
+
   it('answers a tool waiting in ctx.requestApproval with not approved when the run ends', async () => {
     const client = { sendToolResponse: mock(), sendToolApprovalResponse: mock() } as unknown as UseAIClient;
     const hook = renderHook(() => useToolSystem({ clientRef: { current: client }, buildState: () => ({}) }));

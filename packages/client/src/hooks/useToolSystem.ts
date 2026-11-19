@@ -135,15 +135,15 @@ export function useToolSystem({
     runAbortControllerRef.current = new AbortController();
 
     // The server waits for an approval without ending the run, so approvals
-    // are still pending here only when the run was stopped, failed or lost
-    // its connection.
+    // are still pending here only when the run did not finish normally:
+    // stopped, failed, disconnected or the provider was torn down.
     pendingApprovalToolCallsRef.current.clear();
     const resolvers = [...runtimeApprovalResolversRef.current.values()];
     runtimeApprovalResolversRef.current.clear();
     for (const resolve of resolvers) {
       resolve({ approved: false, reason: 'The run ended before the user answered' });
     }
-    setPendingApprovals([]);
+    setPendingApprovals(prev => (prev.length > 0 ? [] : prev));
   }, []);
 
   // ── Registry Methods ────────────────────────────────────────────────────
@@ -422,8 +422,12 @@ export function useToolSystem({
 
     const pendingTools = [...pendingApprovals];
     setPendingApprovals([]);
+    const runSignal = runAbortControllerRef.current.signal;
 
     for (const pending of pendingTools) {
+      // The run ended while an earlier approved tool ran: endRun dropped the
+      // rest, so approving them would answer a run that is over.
+      if (runSignal.aborted) break;
       // Check if this is a runtime client-side approval (from ctx.requestApproval)
       const runtimeResolver = runtimeApprovalResolversRef.current.get(pending.toolCallId);
       if (runtimeResolver) {
