@@ -113,7 +113,7 @@ export interface ChatUIContextValue {
       /** Approve all pending tool calls */
       approveAll: () => void;
       /** Approve all pending tool calls, running the keyed ones with edited arguments */
-      approveWithArgs?: (modifiedArgs: ModifiedToolArgs) => void;
+      approveWithArgs?: (modifiedArgs: ModifiedToolArgs) => Promise<void>;
       /** Reject all pending tool calls with optional reason */
       rejectAll: (reason?: string) => void;
     };

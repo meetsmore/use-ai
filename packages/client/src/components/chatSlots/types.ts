@@ -191,10 +191,10 @@ export interface ChatToolApprovalSlotProps extends ChatSlotProps {
    * runs with those arguments instead of the AI's. Server and MCP tools validate them
    * against their input schema on the server; client tools validate them with their own
    * schema. Only approvals with `acceptsModifiedArgs` take edits; a key naming any other
-   * approval makes the call throw without approving anything.
+   * approval rejects the returned promise without approving anything.
    * Provided when the chat is driven by `UseAIProvider`.
    */
-  onApproveWithArgs?: (modifiedArgs: ModifiedToolArgs) => void;
+  onApproveWithArgs?: (modifiedArgs: ModifiedToolArgs) => Promise<void>;
   onReject: (reason?: string) => void;
 }
 

@@ -586,12 +586,22 @@ import type { ChatToolApprovalSlotProps } from '@meetsmore-oss/use-ai-client';
 function EditableApproval({ approvals, onApprove, onApproveWithArgs, onReject }: ChatToolApprovalSlotProps) {
   const pending = approvals[0];
   const [args, setArgs] = useState(pending.toolCallArgs);
+  const [error, setError] = useState('');
+  const approveEdited = async () => {
+    if (!onApproveWithArgs) return;
+    try {
+      await onApproveWithArgs({ [pending.toolCallId]: args });
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    }
+  };
   return (
     <div>
       <p>{pending.message}</p>
       {/* form fields that update args, e.g. from pending.metadata */}
-      <button onClick={() => onApproveWithArgs?.({ [pending.toolCallId]: args })}>Approve</button>
+      <button onClick={approveEdited}>Approve</button>
       <button onClick={() => onReject()}>Deny</button>
+      {error && <p role="alert">{error}</p>}
     </div>
   );
 }
@@ -599,7 +609,7 @@ function EditableApproval({ approvals, onApprove, onApproveWithArgs, onReject }:
 <UseAIProvider serverUrl="ws://localhost:8081" chatComponents={{ ToolApproval: EditableApproval }}>
 ```
 
-- Only approvals with `acceptsModifiedArgs: true` take edits. The server sets it on `destructiveHint` approvals and MCP `confirmation_required` approvals. `onApproveWithArgs` rejects with an error, and sends nothing, when any edited call lacks it.
+- Only approvals with `acceptsModifiedArgs: true` take edits. The server sets it on `destructiveHint` approvals and MCP `confirmation_required` approvals. `onApproveWithArgs` returns `Promise<void>`; catch its rejection to report a refused edit. It rejects with an error, and sends nothing, when any edited call lacks it.
 - Server tools: tools made with `defineServerTool` validate the edited arguments with their own Zod schema (refinements included). Unknown keys pass unless the schema is `.strict()`.
 - MCP tools: the edited arguments are validated against the complete input schema the MCP server advertised (`$defs`, `$ref` and `additionalProperties` included), as JSON Schema 2020-12. A draft-07 tuple (`items: [...]`) does not compile under 2020-12, so edits to such a tool are denied.
 - Invalid edits do not run the tool; the AI receives an error result that names each failing field.

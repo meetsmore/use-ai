@@ -127,7 +127,7 @@ export interface UseAIChatPanelProps {
   /** Callback to approve all pending tool calls */
   onApproveToolCall?: () => void;
   /** Callback to approve all pending tool calls, running the keyed ones with edited arguments */
-  onApproveToolCallWithArgs?: (modifiedArgs: ModifiedToolArgs) => void;
+  onApproveToolCallWithArgs?: (modifiedArgs: ModifiedToolArgs) => Promise<void>;
   /** Callback to reject all pending tool calls */
   onRejectToolCall?: (reason?: string) => void;
   /**

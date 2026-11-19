@@ -112,7 +112,7 @@ describe('UseAIChat component slots', () => {
   });
 
   test('gives the ToolApproval slot the approval metadata and an approve-with-edited-args callback', () => {
-    const onApproveToolCallWithArgs = mock((_modifiedArgs: Record<string, Record<string, unknown>>) => {});
+    const onApproveToolCallWithArgs = mock(async (_modifiedArgs: Record<string, Record<string, unknown>>) => {});
     const ToolApproval = ({ approvals, onApproveWithArgs }: ChatToolApprovalSlotProps) => (
       <div data-testid="custom-approval" data-message={approvals[0].message}>
         {String(approvals[0].metadata?.chartType)}
@@ -140,6 +140,41 @@ describe('UseAIChat component slots', () => {
     expect(getByTestId('custom-approval')).toHaveAttribute('data-message', 'Create this chart?');
     fireEvent.click(getByTestId('custom-approve-edited'));
     expect(onApproveToolCallWithArgs).toHaveBeenCalledWith({ 'tool-1': { field: 'email' } });
+  });
+
+  test('lets the ToolApproval slot report a refused edited approval', async () => {
+    const onApproveToolCallWithArgs = mock(async () => {
+      throw new Error('This approval does not accept edited arguments');
+    });
+    const ToolApproval = ({ approvals, onApproveWithArgs }: ChatToolApprovalSlotProps) => {
+      const [error, setError] = React.useState('');
+      return (
+        <div>
+          <button
+            data-testid="custom-approve-edited"
+            onClick={() => {
+              void onApproveWithArgs?.({
+                [approvals[0].toolCallId]: { field: 'email' },
+              }).catch((cause: unknown) => {
+                setError(cause instanceof Error ? cause.message : String(cause));
+              });
+            }}
+          >
+            Approve edited
+          </button>
+          <div data-testid="approval-error">{error}</div>
+        </div>
+      );
+    };
+
+    const { getByTestId } = renderPanel({ ToolApproval }, { onApproveToolCallWithArgs });
+
+    fireEvent.click(getByTestId('custom-approve-edited'));
+    await waitFor(() => {
+      expect(getByTestId('approval-error')).toHaveTextContent(
+        'This approval does not accept edited arguments'
+      );
+    });
   });
 
   test('routes the streaming answer through the Message slot', () => {
