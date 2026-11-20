@@ -1461,6 +1461,18 @@ Only `DifyWorkflowRunner` is supported for now, but you can write your own Runne
   });
 ```
 
+A workflow has no chat approval UI. A tool with `annotations: { destructiveHint: true }` runs in a workflow only if you give `onApprovalRequest` and it approves the call. Without `onApprovalRequest`, the workflow gets `{ rejected: true, reason }` as the tool result, and `ctx.requestApproval` resolves with `{ approved: false }`.
+
+```tsx
+  await trigger({
+    inputs: {},
+    tools: { deleteRows },
+    onApprovalRequest: async (request) => ({
+      approved: window.confirm(`Allow ${request.toolName}?`),
+    }),
+  });
+```
+
 Because it's awkward to get API keys for workflows from Dify, you can use a mapping of names -> API keys:
 
 ```typescript

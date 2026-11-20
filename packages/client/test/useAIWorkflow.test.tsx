@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, mock } from 'bun:test';
 import { renderHook, waitFor, act } from '@testing-library/react';
 import React from 'react';
-import { UseAIProvider } from '../src/providers/useAIProvider';
-import { useAIWorkflow } from '../src/useAIWorkflow';
+import { UseAIProvider, useAIContext } from '../src/providers/useAIProvider';
+import { useAIWorkflow, type WorkflowApprovalRequest } from '../src/useAIWorkflow';
 import { defineTool } from '../src/defineTool';
 import type { WorkflowStatus } from '../src/types';
 import { EventType } from '../src/types';
@@ -15,8 +15,10 @@ import {
   simulateWorkflowSuccess,
   simulateWorkflowError,
   findSentMessage,
+  findAllSentMessages,
   getSentMessages,
   getMockServer,
+  lastWorkflowRunId,
 } from './integration-test-utils';
 
 // Store original WebSocket
@@ -168,7 +170,7 @@ describe('useAIWorkflow Hook Tests', () => {
 
       // Simulate error
       act(() => {
-        simulateWorkflowError('Workflow failed');
+        simulateWorkflowError('Workflow failed', lastWorkflowRunId());
       });
 
       await waitFor(() => expect(result.current.status).toBe('error'));
@@ -259,35 +261,35 @@ describe('useAIWorkflow Hook Tests', () => {
           runId,
           input: { threadId, runId, messages: [], tools: [], state: {} } as any,
           timestamp: Date.now(),
-        });
+        }, lastWorkflowRunId());
 
         simulateEvent({
           type: EventType.TEXT_MESSAGE_START,
           messageId,
           role: 'assistant',
           timestamp: Date.now(),
-        });
+        }, lastWorkflowRunId());
 
         simulateEvent({
           type: EventType.TEXT_MESSAGE_CONTENT,
           messageId,
           delta: 'First ',
           timestamp: Date.now(),
-        });
+        }, lastWorkflowRunId());
 
         simulateEvent({
           type: EventType.TEXT_MESSAGE_CONTENT,
           messageId,
           delta: 'Second ',
           timestamp: Date.now(),
-        });
+        }, lastWorkflowRunId());
 
         simulateEvent({
           type: EventType.TEXT_MESSAGE_CONTENT,
           messageId,
           delta: 'Third',
           timestamp: Date.now(),
-        });
+        }, lastWorkflowRunId());
       });
 
       await waitFor(() => expect(result.current.text).toBe('First Second Third'));
@@ -343,7 +345,7 @@ describe('useAIWorkflow Hook Tests', () => {
       });
 
       act(() => {
-        simulateWorkflowError('Something went wrong');
+        simulateWorkflowError('Something went wrong', lastWorkflowRunId());
       });
 
       await waitFor(() => expect(errorReceived).toBeDefined());
@@ -407,7 +409,7 @@ describe('useAIWorkflow Hook Tests', () => {
 
       // Simulate tool call from workflow
       act(() => {
-        simulateToolCall('tool-call-1', 'testTool', { value: 'test-value' });
+        simulateToolCall('tool-call-1', 'testTool', { value: 'test-value' }, lastWorkflowRunId());
       });
 
       await waitFor(() => expect(toolExecutions.length).toBe(1));
@@ -460,9 +462,9 @@ describe('useAIWorkflow Hook Tests', () => {
             state: {},
           } as any,
           timestamp: Date.now(),
-        });
+        }, lastWorkflowRunId());
 
-        simulateToolCall('tool-1', 'testTool', { arg1: 'test' });
+        simulateToolCall('tool-1', 'testTool', { arg1: 'test' }, lastWorkflowRunId());
       });
 
       await waitFor(() => {
@@ -517,10 +519,10 @@ describe('useAIWorkflow Hook Tests', () => {
             state: {},
           } as any,
           timestamp: Date.now(),
-        });
+        }, lastWorkflowRunId());
 
         // First tool call
-        simulateToolCall('tool-1', 'tool1', {});
+        simulateToolCall('tool-1', 'tool1', {}, lastWorkflowRunId());
       });
 
       await waitFor(() => {
@@ -530,7 +532,7 @@ describe('useAIWorkflow Hook Tests', () => {
 
       act(() => {
         // Second tool call
-        simulateToolCall('tool-2', 'tool2', {});
+        simulateToolCall('tool-2', 'tool2', {}, lastWorkflowRunId());
       });
 
       await waitFor(() => {
@@ -580,9 +582,9 @@ describe('useAIWorkflow Hook Tests', () => {
             state: {},
           } as any,
           timestamp: Date.now(),
-        });
+        }, lastWorkflowRunId());
 
-        simulateToolCall('tool-error', 'errorTool', {});
+        simulateToolCall('tool-error', 'errorTool', {}, lastWorkflowRunId());
       });
 
       // Verify error was sent back in tool_result
@@ -679,7 +681,7 @@ describe('useAIWorkflow Hook Tests', () => {
       await waitFor(() => expect(result.current.status).toBe('running'));
 
       act(() => {
-        simulateWorkflowError('First error');
+        simulateWorkflowError('First error', lastWorkflowRunId());
       });
 
       await waitFor(() => expect(result.current.status).toBe('error'));
@@ -725,14 +727,14 @@ describe('useAIWorkflow Hook Tests', () => {
             state: {},
           } as any,
           timestamp: Date.now(),
-        });
+        }, lastWorkflowRunId());
 
         simulateEvent({
           type: EventType.TEXT_MESSAGE_START,
           messageId,
           role: 'assistant',
           timestamp: Date.now(),
-        });
+        }, lastWorkflowRunId());
       });
 
       // Send multiple content chunks
@@ -743,7 +745,7 @@ describe('useAIWorkflow Hook Tests', () => {
             messageId,
             delta: `Chunk ${i} `,
             timestamp: Date.now(),
-          });
+          }, lastWorkflowRunId());
         });
       }
 
@@ -796,7 +798,7 @@ describe('useAIWorkflow Hook Tests', () => {
           messageId: 'msg-test',
           delta: 'Should not crash',
           timestamp: Date.now(),
-        });
+        }, lastWorkflowRunId());
       });
 
       // Test passes if no errors thrown
@@ -834,6 +836,243 @@ describe('useAIWorkflow Hook Tests', () => {
       // Both should be running independently
       expect(result1.current.status).toBe('running');
       expect(result2.current.status).toBe('running');
+    });
+  });
+
+  // Security finding M4: a chat run and a workflow run can share one connection.
+  describe('Run isolation', () => {
+    function useWorkflowAndClient() {
+      const workflow = useAIWorkflow('dify', 'test-workflow');
+      const { client } = useAIContext();
+      return { workflow, client };
+    }
+
+    it('does not run a tool for a tool call of another run, even when the workflow has that tool', async () => {
+      const { result } = renderHook(() => useAIWorkflow('dify', 'test-workflow'), { wrapper });
+      await waitFor(() => expect(result.current.connected).toBe(true));
+      const calls: unknown[] = [];
+      const deleteAll = defineTool('Delete all items', z.object({}), (input) => {
+        calls.push(input);
+        return { deleted: true };
+      });
+
+      act(() => {
+        result.current.trigger({ inputs: {}, tools: { deleteAll } });
+      });
+
+      act(() => {
+        simulateToolCall('chat-tool-call', 'deleteAll', {}, 'chat-run');
+      });
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(calls).toEqual([]);
+      expect(getSentMessages().filter((m) => m.type === 'tool_result')).toEqual([]);
+
+      // The workflow's own tool call still runs.
+      act(() => {
+        simulateToolCall('workflow-tool-call', 'deleteAll', {}, lastWorkflowRunId());
+      });
+      await waitFor(() => expect(calls.length).toBe(1));
+    });
+
+    it('does not run a tool for a tool call without a run id', async () => {
+      const { result } = renderHook(() => useAIWorkflow('dify', 'test-workflow'), { wrapper });
+      await waitFor(() => expect(result.current.connected).toBe(true));
+      const calls: unknown[] = [];
+      const deleteAll = defineTool('Delete all items', z.object({}), (input) => {
+        calls.push(input);
+        return { deleted: true };
+      });
+
+      act(() => {
+        result.current.trigger({ inputs: {}, tools: { deleteAll } });
+      });
+      act(() => {
+        simulateToolCall('unscoped-tool-call', 'deleteAll', {});
+      });
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(calls).toEqual([]);
+    });
+
+    it('ignores the text and the end of another run', async () => {
+      const { result } = renderHook(() => useAIWorkflow('dify', 'test-workflow'), { wrapper });
+      await waitFor(() => expect(result.current.connected).toBe(true));
+
+      act(() => {
+        result.current.trigger({ inputs: {} });
+      });
+      act(() => {
+        simulateWorkflowSuccess('chat-run', 'chat-thread', 'Chat text');
+      });
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(result.current.status).toBe('running');
+      expect(result.current.text).toBeNull();
+    });
+
+    it('keeps workflow output out of the chat history', async () => {
+      const { result } = renderHook(() => useWorkflowAndClient(), { wrapper });
+      await waitFor(() => expect(result.current.workflow.connected).toBe(true));
+
+      act(() => {
+        result.current.client!.sendPrompt('Hello');
+      });
+      const chatRunId = findAllSentMessages('run_agent')[0].data.runId;
+      act(() => {
+        result.current.workflow.trigger({ inputs: {} });
+      });
+      const workflowRunId = lastWorkflowRunId();
+      const workflowThreadId = findSentMessage('run_workflow').data.threadId;
+
+      act(() => {
+        simulateEvent({ type: EventType.RUN_STARTED, threadId: 't', runId: chatRunId }, chatRunId);
+        simulateWorkflowSuccess(workflowRunId, workflowThreadId, 'PDF contents');
+      });
+
+      await waitFor(() => expect(result.current.workflow.status).toBe('completed'));
+      expect(result.current.workflow.text).toBe('PDF contents');
+      const client = result.current.client!;
+      expect(JSON.stringify(client.messages)).not.toContain('PDF contents');
+      expect(JSON.stringify(client.runMessages)).not.toContain('PDF contents');
+      expect(client.currentMessageContent).not.toContain('PDF contents');
+      expect(client.currentRunId).toBe(chatRunId);
+    });
+  });
+
+  // Security finding M4: a workflow has no chat approval UI, so a tool that needs
+  // approval runs only when the caller answers the approval request.
+  describe('Tool approval', () => {
+    const destructive = { annotations: { destructiveHint: true } };
+
+    function toolResults(): Array<Record<string, unknown>> {
+      return getSentMessages()
+        .filter((m) => m.type === 'tool_result')
+        .map((m) => JSON.parse(m.data.content));
+    }
+
+    it('does not run a destructive tool when the caller gives no onApprovalRequest', async () => {
+      const { result } = renderHook(() => useAIWorkflow('dify', 'test-workflow'), { wrapper });
+      await waitFor(() => expect(result.current.connected).toBe(true));
+      const calls: unknown[] = [];
+      const deleteAll = defineTool('Delete all items', () => {
+        calls.push(true);
+        return { deleted: true };
+      }, destructive);
+
+      act(() => {
+        result.current.trigger({ inputs: {}, tools: { deleteAll } });
+      });
+      act(() => {
+        simulateToolCall('tc-1', 'deleteAll', {}, lastWorkflowRunId());
+      });
+
+      await waitFor(() => expect(toolResults().length).toBe(1));
+      expect(calls).toEqual([]);
+      expect(toolResults()[0].rejected).toBe(true);
+    });
+
+    it('runs a destructive tool when onApprovalRequest approves', async () => {
+      const { result } = renderHook(() => useAIWorkflow('dify', 'test-workflow'), { wrapper });
+      await waitFor(() => expect(result.current.connected).toBe(true));
+      const calls: unknown[] = [];
+      const deleteItem = defineTool('Delete one item', z.object({ id: z.string() }), (input) => {
+        calls.push(input);
+        return { deleted: input.id };
+      }, destructive);
+      const requests: WorkflowApprovalRequest[] = [];
+
+      act(() => {
+        result.current.trigger({
+          inputs: {},
+          tools: { deleteItem },
+          onApprovalRequest: async (request) => {
+            requests.push(request);
+            return { approved: true };
+          },
+        });
+      });
+      act(() => {
+        simulateToolCall('tc-1', 'deleteItem', { id: 'a' }, lastWorkflowRunId());
+      });
+
+      await waitFor(() => expect(calls).toEqual([{ id: 'a' }]));
+      expect(requests).toEqual([
+        { toolCallId: 'tc-1', toolName: 'deleteItem', args: { id: 'a' }, annotations: { destructiveHint: true } },
+      ]);
+      await waitFor(() => expect(toolResults()).toEqual([{ deleted: 'a' }]));
+    });
+
+    it('does not run a destructive tool when onApprovalRequest rejects', async () => {
+      const { result } = renderHook(() => useAIWorkflow('dify', 'test-workflow'), { wrapper });
+      await waitFor(() => expect(result.current.connected).toBe(true));
+      const calls: unknown[] = [];
+      const deleteAll = defineTool('Delete all items', () => {
+        calls.push(true);
+        return { deleted: true };
+      }, destructive);
+
+      act(() => {
+        result.current.trigger({
+          inputs: {},
+          tools: { deleteAll },
+          onApprovalRequest: async () => ({ approved: false, reason: 'Not now' }),
+        });
+      });
+      act(() => {
+        simulateToolCall('tc-1', 'deleteAll', {}, lastWorkflowRunId());
+      });
+
+      await waitFor(() => expect(toolResults().length).toBe(1));
+      expect(calls).toEqual([]);
+      expect(toolResults()[0]).toEqual({ rejected: true, reason: 'Not now' });
+    });
+
+    it('rejects ctx.requestApproval when the caller gives no onApprovalRequest', async () => {
+      const { result } = renderHook(() => useAIWorkflow('dify', 'test-workflow'), { wrapper });
+      await waitFor(() => expect(result.current.connected).toBe(true));
+      const askFirst = defineTool('Ask first', async (ctx) => {
+        const { approved } = await ctx.requestApproval({ message: 'Send the email?' });
+        return { approved };
+      });
+
+      act(() => {
+        result.current.trigger({ inputs: {}, tools: { askFirst } });
+      });
+      act(() => {
+        simulateToolCall('tc-1', 'askFirst', {}, lastWorkflowRunId());
+      });
+
+      await waitFor(() => expect(toolResults()).toEqual([{ approved: false }]));
+    });
+
+    it('sends ctx.requestApproval to onApprovalRequest', async () => {
+      const { result } = renderHook(() => useAIWorkflow('dify', 'test-workflow'), { wrapper });
+      await waitFor(() => expect(result.current.connected).toBe(true));
+      const askFirst = defineTool('Ask first', async (ctx) => {
+        const { approved } = await ctx.requestApproval({ message: 'Send the email?', metadata: { to: 'x' } });
+        return { approved };
+      });
+      const requests: WorkflowApprovalRequest[] = [];
+
+      act(() => {
+        result.current.trigger({
+          inputs: {},
+          tools: { askFirst },
+          onApprovalRequest: async (request) => {
+            requests.push(request);
+            return { approved: true };
+          },
+        });
+      });
+      act(() => {
+        simulateToolCall('tc-1', 'askFirst', {}, lastWorkflowRunId());
+      });
+
+      await waitFor(() => expect(toolResults()).toEqual([{ approved: true }]));
+      expect(requests).toEqual([
+        { toolCallId: 'tc-1', toolName: 'askFirst', args: {}, message: 'Send the email?', metadata: { to: 'x' } },
+      ]);
     });
   });
 });

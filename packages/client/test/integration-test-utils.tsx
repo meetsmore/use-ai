@@ -10,6 +10,7 @@ import { mock } from 'bun:test';
 import { UseAIProvider } from '../src/providers/useAIProvider';
 import type { AGUIEvent } from '../src/types';
 import { EventType } from '../src/types';
+import { withEventRunId } from '@meetsmore-oss/use-ai-core';
 
 // Store server mock for cleanup
 let mockServer: SocketServerMock | null = null;
@@ -75,13 +76,22 @@ export function getMockServer(): SocketServerMock | null {
 /**
  * Simulate an AG-UI event from the server
  */
-export function simulateEvent(event: AGUIEvent): void {
+export function simulateEvent(event: AGUIEvent, runId?: string): void {
   if (!mockServer) {
     throw new Error('Mock server not initialized. Call setupMockWebSocket first.');
   }
 
-  // Emit the event to the client
-  mockServer.emit('event', event);
+  // Emit the event to the client. With a runId, the event carries it as the server sets it.
+  mockServer.emit('event', runId === undefined ? event : withEventRunId(event, runId));
+}
+
+/**
+ * The runId of the last run_workflow message that the client sent.
+ */
+export function lastWorkflowRunId(): string {
+  const message = [...sentMessages].reverse().find(msg => msg.type === 'run_workflow');
+  if (!message) throw new Error('No run_workflow message was sent');
+  return message.data.runId;
 }
 
 /**
@@ -90,7 +100,8 @@ export function simulateEvent(event: AGUIEvent): void {
 export function simulateToolCall(
   toolCallId: string,
   toolName: string,
-  input: Record<string, unknown>
+  input: Record<string, unknown>,
+  runId?: string
 ): void {
   simulateEvent({
     type: EventType.TOOL_CALL_START,
@@ -98,20 +109,20 @@ export function simulateToolCall(
     toolCallName: toolName,
     parentMessageId: 'msg-test',
     timestamp: Date.now(),
-  });
+  }, runId);
 
   simulateEvent({
     type: EventType.TOOL_CALL_ARGS,
     toolCallId,
     delta: JSON.stringify(input),
     timestamp: Date.now(),
-  });
+  }, runId);
 
   simulateEvent({
     type: EventType.TOOL_CALL_END,
     toolCallId,
     timestamp: Date.now(),
-  });
+  }, runId);
 }
 
 /**
@@ -134,7 +145,7 @@ export function simulateWorkflowSuccess(
       state: {},
     } as any,
     timestamp: Date.now(),
-  });
+  }, runId);
 
   const messageId = 'msg-' + Math.random();
   simulateEvent({
@@ -142,20 +153,20 @@ export function simulateWorkflowSuccess(
     messageId,
     role: 'assistant',
     timestamp: Date.now(),
-  });
+  }, runId);
 
   simulateEvent({
     type: EventType.TEXT_MESSAGE_CONTENT,
     messageId,
     delta: text,
     timestamp: Date.now(),
-  });
+  }, runId);
 
   simulateEvent({
     type: EventType.TEXT_MESSAGE_END,
     messageId,
     timestamp: Date.now(),
-  });
+  }, runId);
 
   simulateEvent({
     type: EventType.RUN_FINISHED,
@@ -163,18 +174,18 @@ export function simulateWorkflowSuccess(
     runId,
     result: text,
     timestamp: Date.now(),
-  });
+  }, runId);
 }
 
 /**
  * Simulate workflow error
  */
-export function simulateWorkflowError(message: string): void {
+export function simulateWorkflowError(message: string, runId?: string): void {
   simulateEvent({
     type: EventType.RUN_ERROR,
     message,
     timestamp: Date.now(),
-  });
+  }, runId);
 }
 
 /**

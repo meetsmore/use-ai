@@ -76,7 +76,7 @@ export { useLatestToolCall } from './hooks/useLatestToolCall';
 export type { LatestToolCall } from './hooks/useLatestToolCall';
 
 export type { UseAIOptions, UseAIResult } from './useAI';
-export type { UseAIWorkflowResult, TriggerWorkflowOptions, WorkflowProgress } from './useAIWorkflow';
+export type { UseAIWorkflowResult, TriggerWorkflowOptions, WorkflowProgress, WorkflowApprovalRequest, WorkflowApprovalResult } from './useAIWorkflow';
 export type { UseAIConfig, EnabledFeatures, ToolDefinition, AgentInfo } from './types';
 export type {
   UseAIContextValue,

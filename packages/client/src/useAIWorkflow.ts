@@ -4,8 +4,16 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useAIContext } from './providers/useAIProvider';
-import { type ToolsDefinition, executeDefinedTool, convertToolsToDefinitions } from './defineTool';
-import type { AGUIEvent, RunErrorEvent, TextMessageContentEvent, ToolCallEndEvent, WorkflowStatus } from '@meetsmore-oss/use-ai-core';
+import { type ToolsDefinition, type ToolAnnotations, type ToolExecutionContext, executeDefinedTool, convertToolsToDefinitions } from './defineTool';
+import type {
+  AGUIEvent,
+  RunErrorEvent,
+  TextMessageContentEvent,
+  ToolCallArgsEvent,
+  ToolCallEndEvent,
+  ToolCallStartEvent,
+  WorkflowStatus,
+} from '@meetsmore-oss/use-ai-core';
 import { EventType } from '@meetsmore-oss/use-ai-core';
 import type { RunWorkflowMessage } from '@meetsmore-oss/use-ai-core';
 import { v4 as uuidv4 } from 'uuid';
@@ -35,6 +43,35 @@ export interface WorkflowProgress {
 }
 
 /**
+ * A request for user approval before a workflow tool runs.
+ *
+ * A workflow asks for approval in two cases:
+ * - The tool has `annotations: { destructiveHint: true }`. The request has `annotations`.
+ * - The tool calls `ctx.requestApproval`. The request has `message` and `metadata`.
+ */
+export interface WorkflowApprovalRequest {
+  /** Id of the tool call */
+  toolCallId: string;
+  /** Name of the tool, as given in `tools` */
+  toolName: string;
+  /** Arguments that the workflow gave the tool */
+  args: Record<string, unknown>;
+  /** The tool's annotations, for a `destructiveHint` approval */
+  annotations?: ToolAnnotations;
+  /** The message that the tool gave to `ctx.requestApproval` */
+  message?: string;
+  /** The metadata that the tool gave to `ctx.requestApproval` */
+  metadata?: Record<string, unknown>;
+}
+
+/** The answer to a {@link WorkflowApprovalRequest}. */
+export interface WorkflowApprovalResult {
+  approved: boolean;
+  /** Why the user rejected the tool call. The workflow gets it in the tool result. */
+  reason?: string;
+}
+
+/**
  * Configuration for triggering a workflow.
  */
 export interface TriggerWorkflowOptions {
@@ -48,6 +85,26 @@ export interface TriggerWorkflowOptions {
   onComplete?: (result: any) => void;
   /** Optional callback when workflow encounters an error */
   onError?: (error: Error) => void;
+  /**
+   * Asks the user to approve a tool call. A workflow has no chat approval UI,
+   * so the caller shows its own prompt and resolves with the answer.
+   *
+   * Without this callback, a tool with `destructiveHint: true` does not run:
+   * the workflow gets `{ rejected: true, reason }` as the tool result.
+   * `ctx.requestApproval` resolves with `{ approved: false }`.
+   *
+   * @example
+   * ```typescript
+   * trigger({
+   *   inputs,
+   *   tools: { deleteRows },
+   *   onApprovalRequest: async (request) => ({
+   *     approved: window.confirm(`Allow ${request.toolName}?`),
+   *   }),
+   * });
+   * ```
+   */
+  onApprovalRequest?: (request: WorkflowApprovalRequest) => Promise<WorkflowApprovalResult> | WorkflowApprovalResult;
 }
 
 /**
@@ -136,6 +193,10 @@ export function useAIWorkflow(runner: string, workflowId: string): UseAIWorkflow
     onProgress?: (progress: WorkflowProgress) => void;
     onComplete?: (result: any) => void;
     onError?: (error: Error) => void;
+    onApprovalRequest?: TriggerWorkflowOptions['onApprovalRequest'];
+    /** Tool calls of this run, by id, while their arguments arrive */
+    pendingToolCalls: Map<string, { name: string; args: string }>;
+    unsubscribe: () => void;
     accumulatedText: string;
     toolCalls: Array<{
       toolName: string;
@@ -144,19 +205,28 @@ export function useAIWorkflow(runner: string, workflowId: string): UseAIWorkflow
     }>;
   } | null>(null);
 
-  const eventListenerIdRef = useRef<string>(`useAIWorkflow-${Math.random().toString(36).substr(2, 9)}`);
-
-  const handleWorkflowEvent = useCallback(async (event: AGUIEvent) => {
+  /**
+   * Handles an event of the workflow run `runId`. The client gives this handler
+   * only the events that the server marks with `runId` (see `onRunEvent`).
+   */
+  const handleWorkflowEvent = useCallback(async (runId: string, event: AGUIEvent) => {
     const currentWorkflow = currentWorkflowRef.current;
-    if (!currentWorkflow) return;
-
-    // Only process events for the current workflow
-    if (event.type === EventType.RUN_STARTED) {
-      const runEvent = event;
-      if (runEvent.runId !== currentWorkflow.runId) return;
-    }
+    if (!currentWorkflow || currentWorkflow.runId !== runId) return;
 
     switch (event.type) {
+      case EventType.TOOL_CALL_START: {
+        const startEvent = event as ToolCallStartEvent;
+        currentWorkflow.pendingToolCalls.set(startEvent.toolCallId, { name: startEvent.toolCallName, args: '' });
+        break;
+      }
+
+      case EventType.TOOL_CALL_ARGS: {
+        const argsEvent = event as ToolCallArgsEvent;
+        const toolCall = currentWorkflow.pendingToolCalls.get(argsEvent.toolCallId);
+        if (toolCall) toolCall.args += argsEvent.delta;
+        break;
+      }
+
       case EventType.TEXT_MESSAGE_CONTENT: {
         const textEvent = event as TextMessageContentEvent;
         currentWorkflow.accumulatedText += textEvent.delta;
@@ -176,28 +246,61 @@ export function useAIWorkflow(runner: string, workflowId: string): UseAIWorkflow
         const toolCallEvent = event as ToolCallEndEvent;
         const toolCallId = toolCallEvent.toolCallId;
 
-        // Get the accumulated tool call data from the client
-        const toolCallData = client.getToolCallData(toolCallId);
+        // The tool call's name and arguments, from this run's own events
+        const toolCallData = currentWorkflow.pendingToolCalls.get(toolCallId);
         if (!toolCallData) {
           console.error(`[useAIWorkflow] Tool call ${toolCallId} not found`);
           break;
         }
+        currentWorkflow.pendingToolCalls.delete(toolCallId);
 
         const toolName = toolCallData.name;
-        const toolArgs = JSON.parse(toolCallData.args);
+        const toolArgs: Record<string, unknown> = toolCallData.args ? JSON.parse(toolCallData.args) : {};
+        const onApprovalRequest = currentWorkflow.onApprovalRequest;
 
         console.log(`[useAIWorkflow] Executing tool: ${toolName}`, toolArgs);
         console.log(`[useAIWorkflow] Available tools:`, Object.keys(currentWorkflow.tools));
 
         try {
-          // Execute the tool
-          // Workflows are headless — no UI for runtime approval, so provide a no-op context.
-          const noopCtx = {
+          // A destructive tool runs only when the caller approves it.
+          const annotations = currentWorkflow.tools[toolName]?._options?.annotations;
+          if (annotations?.destructiveHint) {
+            const approval: WorkflowApprovalResult = onApprovalRequest
+              ? await onApprovalRequest({ toolCallId, toolName, args: toolArgs, annotations })
+              : {
+                  approved: false,
+                  reason: `Tool "${toolName}" needs user approval, and the workflow has no onApprovalRequest handler`,
+                };
+            if (!approval.approved) {
+              const rejection = { rejected: true, reason: approval.reason || 'User rejected tool execution' };
+              currentWorkflow.toolCalls.push({ toolName, args: toolArgs, result: rejection });
+              currentWorkflow.onProgress?.({
+                status: 'running',
+                text: currentWorkflow.accumulatedText,
+                toolCalls: currentWorkflow.toolCalls,
+              });
+              client.sendToolResponse(toolCallId, rejection);
+              break;
+            }
+          }
+
+          // A workflow cannot be stopped, so the signal never aborts.
+          // A runtime approval goes to the caller, and is rejected without a handler.
+          const ctx: ToolExecutionContext = {
             toolCallId,
             signal: NEVER_ABORTED_SIGNAL,
-            requestApproval: async () => ({ approved: true }),
+            requestApproval: async ({ message, metadata }) => {
+              if (!onApprovalRequest) return { approved: false, reason: 'The workflow has no onApprovalRequest handler' };
+              return onApprovalRequest({
+                toolCallId,
+                toolName,
+                args: toolArgs,
+                message,
+                ...(metadata !== undefined ? { metadata } : {}),
+              });
+            },
           };
-          const result = await executeDefinedTool(currentWorkflow.tools, toolName, toolArgs, noopCtx);
+          const result = await executeDefinedTool(currentWorkflow.tools, toolName, toolArgs, ctx);
 
           // Track tool call
           currentWorkflow.toolCalls.push({
@@ -239,7 +342,8 @@ export function useAIWorkflow(runner: string, workflowId: string): UseAIWorkflow
 
         currentWorkflow.onComplete?.(result);
 
-        // Clear workflow ref
+        // Clear workflow ref and stop listening to the run
+        currentWorkflow.unsubscribe();
         currentWorkflowRef.current = null;
         break;
       }
@@ -259,23 +363,21 @@ export function useAIWorkflow(runner: string, workflowId: string): UseAIWorkflow
 
         currentWorkflow.onError?.(err);
 
-        // Clear workflow ref
+        // Clear workflow ref and stop listening to the run
+        currentWorkflow.unsubscribe();
         currentWorkflowRef.current = null;
         break;
       }
     }
   }, [client]);
 
-  // Register event listener once
+  // Stop listening to a running workflow when the component unmounts
   useEffect(() => {
-    if (!client) return;
-
-    const unsubscribe = client.onEvent(eventListenerIdRef.current, handleWorkflowEvent);
-
     return () => {
-      unsubscribe();
+      currentWorkflowRef.current?.unsubscribe();
+      currentWorkflowRef.current = null;
     };
-  }, [client, handleWorkflowEvent]);
+  }, [client]);
 
   const trigger = useCallback(async (options: TriggerWorkflowOptions) => {
     if (!client?.isConnected()) {
@@ -302,7 +404,8 @@ export function useAIWorkflow(runner: string, workflowId: string): UseAIWorkflow
     const runId = uuidv4();
     const threadId = uuidv4();
 
-    // Store workflow context
+    // Store workflow context. Listen only to the events of this run, so that
+    // the events of a chat run on the same connection never reach the workflow.
     currentWorkflowRef.current = {
       runId,
       threadId,
@@ -310,6 +413,11 @@ export function useAIWorkflow(runner: string, workflowId: string): UseAIWorkflow
       onProgress: options.onProgress,
       onComplete: options.onComplete,
       onError: options.onError,
+      onApprovalRequest: options.onApprovalRequest,
+      pendingToolCalls: new Map(),
+      unsubscribe: client.onRunEvent(runId, (event) => {
+        void handleWorkflowEvent(runId, event);
+      }),
       accumulatedText: '',
       toolCalls: [],
     };

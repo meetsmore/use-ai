@@ -1,4 +1,4 @@
-import { EventType, type CustomEvent } from '@meetsmore-oss/use-ai-core';
+import { EventType, getEventRunId, type CustomEvent } from '@meetsmore-oss/use-ai-core';
 import type {
   ToolDefinition,
   Message,
@@ -84,6 +84,11 @@ export class UseAIClient {
   private transport: UseAITransport;
   private transportUnsubscribes: Array<() => void> = [];
   private eventHandlers: Map<string, AGUIEventHandler> = new Map();
+  // Handlers for the events of runs that are not chat runs (workflows), by run id.
+  private runEventHandlers: Map<string, AGUIEventHandler> = new Map();
+  // Chat runs that sendPrompt started and that have not ended. Only their
+  // events reach the chat (security finding M4).
+  private chatRunIds: Set<string> = new Set();
 
   // Session state
   private _threadId: string | null = null;
@@ -196,6 +201,17 @@ export class UseAIClient {
 
   private handleEvent(event: AGUIEvent) {
     if (event.type === EventType.CUSTOM && this.handleCustomEvent(event as CustomEvent)) return;
+
+    // One connection can carry a chat run and a workflow run at the same time.
+    // An event of a run that is not a chat run in flight goes only to the
+    // handler of that run. It does not change the chat state or history.
+    // An event without a run id comes from a server that does not set one,
+    // and is handled as a chat event.
+    const runId = getEventRunId(event);
+    if (runId !== undefined && !this.chatRunIds.has(runId)) {
+      this.runEventHandlers.get(runId)?.(event);
+      return;
+    }
 
     // Track assistant message lifecycle for conversation history
     if (event.type === EventType.RUN_STARTED) {
@@ -345,6 +361,7 @@ export class UseAIClient {
     // RUN_ERROR is also used for user-initiated aborts (ErrorCode.ABORTED).
     if (event.type === EventType.RUN_FINISHED || event.type === EventType.RUN_ERROR) {
       this._currentRunId = null;
+      if (runId !== undefined) this.chatRunIds.delete(runId);
     }
 
     // Notify all registered handlers
@@ -434,6 +451,7 @@ export class UseAIClient {
     // Create RunAgentInput
     const runId = uuidv4();
     this._currentRunId = runId;
+    this.chatRunIds.add(runId);
     const runInput: RunAgentInput = {
       threadId,
       runId,
@@ -671,6 +689,9 @@ export class UseAIClient {
 
   /**
    * Registers an AG-UI event handler for receiving server events.
+   * The handler gets the events of the chat runs that this client started with
+   * {@link sendPrompt}, and events that do not name a run. Events of other runs,
+   * for example workflow runs, go to {@link onRunEvent} handlers instead.
    *
    * @param id - Unique identifier for this handler
    * @param handler - Callback function to handle incoming AG-UI events
@@ -680,6 +701,23 @@ export class UseAIClient {
     this.eventHandlers.set(id, handler);
     return () => {
       this.eventHandlers.delete(id);
+    };
+  }
+
+  /**
+   * Registers a handler for the events of one run that is not a chat run,
+   * for example a workflow run. Only events that the server marks with this
+   * run id reach the handler. These events do not reach {@link onEvent} handlers
+   * and do not change the chat state or history.
+   *
+   * @param runId - The run id that the client sent to start the run
+   * @param handler - Callback function to handle the run's events
+   * @returns Cleanup function to unregister the handler
+   */
+  onRunEvent(runId: string, handler: AGUIEventHandler): () => void {
+    this.runEventHandlers.set(runId, handler);
+    return () => {
+      if (this.runEventHandlers.get(runId) === handler) this.runEventHandlers.delete(runId);
     };
   }
 
