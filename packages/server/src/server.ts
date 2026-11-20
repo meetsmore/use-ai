@@ -109,7 +109,6 @@ export class UseAIServer {
   };
   private rateLimiter: RateLimiter;
   private cleanupInterval: NodeJS.Timeout;
-  private clientIdCounter = 0;
   private plugins: UseAIServerPlugin[] = [];
   private messageHandlers: Map<string, MessageHandler> = new Map();
   private mcpEndpoints: RemoteMcpToolsProvider[] = [];
@@ -342,7 +341,9 @@ export class UseAIServer {
    */
   private createSession(connection: ClientConnection): ClientSession {
     const session: ClientSession = {
-      clientId: `client-${++this.clientIdCounter}`,
+      // Random, not a per-process counter: a counter repeats across pods and restarts,
+      // which merges unrelated clients under one Langfuse session or Dify user.
+      clientId: `client-${uuidv4()}`,
       ipAddress: connection.ipAddress,
       socket: connection,
       threadId: uuidv4(),
