@@ -1233,6 +1233,32 @@ The flow works like this:
 4. [LLM] The LLM decides to call a tool.
 5. [server] The server checks if the call will use a remote MCP, if it will, it adds the headers matching the URL pattern.
 
+#### `mcpHeaders` patterns must name a domain
+
+The client's patterns decide which configured MCP endpoint gets which headers. The server only uses a pattern that names a domain:
+
+- The pattern has the form `scheme://host[:port][/path]`. The scheme and the path can use globs. If there is no path, the pattern matches only `/`.
+- The host is a literal host (`api.example.com`, `localhost`, `127.0.0.1`, `[::1]`), or `*.` followed by a domain (`*.example.com`).
+- `*.example.com` matches subdomains at any depth (`a.example.com`, `a.b.example.com`). It does not match `example.com`.
+- The domain after `*.` must not be a public suffix, such as `*.jp`, `*.co.jp` or `*.com`.
+- The port is a literal number. If there is no port, the pattern matches only the default port of the scheme.
+- No other globs are allowed in the host or the port. For example, `*`, `api*.example.com` and `a.*.example.com` are not allowed.
+
+The server ignores a pattern that breaks these rules. It never sends that pattern's headers, and it logs a warning with the pattern.
+
+This rule exists because the client and the server config change at different times. An operator can add a new MCP endpoint to the server config later, for example a third-party server. A broad pattern such as `*://*/api/mcp` would then send the user's token to that endpoint, and nobody would notice.
+
+Use the exact MCP URL when you can:
+
+```tsx
+forwardedPropsProvider={() => ({
+  mcpHeaders: {
+    // Before (ignored now): '*://*/api/mcp'
+    [`${apiUrl}/api/mcp`]: { headers: { Authorization: `Bearer ${token}` } },
+  },
+})}
+```
+
 ### Server-Side Tools
 
 Server-side tools execute directly in the server process using `defineServerTool()`. Unlike client tools (which round-trip via Socket.IO) or MCP tools (which call remote HTTP endpoints), server tools are simple function calls with no network overhead.

@@ -356,6 +356,10 @@ export interface UseAIForwardedProps {
  * - Constant strings: `'https://api.example.com'` - Exact match
  * - Glob patterns: `'https://*.meetsmore.com'` - Wildcard matching using picomatch
  *
+ * Every pattern must name a domain. The host must be a literal host, or `*.` followed
+ * by a domain that is not a public suffix. Globs are allowed in the scheme and the path.
+ * The server ignores other patterns (for example a wildcard host) and never sends their headers.
+ *
  * @example
  * ```typescript
  * {
