@@ -131,3 +131,113 @@ describe('useToolSystem approval with edited arguments', () => {
     expect(result.current.pendingApprovals).toHaveLength(1);
   });
 });
+
+describe('useToolSystem approval matches what executes (security finding I6)', () => {
+  function requestApprovalShowing(
+    result: ReturnType<typeof setup>['result'],
+    toolCallId: string,
+    called: { name: string; args: Record<string, unknown> },
+    shown: { name: string; args: Record<string, unknown> },
+  ) {
+    act(() => {
+      result.current.storePendingToolCall(toolCallId, called.name, called.args, {
+        name: called.name,
+        args: JSON.stringify(called.args),
+      });
+      result.current.handleApprovalRequest({
+        type: TOOL_APPROVAL_REQUEST,
+        toolCallId,
+        toolCallName: shown.name,
+        toolCallArgs: shown.args,
+        timestamp: 0,
+        acceptsModifiedArgs: true,
+      });
+    });
+  }
+
+  it('refuses to run a tool whose call arguments differ from the approved arguments', async () => {
+    const { result, client, executed } = setup();
+    requestApprovalShowing(
+      result,
+      'tc-1',
+      { name: 'createItem', args: { title: 'Hidden' } },
+      { name: 'createItem', args: { title: 'Shown' } },
+    );
+
+    await act(async () => {
+      await result.current.approveAll();
+    });
+
+    expect(executed).toEqual([]);
+    const [toolCallId, response] = client.sendToolResponse.mock.calls[0] as [string, { error: string }];
+    expect(toolCallId).toBe('tc-1');
+    expect(response.error).toContain('differs from the tool call the user approved');
+  });
+
+  it('refuses to run a tool whose name differs from the approved tool, even with edited arguments', async () => {
+    const { result, client, executed } = setup();
+    requestApprovalShowing(
+      result,
+      'tc-1',
+      { name: 'createItem', args: { title: 'Same' } },
+      { name: 'renameItem', args: { title: 'Same' } },
+    );
+
+    await act(async () => {
+      await result.current.approveWithArgs({ 'tc-1': { title: 'Edited' } });
+    });
+
+    expect(executed).toEqual([]);
+    const [, response] = client.sendToolResponse.mock.calls[0] as [string, { error: string }];
+    expect(response.error).toContain('differs from the tool call the user approved');
+  });
+
+  it('runs the tool with the edited arguments when the call arguments differ from the shown ones', async () => {
+    const { result, executed } = setup();
+    requestApprovalShowing(
+      result,
+      'tc-1',
+      { name: 'createItem', args: { title: 'Hidden' } },
+      { name: 'createItem', args: { title: 'Shown' } },
+    );
+
+    await act(async () => {
+      await result.current.approveWithArgs({ 'tc-1': { title: 'Edited' } });
+    });
+
+    expect(executed).toEqual([{ title: 'Edited' }]);
+  });
+
+  it('runs the tool when the approved arguments equal the call arguments in a different key order', async () => {
+    const { result, executed } = setup();
+    requestApprovalShowing(
+      result,
+      'tc-1',
+      { name: 'createItem', args: { title: 'Same', tags: { a: 1, b: [1, 2] } } },
+      { name: 'createItem', args: { tags: { b: [1, 2], a: 1 }, title: 'Same' } },
+    );
+
+    await act(async () => {
+      await result.current.approveAll();
+    });
+
+    // The tool schema strips the unknown `tags` key; the call ran.
+    expect(executed).toEqual([{ title: 'Same' }]);
+  });
+
+  it('refuses when an array in the call arguments differs from the approved arguments', async () => {
+    const { result, executed } = setup();
+    requestApprovalShowing(
+      result,
+      'tc-1',
+      { name: 'createItem', args: { title: 'Same', ids: [1, 2, 3] } },
+      { name: 'createItem', args: { title: 'Same', ids: [1, 2] } },
+    );
+
+    await act(async () => {
+      await result.current.approveAll();
+    });
+
+    expect(executed).toEqual([]);
+  });
+});
