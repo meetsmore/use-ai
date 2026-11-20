@@ -3,6 +3,7 @@ import type { ToolAnnotations, ToolApprovalRequestEvent } from '../types';
 import type { UseAIClient } from '../client';
 import type { ToolsDefinition, ToolExecutionContext } from '../defineTool';
 import { executeDefinedTool } from '../defineTool';
+import { jsonValuesEqual } from '../utils/jsonValuesEqual';
 
 // ── Registry Types ──────────────────────────────────────────────────────────
 
@@ -380,10 +381,20 @@ export function useToolSystem({
     pendingApprovalToolCallsRef.current.set(toolCallId, { name, input, toolCallData });
   }, []);
 
+  /**
+   * Runs a client tool call after the user approved it.
+   *
+   * The approval dialog shows the name and arguments of the TOOL_APPROVAL_REQUEST event,
+   * but the call itself comes from TOOL_CALL_END. The tool runs only when both name the
+   * same tool, and with exactly the arguments the user approved: the edited arguments,
+   * or else the shown arguments, which must equal the call arguments. Otherwise the
+   * tool does not run and the server gets an error result (security finding I6).
+   */
   const executePendingToolAfterApproval = useCallback(async (
-    toolCallId: string,
+    approval: PendingToolApproval,
     modifiedArgs?: Record<string, unknown>
   ) => {
+    const { toolCallId } = approval;
     const pendingTool = pendingApprovalToolCallsRef.current.get(toolCallId);
     if (!pendingTool) {
       console.warn(`[useToolSystem] No pending tool found for ${toolCallId}`);
@@ -391,8 +402,19 @@ export function useToolSystem({
     }
 
     pendingApprovalToolCallsRef.current.delete(toolCallId);
+
+    const nameMatches = pendingTool.name === approval.toolCallName;
+    const argsMatch = modifiedArgs !== undefined || jsonValuesEqual(pendingTool.input, approval.toolCallArgs);
+    if (!nameMatches || !argsMatch) {
+      console.error(`[useToolSystem] Tool call ${toolCallId} differs from the approval request, refusing to run it`);
+      clientRef.current?.sendToolResponse(toolCallId, {
+        error: `Tool execution refused: the tool call differs from the tool call the user approved. ${pendingTool.name} did not run.`,
+      });
+      return;
+    }
+
     await executeToolCall(toolCallId, pendingTool.name, modifiedArgs ?? pendingTool.input);
-  }, [executeToolCall]);
+  }, [clientRef, executeToolCall]);
 
   const approve = useCallback(async (modifiedArgsByToolCallId?: ModifiedToolArgs) => {
     if (!clientRef.current) return;
@@ -415,9 +437,11 @@ export function useToolSystem({
         runtimeResolver({ approved: true });
       } else {
         // Server-side approval (destructiveHint flow)
-        const modifiedArgs = modifiedArgsByToolCallId?.[pending.toolCallId];
+        // Copy the edited arguments once, so the server gets and the tool runs the same value.
+        const edited = modifiedArgsByToolCallId?.[pending.toolCallId];
+        const modifiedArgs = edited === undefined ? undefined : structuredClone(edited);
         clientRef.current.sendToolApprovalResponse(pending.toolCallId, true, undefined, modifiedArgs);
-        await executePendingToolAfterApproval(pending.toolCallId, modifiedArgs);
+        await executePendingToolAfterApproval(pending, modifiedArgs);
       }
     }
   }, [clientRef, pendingApprovals, executePendingToolAfterApproval]);
