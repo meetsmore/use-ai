@@ -55,6 +55,7 @@ bun run kill                   # Kill processes on ports 3000, 3002, 8081
 - `LOG_FORMAT` (optional): `pretty` (default) or `json`
 - `RATE_LIMIT_MAX_REQUESTS` (optional): Max requests per window (0 = unlimited)
 - `RATE_LIMIT_WINDOW_MS` (optional): Window in ms (default: 60000)
+- `ALLOWED_ORIGINS` (optional): comma-separated origins that may connect. Sets `allowedOrigins` on `UseAIServer`. Unset: no Origin check.
 - `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_BASE_URL` (optional): LLM observability
 
 ### WebSocket Protocol
@@ -236,6 +237,7 @@ Optional Langfuse integration tracks Claude API calls, token usage, tool calls, 
 ## Security
 
 - **Rate limiting**: Per-IP address (configured via env vars)
+- **Origin check**: Optional. `allowedOrigins: string[]` on `UseAIServer` refuses a Socket.IO handshake or WebSocket upgrade with HTTP 403 when the `Origin` header is missing or not in the list. Both transports and both runtimes. Default: no check. A non-browser client can forge `Origin`, so this does not replace auth.
 - **Client-only scope**: AI can only see/manipulate what's on the page
 - **No backend API access**: V1 intentionally limits security risks
 - **destructiveHint**: Tools with `annotations: { destructiveHint: true }` require explicit user approval via UI before execution
