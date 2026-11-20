@@ -166,6 +166,46 @@ describe('Plugin Architecture', () => {
     sessionServer.close();
   });
 
+  test('clientId is unique across server instances (pods and restarts)', async () => {
+    // Two server instances stand for two pods, or one pod before and after a restart.
+    // A per-process counter gives "client-1" on both, which merges tenants in Langfuse and Dify.
+    const ports = [9018, 9019];
+    const clientIds: string[] = [];
+
+    class CapturePlugin implements UseAIServerPlugin {
+      getName(): string {
+        return 'capture-client-id';
+      }
+
+      registerHandlers(): void {}
+
+      onClientConnect(session: ClientSession): void {
+        clientIds.push(session.clientId);
+      }
+    }
+
+    for (const port of ports) {
+      const instance = new UseAIServer({
+        port,
+        agents: { test: createTestAgent() },
+        defaultAgent: 'test',
+        plugins: [new CapturePlugin()],
+      });
+      cleanup.trackServer(instance);
+
+      const socket = await cleanup.createTestClient(port);
+      await new Promise(resolve => setTimeout(resolve, 100));
+      socket.disconnect();
+      instance.close();
+    }
+
+    expect(clientIds).toHaveLength(2);
+    expect(clientIds[0]).not.toBe(clientIds[1]);
+    for (const clientId of clientIds) {
+      expect(clientId).toMatch(/^client-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+    }
+  });
+
   test('WorkflowsPlugin enables headless workflow execution', () => {
     // WorkflowsPlugin is tested in the workflows package
     // This test just verifies the concept
