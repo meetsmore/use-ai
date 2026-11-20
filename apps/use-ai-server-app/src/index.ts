@@ -249,14 +249,20 @@ function createMcpEndpoints(): McpEndpointConfig[] {
       // Look for corresponding namespace and timeout
       const namespaceKey = `MCP_ENDPOINT_${name}_NAMESPACE`;
       const timeoutKey = `MCP_ENDPOINT_${name}_TIMEOUT`;
+      const allowedClientHeadersKey = `MCP_ENDPOINT_${name}_ALLOWED_CLIENT_HEADERS`;
 
       const namespace = process.env[namespaceKey] || name.toLowerCase().replace(/_/g, '-');
       const timeout = Number(process.env[timeoutKey]) || 30000;
+      const allowedClientHeaders = process.env[allowedClientHeadersKey]
+        ?.split(',')
+        .map((name) => name.trim())
+        .filter(Boolean);
 
       endpoints.push({
         url,
         namespace,
         timeout,
+        allowedClientHeaders,
       });
 
       if (logFormat === 'pretty') {

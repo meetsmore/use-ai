@@ -74,10 +74,7 @@ export class WorkflowsPlugin implements UseAIServerPlugin {
 
   private async handleRunWorkflow(session: ClientSession, message: UseAIClientMessage): Promise<void> {
     const workflowMessage = message as RunWorkflowMessage;
-    const { runner: runnerName, workflowId, inputs, tools, runId, threadId, forwardedProps } = workflowMessage.data;
-
-    // Extract MCP headers from forwardedProps (AG-UI extension point)
-    const mcpHeaders = forwardedProps?.mcpHeaders;
+    const { runner: runnerName, workflowId, inputs, tools, runId, threadId } = workflowMessage.data;
 
     logger.info('Running workflow', {
       runner: runnerName,
@@ -110,9 +107,6 @@ export class WorkflowsPlugin implements UseAIServerPlugin {
     })) as ToolDefinition[];
     session.state = inputs;
 
-    // Store MCP headers for this workflow execution (will be cleared after completion)
-    session.currentMcpHeaders = mcpHeaders;
-
     // Create event emitter for workflow runner
     const eventEmitter: EventEmitter = {
       emit: (event) => {
@@ -121,34 +115,29 @@ export class WorkflowsPlugin implements UseAIServerPlugin {
     };
 
     // Execute workflow
-    try {
-      const result = await runner.execute(
-        {
-          session,
-          runId,
-          threadId,
-          workflowId,
-          inputs,
-          tools: session.tools,
-        },
-        eventEmitter
-      );
+    const result = await runner.execute(
+      {
+        session,
+        runId,
+        threadId,
+        workflowId,
+        inputs,
+        tools: session.tools,
+      },
+      eventEmitter
+    );
 
-      if (result.success) {
-        logger.info('Workflow completed successfully', {
-          runner: runnerName,
-          workflowId,
-        });
-      } else {
-        logger.error('Workflow failed', {
-          runner: runnerName,
-          workflowId,
-          error: result.error,
-        });
-      }
-    } finally {
-      // Clear MCP headers after workflow completes (success or failure)
-      delete session.currentMcpHeaders;
+    if (result.success) {
+      logger.info('Workflow completed successfully', {
+        runner: runnerName,
+        workflowId,
+      });
+    } else {
+      logger.error('Workflow failed', {
+        runner: runnerName,
+        workflowId,
+        error: result.error,
+      });
     }
   }
 }

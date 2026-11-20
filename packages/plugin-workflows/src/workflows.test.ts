@@ -1270,50 +1270,5 @@ describe('WorkflowsPlugin', () => {
       expect(session.tools).toEqual(tools);
       expect(session.state).toEqual({ test: 'data' });
     });
-
-    test('handles MCP headers from forwardedProps', async () => {
-      const mockRunner = new MockWorkflowRunner();
-      const plugin = new WorkflowsPlugin({
-        runners: new Map([['mock', mockRunner]]),
-      });
-
-      const session = createMockSession();
-      const mcpHeaders = {
-        'https://api.example.com': {
-          headers: { Authorization: 'Bearer test-token' },
-        },
-      };
-
-      const message: RunWorkflowMessage = {
-        type: 'run_workflow',
-        data: {
-          runner: 'mock',
-          workflowId: 'test-workflow',
-          inputs: {},
-          tools: [],
-          runId: uuidv4(),
-          threadId: uuidv4(),
-          forwardedProps: {
-            mcpHeaders,
-          },
-        },
-      };
-
-      const handlers = new Map<string, any>();
-      const mockServer = {
-        registerMessageHandler: (type: string, handler: any) => {
-          handlers.set(type, handler);
-        },
-      };
-
-      plugin.registerHandlers(mockServer);
-      const handler = handlers.get('run_workflow');
-      await handler(session, message);
-
-      // MCP headers should have been set during execution
-      // They are cleared after completion, so we can't check them here
-      // But we can verify the workflow executed successfully
-      expect(mockRunner.executeCalls.length).toBe(1);
-    });
   });
 });

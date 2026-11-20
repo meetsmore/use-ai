@@ -197,14 +197,17 @@ describe('Plugin Architecture', () => {
 
     const socket = await cleanup.createTestClient(hookPort);
 
+    const mcpHeaders = { 'http://mcp.test/*': { headers: { Authorization: 'Bearer user-token' } } };
     const eventsPromise = collectEventsUntil(socket, EventType.RUN_FINISHED);
-    sendRunAgent(socket, { prompt: 'Hello' });
+    sendRunAgent(socket, { prompt: 'Hello', forwardedProps: { mcpHeaders } });
     await eventsPromise;
 
     expect(hookCalledWith).not.toBeNull();
     expect(hookCalledWith!.session).toBeDefined();
     expect(hookCalledWith!.runId).toBeDefined();
     expect(hookCalledWith!.messages).toBeDefined();
+    // MCP headers belong to the run, not the shared session
+    expect(hookCalledWith!.mcpHeaders).toEqual(mcpHeaders);
 
     socket.disconnect();
     hookServer.close();
