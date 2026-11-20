@@ -140,6 +140,7 @@ services:
       # - LOG_FORMAT=json
       # - RATE_LIMIT_MAX_REQUESTS=0
       # - RATE_LIMIT_WINDOW_MS=60000
+      # - RATE_LIMIT_MAX_LLM_CALLS=0
 
       # CORS: Set to '*' for local dev, or your frontend URL for production
       - CORS_ORIGIN=*
@@ -1128,6 +1129,7 @@ ANTHROPIC_API_KEY=sk-ant-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 # Rate Limiting (optional)
 # RATE_LIMIT_MAX_REQUESTS=0
 # RATE_LIMIT_WINDOW_MS=60000
+# RATE_LIMIT_MAX_LLM_CALLS=0                          # Max LLM calls (agent steps) per window
 
 # Langfuse Observability (optional)
 # LANGFUSE_PUBLIC_KEY=pk-lf-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
@@ -1297,6 +1299,7 @@ You can configure it using environment variables if using `@meetsmore-oss/use-ai
 # Rate Limiting (optional)
 RATE_LIMIT_MAX_REQUESTS=0
 RATE_LIMIT_WINDOW_MS=60000
+RATE_LIMIT_MAX_LLM_CALLS=0
 ```
 
 Or you can use arguments to `UseAIServer`:
@@ -1310,8 +1313,21 @@ Or you can use arguments to `UseAIServer`:
     defaultAgent: 'claude',
     rateLimitMaxRequests: 1_000,
     rateLimitWindowMs: 60_000,
+    rateLimitMaxLlmCalls: 5_000,
   });
 ```
+
+The two limits count different things:
+
+- `RATE_LIMIT_MAX_REQUESTS` (`rateLimitMaxRequests`) counts runs. One run is one user message.
+- `RATE_LIMIT_MAX_LLM_CALLS` (`rateLimitMaxLlmCalls`) counts LLM calls. One run calls the LLM once for each step, up to `maxSteps + 1` times. A run that keeps calling tools uses many LLM calls.
+
+Both limits use the same window (`RATE_LIMIT_WINDOW_MS`) and the same key. A value of `0` disables a limit. Both are `0` by default.
+
+If you use rate limiting to control token spend, set `RATE_LIMIT_MAX_LLM_CALLS`. The run limit alone does not bound the number of LLM calls.
+If a run uses up the LLM call budget, the agent does not make the next LLM call. The run stops with a `RUN_ERROR` that has the `RATE_LIMITED` error code.
+
+A custom agent receives the budget as `input.llmCallLimit`. Call `input.llmCallLimit?.consume()` before each LLM call. If it returns `allowed: false`, do not call the LLM and end the run with `RUN_ERROR`.
 
 ### Langfuse
 
