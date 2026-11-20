@@ -17,6 +17,7 @@ import {
 } from '../test/integration-test-utils';
 import { UseAIServer } from './server';
 import { AISDKAgent } from './agents/AISDKAgent';
+import { getEventRunId } from '@meetsmore-oss/use-ai-core';
 
 // Global cleanup manager
 const cleanup = new TestCleanupManager();
@@ -561,6 +562,59 @@ describe.each(RUNTIMES)('Rate Limiting [%s runtime]', (runtime) => {
 
     ws1.disconnect();
     ws2.disconnect();
+  });
+});
+
+// Security finding M4: a client can run a chat and a workflow on one connection.
+// The client tells their events apart by the run id that the server puts on each event.
+describe.each(RUNTIMES)('Run scoping [%s runtime]', (runtime) => {
+  test('every event of a chat run carries the run id', async () => {
+    const port = getPort(8192, runtime);
+    const model = createSequentialMockModel([{ text: 'Hello world' }]);
+    const server = new UseAIServer({
+      port,
+      agents: { test: new AISDKAgent({ hooks: { loadConfig: () => ({ model }) } }) },
+      defaultAgent: 'test',
+      runtime,
+    });
+    cleanup.trackServer(server);
+
+    const ws = await cleanup.createTestClient(port);
+    sendRunAgent(ws, { prompt: 'Say hello', tools: [], runId: 'chat-run-1' });
+
+    const events = await collectEventsUntil(ws, EventType.RUN_FINISHED);
+
+    expect(events.length).toBeGreaterThan(3);
+    for (const event of events) {
+      expect(getEventRunId(event)).toBe('chat-run-1');
+    }
+
+    ws.disconnect();
+  });
+
+  test('a RUN_ERROR sent before the agent starts carries the run id', async () => {
+    const port = getPort(8193, runtime);
+    const model = createSequentialMockModel([{ text: 'unused' }]);
+    const server = new UseAIServer({
+      port,
+      agents: { test: new AISDKAgent({ hooks: { loadConfig: () => ({ model }) } }) },
+      defaultAgent: 'test',
+      runtime,
+    });
+    cleanup.trackServer(server);
+
+    const ws = await cleanup.createTestClient(port);
+    sendRunAgent(ws, {
+      prompt: 'Hello',
+      tools: [],
+      runId: 'chat-run-2',
+      forwardedProps: { agent: 'missing-agent' },
+    });
+
+    const errorEvent = await waitForEventType(ws, EventType.RUN_ERROR);
+    expect(getEventRunId(errorEvent)).toBe('chat-run-2');
+
+    ws.disconnect();
   });
 });
 

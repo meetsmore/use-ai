@@ -1,7 +1,7 @@
 import type { UseAIServerPlugin, MessageHandler, ClientSession } from '@meetsmore-oss/use-ai-server';
 import { logger } from '@meetsmore-oss/use-ai-server';
 import type { UseAIClientMessage, RunWorkflowMessage, ToolDefinition, UseAIForwardedProps } from '@meetsmore-oss/use-ai-core';
-import { EventType } from '@meetsmore-oss/use-ai-core';
+import { EventType, withEventRunId } from '@meetsmore-oss/use-ai-core';
 import type { WorkflowRunner, EventEmitter } from './types';
 
 /**
@@ -93,11 +93,11 @@ export class WorkflowsPlugin implements UseAIServerPlugin {
         requestedRunner: runnerName,
         availableRunners: Array.from(this.runners.keys()),
       });
-      session.socket.emit('event', {
+      session.socket.emit('event', withEventRunId({
         type: EventType.RUN_ERROR,
         message: `Workflow runner "${runnerName}" not found. Available runners: ${availableRunners}`,
         timestamp: Date.now(),
-      });
+      }, runId));
       return;
     }
 
@@ -113,10 +113,12 @@ export class WorkflowsPlugin implements UseAIServerPlugin {
     // Store MCP headers for this workflow execution (will be cleared after completion)
     session.currentMcpHeaders = mcpHeaders;
 
-    // Create event emitter for workflow runner
+    // Create event emitter for workflow runner.
+    // Each event carries the run id, so that the client keeps workflow events
+    // apart from chat events on the same connection (security finding M4).
     const eventEmitter: EventEmitter = {
       emit: (event) => {
-        session.socket.emit('event', event);
+        session.socket.emit('event', withEventRunId(event, runId));
       },
     };
 

@@ -4,7 +4,7 @@ import { DifyWorkflowRunner, type DifyWorkflowRunnerConfig } from './runners/Dif
 import type { WorkflowRunner, WorkflowInput, WorkflowResult, EventEmitter } from './types';
 import type { ClientSession } from '@meetsmore-oss/use-ai-server';
 import type { UseAIClientMessage, RunWorkflowMessage, AGUIEvent, ToolDefinition } from '@meetsmore-oss/use-ai-core';
-import { EventType } from '@meetsmore-oss/use-ai-core';
+import { EventType, getEventRunId } from '@meetsmore-oss/use-ai-core';
 import { v4 as uuidv4 } from 'uuid';
 
 // Mock fetch for Dify tests
@@ -404,6 +404,57 @@ describe('WorkflowsPlugin', () => {
       expect(errorEvent).toBeDefined();
       expect(errorEvent.message).toContain('invalid-runner');
       expect(errorEvent.message).toContain('valid-runner');
+    });
+  });
+
+  // Security finding M4: the client tells workflow events and chat events apart
+  // by the run id that the server puts on each event.
+  describe('Run scoping', () => {
+    const tool: ToolDefinition = {
+      name: 'insertText',
+      description: 'Insert text',
+      parameters: { type: 'object', properties: {} },
+    };
+
+    async function runWorkflow(runner: string, runId: string): Promise<AGUIEvent[]> {
+      const plugin = new WorkflowsPlugin({
+        runners: new Map([['mock', new MockWorkflowRunner('mock', { shouldEmitToolCalls: true })]]),
+      });
+      const session = createMockSession();
+      const emittedEvents: AGUIEvent[] = [];
+      session.socket.emit = (eventName: string, event: AGUIEvent): boolean => {
+        if (eventName === 'event') emittedEvents.push(event);
+        return true;
+      };
+      let handler: ((s: ClientSession, m: UseAIClientMessage) => Promise<void> | void) | undefined;
+      plugin.registerHandlers({
+        registerMessageHandler: (_type, h) => {
+          handler = h;
+        },
+      });
+      const message: RunWorkflowMessage = {
+        type: 'run_workflow',
+        data: { runner, workflowId: 'test-workflow', inputs: {}, tools: [tool], runId, threadId: uuidv4() },
+      };
+      await handler!(session, message);
+      return emittedEvents;
+    }
+
+    test('every event of a workflow run carries the run id', async () => {
+      const events = await runWorkflow('mock', 'workflow-run-1');
+
+      expect(events.length).toBeGreaterThan(3);
+      for (const event of events) {
+        expect(getEventRunId(event)).toBe('workflow-run-1');
+      }
+    });
+
+    test('the RUN_ERROR for an unknown runner carries the run id', async () => {
+      const events = await runWorkflow('unknown', 'workflow-run-2');
+
+      const errorEvent = events.find((e) => e.type === EventType.RUN_ERROR);
+      expect(errorEvent).toBeDefined();
+      expect(getEventRunId(errorEvent!)).toBe('workflow-run-2');
     });
   });
 

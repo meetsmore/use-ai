@@ -127,9 +127,10 @@ export function sendRunAgent(
     threadId?: string;
     previousMessages?: AGUIMessage[];
     forwardedProps?: Record<string, unknown>;
+    runId?: string;
   }
 ): void {
-  const { prompt, tools = [], state = null, threadId = uuidv4(), previousMessages = [], forwardedProps = {} } = options;
+  const { prompt, tools = [], state = null, threadId = uuidv4(), previousMessages = [], forwardedProps = {}, runId = uuidv4() } = options;
 
   const messages: AGUIMessage[] = [
     ...previousMessages,
@@ -142,7 +143,7 @@ export function sendRunAgent(
 
   const runInput: RunAgentInput = {
     threadId,
-    runId: uuidv4(),
+    runId,
     messages,
     tools,
     state,

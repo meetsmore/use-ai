@@ -87,3 +87,6 @@ export {
   isUseAIInternalResponse,
   isMcpConfirmationResponse,
 } from './useAIInternalResponse';
+
+export type { EventRunScope } from './eventRunId';
+export { getEventRunId, withEventRunId } from './eventRunId';

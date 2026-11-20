@@ -68,6 +68,8 @@ The server sends one AG-UI event per frame. Each event has a `type` field.
 { "type": "RUN_FINISHED", "threadId": "...", "runId": "..." }
 ```
 
+Each event of a run also has a `useAIRunId` field. It holds the `runId` of the `run_agent` or `run_workflow` message that started the run. One connection can carry a chat run and a workflow run at the same time, and most AG-UI events do not name their run. The client uses `useAIRunId` to give each event only to the run that started it. A chat ignores the events of runs that it did not start. A workflow ignores all events that do not carry its own run id. `RUN_FINISHED.runId` can hold the Langfuse trace id, so the client does not use it for this purpose.
+
 Two payloads are not AG-UI events. The server sends them as AG-UI `CUSTOM` events, once, after the connection opens.
 
 ```json

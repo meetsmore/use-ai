@@ -1,7 +1,7 @@
 import { Server as SocketIOServer } from 'socket.io';
 import { ModelMessage, ToolModelMessage } from 'ai';
 import { createHash } from 'crypto';
-import { EventType, type McpHeadersMap, type UseAIForwardedProps, type ResolveAttachments } from '@meetsmore-oss/use-ai-core';
+import { EventType, withEventRunId, type McpHeadersMap, type UseAIForwardedProps, type ResolveAttachments } from '@meetsmore-oss/use-ai-core';
 import { resolveAttachmentParts, countRefParts, dropRemoteUrlParts } from './attachmentResolution';
 import type {
   UseAIServerConfig,
@@ -406,7 +406,7 @@ export class UseAIServer {
         type: EventType.RUN_ERROR,
         message: error instanceof Error ? error.message : 'Unknown error',
         timestamp: Date.now(),
-      });
+      }, runIdOfMessage(message));
     }
   }
 
@@ -471,7 +471,7 @@ export class UseAIServer {
           type: EventType.RUN_ERROR,
           message: `Agent "${requestedAgent}" not found. Available agents: ${availableAgents.join(', ')}`,
           timestamp: Date.now(),
-        });
+        }, runId);
         return;
       }
     }
@@ -493,7 +493,7 @@ export class UseAIServer {
         type: EventType.RUN_ERROR,
         message: `Rate limit exceeded. Please try again in ${retryAfterSeconds} seconds.`,
         timestamp: Date.now(),
-      });
+      }, runId);
       return;
     }
 
@@ -836,7 +836,7 @@ export class UseAIServer {
     // Create event emitter that forwards all events to client
     const eventEmitter: EventEmitter = {
       emit: <T extends AGUIEventExtended>(event: T) => {
-        this.sendEvent(session.socket, event);
+        this.sendEvent(session.socket, event, runId);
       },
     };
 
@@ -860,7 +860,7 @@ export class UseAIServer {
             type: EventType.RUN_ERROR,
             message: result.message,
             timestamp: Date.now(),
-          });
+          }, runId);
           return;
         }
       }
@@ -962,8 +962,12 @@ export class UseAIServer {
     logger.info('Run aborted', { clientId: session.clientId, runId });
   }
 
-  private sendEvent<T = unknown>(connection: ClientConnection, event: T) {
-    connection.emit('event', event);
+  /**
+   * Sends an event to the client. An event of a run carries the run's id, so that
+   * the client can keep the events of concurrent runs apart (security finding M4).
+   */
+  private sendEvent(connection: ClientConnection, event: object, runId: string | undefined) {
+    connection.emit('event', runId === undefined ? event : withEventRunId(event, runId));
   }
 
   /**
@@ -1144,4 +1148,14 @@ export class UseAIServer {
       this.serverHandle = null;
     }
   }
+}
+
+/**
+ * The run that a client message starts, if it starts one.
+ * `run_agent` and `run_workflow` both carry the run id in `data.runId`.
+ */
+function runIdOfMessage(message: UseAIClientMessage): string | undefined {
+  if (message.type !== 'run_agent' && message.type !== 'run_workflow') return undefined;
+  const runId = (message.data as { runId?: unknown } | undefined)?.runId;
+  return typeof runId === 'string' ? runId : undefined;
 }
