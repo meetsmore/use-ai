@@ -291,7 +291,7 @@ export async function executeDefinedTool(
 ): Promise<unknown> {
   const tool = tools[toolName];
   if (!tool) {
-    throw new Error(`Tool "${toolName}" not found`);
+    throw new Error(`Tool "${toolName}" is not available`);
   }
   return await tool._execute(input, ctx);
 }
