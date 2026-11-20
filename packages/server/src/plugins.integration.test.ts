@@ -166,12 +166,6 @@ describe('Plugin Architecture', () => {
     sessionServer.close();
   });
 
-  test('WorkflowsPlugin enables headless workflow execution', () => {
-    // WorkflowsPlugin is tested in the workflows package
-    // This test just verifies the concept
-    expect(true).toBe(true);
-  });
-
   test('beforeRunAgent hook is called before agent execution', async () => {
     const hookPort = 9013;
     let hookCalledWith: AgentInput | null = null;
