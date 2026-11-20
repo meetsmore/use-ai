@@ -2,7 +2,7 @@ export { useAI } from './useAI';
 export { useAIWorkflow } from './useAIWorkflow';
 export { UseAIProvider, useAIContext } from './providers/useAIProvider';
 export { UseAIClient } from './client';
-export type { RunTarget } from './client';
+export type { RunTarget, ToolResultHandler } from './client';
 export { SocketIOTransport, WebSocketTransport } from './transport';
 export type { UseAITransport, WebSocketTransportOptions } from './transport';
 export { defineTool, executeDefinedTool, convertToolsToDefinitions } from './defineTool';
@@ -70,6 +70,10 @@ export {
   getTextFromStreamingParts,
   getReasoningPartsFromStreamingParts,
 } from './utils/streamingParts';
+// Tool call status and results, for the in-flight answer and persisted turns alike.
+export { getTurnParts, getToolCallStatus } from './utils/toolCalls';
+export { useLatestToolCall } from './hooks/useLatestToolCall';
+export type { LatestToolCall } from './hooks/useLatestToolCall';
 
 export type { UseAIOptions, UseAIResult } from './useAI';
 export type { UseAIWorkflowResult, TriggerWorkflowOptions, WorkflowProgress } from './useAIWorkflow';
@@ -194,6 +198,7 @@ export type {
   UseServerEventsReturn,
   ExecutingToolDisplay,
   ChatStreamingPart,
+  ChatToolCallStatus,
 } from './hooks/useServerEvents';
 
 // Message queue

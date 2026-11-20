@@ -69,8 +69,13 @@ export function mergeAssistantMessagesForDisplay(messages: PersistedMessage[]): 
     if (msg.displayMode === 'info') {
       // System notice — flush the in-progress assistant text as its own
       // message, then keep the notice standalone (no merge, no displayMode leak).
+      // A turn stopped before it said anything has only tool calls and their
+      // results pending, which make no bubble of their own. They go into the
+      // notice's sources instead, so a slot can still draw those calls after
+      // the chat is saved and reloaded.
+      const toolOnlySources = pendingTexts.length === 0 && pendingReasoningParts.length === 0 ? pendingSources : [];
       flushPending();
-      result.push({ ...msg, sourceMessages: [msg] });
+      result.push({ ...msg, sourceMessages: [...toolOnlySources, msg] });
       continue;
     }
 

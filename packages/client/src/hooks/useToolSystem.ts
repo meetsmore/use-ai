@@ -3,6 +3,7 @@ import type { ToolAnnotations, ToolApprovalRequestEvent } from '../types';
 import type { UseAIClient } from '../client';
 import type { ToolsDefinition, ToolExecutionContext } from '../defineTool';
 import { executeDefinedTool } from '../defineTool';
+import { isErrorResult } from '../utils/toolCalls';
 
 // ── Registry Types ──────────────────────────────────────────────────────────
 
@@ -25,6 +26,15 @@ export interface PendingToolApproval {
   message?: string;
   /** Optional metadata for the approval request (runtime approval) */
   metadata?: Record<string, unknown>;
+}
+
+/**
+ * Whether a pending approval belongs to a tool call: the call's own approval
+ * (`destructiveHint`, keyed by its `toolCallId`), or one the tool asked for
+ * with `ctx.requestApproval`, keyed `${toolCallId}-runtime-${timestamp}`.
+ */
+export function isApprovalForToolCall(approval: PendingToolApproval, toolCallId: string): boolean {
+  return approval.toolCallId === toolCallId || approval.toolCallId.startsWith(`${toolCallId}-runtime-`);
 }
 
 // ── Hook Options & Return ───────────────────────────────────────────────────
@@ -322,20 +332,19 @@ export function useToolSystem({
       console.log('[useToolSystem] Executing tool...');
       const result = await executeDefinedTool(aggregatedToolsRef.current, name, input, ctx);
 
-      const isErrorResult = result && typeof result === 'object' &&
-        ('error' in result || (result as Record<string, unknown>).success === false);
+      const isError = isErrorResult(result);
 
       const ownerIsInvisible = ownerId ? isInvisible(ownerId) : false;
 
       // Wait for prompt to update (via waiter registered by useAI) unless it's an error or invisible
-      if (ownerId && !isErrorResult && !ownerIsInvisible) {
+      if (ownerId && !isError && !ownerIsInvisible) {
         const waiter = getWaiter(ownerId);
         if (waiter) {
           console.log(`[useToolSystem] Waiting for prompt change from ${ownerId}...`);
           await waiter();
           console.log('[useToolSystem] Prompt change wait complete');
         }
-      } else if (isErrorResult) {
+      } else if (isError) {
         console.log('[useToolSystem] Tool returned error, skipping prompt wait');
       } else if (ownerIsInvisible) {
         console.log('[useToolSystem] Component is invisible, skipping prompt wait');

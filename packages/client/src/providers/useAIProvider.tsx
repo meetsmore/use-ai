@@ -637,11 +637,15 @@ export function UseAIProvider({
       await handleServerEventRef.current(client, event);
     });
 
+    // Stable for the hook's lifetime (a useCallback with no changing deps).
+    const unsubscribeToolResult = client.onToolResult(serverEvents.handleToolResult);
+
     clientRef.current = client;
 
     return () => {
       unsubscribeConnection();
       unsubscribe();
+      unsubscribeToolResult();
       client.disconnect();
     };
   }, [serverUrl]);
