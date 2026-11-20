@@ -9,7 +9,6 @@ import type {
   ToolDefinition,
   UseAIClientMessage,
   RunAgentMessage,
-  RunWorkflowMessage,
   ToolResultMessage,
   AbortRunMessage,
   ToolApprovalResponseMessage,
@@ -295,7 +294,7 @@ export class UseAIServer {
    * Register a custom message handler for a specific message type.
    * Used by plugins to handle custom message types.
    *
-   * @param type - The message type to handle (e.g., 'run_workflow')
+   * @param type - The message type to handle (e.g., 'message_feedback')
    * @param handler - The handler function to call when this message type is received
    */
   public registerMessageHandler(type: string, handler: MessageHandler): void {

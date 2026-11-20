@@ -1,5 +1,4 @@
 export { useAI } from './useAI';
-export { useAIWorkflow } from './useAIWorkflow';
 export { UseAIProvider, useAIContext } from './providers/useAIProvider';
 export { UseAIClient } from './client';
 export type { RunTarget, ToolResultHandler } from './client';
@@ -76,7 +75,6 @@ export { useLatestToolCall } from './hooks/useLatestToolCall';
 export type { LatestToolCall } from './hooks/useLatestToolCall';
 
 export type { UseAIOptions, UseAIResult } from './useAI';
-export type { UseAIWorkflowResult, TriggerWorkflowOptions, WorkflowProgress } from './useAIWorkflow';
 export type { UseAIConfig, EnabledFeatures, ToolDefinition, AgentInfo } from './types';
 export type {
   UseAIContextValue,
