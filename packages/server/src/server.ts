@@ -241,6 +241,9 @@ export class UseAIServer {
       onPollingConnection: (sessionId, ip) => {
         this.clientIpTracker.trackPollingConnection(sessionId, ip);
       },
+      onPollingClose: (sessionId) => {
+        this.clientIpTracker.removePollingConnection(sessionId);
+      },
     });
     logger.info('UseAI server ready', { port: this.config.port, transport: this.config.transport });
   }
