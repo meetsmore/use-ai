@@ -1,5 +1,5 @@
 import React from 'react';
-import ReactMarkdown from 'react-markdown';
+import ReactMarkdown, { uriTransformer } from 'react-markdown';
 import type { Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useChatRenderers, type ChatCodeBlockRendererProps } from './chatRenderers';
@@ -257,7 +257,14 @@ const MARKDOWN_COMPONENTS: Components = {
  */
 export const MarkdownContent = React.memo(function MarkdownContent({ content }: MarkdownContentProps) {
   return (
-    <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={MARKDOWN_COMPONENTS}>
+    <ReactMarkdown
+      remarkPlugins={REMARK_PLUGINS}
+      components={MARKDOWN_COMPONENTS}
+      // Links are sanitized by default, images are not. Without this,
+      // `![x](javascript:alert(1))` becomes a clickable `javascript:` link
+      // because the `img` override above renders images as `<a href={src}>`.
+      transformImageUri={uriTransformer}
+    >
       {content}
     </ReactMarkdown>
   );
