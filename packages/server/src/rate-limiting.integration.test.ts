@@ -5,8 +5,15 @@ import {
   sendRunAgent,
 } from '../test/test-utils';
 import { UseAIServer } from './server';
+import type { UseAIServerConfig } from './types';
+import { AISDKAgent } from './agents/AISDKAgent';
+import { defineServerTool } from './tools';
+import { ErrorCode } from '@meetsmore-oss/use-ai-core';
 import {
   createServerConfig,
+  createMockModel,
+  createToolCallStreamChunks,
+  simulateReadableStream,
   TestCleanupManager,
 } from '../test/integration-test-utils';
 
@@ -284,5 +291,95 @@ describe('Rate Limiting', () => {
     wsSocket.disconnect();
     pollingSocket.disconnect();
     mixedServer.close();
+  });
+});
+
+describe('LLM call rate limiting', () => {
+  const loopToolName = 'loop_tool';
+
+  /** Creates an agent whose model always calls loop_tool, so each run uses every allowed step. */
+  function createToolLoopAgent(calls: { count: number }, maxSteps: number): AISDKAgent {
+    const model = createMockModel(async () => {
+      calls.count++;
+      const toolCallId = `tool-call-${calls.count}`;
+      return {
+        stream: simulateReadableStream({
+          chunks: createToolCallStreamChunks(toolCallId, loopToolName, '{}'),
+        }),
+        response: {
+          id: `response-${calls.count}`,
+          timestamp: new Date(),
+          modelId: 'mock-model',
+          headers: {},
+          messages: [
+            {
+              role: 'assistant',
+              content: [{ type: 'tool-call', toolCallId, toolName: loopToolName, input: {} }],
+            },
+          ],
+        },
+      };
+    });
+    return new AISDKAgent({ hooks: { loadConfig: () => ({ model, maxSteps }) } });
+  }
+
+  function createLoopServer(port: number, calls: { count: number }, extraConfig: Pick<UseAIServerConfig, 'rateLimitMaxRequests' | 'rateLimitWindowMs' | 'rateLimitMaxLlmCalls'>): UseAIServer {
+    const server = new UseAIServer({
+      port,
+      agents: { 'loop-agent': createToolLoopAgent(calls, 5) },
+      defaultAgent: 'loop-agent',
+      tools: {
+        [loopToolName]: defineServerTool('Loop tool', () => ({ ok: true })),
+      },
+      ...extraConfig,
+    });
+    cleanup.trackServer(server);
+    return server;
+  }
+
+  test('rateLimitMaxLlmCalls stops a run with RATE_LIMITED when the budget runs out mid-run', async () => {
+    const port = 9317;
+    const calls = { count: 0 };
+    const server = createLoopServer(port, calls, {
+      rateLimitMaxRequests: 10,
+      rateLimitMaxLlmCalls: 3,
+      rateLimitWindowMs: 60000,
+    });
+
+    const socket = await cleanup.createTestClient(port);
+    sendRunAgent(socket, { prompt: 'Loop forever', tools: [] });
+    const errorEvent = await waitForEventType(socket, EventType.RUN_ERROR);
+
+    expect((errorEvent as { message: string }).message).toBe(ErrorCode.RATE_LIMITED);
+    // maxSteps is 5 (6 calls with the summary step), but the budget allows only 3
+    expect(calls.count).toBe(3);
+
+    // The budget is per key and per window, so the next run cannot call the LLM
+    sendRunAgent(socket, { prompt: 'Loop again', tools: [] });
+    const secondError = await waitForEventType(socket, EventType.RUN_ERROR);
+    expect((secondError as { message: string }).message).toBe(ErrorCode.RATE_LIMITED);
+    expect(calls.count).toBe(3);
+
+    socket.disconnect();
+    server.close();
+  });
+
+  test('LLM calls are not limited when rateLimitMaxLlmCalls is not set', async () => {
+    const port = 9318;
+    const calls = { count: 0 };
+    const server = createLoopServer(port, calls, {
+      rateLimitMaxRequests: 10,
+      rateLimitWindowMs: 60000,
+    });
+
+    const socket = await cleanup.createTestClient(port);
+    sendRunAgent(socket, { prompt: 'Loop until maxSteps', tools: [] });
+    await waitForEventType(socket, EventType.RUN_FINISHED);
+
+    // 5 main iterations + 1 graceful summary call
+    expect(calls.count).toBe(6);
+
+    socket.disconnect();
+    server.close();
   });
 });

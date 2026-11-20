@@ -74,6 +74,22 @@ export interface AgentInput {
   systemPrompt?: string;
   /** The original RunAgentInput from AG-UI protocol (for emitting RUN_STARTED event) */
   originalInput: import('../types').RunAgentInput;
+  /**
+   * Optional budget for LLM calls. The server sets it when `rateLimitMaxLlmCalls` is above 0.
+   * An agent calls `consume()` once before each LLM call. If `consume()` returns
+   * `allowed: false`, the agent must not call the LLM and must end the run with RUN_ERROR.
+   */
+  llmCallLimit?: LlmCallLimit;
+}
+
+/**
+ * Budget for LLM calls, shared across runs for the same rate-limit key.
+ * One run can call the LLM many times (one call for each step), so this
+ * bounds LLM calls and not only runs.
+ */
+export interface LlmCallLimit {
+  /** Records one LLM call. Returns `allowed: false` when the budget is used up. */
+  consume(): { allowed: boolean; retryAfterMs?: number };
 }
 
 /**

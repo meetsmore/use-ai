@@ -55,6 +55,7 @@ bun run kill                   # Kill processes on ports 3000, 3002, 8081
 - `LOG_FORMAT` (optional): `pretty` (default) or `json`
 - `RATE_LIMIT_MAX_REQUESTS` (optional): Max requests per window (0 = unlimited)
 - `RATE_LIMIT_WINDOW_MS` (optional): Window in ms (default: 60000)
+- `RATE_LIMIT_MAX_LLM_CALLS` (optional): Max LLM calls per window (0 = unlimited). Each agent step is one LLM call, so one run can use up to `maxSteps + 1`. If the budget runs out mid-run, the run stops with `RUN_ERROR` (`RATE_LIMITED`). Same window and key as `RATE_LIMIT_MAX_REQUESTS`.
 - `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_BASE_URL` (optional): LLM observability
 
 ### WebSocket Protocol
@@ -235,7 +236,7 @@ Optional Langfuse integration tracks Claude API calls, token usage, tool calls, 
 
 ## Security
 
-- **Rate limiting**: Per-IP address (configured via env vars)
+- **Rate limiting**: Per-IP address (configured via env vars). `RATE_LIMIT_MAX_REQUESTS` counts runs. `RATE_LIMIT_MAX_LLM_CALLS` counts LLM calls (agent steps).
 - **Client-only scope**: AI can only see/manipulate what's on the page
 - **No backend API access**: V1 intentionally limits security risks
 - **destructiveHint**: Tools with `annotations: { destructiveHint: true }` require explicit user approval via UI before execution
