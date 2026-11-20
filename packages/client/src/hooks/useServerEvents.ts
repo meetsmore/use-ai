@@ -21,6 +21,7 @@ import type { UseAIStrings } from '../theme';
 import type { PersistedMessage, MessageDisplayMode } from '../providers/chatRepository/types';
 import { extractTurnMessages } from '../utils/messageConversion';
 import { getToolCallStatus } from '../utils/toolCalls';
+import { logger } from '../utils/logger';
 
 export interface UseServerEventsOptions {
   /** Tool system for executing tools and looking up tool metadata */
@@ -393,13 +394,13 @@ export function useServerEvents({
       // Skip tools not in our registry (likely workflow tools)
       const tool = ts.aggregatedToolsRef.current[name];
       if (!tool) {
-        console.log(`[ServerEvents] Tool "${name}" not found in useAI tools, skipping (likely a workflow tool)`);
+        logger.debug(`[ServerEvents] Tool "${name}" not found in useAI tools, skipping (likely a workflow tool)`);
         return;
       }
 
       // Defer execution if tool requires approval
       if (tool._options?.annotations?.destructiveHint === true) {
-        console.log(`[ServerEvents] Tool "${name}" requires approval, deferring execution`);
+        logger.debug(`[ServerEvents] Tool "${name}" requires approval, deferring execution`);
         ts.storePendingToolCall(toolCallId, name, input, toolCallData);
         return;
       }
