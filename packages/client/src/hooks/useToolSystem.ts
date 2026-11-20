@@ -87,6 +87,14 @@ export interface UseToolSystemReturn {
   approveAll: () => Promise<void>;
   /** Reject all pending tool calls with optional reason */
   rejectAll: (reason?: string) => void;
+  /**
+   * Called when a run ends, however it ends. Aborts the `ctx.signal` handed to
+   * the run's tool calls and starts a fresh one for the next run. Also drops
+   * the approvals still waiting for the user: a tool approved after its run
+   * ended would act with nobody left to receive its result, and a tool
+   * waiting in `ctx.requestApproval` gets `{ approved: false }`.
+   */
+  endRun: () => void;
 }
 
 /**
@@ -128,6 +136,25 @@ export function useToolSystem({
 
   /** Resolvers for runtime approval requests (from ctx.requestApproval) */
   const runtimeApprovalResolversRef = useRef<Map<string, (result: { approved: boolean; reason?: string }) => void>>(new Map());
+
+  /** One controller per run: every tool call of the run gets its signal as `ctx.signal`. */
+  const runAbortControllerRef = useRef(new AbortController());
+
+  const endRun = useCallback(() => {
+    runAbortControllerRef.current.abort();
+    runAbortControllerRef.current = new AbortController();
+
+    // The server waits for an approval without ending the run, so approvals
+    // are still pending here only when the run did not finish normally:
+    // stopped, failed, disconnected or the provider was torn down.
+    pendingApprovalToolCallsRef.current.clear();
+    const resolvers = [...runtimeApprovalResolversRef.current.values()];
+    runtimeApprovalResolversRef.current.clear();
+    for (const resolve of resolvers) {
+      resolve({ approved: false, reason: 'The run ended before the user answered' });
+    }
+    setPendingApprovals(prev => (prev.length > 0 ? [] : prev));
+  }, []);
 
   // ── Registry Methods ────────────────────────────────────────────────────
 
@@ -298,6 +325,7 @@ export function useToolSystem({
     name: string,
     input: unknown
   ) => {
+    const signal = runAbortControllerRef.current.signal;
     const client = clientRef.current;
     if (!client) {
       console.error('[useToolSystem] No client available for tool execution');
@@ -310,6 +338,8 @@ export function useToolSystem({
 
       // Build ToolExecutionContext with requestApproval for runtime approvals
       const ctx: ToolExecutionContext = {
+        toolCallId,
+        signal,
         requestApproval: ({ message, metadata }) => {
           return new Promise<{ approved: boolean; reason?: string }>((resolve) => {
             const approvalId = `${toolCallId}-runtime-${Date.now()}`;
@@ -331,6 +361,10 @@ export function useToolSystem({
 
       console.log('[useToolSystem] Executing tool...');
       const result = await executeDefinedTool(aggregatedToolsRef.current, name, input, ctx);
+      // The run ended while the tool worked (e.g. a question gave up waiting on
+      // `ctx.signal`). Nothing is left to receive the result, so skip waiting
+      // for the prompt to update as well.
+      if (signal.aborted) return;
 
       const isError = isErrorResult(result);
 
@@ -358,9 +392,12 @@ export function useToolSystem({
       const updatedState = buildState();
       console.log(`[useToolSystem] Updated state (aggregated from all hooks)`);
 
+      // The run may also have ended during the waits above.
+      if (signal.aborted) return;
       client.sendToolResponse(toolCallId, result, updatedState);
     } catch (err) {
       console.error('Tool execution error:', err);
+      if (signal.aborted) return;
       client.sendToolResponse(toolCallId, {
         error: err instanceof Error ? err.message : 'Unknown error',
       });
@@ -394,8 +431,12 @@ export function useToolSystem({
 
     const pendingTools = [...pendingApprovals];
     setPendingApprovals([]);
+    const runSignal = runAbortControllerRef.current.signal;
 
     for (const pending of pendingTools) {
+      // The run ended while an earlier approved tool ran: endRun dropped the
+      // rest, so approving them would answer a run that is over.
+      if (runSignal.aborted) break;
       // Check if this is a runtime client-side approval (from ctx.requestApproval)
       const runtimeResolver = runtimeApprovalResolversRef.current.get(pending.toolCallId);
       if (runtimeResolver) {
@@ -454,5 +495,6 @@ export function useToolSystem({
     storePendingToolCall,
     approveAll,
     rejectAll,
+    endRun,
   };
 }

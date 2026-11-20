@@ -5,6 +5,8 @@ import type { ToolExecutionContext } from './defineTool';
 
 /** No-op context for tests that don't use requestApproval */
 const noopCtx: ToolExecutionContext = {
+  toolCallId: 'test-call',
+  signal: new AbortController().signal,
   requestApproval: async () => ({ approved: true }),
 };
 
@@ -316,6 +318,7 @@ describe('ToolExecutionContext with requestApproval', () => {
 
   test('tool can call requestApproval and receive approved result', async () => {
     const approveCtx: ToolExecutionContext = {
+      ...noopCtx,
       requestApproval: async () => ({ approved: true }),
     };
 
@@ -336,6 +339,7 @@ describe('ToolExecutionContext with requestApproval', () => {
 
   test('tool can call requestApproval and receive rejected result', async () => {
     const rejectCtx: ToolExecutionContext = {
+      ...noopCtx,
       requestApproval: async () => ({ approved: false, reason: 'Too risky' }),
     };
 
@@ -358,6 +362,7 @@ describe('ToolExecutionContext with requestApproval', () => {
     let capturedInput: { message: string; metadata?: Record<string, unknown> } | undefined;
 
     const ctx: ToolExecutionContext = {
+      ...noopCtx,
       requestApproval: async (input) => {
         capturedInput = input;
         return { approved: true };

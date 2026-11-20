@@ -419,10 +419,17 @@ export function useServerEvents({
     } else if (event.type === EventType.RUN_FINISHED) {
       // client.ts handleEvent already called finalizeRun({ aborted: false })
       // for RUN_FINISHED; this branch only persists the resulting state.
+      // Every way a run ends aborts the tools' signal first, before any await:
+      // a tool still working for the run (a question waiting for the user's
+      // answer) has nobody left to answer.
+      ts.endRun();
       const finishedEvent = event as RunFinishedEvent;
       await persistFinalResponse(client, { aborted: false, traceId: finishedEvent.runId });
       resetRunUiState();
     } else if (event.type === EventType.RUN_ERROR) {
+      // Abort before recording the aborted results and saving, so a tool that
+      // finishes meanwhile does not send a second result.
+      ts.endRun();
       const errorEvent = event as RunErrorEvent;
       const errorCode = errorEvent.message as ErrorCode;
 
@@ -450,6 +457,7 @@ export function useServerEvents({
     const strs = stringsRef.current;
     const message = strs.errors[ErrorCode.CONNECTION_LOST] || strs.errors[ErrorCode.UNKNOWN_ERROR];
 
+    toolSystemRef.current.endRun();
     saveAIResponseRef.current(message, 'error');
     resetRunUiState();
   }, [resetRunUiState]);

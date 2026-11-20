@@ -13,6 +13,9 @@ import { v4 as uuidv4 } from 'uuid';
 // Re-export WorkflowStatus for convenience
 export type { WorkflowStatus } from '@meetsmore-oss/use-ai-core';
 
+/** A workflow has no stop, so the signal its tools get never aborts. */
+const NEVER_ABORTED_SIGNAL = new AbortController().signal;
+
 /**
  * Progress update from a workflow execution.
  */
@@ -188,8 +191,10 @@ export function useAIWorkflow(runner: string, workflowId: string): UseAIWorkflow
 
         try {
           // Execute the tool
-          // Workflows are headless — no UI for runtime approval, so provide a no-op context
+          // Workflows are headless — no UI for runtime approval, so provide a no-op context.
           const noopCtx = {
+            toolCallId,
+            signal: NEVER_ABORTED_SIGNAL,
             requestApproval: async () => ({ approved: true }),
           };
           const result = await executeDefinedTool(currentWorkflow.tools, toolName, toolArgs, noopCtx);
