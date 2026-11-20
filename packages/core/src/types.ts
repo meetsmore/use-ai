@@ -381,22 +381,11 @@ export type McpHeadersMap = Record<string, McpHeadersConfig>;
  * Includes AG-UI protocol messages ('run_agent', 'tool_result', 'abort_run')
  * plus use-ai-specific extensions ('message_feedback', 'tool_approval_response').
  *
- * `type` also accepts any other string. A server plugin can register a handler
- * for its own message type with `registerMessageHandler`, and a client can send
- * that message type.
- *
  * Note: This extends beyond AG-UI protocol.
  * For AG-UI compliance, use ClientMessage instead.
  */
 export interface UseAIClientMessage {
-  type:
-    | 'run_agent'
-    | 'tool_result'
-    | 'abort_run'
-    | 'message_feedback'
-    | 'tool_approval_response'
-    // Custom plugin message types. `string & {}` keeps editor completion for the names above.
-    | (string & {});
+  type: 'run_agent' | 'tool_result' | 'abort_run' | 'message_feedback' | 'tool_approval_response';
   data: unknown;
 }
 

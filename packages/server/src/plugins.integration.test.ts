@@ -1,6 +1,5 @@
 import { describe, expect, test, afterAll } from 'bun:test';
-import type { UseAIServerPlugin, BeforeRunAgentResult, MessageHandler } from './plugins/types';
-import type { UseAIClientMessage } from './types';
+import type { UseAIServerPlugin, BeforeRunAgentResult } from './plugins/types';
 import type { ClientSession, AgentInput } from './agents/types';
 import { EventType } from './types';
 import { UseAIServer } from './server';
@@ -82,46 +81,6 @@ describe('Plugin Architecture', () => {
     await new Promise(resolve => setTimeout(resolve, 100));
 
     expect(customMessageReceived).toBe(true);
-
-    socket.disconnect();
-    pluginServer.close();
-  });
-
-  test('Plugins can handle their own message types, including run_workflow', async () => {
-    const runWorkflowPort = 9018;
-    const received: UseAIClientMessage[] = [];
-
-    class CustomWorkflowPlugin implements UseAIServerPlugin {
-      getName(): string {
-        return 'custom-workflow';
-      }
-
-      registerHandlers(server: { registerMessageHandler(type: string, handler: MessageHandler): void }): void {
-        server.registerMessageHandler('run_workflow', async (_session, message) => {
-          if (message.type === 'run_workflow') {
-            received.push(message);
-          }
-        });
-      }
-    }
-
-    const pluginServer = new UseAIServer({
-      port: runWorkflowPort,
-      agents: { test: createTestAgent() },
-      defaultAgent: 'test',
-      plugins: [new CustomWorkflowPlugin()],
-    });
-    cleanup.trackServer(pluginServer);
-
-    const socket = await cleanup.createTestClient(runWorkflowPort);
-
-    // A client sends the custom message type as a typed UseAIClientMessage.
-    const message: UseAIClientMessage = { type: 'run_workflow', data: { workflowId: 'my-workflow' } };
-    socket.emit('message', message);
-
-    await new Promise(resolve => setTimeout(resolve, 100));
-
-    expect(received).toEqual([message]);
 
     socket.disconnect();
     pluginServer.close();
