@@ -1124,6 +1124,7 @@ ANTHROPIC_API_KEY=sk-ant-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 # LOG_SILENT=true                                     # Disable all logging
 # DEBUG=1                                             # Enable debug logging
 # MAX_HTTP_BUFFER_SIZE=10485760                       # Max payload size in bytes
+# ALLOWED_ORIGINS=https://app.example.com             # Comma-separated. Refuse connections from other origins
 
 # Rate Limiting (optional)
 # RATE_LIMIT_MAX_REQUESTS=0
@@ -1154,6 +1155,7 @@ const server = new UseAIServer({
   },
   defaultAgent: 'claude',
   transport: 'socketio',  // or 'websocket', see 'Transports'
+  allowedOrigins: ['https://app.example.com'], // optional, see 'Origin check'
   rateLimitMaxRequests: 1_000,
   rateLimitWindowMs: 60_000,
   plugins: [              // see 'Plugins'
@@ -1167,6 +1169,19 @@ const server = new UseAIServer({
   }],
 });
 ```
+
+#### Origin check
+
+By default, the server does not check the `Origin` header. CORS does not apply to WebSocket upgrades, so any site can open a connection from its users' browsers.
+
+To refuse connections from other sites, set `allowedOrigins` on `UseAIServer`, or `ALLOWED_ORIGINS` (comma-separated) on the Docker image. The check applies to both transports:
+
+- With `transport: 'socketio'`, the server refuses the handshake (polling or WebSocket) with HTTP 403.
+- With `transport: 'websocket'`, the server refuses the upgrade at `/` with HTTP 403.
+
+Each entry must match the `Origin` header exactly: scheme, host and port, with no trailing slash, for example `https://app.example.com`. The server also refuses a request that has no `Origin` header. Browsers always send this header on a WebSocket upgrade and on a cross-origin request.
+
+A non-browser client can send any `Origin` header. The origin check stops other sites in a browser, but it does not replace authentication. Use an auth plugin as well.
 
 ### External MCPs
 

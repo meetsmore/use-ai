@@ -3,6 +3,7 @@ import type { Server as SocketIOServer } from 'socket.io';
 import { WebSocketServer } from 'ws';
 import type { RuntimeAdapter, RuntimeListener, RuntimeServerConfig, RuntimeServerHandle, WebSocketListener } from '../types';
 import { forwardedClientIp } from '../clientIp';
+import { isOriginAllowed } from '../origin';
 import { NodeRawWebSocket } from './rawWebSocket';
 
 /**
@@ -58,6 +59,10 @@ export class NodeRuntimeAdapter implements RuntimeAdapter {
         methods: config.cors.methods ?? ['GET', 'POST'],
         credentials: config.cors.credentials,
       } : undefined,
+      // Runs on each handshake, polling or WebSocket. Later requests belong to an accepted session.
+      allowRequest: config.allowedOrigins
+        ? (req, callback) => callback(null, isOriginAllowed(req.headers.origin, config.allowedOrigins))
+        : undefined,
     });
 
     // Capture client IP for polling connections
@@ -84,6 +89,10 @@ export class NodeRuntimeAdapter implements RuntimeAdapter {
       const url = new URL(req.url || '/', `http://localhost:${config.port}`);
       if (url.pathname !== '/') {
         socket.destroy();
+        return;
+      }
+      if (!isOriginAllowed(req.headers.origin, config.allowedOrigins)) {
+        socket.end('HTTP/1.1 403 Forbidden\r\nConnection: close\r\nContent-Length: 0\r\n\r\n');
         return;
       }
       wss.handleUpgrade(req, socket, head, (ws) => {

@@ -22,6 +22,10 @@ const maxHttpBufferSize = process.env.MAX_HTTP_BUFFER_SIZE
   : undefined;
 // CORS origin for Socket.IO (e.g., '*' for local dev, 'https://example.com' for production)
 const corsOrigin = process.env.CORS_ORIGIN;
+// Comma-separated origins that may connect (e.g., 'https://app.example.com'). Unset: no Origin check.
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim()).filter(origin => origin.length > 0)
+  : undefined;
 // Runtime adapter: 'auto' (default), 'bun', or 'node'
 const runtime = (process.env.RUNTIME as 'auto' | 'bun' | 'node') || 'auto';
 const transport = (process.env.TRANSPORT as 'socketio' | 'websocket') || 'socketio';
@@ -389,6 +393,7 @@ logger.info('Starting UseAI server', { logFormat });
             credentials: true,
           }
         : undefined,
+      allowedOrigins,
       runtime,
       transport,
     });

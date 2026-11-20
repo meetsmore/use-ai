@@ -49,6 +49,11 @@ export interface RuntimeServerConfig {
   /** CORS configuration options */
   cors?: CorsOptions;
   /**
+   * When set, connections whose Origin header is not in this list are refused.
+   * When undefined, the Origin header is not checked.
+   */
+  allowedOrigins?: readonly string[];
+  /**
    * Idle timeout in seconds.
    * Only used by Bun runtime (ignored by Node.js).
    * @default 30

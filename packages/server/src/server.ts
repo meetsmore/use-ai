@@ -101,11 +101,12 @@ export class UseAIServer {
   private clients: Map<string, ClientSession> = new Map();
   // Sent to every client on connect; constant after construction.
   private agentsPayload: { agents: Array<{ id: string; name: string; annotation?: string }>; defaultAgent: string };
-  private config: Required<Omit<UseAIServerConfig, 'defaultAgent' | 'agents' | 'plugins' | 'tools' | 'mcpEndpoints' | 'maxHttpBufferSize' | 'cors' | 'idleTimeout' | 'runtime' | 'spanProcessors' | 'resolveAttachments' | 'transport'>> & {
+  private config: Required<Omit<UseAIServerConfig, 'defaultAgent' | 'agents' | 'plugins' | 'tools' | 'mcpEndpoints' | 'maxHttpBufferSize' | 'cors' | 'idleTimeout' | 'runtime' | 'spanProcessors' | 'resolveAttachments' | 'transport' | 'allowedOrigins'>> & {
     maxHttpBufferSize: number;
     cors?: CorsOptions;
     idleTimeout: number;
     transport: 'socketio' | 'websocket';
+    allowedOrigins?: readonly string[];
   };
   private rateLimiter: RateLimiter;
   private cleanupInterval: NodeJS.Timeout;
@@ -138,6 +139,7 @@ export class UseAIServer {
       cors: config.cors,
       idleTimeout: config.idleTimeout ?? 30,
       transport: config.transport ?? 'socketio',
+      allowedOrigins: config.allowedOrigins ? [...config.allowedOrigins] : undefined,
     };
 
     // Set agents registry
@@ -237,6 +239,7 @@ export class UseAIServer {
       port: this.config.port,
       idleTimeout: this.config.idleTimeout,
       cors: this.config.cors,
+      allowedOrigins: this.config.allowedOrigins,
       maxHttpBufferSize: this.config.maxHttpBufferSize,
       onPollingConnection: (sessionId, ip) => {
         this.clientIpTracker.trackPollingConnection(sessionId, ip);
