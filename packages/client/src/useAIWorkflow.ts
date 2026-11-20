@@ -9,6 +9,7 @@ import type { AGUIEvent, RunErrorEvent, TextMessageContentEvent, ToolCallEndEven
 import { EventType } from '@meetsmore-oss/use-ai-core';
 import type { RunWorkflowMessage } from '@meetsmore-oss/use-ai-core';
 import { v4 as uuidv4 } from 'uuid';
+import { logger } from './utils/logger';
 
 // Re-export WorkflowStatus for convenience
 export type { WorkflowStatus } from '@meetsmore-oss/use-ai-core';
@@ -186,8 +187,8 @@ export function useAIWorkflow(runner: string, workflowId: string): UseAIWorkflow
         const toolName = toolCallData.name;
         const toolArgs = JSON.parse(toolCallData.args);
 
-        console.log(`[useAIWorkflow] Executing tool: ${toolName}`, toolArgs);
-        console.log(`[useAIWorkflow] Available tools:`, Object.keys(currentWorkflow.tools));
+        logger.debug(`[useAIWorkflow] Executing tool: ${toolName}`, toolArgs);
+        logger.debug(`[useAIWorkflow] Available tools:`, Object.keys(currentWorkflow.tools));
 
         try {
           // Execute the tool
@@ -330,7 +331,7 @@ export function useAIWorkflow(runner: string, workflowId: string): UseAIWorkflow
       },
     };
 
-    console.log('[useAIWorkflow] Sending run_workflow message:', message);
+    logger.debug('[useAIWorkflow] Sending run_workflow message:', message);
 
     // Send via socket
     client.send(message);

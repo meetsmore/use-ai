@@ -2,6 +2,7 @@ import { io, Socket } from 'socket.io-client';
 import { EventType, type CustomEvent } from '@meetsmore-oss/use-ai-core';
 import type { AGUIEvent, UseAIClientMessage } from '../types';
 import type { UseAITransport } from './types';
+import { logger } from '../utils/logger';
 
 // Reconnect indefinitely so clients recover after extended outages (mobile
 // app backgrounded long enough for server pingTimeout, airplane mode, etc.).
@@ -49,12 +50,12 @@ export class SocketIOTransport implements UseAITransport {
     this.socket = socket;
 
     socket.on('connect', () => {
-      console.log('[UseAI] Transport:', socket.io?.engine?.transport?.name);
+      logger.debug('[UseAI] Transport:', socket.io?.engine?.transport?.name);
 
       const engine = socket.io?.engine;
       if (engine) {
         engine.on('upgrade', (transport: { name: string }) => {
-          console.log('[UseAI] Upgraded to transport:', transport.name);
+          logger.debug('[UseAI] Upgraded to transport:', transport.name);
         });
 
         engine.on('upgradeError', (err: { message: string }) => {

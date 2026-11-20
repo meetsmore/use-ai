@@ -25,6 +25,7 @@ import type {
 import { SocketIOTransport } from './transport/SocketIOTransport';
 import type { UseAITransport } from './transport/types';
 import { v4 as uuidv4 } from 'uuid';
+import { logger } from './utils/logger';
 
 /**
  * Handler for AG-UI events from the server.
@@ -155,12 +156,12 @@ export class UseAIClient {
   connect(): void {
     this.transportUnsubscribes.push(
       this.transport.onConnectionChange((connected, reason) => {
-        console.log(connected ? '[UseAI] Connected to server' : '[UseAI] Disconnected:', reason ?? '');
+        logger.debug(connected ? '[UseAI] Connected to server' : '[UseAI] Disconnected:', reason ?? '');
         this.connectionStateHandlers.forEach(handler => handler(connected));
       }),
       this.transport.onEvent((event) => {
         try {
-          console.log('[Client] Received event:', event.type);
+          logger.debug('[Client] Received event:', event.type);
           this.handleEvent(event);
         } catch (error) {
           console.error('[UseAI] Error handling event:', error);
@@ -178,7 +179,7 @@ export class UseAIClient {
   private handleCustomEvent(event: CustomEvent): boolean {
     if (event.name === 'agents') {
       const { agents, defaultAgent } = event.value as { agents: AgentInfo[]; defaultAgent: string };
-      console.log('[Client] Received available agents:', event.value);
+      logger.debug('[Client] Received available agents:', event.value);
       this._availableAgents = agents;
       this._defaultAgent = defaultAgent;
       this.agentsChangeHandlers.forEach(handler => handler(agents, defaultAgent));
@@ -186,7 +187,7 @@ export class UseAIClient {
     }
     if (event.name === 'config') {
       const { langfuseEnabled } = event.value as { langfuseEnabled?: boolean };
-      console.log('[Client] Received server config:', event.value);
+      logger.debug('[Client] Received server config:', event.value);
       this._langfuseEnabled = langfuseEnabled ?? false;
       this.langfuseConfigHandlers.forEach(handler => handler(this._langfuseEnabled));
       return true;
@@ -756,7 +757,9 @@ export class UseAIClient {
             handler(e.toolCallId, toolCall.name, args);
             this.currentToolCalls.delete(e.toolCallId);
           } catch (error) {
-            console.error('Error parsing tool call args:', error);
+            // A JSON parse error message can quote the arguments, so it is a debug log only.
+            console.error(`[UseAI] Failed to parse arguments for tool call ${e.toolCallId}`);
+            logger.debug('[UseAI] Tool call argument parse error:', error);
           }
         }
       }
@@ -855,7 +858,7 @@ export class UseAIClient {
    */
   setAgent(agentId: string | null) {
     this._selectedAgent = agentId;
-    console.log('[Client] Agent set to:', agentId ?? 'server default');
+    logger.debug('[Client] Agent set to:', agentId ?? 'server default');
   }
 
   /**
@@ -902,7 +905,7 @@ export class UseAIClient {
    */
   setThreadId(threadId: string) {
     if (this._threadId !== threadId) {
-      console.log('[Client] ThreadId changed, clearing conversation state', {
+      logger.debug('[Client] ThreadId changed, clearing conversation state', {
         oldThreadId: this._threadId,
         newThreadId: threadId,
       });
