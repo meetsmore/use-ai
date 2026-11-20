@@ -13,7 +13,7 @@ ReactDOM.render(
     systemPrompt="You are a helpful AI assistant for a demo application. Be concise and friendly in your responses."
     forwardedPropsProvider={() => ({
       mcpHeaders: {
-        'http://localhost:3002': {
+        'http://localhost:3002/mcp': {
           headers: { 'X-API-Key': 'secret-api-key-123' },
         },
       },
