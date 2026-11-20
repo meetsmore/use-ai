@@ -1,0 +1,21 @@
+packages/client/src/components/MarkdownContent.tsx
+  s_618ff88bf231df::t_6580b6f3043774 2,260-267
+packages/client/src/components/MarkdownContent.test.tsx
+  s_618ff88bf231df::t_6580b6f3043774 86-98
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "486e2db4c7265c91f97165fa72b477b5cfefe46a",
+  "prompts": {},
+  "sessions": {
+    "s_618ff88bf231df": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b62c391f-8f1d-4133-ad11-2ed214c46506",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "yuma.ito <yuma.ito@meetsmore.com>"
+    }
+  }
+}
