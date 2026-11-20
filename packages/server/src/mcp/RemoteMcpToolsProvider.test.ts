@@ -7,25 +7,23 @@ describe('RemoteMcpToolsProvider', () => {
 
   beforeEach(() => {
     mockFetch = mock(() =>
-      Promise.resolve({
-        ok: true,
-        json: () =>
-          Promise.resolve({
-            result: {
-              tools: [
-                {
-                  name: 'test-tool',
-                  description: 'A test tool',
-                  inputSchema: {
-                    type: 'object',
-                    properties: { input: { type: 'string' } },
-                    required: ['input'],
-                  },
+      Promise.resolve(
+        Response.json({
+          result: {
+            tools: [
+              {
+                name: 'test-tool',
+                description: 'A test tool',
+                inputSchema: {
+                  type: 'object',
+                  properties: { input: { type: 'string' } },
+                  required: ['input'],
                 },
-              ],
-            },
-          }),
-      } as Response)
+              },
+            ],
+          },
+        })
+      )
     );
     globalThis.fetch = mockFetch as unknown as typeof fetch;
   });
@@ -125,11 +123,7 @@ describe('RemoteMcpToolsProvider', () => {
 
     test('throws on HTTP error', async () => {
       mockFetch.mockImplementation(() =>
-        Promise.resolve({
-          ok: false,
-          status: 500,
-          statusText: 'Internal Server Error',
-        } as Response)
+        Promise.resolve(new Response(null, { status: 500, statusText: 'Internal Server Error' }))
       );
 
       const provider = new RemoteMcpToolsProvider({
@@ -143,13 +137,7 @@ describe('RemoteMcpToolsProvider', () => {
 
     test('throws on MCP error response', async () => {
       mockFetch.mockImplementation(() =>
-        Promise.resolve({
-          ok: true,
-          json: () =>
-            Promise.resolve({
-              error: { message: 'Tool listing failed' },
-            }),
-        } as Response)
+        Promise.resolve(Response.json({ error: { message: 'Tool listing failed' } }))
       );
 
       const provider = new RemoteMcpToolsProvider({

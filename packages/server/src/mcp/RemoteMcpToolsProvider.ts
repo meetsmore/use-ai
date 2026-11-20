@@ -52,6 +52,8 @@ export interface RemoteToolDefinition extends ToolDefinition {
 export class RemoteMcpToolsProvider {
   private readonly url: string;
   private readonly config: McpEndpointConfig;
+  /** `x-mcp-header` parameters of each listed tool, by original tool name. */
+  private readonly paramHeaders = new Map<string, McpParamHeader[]>();
 
   constructor(config: McpEndpointConfig) {
     this.config = config;
@@ -95,24 +97,9 @@ export class RemoteMcpToolsProvider {
     const timeoutId = setTimeout(() => controller.abort(), timeout);
 
     try {
-      const response = await fetch(this.url, {
-        method: 'POST',
-        headers: mergedHeaders,
-        body: JSON.stringify({
-          jsonrpc: '2.0',
-          method: 'tools/list',
-          id: Date.now(),
-        }),
-        signal: controller.signal,
-      });
+      const rpcResponse = await this.post('tools/list', {}, mergedHeaders, controller.signal);
 
       clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const rpcResponse = (await response.json()) as Record<string, unknown>;
 
       if (rpcResponse.error) {
         const error = rpcResponse.error as { message?: string };
@@ -141,7 +128,19 @@ export class RemoteMcpToolsProvider {
    * Converts MCP tool schemas to RemoteToolDefinition format.
    */
   private convertToToolDefinitions(schema: McpSchemaResponse): RemoteToolDefinition[] {
-    return schema.tools.map((tool) => {
+    const tools = this.config.protocolVersion
+      ? schema.tools.filter((tool) => {
+          const paramHeaders = readMcpParamHeaders(tool.inputSchema);
+          if (typeof paramHeaders === 'string') {
+            logger.warn(`[MCP] Excluding tool "${tool.name}" from ${this.url}: ${paramHeaders}`);
+            return false;
+          }
+          this.paramHeaders.set(tool.name, paramHeaders);
+          return true;
+        })
+      : schema.tools;
+
+    return tools.map((tool) => {
       // Apply namespace prefix if configured
       const name = this.config.namespace ? `${this.config.namespace}_${tool.name}` : tool.name;
 
@@ -229,28 +228,14 @@ export class RemoteMcpToolsProvider {
     }
 
     try {
-      const response = await fetch(this.url, {
-        method: 'POST',
-        headers,  // Use merged headers
-        body: JSON.stringify({
-          jsonrpc: '2.0',
-          method: 'tools/call',
-          params: {
-            name: toolName,
-            arguments: args,
-          },
-          id: Date.now(),
-        }),
-        signal: controller.signal,
-      });
+      const rpcResponse = (await this.post(
+        'tools/call',
+        { name: toolName, arguments: args },
+        headers,
+        controller.signal
+      )) as any;
 
       clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const rpcResponse = (await response.json()) as any;
 
       if (rpcResponse.error) {
         throw new Error(`MCP error: ${rpcResponse.error.message}`);
@@ -290,6 +275,80 @@ export class RemoteMcpToolsProvider {
   }
 
   /**
+   * Sends one JSON-RPC request over Streamable HTTP and returns the JSON-RPC response.
+   * With `protocolVersion` configured, adds the `MCP-Protocol-Version`, `Mcp-Method` and
+   * `Mcp-Name` headers and the required `io.modelcontextprotocol/*` fields in `params._meta`.
+   * Reads either an `application/json` body or a `text/event-stream` body.
+   * @see https://modelcontextprotocol.io/specification/2026-07-28/basic/transports/streamable-http
+   */
+  private async post(
+    method: string,
+    params: Record<string, unknown>,
+    headers: Record<string, string>,
+    signal: AbortSignal
+  ): Promise<Record<string, unknown>> {
+    const id = Date.now();
+    const version = this.config.protocolVersion;
+    const requestHeaders = { ...headers };
+    let requestParams: Record<string, unknown> | undefined =
+      Object.keys(params).length > 0 ? params : undefined;
+
+    if (version) {
+      requestHeaders['MCP-Protocol-Version'] = version;
+      requestHeaders['Mcp-Method'] = method;
+      if (typeof params.name === 'string') {
+        requestHeaders['Mcp-Name'] = encodeMcpHeaderValue(params.name);
+      }
+      if (method === 'tools/call' && typeof params.name === 'string') {
+        for (const { header, path } of this.paramHeaders.get(params.name) ?? []) {
+          let value: unknown = params.arguments;
+          for (const key of path) {
+            value = value !== null && typeof value === 'object' ? (value as Record<string, unknown>)[key] : undefined;
+          }
+          if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+            requestHeaders[`Mcp-Param-${header}`] = encodeMcpHeaderValue(String(value));
+          }
+        }
+      }
+      requestParams = {
+        ...params,
+        _meta: {
+          'io.modelcontextprotocol/protocolVersion': version,
+          'io.modelcontextprotocol/clientCapabilities': {},
+        },
+      };
+    }
+
+    const finished = new AbortController();
+    const response = await fetch(this.url, {
+      method: 'POST',
+      headers: requestHeaders,
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        method,
+        ...(requestParams ? { params: requestParams } : {}),
+        id,
+      }),
+      signal: AbortSignal.any([signal, finished.signal]),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const contentType = response.headers.get('content-type')?.toLowerCase() ?? '';
+    if (contentType.includes('text/event-stream')) {
+      try {
+        return await readSseResponse(response.body, id);
+      } finally {
+        // Closes the connection when the server keeps the stream open after the response.
+        finished.abort();
+      }
+    }
+    return (await response.json()) as Record<string, unknown>;
+  }
+
+  /**
    * Cleans up resources.
    * Should be called when the server shuts down.
    */
@@ -315,4 +374,134 @@ export class RemoteMcpToolsProvider {
       .map(([key, value]) => `${key}: ${isDebug ? value : '*'.repeat(value.length)}`)
       .join(', ');
   }
+}
+
+interface McpParamHeader {
+  /** Name portion of the `Mcp-Param-{name}` header */
+  header: string;
+  /** Chain of `properties` keys from the schema root to the annotated property */
+  path: string[];
+}
+
+const HTTP_TOKEN = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
+const HEADER_TYPES = new Set(['string', 'integer', 'boolean']);
+
+/**
+ * Collects the `x-mcp-header` annotations of a tool input schema.
+ * Returns the reason when an annotation breaks a constraint of the spec: not an HTTP token,
+ * not case-insensitively unique, not on a string, integer or boolean property, or not
+ * statically reachable from the root through `properties` keys only.
+ * @see https://modelcontextprotocol.io/specification/2026-07-28/server/tools#x-mcp-header
+ */
+function readMcpParamHeaders(schema: unknown): McpParamHeader[] | string {
+  const found: McpParamHeader[] = [];
+  const seen = new Set<string>();
+  let reachable = 0;
+
+  const visitProperties = (node: unknown, path: string[]): string | undefined => {
+    const properties = (node as { properties?: unknown } | null)?.properties;
+    if (properties === null || typeof properties !== 'object') return undefined;
+    for (const [key, property] of Object.entries(properties)) {
+      if (property === null || typeof property !== 'object') continue;
+      if ('x-mcp-header' in property) {
+        reachable++;
+        const header = (property as Record<string, unknown>)['x-mcp-header'];
+        const type = (property as Record<string, unknown>).type;
+        if (typeof header !== 'string' || !HTTP_TOKEN.test(header)) {
+          return `x-mcp-header ${JSON.stringify(header)} is not an HTTP header token`;
+        }
+        if (seen.has(header.toLowerCase())) return `x-mcp-header "${header}" is not unique`;
+        if (typeof type !== 'string' || !HEADER_TYPES.has(type)) {
+          return `x-mcp-header "${header}" is on a property of type ${JSON.stringify(type)}`;
+        }
+        seen.add(header.toLowerCase());
+        found.push({ header, path: [...path, key] });
+      }
+      const error = visitProperties(property, [...path, key]);
+      if (error) return error;
+    }
+    return undefined;
+  };
+
+  const countAll = (node: unknown, isPropertiesMap = false): number => {
+    if (node === null || typeof node !== 'object') return 0;
+    let count = 0;
+    for (const [key, value] of Object.entries(node)) {
+      if (key === 'x-mcp-header' && !isPropertiesMap && !Array.isArray(node)) count++;
+      count += countAll(value, key === 'properties' && !isPropertiesMap && !Array.isArray(node));
+    }
+    return count;
+  };
+
+  const error = visitProperties(schema, []);
+  if (error) return error;
+  if (countAll(schema) > reachable) return 'x-mcp-header is on a property that is not statically reachable';
+  return found;
+}
+
+/**
+ * Encodes a value for the `Mcp-Name` or `Mcp-Param-*` header: plain when it is printable ASCII without
+ * leading or trailing whitespace and does not look like the sentinel, otherwise
+ * `=?base64?{UTF-8 bytes in Base64}?=`.
+ * @see https://modelcontextprotocol.io/specification/2026-07-28/basic/transports/streamable-http#value-encoding
+ */
+function encodeMcpHeaderValue(value: string): string {
+  const plain =
+    /^[\x20-\x7E\t]*$/.test(value) &&
+    value === value.trim() &&
+    !(value.startsWith('=?base64?') && value.endsWith('?='));
+  return plain ? value : `=?base64?${Buffer.from(value, 'utf8').toString('base64')}?=`;
+}
+
+/**
+ * Reads a `text/event-stream` body until the JSON-RPC response with the given id arrives.
+ * Events with empty data (such as priming events), comment lines and notifications are skipped.
+ * Unlike the event-stream spec, an unterminated last event at the end of the stream is still read.
+ * @see https://html.spec.whatwg.org/multipage/server-sent-events.html#event-stream-interpretation
+ */
+async function readSseResponse(
+  body: ReadableStream<Uint8Array> | null,
+  id: number
+): Promise<Record<string, unknown>> {
+  let data: string[] = [];
+
+  const readLine = (line: string): Record<string, unknown> | undefined => {
+    if (line === '') {
+      const text = data.join('\n');
+      data = [];
+      if (text === '') return undefined;
+      const message = JSON.parse(text) as Record<string, unknown>;
+      return message.id === id && ('result' in message || 'error' in message) ? message : undefined;
+    }
+    if (line === 'data' || line.startsWith('data:')) {
+      const value = line.slice(5);
+      data.push(value.startsWith(' ') ? value.slice(1) : value);
+    }
+    return undefined;
+  };
+
+  if (body) {
+    const reader = body.pipeThrough(new TextDecoderStream()).getReader();
+    let buffer = '';
+    let afterCr = false;
+    for (;;) {
+      const { value, done } = await reader.read();
+      let chunk = done ? '\n\n' : value;
+      // An LF right after a CR that ended the previous chunk is the second half of a CRLF.
+      if (afterCr && chunk.startsWith('\n')) chunk = chunk.slice(1);
+      afterCr = chunk.endsWith('\r');
+      if (chunk === '') continue;
+      buffer += chunk;
+      if (!/[\r\n]/.test(chunk)) continue;
+      const lines = buffer.split(/\r\n|\r|\n/);
+      buffer = lines.pop()!;
+      for (const line of lines) {
+        const message = readLine(line);
+        if (message) return message;
+      }
+      if (done) break;
+    }
+  }
+
+  throw new Error('SSE stream ended without a JSON-RPC response');
 }
