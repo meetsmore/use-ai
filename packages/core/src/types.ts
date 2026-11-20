@@ -356,6 +356,9 @@ export interface UseAIForwardedProps {
  * - Constant strings: `'https://api.example.com'` - Exact match
  * - Glob patterns: `'https://*.meetsmore.com'` - Wildcard matching using picomatch
  *
+ * The server forwards only the header names allowed by the endpoint's
+ * `allowedClientHeaders` (default: `Authorization`) and drops the others.
+ *
  * @example
  * ```typescript
  * {

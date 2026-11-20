@@ -504,9 +504,6 @@ export class UseAIServer {
     // Create AbortController for this run (used to cancel pending tool calls/approvals on disconnect)
     session.abortController = new AbortController();
 
-    // Store MCP headers for this request (will be cleared after run completes)
-    session.currentMcpHeaders = mcpHeaders;
-
     // Merge client tools with MCP tools from all endpoints
     const clientTools = tools.map(t => ({
       ...t,
@@ -849,6 +846,7 @@ export class UseAIServer {
       state,
       systemPrompt,
       originalInput: message.data,
+      mcpHeaders,
     };
 
     // Run beforeRunAgent hooks from all plugins
@@ -867,12 +865,7 @@ export class UseAIServer {
     }
 
     // Delegate to selected agent
-    try {
-      await selectedAgent.run(agentInput, eventEmitter);
-    } finally {
-      // Clear MCP headers after run completes (success or failure)
-      delete session.currentMcpHeaders;
-    }
+    await selectedAgent.run(agentInput, eventEmitter);
   }
 
   private buildSystemPrompt(session: ClientSession, state: unknown): string | undefined {
