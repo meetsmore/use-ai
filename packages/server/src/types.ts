@@ -128,6 +128,20 @@ export interface UseAIServerConfig<TAgents extends Record<string, import('./agen
    */
   cors?: CorsOptions;
   /**
+   * Origins that may open a connection, for both transports.
+   * When set, the server refuses a Socket.IO handshake or a WebSocket upgrade whose
+   * Origin header is not in this list. It also refuses a request without an Origin header.
+   * Each entry must match the Origin header exactly, for example `'https://app.example.com'`
+   * (scheme, host and port, with no trailing slash).
+   *
+   * Browsers always send the Origin header on these requests, so this check stops other
+   * sites from opening a connection from their users' browsers. A non-browser client can
+   * send any Origin header, so use an auth plugin as well.
+   *
+   * Default: undefined (the server does not check the Origin header).
+   */
+  allowedOrigins?: string[];
+  /**
    * Idle timeout in seconds for the HTTP server.
    * Only used by the Bun runtime (ignored by Node.js).
    * Must be greater than the pingInterval option (25 seconds by default).
