@@ -115,69 +115,6 @@ export function simulateToolCall(
 }
 
 /**
- * Simulate workflow success
- */
-export function simulateWorkflowSuccess(
-  runId: string,
-  threadId: string,
-  text: string = 'Workflow completed'
-): void {
-  simulateEvent({
-    type: EventType.RUN_STARTED,
-    threadId,
-    runId,
-    input: {
-      threadId,
-      runId,
-      messages: [],
-      tools: [],
-      state: {},
-    } as any,
-    timestamp: Date.now(),
-  });
-
-  const messageId = 'msg-' + Math.random();
-  simulateEvent({
-    type: EventType.TEXT_MESSAGE_START,
-    messageId,
-    role: 'assistant',
-    timestamp: Date.now(),
-  });
-
-  simulateEvent({
-    type: EventType.TEXT_MESSAGE_CONTENT,
-    messageId,
-    delta: text,
-    timestamp: Date.now(),
-  });
-
-  simulateEvent({
-    type: EventType.TEXT_MESSAGE_END,
-    messageId,
-    timestamp: Date.now(),
-  });
-
-  simulateEvent({
-    type: EventType.RUN_FINISHED,
-    threadId,
-    runId,
-    result: text,
-    timestamp: Date.now(),
-  });
-}
-
-/**
- * Simulate workflow error
- */
-export function simulateWorkflowError(message: string): void {
-  simulateEvent({
-    type: EventType.RUN_ERROR,
-    message,
-    timestamp: Date.now(),
-  });
-}
-
-/**
  * Helper to create stable tools that don't cause re-renders
  */
 export function useStableTools<T extends Record<string, any>>(tools: T): T {
@@ -265,69 +202,6 @@ export function simulateStreamingText(
   simulateEvent({
     type: EventType.TEXT_MESSAGE_END,
     messageId,
-    timestamp: Date.now(),
-  });
-}
-
-/**
- * Simulate complete workflow with tool calls
- */
-export function simulateWorkflowWithToolCalls(
-  runId: string,
-  threadId: string,
-  toolCalls: Array<{
-    toolCallId: string;
-    toolName: string;
-    args: Record<string, unknown>;
-  }>,
-  finalText: string = 'Complete'
-): void {
-  simulateEvent({
-    type: EventType.RUN_STARTED,
-    threadId,
-    runId,
-    input: {
-      threadId,
-      runId,
-      messages: [],
-      tools: [],
-      state: {},
-    } as any,
-    timestamp: Date.now(),
-  });
-
-  // Simulate tool calls
-  toolCalls.forEach(toolCall => {
-    simulateToolCall(toolCall.toolCallId, toolCall.toolName, toolCall.args);
-  });
-
-  // Simulate final text response
-  const messageId = 'msg-final';
-  simulateEvent({
-    type: EventType.TEXT_MESSAGE_START,
-    messageId,
-    role: 'assistant',
-    timestamp: Date.now(),
-  });
-
-  simulateEvent({
-    type: EventType.TEXT_MESSAGE_CONTENT,
-    messageId,
-    delta: finalText,
-    timestamp: Date.now(),
-  });
-
-  simulateEvent({
-    type: EventType.TEXT_MESSAGE_END,
-    messageId,
-    timestamp: Date.now(),
-  });
-
-  simulateEvent({
-    type: EventType.RUN_FINISHED,
-    threadId,
-    runId,
-    result: finalText,
     timestamp: Date.now(),
   });
 }

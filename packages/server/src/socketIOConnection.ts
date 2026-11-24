@@ -11,14 +11,12 @@ export class SocketIOClientConnection implements ClientConnection {
   readonly id: string;
   readonly ipAddress: string;
 
-  private readonly conn: ClientIpConnection;
-
-  constructor(private socket: Socket, private ipTracker: ClientIpTracker) {
+  constructor(private socket: Socket, ipTracker: ClientIpTracker) {
     this.id = socket.id;
-    this.conn = socket.conn as unknown as ClientIpConnection;
+    const conn = socket.conn as unknown as ClientIpConnection;
     // Polling connections record their address at engine level, since the transport
     // socket is not available later; WebSocket connections carry it on the handshake.
-    this.ipAddress = ipTracker.getClientIp(this.conn) || socket.handshake.address || socket.id;
+    this.ipAddress = ipTracker.getClientIp(conn) || socket.handshake.address || socket.id;
 
     logger.info('Socket.IO connection', { connectionId: this.id, transport: socket.conn.transport.name });
     socket.conn.on('upgrade', (transport) => {
@@ -39,9 +37,7 @@ export class SocketIOClientConnection implements ClientConnection {
   }
 
   onClose(handler: () => void): void {
-    this.socket.on('disconnect', () => {
-      this.ipTracker.removePollingConnection(this.conn.id);
-      handler();
-    });
+    // The runtime adapter removes the polling IP record when the engine.io session closes.
+    this.socket.on('disconnect', handler);
   }
 }

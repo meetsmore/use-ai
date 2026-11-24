@@ -94,7 +94,9 @@ export class BunRuntimeAdapter implements RuntimeAdapter {
       if (engineSocket.transport?.name === 'polling' && config.onPollingConnection) {
         const clientIp = bunServer.requestIP(req);
         if (clientIp) {
-          config.onPollingConnection(engineSocket.id, clientIp.address);
+          const sessionId = engineSocket.id;
+          config.onPollingConnection(sessionId, clientIp.address);
+          engineSocket.once('close', () => config.onPollingClose?.(sessionId));
         }
       }
     });

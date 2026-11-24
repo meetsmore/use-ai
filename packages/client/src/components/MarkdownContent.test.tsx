@@ -83,3 +83,16 @@ describe('MarkdownContent during streaming', () => {
     expect(container.querySelector('strong')?.textContent).toBe('bold');
   });
 });
+
+describe('MarkdownContent link and image URLs', () => {
+  test('neutralizes a javascript: URL in image syntax like it does in link syntax', () => {
+    const { container } = render(
+      <MarkdownContent content={'[link](javascript:alert(1)) ![image](javascript:alert(1))'} />
+    );
+
+    expect([...container.querySelectorAll('a')].map((a) => a.getAttribute('href'))).toEqual([
+      'javascript:void(0)',
+      'javascript:void(0)',
+    ]);
+  });
+});

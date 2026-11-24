@@ -58,6 +58,8 @@ export default defineConfig({
         USE_AI_ENABLE_MOCK_AGENT: process.env.USE_AI_ENABLE_MOCK_AGENT || '',
         MCP_ENDPOINT_LOCALDEV_URL: 'http://localhost:3002/mcp',
         MCP_ENDPOINT_LOCALDEV_NAMESPACE: 'mcp',
+        // The example MCP server authenticates with X-API-Key sent from the client
+        MCP_ENDPOINT_LOCALDEV_ALLOWED_CLIENT_HEADERS: 'Authorization,X-API-Key',
         LOG_SILENT: 'true',
         // Use temperature=0 for deterministic AI responses in E2E tests
         AI_TEMPERATURE: '0',
