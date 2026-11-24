@@ -29,7 +29,7 @@ export interface ClientIpTracker {
   trackPollingConnection(sessionId: string, ip: string): void;
 
   /**
-   * Remove stored IP address when a connection disconnects.
+   * Remove stored IP address when the engine.io session closes.
    */
   removePollingConnection(sessionId: string): void;
 
