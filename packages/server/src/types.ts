@@ -44,6 +44,13 @@ export interface McpEndpointConfig {
   /** Optional HTTP headers for authentication (e.g., { 'Authorization': 'Bearer token' }) */
   headers?: Record<string, string>;
   /**
+   * Header names a client may send to this endpoint through `forwardedProps.mcpHeaders`.
+   * Matched case-insensitively. Other client headers are dropped, and a client header
+   * never replaces one set in `headers`.
+   * Default: ['Authorization']
+   */
+  allowedClientHeaders?: string[];
+  /**
    * Tool execution timeout in milliseconds.
    * Default: 30000 (30 seconds)
    */

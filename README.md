@@ -1176,6 +1176,7 @@ To configure these in `@meetsmore-oss/use-ai-server`, you can use the environmen
 # MCP_ENDPOINT_YOURMCPNAME_NAMESPACE=yourmcpname  # Optional, defaults to "yourmcpname"
 # MCP_ENDPOINT_YOURMCPNAME_TIMEOUT=60000          # Optional, defaults to 30000
 # MCP_ENDPOINT_YOURMCPNAME_TOOLS_CACHE_TTL=60000  # Optional, cache tool definitions
+# MCP_ENDPOINT_YOURMCPNAME_ALLOWED_CLIENT_HEADERS=Authorization,X-API-Key  # Optional, defaults to "Authorization"
 
 # multiple endpoints are supported
 # MCP_ENDPOINT_ANOTHERMCP_URL=http://localhost:3003
@@ -1192,7 +1193,7 @@ root.render(
     forwardedPropsProvider={() => ({
       mcpHeaders: {
         'http://localhost:3002/*': {        // when any URL matching this pattern is called by the server for MCPs....
-          headers: { 'X-API-Key': 'secret-api-key-123' },   // add these headers to the request.
+          headers: { Authorization: `Bearer ${userToken}` },   // add these headers to the request.
         },
       },
       telemetryMetadata: {                  // optional: metadata forwarded to observability (e.g., Langfuse)
@@ -1226,6 +1227,10 @@ The flow works like this:
 3. [server] The server prompts the LLM.
 4. [LLM] The LLM decides to call a tool.
 5. [server] The server checks if the call will use a remote MCP, if it will, it adds the headers matching the URL pattern.
+
+The headers are scoped to the run that sent them. The server only forwards the header names listed in the endpoint's `allowedClientHeaders` (default: `['Authorization']`) and drops the rest. Headers set in the endpoint's `headers` config always win over client headers with the same name.
+
+The client can omit `mcpHeaders`, and then the MCP endpoint is called with only the server-configured `headers`. Do not put a credential with broader access than a single user in `headers` unless every run is authenticated before it reaches the MCP endpoint.
 
 ### Server-Side Tools
 
