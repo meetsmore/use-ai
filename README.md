@@ -58,7 +58,6 @@ A React client/framework for easily enabling AI to control your users frontend.
     - [Langfuse](#langfuse)
     - [Feedback](#feedback)
   - [Plugins](#plugins)
-    - [`@meetsmore-oss/use-ai-plugin-workflows`](#meetsmore-use-ai-plugin-workflows)
 - [Skills](#skills)
 
 ## Overview
@@ -278,8 +277,6 @@ Because the tools are all clientside, we don't need to worry about auth for the 
 ├── packages
 │   ├── client                   # frontend React library
 │   ├── core                     # shared types
-│   ├── plugin-workflows         # headless workflow execution plugin
-│   ├── plugin-workflows-client  # client hooks for workflows
 │   └── server                   # backend server library
 ```
 
@@ -296,7 +293,8 @@ Not all aspects of AG-UI protocol are implemented now, but it feel free to open 
 There are some minor extensions to the protocol:
 
 **Message Types**:
-- `run_workflow`: Trigger headless workflow (use-ai extension) [see `@meetsmore-oss/use-ai-plugin-workflows`]
+- `message_feedback`: Sends user feedback on an AI message (see 'Feedback').
+- `tool_approval_response`: Sends the user's answer to a tool approval request.
 
 ### Transports
 
@@ -723,7 +721,6 @@ root.render(
 ### Using the AI directly (without chat UI)
 
 > TODO: This needs to be easier, using the client currently is awkward.
->       User should get a similar interface to `useAIWorkflow`. 
 
 ```typescript
 const { 
@@ -1110,9 +1107,6 @@ ANTHROPIC_API_KEY=sk-ant-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 # OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 # OPENAI_MODEL=gpt-4-turbo
 
-# Dify Workflow Runner (optional)
-# DIFY_API_URL=http://localhost:3001/v1
-
 # Remote MCP Server Configuration
 # MCP_ENDPOINT_YOURMCPNAME_URL=http://localhost:3002
 # MCP_ENDPOINT_YOURMCPNAME_NAMESPACE=yourmcpname  # Optional, defaults to "yourmcpname"
@@ -1140,7 +1134,7 @@ ANTHROPIC_API_KEY=sk-ant-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 If you want to integrate the `use-ai` server into your existing server, for example if you don't want to deploy another instance in your infrastructure, or you want to use some capabilities in your existing server, you can use `@meetsmore-oss/use-ai-server` as a library and run an instance of `UseAIServer`:
 
 ```typescript
-import { UseAIServer, AISDKAgent } from '@meetsmore-oss/use-ai-server';
+import { UseAIServer, AISDKAgent, FeedbackPlugin } from '@meetsmore-oss/use-ai-server';
 import { anthropic } from '@ai-sdk/anthropic';
 
 const server = new UseAIServer({
@@ -1157,7 +1151,7 @@ const server = new UseAIServer({
   rateLimitMaxRequests: 1_000,
   rateLimitWindowMs: 60_000,
   plugins: [              // see 'Plugins'
-    new WorkflowsPlugin({ /** see @meetsmore-oss/use-ai-plugin-workflows */})
+    new FeedbackPlugin()
   ],
   mcpEndpoints: [{        // see 'External MCPs'
     url: 'http://my-app.com/mcp',
@@ -1366,7 +1360,7 @@ export interface UseAIServerPlugin {
    * Returns the unique identifier for this plugin.
    * Used for logging and debugging purposes.
    *
-   * @returns Plugin name (e.g., 'workflows', 'analytics', 'auth')
+   * @returns Plugin name (e.g., 'feedback', 'analytics', 'auth')
    */
   getName(): string;
 
@@ -1402,90 +1396,7 @@ export interface UseAIServerPlugin {
 }
 ```
 
-This is primarily used to avoid polluting the main library with the code used for providing workflow runners (see `@meetsmore-oss/use-ai-plugin-workflows`)
-
-### `@meetsmore-oss/use-ai-plugin-workflows`
-
-`@meetsmore-oss/use-ai-plugin-workflows` provides the capability for running workflows using AI workflow engines like Dify.
-
-Only `DifyWorkflowRunner` is supported for now, but you can write your own Runners very easily (feel free to open a PR).
-
-```typescript
-  const server = new UseAIServer({
-    port: 8081,
-    agents: {
-      'claude': new AISDKAgent({ /** see AISDKAgent for an example */ })
-    },
-    defaultAgent: 'claude',
-    plugins: [
-      new WorkflowsPlugin({
-        runners: new Map([
-          ['dify', new DifyWorkflowRunner({
-            apiBaseUrl: process.env.DIFY_API_URL,
-            workflows: {
-              'greeting-workflow': 'get-this-value-from-dify'
-            }
-          })]
-        ])
-      })
-    ]
-  });
-```
-
-```tsx
-  // define an existing `dify` workflow.
-  const { trigger, status, text, error, connected } = useAIWorkflow('dify', 'greeting-workflow');
-
-  // Trigger the workflow.
-  await trigger({
-    inputs: {
-      username: 'Alice',
-    },
-    tools: {
-      displayGreeting: defineTool(
-        'Display a greeting message to the user',
-        z.object({
-          greeting: z.string().describe('The greeting message to display'),
-        }),
-        (input) => {
-          addLog(`Tool called: displayGreeting`);
-          setProcessedItems((prev) => [...prev, input.greeting]);
-          return { success: true };
-        }
-      ),
-    },
-    onProgress: (progress) => {
-      addLog(`Progress: ${progress.status}${progress.text ? ` - ${progress.text}` : ''}`);
-    },
-    onComplete: (result) => {
-      addLog('Workflow completed!');
-    },
-    onError: (err) => {
-      addLog(`Error: ${err.message}`);
-    },
-  });
-```
-
-Because it's awkward to get API keys for workflows from Dify, you can use a mapping of names -> API keys:
-
-```typescript
-    plugins: [
-      new WorkflowsPlugin({
-        runners: new Map([
-          ['dify', new DifyWorkflowRunner({
-            apiBaseUrl: process.env.DIFY_API_URL,
-            workflows: {
-              'greeting-workflow': 'x7a$978s998290abhdg' // memorable name -> dify API key value
-            }
-          })]
-        ])
-      })
-    ]
-```
-
-```tsx
-  const { trigger, status, text, error, connected } = useAIWorkflow('dify', 'greeting-workflow');
-```
+The built-in `FeedbackPlugin` uses this interface (see 'Feedback').
 
 ## Skills
 

@@ -106,7 +106,7 @@ export interface UseAIServerConfig<TAgents extends Record<string, import('./agen
   tools?: Record<string, import('./tools/types').ServerToolConfig>;
   /**
    * Optional array of MCP endpoints to fetch tools from.
-   * Tools from these endpoints will be automatically available to all agents and workflows.
+   * Tools from these endpoints will be automatically available to all agents.
    */
   mcpEndpoints?: McpEndpointConfig[];
   /**
@@ -227,9 +227,7 @@ export type {
   // use-ai extensions
   ToolAnnotations,
   ToolCallStartExtensions,
-  WorkflowStatus,
   UseAIClientMessage,
-  RunWorkflowMessage,
   UseAIForwardedProps,
   // Tool approval types
   ToolApprovalRequestEvent,

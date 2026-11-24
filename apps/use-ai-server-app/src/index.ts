@@ -6,8 +6,6 @@ import { createAnthropic } from '@ai-sdk/anthropic';
 import { createOpenAI } from '@ai-sdk/openai';
 import { createGateway } from '@ai-sdk/gateway';
 import type { JSONValue } from 'ai';
-import { WorkflowsPlugin, DifyWorkflowRunner } from '@meetsmore-oss/use-ai-plugin-workflows';
-import type { WorkflowRunner } from '@meetsmore-oss/use-ai-plugin-workflows';
 import { z } from 'zod';
 
 type AgentModel = ConstructorParameters<typeof AISDKAgent>[0]['model'];
@@ -181,56 +179,6 @@ function createAgents(): { agents: Record<string, Agent>; defaultAgent: string }
 }
 
 /**
- * Create workflow runners based on available configuration.
- * Returns a map of runner names to runner instances.
- */
-function createWorkflowRunners(): Map<string, WorkflowRunner> {
-  const runners = new Map<string, WorkflowRunner>();
-  const enabledRunners: string[] = [];
-
-  // Check for Dify configuration
-  const difyUrl = process.env.DIFY_API_URL;
-  if (difyUrl) {
-    // Build workflows mapping from environment variables
-    // Convention: DIFY_<WORKFLOW_NAME>_KEY maps to workflow name
-    const workflows: Record<string, string> = {};
-
-    // Example: DIFY_GREETING_WORKFLOW_KEY -> 'greeting-workflow'
-    // Example: DIFY_PDF_PROCESSOR_KEY -> 'pdf-processor'
-    Object.keys(process.env).forEach((key) => {
-      if (key.startsWith('DIFY_') && key.endsWith('_KEY')) {
-        const workflowName = key
-          .slice(5, -4) // Remove 'DIFY_' prefix and '_KEY' suffix
-          .toLowerCase()
-          .replace(/_/g, '-'); // Convert underscores to hyphens
-        workflows[workflowName] = process.env[key]!;
-      }
-    });
-
-    runners.set(
-      'dify',
-      new DifyWorkflowRunner({
-        apiBaseUrl: difyUrl,
-        workflows,
-      })
-    );
-
-    const workflowNames = Object.keys(workflows).join(', ');
-    enabledRunners.push(
-      `dify (${difyUrl}${workflowNames ? `, workflows: ${workflowNames}` : ''})`
-    );
-  }
-
-  if (logFormat === 'pretty' && enabledRunners.length > 0) {
-    console.log(`✓ Enabled workflow runners: ${enabledRunners.join(', ')}`);
-  } else if (enabledRunners.length > 0) {
-    logger.info('Workflow runners configured', { enabledRunners });
-  }
-
-  return runners;
-}
-
-/**
  * Create MCP endpoint configurations from environment variables.
  * Returns an array of MCP endpoint configs.
  */
@@ -366,17 +314,13 @@ logger.info('Starting UseAI server', { logFormat });
 
 (async () => {
   try {
-    // Create agents and workflow runners
+    // Create agents
     const { agents, defaultAgent } = createAgents();
-    const workflowRunners = createWorkflowRunners();
     const mcpEndpoints = createMcpEndpoints();
     const serverTools = createServerTools();
 
     // Build plugins array
     const plugins: UseAIServerPlugin[] = [new TokenValidationPlugin()];
-    if (workflowRunners.size > 0) {
-      plugins.push(new WorkflowsPlugin({ runners: workflowRunners }));
-    }
 
     const server = new UseAIServer({
       port,

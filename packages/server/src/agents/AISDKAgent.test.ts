@@ -2676,7 +2676,9 @@ describe('AISDKAgent', () => {
       });
 
       // Mock the telemetry module to spy on span.recordError
-      const telemetryModule = await import('../telemetry');
+      // Snapshot the exports: mock.module() patches the live namespace in place, so
+      // restoring with the namespace object itself would keep the mocked startRunSpan.
+      const telemetryModule = { ...(await import('../telemetry')) };
 
       const recordedCalls: Array<{ runId: string; errorCategory: string; errorMessage: string }> = [];
       mock.module('../telemetry', () => ({

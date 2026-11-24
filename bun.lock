@@ -59,7 +59,6 @@
         "@ai-sdk/anthropic": "3.0.0-beta.59",
         "@ai-sdk/gateway": "2.0.0-beta.61",
         "@ai-sdk/openai": "3.0.0-beta.66",
-        "@meetsmore-oss/use-ai-plugin-workflows": "workspace:*",
         "@meetsmore-oss/use-ai-server": "workspace:*",
         "zod": "3",
       },
@@ -108,23 +107,6 @@
         "typescript": "^5.9.3",
       },
     },
-    "packages/plugin-workflows": {
-      "name": "@meetsmore-oss/use-ai-plugin-workflows",
-      "version": "2.2.0",
-      "dependencies": {
-        "@meetsmore-oss/use-ai-core": "workspace:^",
-        "ai": "6.0.0-beta.116",
-        "uuid": "^11.0.3",
-      },
-      "devDependencies": {
-        "@meetsmore-oss/use-ai-server": "workspace:^",
-        "@types/uuid": "^10.0.0",
-        "typescript": "^5.9.3",
-      },
-      "peerDependencies": {
-        "@meetsmore-oss/use-ai-server": "workspace:^",
-      },
-    },
     "packages/server": {
       "name": "@meetsmore-oss/use-ai-server",
       "version": "2.2.0",
@@ -132,6 +114,7 @@
         "@ai-sdk/anthropic": "3.0.0-beta.59",
         "@ai-sdk/openai": "3.0.0-beta.66",
         "@langfuse/client": "^5.14.0",
+        "@langfuse/core": "^5.14.0",
         "@meetsmore-oss/use-ai-core": "workspace:^",
         "@socket.io/bun-engine": "^0.1.0",
         "ai": "6.0.0-beta.116",
@@ -301,8 +284,6 @@
     "@meetsmore-oss/use-ai-client": ["@meetsmore-oss/use-ai-client@workspace:packages/client"],
 
     "@meetsmore-oss/use-ai-core": ["@meetsmore-oss/use-ai-core@workspace:packages/core"],
-
-    "@meetsmore-oss/use-ai-plugin-workflows": ["@meetsmore-oss/use-ai-plugin-workflows@workspace:packages/plugin-workflows"],
 
     "@meetsmore-oss/use-ai-server": ["@meetsmore-oss/use-ai-server@workspace:packages/server"],
 

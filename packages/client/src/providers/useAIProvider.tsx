@@ -637,12 +637,20 @@ export function UseAIProvider({
       await handleServerEventRef.current(client, event);
     });
 
+    // Stable for the hook's lifetime (a useCallback with no changing deps).
+    const unsubscribeToolResult = client.onToolResult(serverEvents.handleToolResult);
+
     clientRef.current = client;
 
     return () => {
       unsubscribeConnection();
       unsubscribe();
+      unsubscribeToolResult();
       client.disconnect();
+      // The connection subscription is already gone, so handleDisconnect does
+      // not run here. A tool still working for this client's run (a question
+      // waiting for the user) would otherwise wait forever.
+      toolSystem.endRun();
     };
   }, [serverUrl]);
 

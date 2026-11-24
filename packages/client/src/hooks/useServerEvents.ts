@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useMemo } from 'react';
 import type {
   AGUIEvent,
   ToolCallStartEvent,
@@ -16,10 +16,11 @@ import type {
 import { EventType, ErrorCode, TOOL_APPROVAL_REQUEST } from '../types';
 import type { UseAIClient } from '../client';
 import { generateMessageId } from '../providers/chatRepository/types';
-import type { UseToolSystemReturn } from './useToolSystem';
+import { isApprovalForToolCall, type UseToolSystemReturn } from './useToolSystem';
 import type { UseAIStrings } from '../theme';
 import type { PersistedMessage, MessageDisplayMode } from '../providers/chatRepository/types';
 import { extractTurnMessages } from '../utils/messageConversion';
+import { getToolCallStatus } from '../utils/toolCalls';
 
 export interface UseServerEventsOptions {
   /** Tool system for executing tools and looking up tool metadata */
@@ -51,8 +52,47 @@ export type ChatStreamingPart =
    * @example "msg_01abc123"
    */
   | { kind: 'text'; text: string; messageId?: string }
-  /** Args arrive as a JSON string, incomplete until the call is fully received. */
-  | { kind: 'tool_call'; toolCallId: string; name: string; args: string };
+  | {
+      kind: 'tool_call';
+      /** @example "toolu_01abc123" */
+      toolCallId: string;
+      /** The name the tool was called by, including any `useAI` id prefix, e.g. "Row 1_updateLabel". */
+      name: string;
+      /** Args arrive as a JSON string, incomplete until the call is fully received. */
+      args: string;
+      status: ChatToolCallStatus;
+      /**
+       * The tool's result as kept in the conversation history, once there is
+       * one: the JSON string sent back to the model, e.g. `'{"success":true}'`.
+       */
+      result?: string;
+    };
+
+/**
+ * Where a tool call is. A persisted turn only has the four finished states,
+ * read from each call's result by `getToolCallStatus`; the same function
+ * decides them while the answer streams, so a call shows the same state
+ * before and after the chat is reloaded.
+ *
+ * - `receiving-args`: the call has started and its arguments are still streaming
+ * - `awaiting-approval`: the user is asked to approve the call before it runs
+ * - `running`: the call is executing (or waiting for the user, e.g. a question)
+ * - `done`: it returned a result
+ * - `error`: it returned `{ error }` or `{ success: false }`, or threw
+ * - `rejected`: the user rejected it
+ * - `aborted`: the run ended before it returned
+ */
+export type ChatToolCallStatus =
+  | 'receiving-args'
+  | 'awaiting-approval'
+  | 'running'
+  | 'done'
+  | 'error'
+  | 'rejected'
+  | 'aborted';
+
+/** The `tool_call` member of {@link ChatStreamingPart}. */
+export type ChatToolCallPart = Extract<ChatStreamingPart, { kind: 'tool_call' }>;
 
 export interface ExecutingToolDisplay {
   /** @example "toolu_01abc123" */
@@ -84,6 +124,11 @@ export interface UseServerEventsReturn {
   streamingChatIdRef: React.MutableRefObject<string | null>;
   /** The in-flight answer split into ordered parts; empty between runs. */
   streamingParts: ChatStreamingPart[];
+  /**
+   * Records a tool call's result into `streamingParts`. The provider
+   * subscribes it to `UseAIClient.onToolResult`.
+   */
+  handleToolResult: (toolCallId: string, content: string) => void;
   /**
    * Handles a server event. Called from the provider's client subscription.
    * Takes the client instance so it can access client-internal state
@@ -175,6 +220,36 @@ export function useServerEvents({
       return [...prev, { kind: 'text', text: delta, messageId }];
     });
   }, []);
+
+  /**
+   * Replaces the tool call part with `toolCallId` by `update(part)`. Without
+   * such a part the array is kept: a new one re-renders the whole panel for
+   * nothing, and args arrive one event per token.
+   */
+  const updateToolCallPart = useCallback((
+    toolCallId: string,
+    update: (part: ChatToolCallPart) => ChatToolCallPart,
+  ) => {
+    setStreamingParts(prev => {
+      const index = prev.findIndex(part => part.kind === 'tool_call' && part.toolCallId === toolCallId);
+      if (index < 0) return prev;
+      const next = [...prev];
+      next[index] = update(prev[index] as ChatToolCallPart);
+      return next;
+    });
+  }, []);
+
+  /**
+   * Records a call's result from `UseAIClient.onToolResult`, which fires once
+   * per call as the result enters the conversation history. Reading it from
+   * there rather than from TOOL_CALL_RESULT keeps the streamed status equal to
+   * the persisted one: for a rejected call the server reports `{ error: true }`
+   * while the history keeps `{ rejected: true }`, and a stopped run gets its
+   * `{ aborted: true }` results from the client alone.
+   */
+  const handleToolResult = useCallback((toolCallId: string, content: string) => {
+    updateToolCallPart(toolCallId, part => ({ ...part, status: getToolCallStatus(content), result: content }));
+  }, [updateToolCallPart]);
 
   /** Appends `delta` to the trailing reasoning part, starting one if needed. */
   const appendReasoning = useCallback((delta: string) => {
@@ -281,19 +356,7 @@ export function useServerEvents({
       setStreamingParts(prev => [...prev, { kind: 'text', text: '', messageId: startEvent.messageId }]);
     } else if (event.type === EventType.TOOL_CALL_ARGS) {
       const argsEvent = event as ToolCallArgsEvent;
-      setStreamingParts(prev => {
-        // One event per argument token, so an unchanged run must keep its array:
-        // a new one re-renders the whole panel for nothing.
-        for (let index = 0; index < prev.length; index++) {
-          const part = prev[index];
-          if (part.kind === 'tool_call' && part.toolCallId === argsEvent.toolCallId) {
-            const next = [...prev];
-            next[index] = { ...part, args: part.args + argsEvent.delta };
-            return next;
-          }
-        }
-        return prev;
-      });
+      updateToolCallPart(argsEvent.toolCallId, part => ({ ...part, args: part.args + argsEvent.delta }));
     } else if (event.type === EventType.TOOL_CALL_START) {
       const e = event as ToolCallStartEvent & Partial<ToolCallStartExtensions>;
 
@@ -309,13 +372,14 @@ export function useServerEvents({
       setExecutingTool({ toolCallId: e.toolCallId, name: e.toolCallName, title });
       setStreamingParts(prev => [
         ...prev,
-        { kind: 'tool_call', toolCallId: e.toolCallId, name: e.toolCallName, args: '' },
+        { kind: 'tool_call', toolCallId: e.toolCallId, name: e.toolCallName, args: '', status: 'receiving-args' },
       ]);
     } else if (event.type === EventType.TOOL_CALL_END) {
       const toolCallEnd = event as ToolCallEndEvent;
       const toolCallId = toolCallEnd.toolCallId;
 
       setExecutingTool(prev => prev?.toolCallId === toolCallId ? null : prev);
+      updateToolCallPart(toolCallId, part => ({ ...part, status: 'running' }));
 
       const toolCallData = (client as unknown as { currentToolCalls: Map<string, { name: string; args: string }> }).currentToolCalls.get(toolCallId);
       if (!toolCallData) {
@@ -326,10 +390,10 @@ export function useServerEvents({
       const name = toolCallData.name;
       const input = JSON.parse(toolCallData.args);
 
-      // Skip tools not in our registry (likely workflow tools)
+      // Skip tools not in our registry
       const tool = ts.aggregatedToolsRef.current[name];
       if (!tool) {
-        console.log(`[ServerEvents] Tool "${name}" not found in useAI tools, skipping (likely a workflow tool)`);
+        console.log(`[ServerEvents] Tool "${name}" not found in useAI tools, skipping`);
         return;
       }
 
@@ -355,10 +419,17 @@ export function useServerEvents({
     } else if (event.type === EventType.RUN_FINISHED) {
       // client.ts handleEvent already called finalizeRun({ aborted: false })
       // for RUN_FINISHED; this branch only persists the resulting state.
+      // Every way a run ends aborts the tools' signal first, before any await:
+      // a tool still working for the run (a question waiting for the user's
+      // answer) has nobody left to answer.
+      ts.endRun();
       const finishedEvent = event as RunFinishedEvent;
       await persistFinalResponse(client, { aborted: false, traceId: finishedEvent.runId });
       resetRunUiState();
     } else if (event.type === EventType.RUN_ERROR) {
+      // Abort before recording the aborted results and saving, so a tool that
+      // finishes meanwhile does not send a second result.
+      ts.endRun();
       const errorEvent = event as RunErrorEvent;
       const errorCode = errorEvent.message as ErrorCode;
 
@@ -386,6 +457,7 @@ export function useServerEvents({
     const strs = stringsRef.current;
     const message = strs.errors[ErrorCode.CONNECTION_LOST] || strs.errors[ErrorCode.UNKNOWN_ERROR];
 
+    toolSystemRef.current.endRun();
     saveAIResponseRef.current(message, 'error');
     resetRunUiState();
   }, [resetRunUiState]);
@@ -397,6 +469,19 @@ export function useServerEvents({
     displayText: executingToolRaw.title ?? executingToolFallbackRef.current ?? strings.toolExecution.fallbackMessages[0],
   } : null;
 
+  // A call waiting for approval shows as such until the user answers. Derived
+  // from the pending approvals rather than stored in the part, so approving or
+  // rejecting needs no update here.
+  const { pendingApprovals } = toolSystem;
+  const streamingPartsWithApprovals = useMemo(() => {
+    if (pendingApprovals.length === 0) return streamingParts;
+    return streamingParts.map(part =>
+      part.kind === 'tool_call' && part.status === 'running'
+        && pendingApprovals.some(pending => isApprovalForToolCall(pending, part.toolCallId))
+        ? { ...part, status: 'awaiting-approval' as const }
+        : part);
+  }, [streamingParts, pendingApprovals]);
+
   return {
     loading,
     setLoading,
@@ -404,7 +489,8 @@ export function useServerEvents({
     clearStreamingParts,
     executingTool,
     streamingChatIdRef,
-    streamingParts,
+    streamingParts: streamingPartsWithApprovals,
+    handleToolResult,
     handleServerEvent,
     handleDisconnect,
   };
