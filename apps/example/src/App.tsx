@@ -5,7 +5,6 @@ import CalculatorPage from './pages/CalculatorPage';
 import CombinedPage from './pages/CombinedPage';
 import MultiListPage from './pages/MultiListPage';
 import InvisibleTestPage from './pages/InvisibleTestPage';
-import WorkflowDemoPage from './pages/WorkflowDemoPage';
 import RemoteMcpToolsPage from './pages/RemoteMcpToolsPage';
 import ServerToolsPage from './pages/ServerToolsPage';
 import EmbeddedChatPage from './pages/EmbeddedChatPage';
@@ -87,7 +86,6 @@ const NAV_CATEGORIES: NavCategory[] = [
       { path: '/multimodal', label: 'Multimodal' },
       { path: '/multi-agent', label: 'Multi-Agent' },
       { path: '/before-run-agent', label: 'beforeRunAgent Hook' },
-      { path: '/workflow-demo', label: 'Workflow Integration' },
       { path: '/abort', label: 'Abort' },
     ],
   },
@@ -191,7 +189,6 @@ function AppContent() {
         <Route path="/multimodal"><MultimodalPage /></Route>
         <Route path="/multi-agent"><MultiAgentPage /></Route>
         <Route path="/before-run-agent"><BeforeRunAgentPage /></Route>
-        <Route path="/workflow-demo"><WorkflowDemoPage /></Route>
         <Route path="/abort"><AbortPage /></Route>
         <Route path="/error-tracing-test"><ErrorTracingTestPage /></Route>
       </main>

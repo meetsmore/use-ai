@@ -9,9 +9,11 @@ import type { UseAIClient } from '../client';
 function makeToolSystem(): UseToolSystemReturn {
   return {
     aggregatedToolsRef: { current: {} },
+    endRun: mock(),
     executeToolCall: mock(async () => undefined),
     storePendingToolCall: mock(),
     handleApprovalRequest: mock(),
+    pendingApprovals: [],
   } as unknown as UseToolSystemReturn;
 }
 
@@ -95,7 +97,7 @@ describe('useServerEvents — streaming parts', () => {
 
     expect(result.current.streamingParts).toEqual([
       { kind: 'reasoning', text: 'Need the time.' },
-      { kind: 'tool_call', toolCallId: 'tc1', name: 'getServerTime', args: '{"tz":"UTC"}' },
+      { kind: 'tool_call', toolCallId: 'tc1', name: 'getServerTime', args: '{"tz":"UTC"}', status: 'receiving-args' },
       { kind: 'text', text: 'It is noon.', messageId: 'm1' },
     ]);
   });
