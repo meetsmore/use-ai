@@ -774,7 +774,7 @@ describe('Error recording and abort handling', () => {
           context: [],
           forwardedProps: {
             agent: 'nonexistent',
-            telemetryMetadata: { userId: 'user-123', tenantId: 'tenant-abc' },
+            telemetryMetadata: { userId: 'user-123', tenantId: 'tenant-abc', requestedAgent: 'spoofed', runId: 'spoofed-run' },
           },
         },
       });
@@ -790,6 +790,9 @@ describe('Error recording and abort handling', () => {
       // Verify telemetryMetadata is included in trace metadata
       expect(call.metadata.userId).toBe('user-123');
       expect(call.metadata.tenantId).toBe('tenant-abc');
+      // Server-set keys win over the same keys in telemetryMetadata
+      expect(call.metadata.requestedAgent).toBe('nonexistent');
+      expect(call.metadata.runId).not.toBe('spoofed-run');
 
       // Verify error span was created with ERROR level
       expect(call.span.name).toBe('agent_not_found');
@@ -828,7 +831,7 @@ describe('Error recording and abort handling', () => {
         prompt: 'second request',
         tools: [],
         forwardedProps: {
-          telemetryMetadata: { userId: 'rate-limited-user' },
+          telemetryMetadata: { userId: 'rate-limited-user', retryAfterSeconds: 0 },
         },
       });
       const errorEvent = await waitForEventType(socket, EventType.RUN_ERROR);
@@ -840,6 +843,8 @@ describe('Error recording and abort handling', () => {
       expect(call.tags).toEqual(['error', 'rate_limit_exceeded']);
       // Verify telemetryMetadata is included
       expect(call.metadata.userId).toBe('rate-limited-user');
+      // Server-set retryAfterSeconds wins over the same key in telemetryMetadata
+      expect(Number(call.metadata.retryAfterSeconds)).toBeGreaterThan(0);
 
       // Verify error span was created
       expect(call.span.level).toBe('ERROR');
