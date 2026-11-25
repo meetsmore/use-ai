@@ -1,10 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
-import { render, renderHook, waitFor, act } from '@testing-library/react';
+import { render, waitFor, act } from '@testing-library/react';
 import React from 'react';
 import { z } from 'zod';
 import { UseAIProvider } from '../src/providers/useAIProvider';
 import { useAI } from '../src/useAI';
-import { useAIWorkflow } from '../src/useAIWorkflow';
 import { defineTool } from '../src/defineTool';
 import { DEBUG_STORAGE_KEY, setDebugLogging } from '../src/utils/logger';
 import {
@@ -104,31 +103,6 @@ describe('client debug logging', () => {
 
   it('does not log tool arguments or results by default', async () => {
     await runToolCall();
-
-    expect(callsContaining(SECRET)).toEqual([]);
-    expect(calls.filter(call => call.method === 'log')).toEqual([]);
-  });
-
-  it('does not log workflow inputs or tool arguments by default', async () => {
-    const wrapper = ({ children }: { children: React.ReactNode }) => (
-      <UseAIProvider serverUrl="ws://localhost:8081">{children}</UseAIProvider>
-    );
-    const { result } = renderHook(() => useAIWorkflow('dify', 'test-workflow'), { wrapper });
-    await waitFor(() => expect(result.current.connected).toBe(true));
-
-    const tools = {
-      saveNote: defineTool('Save a note', z.object({ text: z.string() }), () => ({ success: true })),
-    };
-
-    await act(async () => {
-      result.current.trigger({ inputs: { note: SECRET }, tools });
-    });
-    await waitFor(() => expect(findSentMessage('run_workflow')).toBeDefined());
-
-    await act(async () => {
-      simulateToolCall('call-1', 'saveNote', { text: SECRET });
-    });
-    await waitFor(() => expect(findSentMessage('tool_result')).toBeDefined());
 
     expect(callsContaining(SECRET)).toEqual([]);
     expect(calls.filter(call => call.method === 'log')).toEqual([]);

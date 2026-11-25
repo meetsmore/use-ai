@@ -9,7 +9,7 @@ import { convertToolsToDefinitions, type ToolsDefinition } from '../defineTool';
 import type { ChatRepository, Chat, ChatMetadata, CreateChatOptions, PersistedMessage, PersistedMessageContent } from './chatRepository/types';
 import { LocalStorageChatRepository } from './chatRepository/LocalStorageChatRepository';
 import type { FileAttachment, FileUploadConfig, FileProcessingState } from '../fileUpload/types';
-import { processAttachments } from '../fileUpload/processAttachments';
+import { processAttachments, clearTransformationCache } from '../fileUpload/processAttachments';
 import { buildPersistedParts } from '../fileUpload/buildPersistedParts';
 import { EmbedFileUploadBackend } from '../fileUpload/EmbedFileUploadBackend';
 import type { MultimodalContent } from '@meetsmore-oss/use-ai-core';
@@ -669,6 +669,11 @@ export function UseAIProvider({
       toolSystem.endRun();
     };
   }, [serverUrl]);
+
+  // The file transformation cache is module-level and outlives the provider.
+  // Clear it on unmount so results from one session (for example, before a
+  // user switch that remounts the provider) are not reused in the next one.
+  useEffect(() => () => clearTransformationCache(), []);
 
   // ── Tool Registration Sync ──────────────────────────────────────────────
 

@@ -391,10 +391,10 @@ export function useServerEvents({
       const name = toolCallData.name;
       const input = JSON.parse(toolCallData.args);
 
-      // Skip tools not in our registry (likely workflow tools)
+      // Skip tools not in our registry
       const tool = ts.aggregatedToolsRef.current[name];
       if (!tool) {
-        logger.debug(`[ServerEvents] Tool "${name}" not found in useAI tools, skipping (likely a workflow tool)`);
+        logger.debug(`[ServerEvents] Tool "${name}" not found in useAI tools, skipping`);
         return;
       }
 

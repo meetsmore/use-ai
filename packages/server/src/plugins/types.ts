@@ -26,14 +26,14 @@ export interface BeforeRunAgentResult {
  *
  * @example
  * ```typescript
- * class WorkflowsPlugin implements UseAIServerPlugin {
+ * class FeedbackPlugin implements UseAIServerPlugin {
  *   getName() {
- *     return 'workflows';
+ *     return 'feedback';
  *   }
  *
  *   registerHandlers(server) {
- *     server.registerMessageHandler('run_workflow', async (session, message) => {
- *       // Handle workflow execution
+ *     server.registerMessageHandler('message_feedback', async (session, message) => {
+ *       // Handle the feedback message
  *     });
  *   }
  *
@@ -52,7 +52,7 @@ export interface UseAIServerPlugin {
    * Returns the unique identifier for this plugin.
    * Used for logging and debugging purposes.
    *
-   * @returns Plugin name (e.g., 'workflows', 'analytics', 'auth')
+   * @returns Plugin name (e.g., 'feedback', 'analytics', 'auth')
    */
   getName(): string;
 

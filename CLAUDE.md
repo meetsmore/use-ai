@@ -12,8 +12,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `packages/core/` - AG-UI protocol types and events
 - `packages/client/` - React hooks (`useAI`)
 - `packages/server/` - Socket.IO server with plugin support
-- `packages/plugin-workflows/` - Headless workflow execution (server plugin)
-- `packages/plugin-workflows-client/` - Client hooks for workflows (`useAIWorkflow`)
 - `apps/example/` - Example todo app
 
 ## Development Commands
@@ -127,7 +125,6 @@ useAI({
 
 **Client → Server messages:**
 - `run_agent`: User prompt with tools, state, conversation history (chat)
-- `run_workflow`: Trigger headless workflow (use-ai extension)
 - `tool_result`: Tool execution result
 - `abort_run`: Cancel current run
 
@@ -142,66 +139,25 @@ useAI({
 
 Server supports plugins for extensibility. All plugins implement `UseAIServerPlugin` interface.
 
-**Built-in Plugin:** `WorkflowsPlugin` for headless workflow execution.
+**Built-in Plugin:** `FeedbackPlugin` for user feedback on AI messages (sent to Langfuse).
 
 ```typescript
-import { UseAIServer, AISDKAgent } from '@meetsmore-oss/use-ai-server';
-import { WorkflowsPlugin, DifyWorkflowRunner } from '@meetsmore-oss/use-ai-plugin-workflows';
+import { UseAIServer, AISDKAgent, FeedbackPlugin } from '@meetsmore-oss/use-ai-server';
 import { anthropic } from '@ai-sdk/anthropic';
 
 const server = new UseAIServer({
   agents: { claude: new AISDKAgent({ hooks: { loadConfig: () => ({ model: anthropic('claude-3-5-sonnet-20241022') }) } }) },
   defaultAgent: 'claude',
-  plugins: [
-    new WorkflowsPlugin({
-      runners: new Map([
-        ['dify', new DifyWorkflowRunner({
-          apiBaseUrl: process.env.DIFY_API_URL || 'http://localhost:3001/v1',
-          workflows: {
-            'greeting-workflow': process.env.DIFY_GREETING_WORKFLOW_KEY!,
-          },
-        })],
-      ]),
-    }),
-  ],
+  plugins: [new FeedbackPlugin()],
 });
 ```
 
-### Agent vs WorkflowRunner
+### Agent
 
 **Agent** (`packages/server/src/agents/types.ts`):
 - Handles conversational chat with history
 - Used by `useAI` hook
 - Default: `AISDKAgent` (uses Claude API via AI SDK)
-
-**WorkflowRunner** (`packages/plugin-workflows/src/types.ts`):
-- Handles stateless, button-triggered operations
-- Used by `useAIWorkflow` hook
-- Example: `DifyWorkflowRunner` (integrates with Dify.AI)
-
-**Why separate?** Different lifecycles (multi-turn vs single-run), different integrations (LLMs vs workflow platforms).
-
-#### Using Workflows
-
-```typescript
-import { useAIWorkflow } from '@meetsmore-oss/use-ai-plugin-workflows-client';
-
-function PDFUploadButton() {
-  const { trigger, status, text, error, connected } = useAIWorkflow('dify', 'greeting-workflow');
-
-  const handleClick = async () => {
-    await trigger({
-      inputs: { username: 'Alice' },
-      tools: { /* tools workflow can call */ },
-      onProgress: (progress) => console.log(progress),
-      onComplete: (result) => console.log(result),
-      onError: (err) => console.error(err),
-    });
-  };
-
-  return <button onClick={handleClick} disabled={!connected || status === 'running'}>Upload</button>;
-}
-```
 
 ### Chat History
 
@@ -305,10 +261,6 @@ E2E tests are preferred for AI features to catch edge cases with real API intera
 ### Creating Custom Agents
 
 Implement `Agent` interface (see `packages/server/src/agents/types.ts`). Must emit AG-UI protocol events (`RUN_STARTED`, `TEXT_MESSAGE_*`, `TOOL_CALL_*`, `RUN_FINISHED`/`RUN_ERROR`).
-
-### Creating Custom WorkflowRunners
-
-Implement `WorkflowRunner` interface (see `packages/plugin-workflows/src/types.ts`). Must emit AG-UI protocol events.
 
 ### Creating Custom Plugins
 
