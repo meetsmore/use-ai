@@ -1,7 +1,7 @@
 import { Server as SocketIOServer } from 'socket.io';
 import { ModelMessage, ToolModelMessage } from 'ai';
 import { createHash } from 'crypto';
-import { EventType, type McpHeadersMap, type UseAIForwardedProps, type ResolveAttachments } from '@meetsmore-oss/use-ai-core';
+import { EventType, ErrorCode, type McpHeadersMap, type UseAIForwardedProps, type ResolveAttachments } from '@meetsmore-oss/use-ai-core';
 import { resolveAttachmentParts, countRefParts, dropRemoteUrlParts } from './attachmentResolution';
 import type {
   UseAIServerConfig,
@@ -22,7 +22,7 @@ import { recordErrorTrace, startTracing } from './instrumentation';
 import { v4 as uuidv4 } from 'uuid';
 import type { Agent, EventEmitter, AGUIEventExtended } from './agents/types';
 import type { ClientConnection, ClientSession } from './agents/types';
-import type { UseAIServerPlugin, MessageHandler } from './plugins/types';
+import type { UseAIServerPlugin, MessageHandler, AuthorizeRunInput } from './plugins/types';
 import { FeedbackPlugin } from './plugins/FeedbackPlugin';
 import { isRemoteTool, isServerTool } from './utils/toolFilters';
 import { abortRun, RunAbortedByUser, RunAbortedByClientDisconnect } from './utils/abortReason';
@@ -445,7 +445,6 @@ export class UseAIServer {
 
     // Extract use-ai extensions from forwardedProps (AG-UI extension point)
     const forwardedProps = rawForwardedProps as UseAIForwardedProps | undefined;
-    const mcpHeaders = forwardedProps?.mcpHeaders;
     const requestedAgent = forwardedProps?.agent;
 
     // Select agent: use requested agent if valid, otherwise fall back to default
@@ -505,7 +504,52 @@ export class UseAIServer {
     session.currentRunId = runId;
 
     // Create AbortController for this run (used to cancel pending tool calls/approvals on disconnect)
-    session.abortController = new AbortController();
+    // Kept locally too: another run_agent on this session may replace it while a hook awaits.
+    const runAbortController = new AbortController();
+    session.abortController = runAbortController;
+
+    // authorizeRun hooks run before any external call, so a rejected run cannot
+    // trigger MCP tools/list or attachment resolution.
+    const authorizeInput: AuthorizeRunInput = {
+      session,
+      runId,
+      originalInput: message.data,
+      mcpHeaders: forwardedProps?.mcpHeaders,
+    };
+    for (const plugin of this.plugins) {
+      if (plugin.authorizeRun) {
+        const result = await plugin.authorizeRun(authorizeInput);
+        if (result?.abort) {
+          session.currentRunId = undefined;
+          this.sendEvent(session.socket, {
+            type: EventType.RUN_ERROR,
+            message: result.message,
+            timestamp: Date.now(),
+          });
+          return;
+        }
+      }
+    }
+    // A disconnect or abort_run may arrive while a hook awaits (e.g. an identity provider call).
+    if (runAbortController.signal.aborted) {
+      logger.info('Run cancelled before start', { clientId: session.clientId, runId });
+      // The client resets its run state on RUN_ERROR(ABORTED) after sending abort_run, and takes
+      // the turn's start position from RUN_STARTED. The agent has not run yet, so send it here.
+      this.sendEvent(session.socket, {
+        type: EventType.RUN_STARTED,
+        threadId,
+        runId,
+        input: message.data,
+        timestamp: Date.now(),
+      });
+      this.sendEvent(session.socket, {
+        type: EventType.RUN_ERROR,
+        message: ErrorCode.ABORTED,
+        timestamp: Date.now(),
+      });
+      return;
+    }
+    const mcpHeaders = authorizeInput.mcpHeaders;
 
     // Merge client tools with MCP tools from all endpoints
     const clientTools = tools.map(t => ({

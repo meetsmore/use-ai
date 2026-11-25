@@ -1,3 +1,4 @@
+import type { McpHeadersMap } from '@meetsmore-oss/use-ai-core';
 import type { ClientSession, AgentInput } from '../agents/types';
 import type { UseAIClientMessage } from '../types';
 
@@ -10,12 +11,38 @@ import type { UseAIClientMessage } from '../types';
 export type MessageHandler = (session: ClientSession, message: UseAIClientMessage) => Promise<void> | void;
 
 /**
- * Result from a beforeRunAgent hook indicating the run should be aborted.
- * Return this from beforeRunAgent to block the run and send the message to the client as RUN_ERROR.
+ * Result from a beforeRunAgent or authorizeRun hook indicating the run should be aborted.
+ * Return this from either hook to block the run and send the message to the client as RUN_ERROR.
  */
 export interface BeforeRunAgentResult {
   abort: true;
   message: string;
+}
+
+/**
+ * Input passed to authorizeRun hooks.
+ *
+ * authorizeRun runs before any external call for the run (MCP `tools/list`, attachment
+ * resolution), so messages and tools are not built yet; the raw client request is in
+ * `originalInput`.
+ */
+export interface AuthorizeRunInput {
+  /**
+   * The client session context. `threadId`, `currentRunId` and `abortController` are already set
+   * for this run; `tools` and `state` still hold the previous run's values (read them from
+   * `originalInput`).
+   */
+  session: ClientSession;
+  /** The unique identifier for this run */
+  runId: string;
+  /** The raw RunAgentInput sent by the client (messages, client tools, state, forwardedProps) */
+  originalInput: AgentInput['originalInput'];
+  /**
+   * MCP headers used for this run, initially `forwardedProps.mcpHeaders` from the client.
+   * A hook may reassign this (e.g. to swap a client token for a server-issued one);
+   * the final value is what the server sends to MCP endpoints.
+   */
+  mcpHeaders?: McpHeadersMap;
 }
 
 /**
@@ -81,8 +108,25 @@ export interface UseAIServerPlugin {
   onClientDisconnect?(session: ClientSession): void;
 
   /**
+   * Optional hook called first for every run, before any external call (MCP `tools/list`,
+   * attachment resolution). Use this for authentication, so a rejected run causes no
+   * outbound requests.
+   *
+   * Return `{ abort: true, message: '...' }` to block the run. The message is sent
+   * to the client as a RUN_ERROR event. Return `void` (or `undefined`) to allow the run.
+   * Reassign `input.mcpHeaders` to change the headers sent to MCP endpoints for this run.
+   *
+   * @param input - The raw run request and the MCP headers for this run
+   * @returns Promise resolving to an abort result or void
+   */
+  authorizeRun?(input: AuthorizeRunInput): Promise<BeforeRunAgentResult | void>;
+
+  /**
    * Optional hook called before an agent run starts.
-   * Use this to perform pre-run checks such as authentication, quota enforcement, etc.
+   * Use this to perform pre-run checks that need the built run input, such as quota enforcement.
+   *
+   * Runs after MCP `tools/list` and attachment resolution. Do authentication in `authorizeRun`
+   * instead, so unauthenticated runs cannot trigger those external calls.
    *
    * Return `{ abort: true, message: '...' }` to block the run — the message is sent
    * to the client as a RUN_ERROR event. Return `void` (or `undefined`) to allow the run.
