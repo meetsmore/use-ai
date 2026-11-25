@@ -6,7 +6,8 @@ interface LogData {
   [key: string]: unknown;
 }
 
-class Logger {
+/** Exported for tests; use the `logger` instance. */
+export class Logger {
   private format: 'json' | 'pretty';
   private silent: boolean;
 
@@ -25,11 +26,13 @@ class Logger {
   }
 
   private logJson(level: LogLevel, message: string, data?: Record<string, unknown>) {
+    // Drop timestamp, level and message from data, so values passed in data (e.g. client metadata) cannot replace the logger's own.
+    const { timestamp: _timestamp, level: _level, message: _message, ...rest } = data ?? {};
     const logEntry: LogData = {
       timestamp: new Date().toISOString(),
       level,
       message,
-      ...data,
+      ...rest,
     };
     console.log(JSON.stringify(logEntry));
   }

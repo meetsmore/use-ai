@@ -144,6 +144,31 @@ describe('recordErrorTrace', () => {
     expect(child.spanContext().traceId).toBe(root.spanContext().traceId);
   });
 
+  test('client metadata cannot replace the server-set runId, errorCategory, ipAddress or source', async () => {
+    langfuse.enabled = true;
+
+    recordErrorTrace({
+      ...baseParams,
+      metadata: { runId: 'spoofed-run', errorCategory: 'spoofed', ipAddress: '203.0.113.9', source: 'spoofed', userId: 'user-1' },
+    });
+
+    const root = (await finishedSpans()).find((s: { name: string }) => s.name === 'use-ai-error');
+    expect(root.attributes[`${A.TRACE_METADATA}.runId`]).toBe('run-123');
+    expect(root.attributes[`${A.TRACE_METADATA}.errorCategory`]).toBe('agent_not_found');
+    expect(root.attributes[`${A.TRACE_METADATA}.ipAddress`]).toBe('127.0.0.1');
+    expect(root.attributes[`${A.TRACE_METADATA}.source`]).toBe('use-ai-server');
+    expect(root.attributes[`${A.TRACE_METADATA}.userId`]).toBe('user-1');
+  });
+
+  test('a client ipAddress is dropped when the server has none', async () => {
+    langfuse.enabled = true;
+
+    recordErrorTrace({ ...baseParams, ipAddress: undefined, metadata: { ipAddress: '203.0.113.9' } });
+
+    const root = (await finishedSpans()).find((s: { name: string }) => s.name === 'use-ai-error');
+    expect(root.attributes[`${A.TRACE_METADATA}.ipAddress`]).toBeUndefined();
+  });
+
   test('starts a new trace even when called inside an active span', async () => {
     langfuse.enabled = true;
     const { trace } = require('@opentelemetry/api');

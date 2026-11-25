@@ -8,7 +8,7 @@ import { simulateReadableStream } from 'ai';
 import { v4 as uuidv4 } from 'uuid';
 import { AISDKAgent } from './AISDKAgent';
 import type { AgentInput } from './types';
-import { _createLangfuseSpanProcessor, langfuse, USE_AI_TRACER_NAME, type SpanProcessor } from '../instrumentation';
+import { _createLangfuseSpanProcessor, _createTraceIdCaptureProcessor, langfuse, popTraceIdForRun, USE_AI_TRACER_NAME, type SpanProcessor } from '../instrumentation';
 import { startRunSpan } from '../telemetry';
 
 /**
@@ -81,7 +81,7 @@ describe('AISDKAgent trace-level attributes', () => {
   beforeEach(() => {
     exporter = new InMemorySpanExporter();
     provider = new BasicTracerProvider({
-      spanProcessors: [_createLangfuseSpanProcessor({ exporter }), tagFromMetadataProcessor],
+      spanProcessors: [_createTraceIdCaptureProcessor(), _createLangfuseSpanProcessor({ exporter }), tagFromMetadataProcessor],
     });
     trace.disable();
     otelContext.disable();
@@ -126,6 +126,73 @@ describe('AISDKAgent trace-level attributes', () => {
 
     const root = exporter.getFinishedSpans().find(s => s.name === 'use-ai.agent.run');
     expect(root?.attributes['ai.telemetry.metadata.sessionId']).toBe('client-1');
+  });
+
+  describe('client telemetryMetadata cannot replace server-owned metadata', () => {
+    const spoofed = {
+      runId: 'spoofed-run',
+      threadId: 'spoofed-thread',
+      ipAddress: '203.0.113.9',
+      toolCount: 99,
+      stepIteration: 99,
+      userId: 'user-1',
+    };
+
+    async function runSpans(input: AgentInput): Promise<ReadableSpan[]> {
+      const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: createModel() }) } });
+      await agent.run(input, { emit: () => {} });
+      await provider.forceFlush();
+      const spans = exporter.getFinishedSpans();
+      const root = spans.find(s => s.name === 'use-ai.agent.run');
+      expect(root).toBeDefined();
+      return spans.filter(s => s.spanContext().traceId === root!.spanContext().traceId);
+    }
+
+    test('the run span and every AI SDK span keep the server run id, thread id and IP address', async () => {
+      const input = createInput(spoofed);
+      const spans = await runSpans(input);
+      const withMetadata = spans.filter(s => s.attributes['ai.telemetry.metadata.runId'] !== undefined);
+      expect(withMetadata.map(s => s.name)).toEqual(expect.arrayContaining(['use-ai.agent.run', 'ai.streamText']));
+
+      for (const span of withMetadata) {
+        const m = (key: string) => span.attributes[`ai.telemetry.metadata.${key}`];
+        expect({ span: span.name, runId: m('runId'), threadId: m('threadId'), ipAddress: m('ipAddress'), userId: m('userId') })
+          .toEqual({ span: span.name, runId: input.runId, threadId: 'thread-1', ipAddress: '127.0.0.1', userId: 'user-1' });
+      }
+      const streamText = withMetadata.find(s => s.name === 'ai.streamText')!;
+      expect(streamText.attributes['ai.telemetry.metadata.toolCount']).toBe(0);
+      expect(streamText.attributes['ai.telemetry.metadata.stepIteration']).toBe(0);
+    });
+
+    test('a client ipAddress is dropped when the server has none', async () => {
+      const input = createInput({ ipAddress: '203.0.113.9' });
+      input.session.ipAddress = undefined;
+      const spans = await runSpans(input);
+
+      for (const span of spans) {
+        expect({ span: span.name, ipAddress: span.attributes['ai.telemetry.metadata.ipAddress'] })
+          .toEqual({ span: span.name, ipAddress: undefined });
+      }
+    });
+
+    test('a client runId leaves no trace id entry behind after the run', async () => {
+      const input = createInput(spoofed);
+      await runSpans(input);
+
+      expect(popTraceIdForRun('spoofed-run')).toBeUndefined();
+      expect(popTraceIdForRun(input.runId)).toBeUndefined();
+    });
+
+    test('the run span and every AI SDK span share the client sessionId', async () => {
+      const spans = await runSpans(createInput({ sessionId: 'chat-42' }));
+      const withMetadata = spans.filter(s => s.attributes['ai.telemetry.metadata.runId'] !== undefined);
+      expect(withMetadata.length).toBeGreaterThan(1);
+
+      for (const span of withMetadata) {
+        expect({ span: span.name, sessionId: span.attributes['ai.telemetry.metadata.sessionId'] })
+          .toEqual({ span: span.name, sessionId: 'chat-42' });
+      }
+    });
   });
 
   test('startRunSpan config.attributes override the default run span attributes', async () => {

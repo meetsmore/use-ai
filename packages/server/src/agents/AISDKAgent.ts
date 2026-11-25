@@ -645,19 +645,45 @@ export class AISDKAgent implements Agent {
     });
   }
 
+  /** The client's `forwardedProps.telemetryMetadata`, or an empty object. */
+  private clientTelemetryMetadata(ctx: RunContext): Record<string, unknown> {
+    return (ctx.originalInput.forwardedProps as UseAIForwardedProps | undefined)?.telemetryMetadata ?? {};
+  }
+
+  /**
+   * Langfuse session of the run: the client's `telemetryMetadata.sessionId` when it is a non-empty string,
+   * else the socket client id. Used for the run span, every step and the error trace, so one run has one session.
+   */
+  private runSessionId(ctx: RunContext): string {
+    const sessionId = this.clientTelemetryMetadata(ctx).sessionId;
+    return typeof sessionId === 'string' && sessionId !== '' ? sessionId : ctx.session.clientId;
+  }
+
+  /**
+   * Telemetry metadata shared by the run span and every step.
+   * The client metadata goes first, so the server's run id, thread id and IP address always win,
+   * also when the server value is undefined.
+   */
+  private runTelemetryMetadata(ctx: RunContext): Record<string, unknown> {
+    return {
+      ...this.clientTelemetryMetadata(ctx),
+      sessionId: this.runSessionId(ctx),
+      threadId: ctx.session.threadId,
+      runId: ctx.runId,
+      ipAddress: ctx.session.ipAddress,
+    };
+  }
+
   /**
    * Creates a telemetry span and sets input from the last user message.
    */
   private startTelemetrySpan(ctx: RunContext): ReturnType<typeof startRunSpan> {
-    const telemetryMetadata = (ctx.originalInput.forwardedProps as UseAIForwardedProps | undefined)?.telemetryMetadata;
-    const sessionId = typeof telemetryMetadata?.sessionId === 'string' && telemetryMetadata.sessionId !== ''
-      ? telemetryMetadata.sessionId
-      : ctx.session.clientId;
+    const { runId, sessionId, ...metadata } = this.runTelemetryMetadata(ctx);
     const attributes: Record<string, AttributeValue> = {};
-    for (const [key, value] of Object.entries(telemetryMetadata ?? {})) {
-      if (value != null && key !== 'runId' && key !== 'sessionId') attributes[`ai.telemetry.metadata.${key}`] = value as AttributeValue;
+    for (const [key, value] of Object.entries(metadata)) {
+      if (value != null) attributes[`ai.telemetry.metadata.${key}`] = value as AttributeValue;
     }
-    const span = startRunSpan({ runId: ctx.runId, sessionId, attributes });
+    const span = startRunSpan({ runId: runId as string, sessionId: sessionId as string, attributes });
 
     const lastUserMessage = [...ctx.messages].reverse().find(m => m.role === 'user');
     if (lastUserMessage) {
@@ -741,13 +767,9 @@ export class AISDKAgent implements Agent {
           ? (this.sanitizeToolsForAPI(this.filterTools(stepCtx.currentTools), ctx.session, events, ctx.mcpHeaders) as any)
           : undefined,
         metadata: {
-          sessionId: ctx.session.clientId,
-          threadId: ctx.session.threadId,
-          runId: ctx.runId,
-          ipAddress: ctx.session.ipAddress,
+          ...this.runTelemetryMetadata(ctx),
           toolCount: stepCtx.currentTools.length,
           stepIteration,
-          ...((ctx.originalInput.forwardedProps as UseAIForwardedProps | undefined)?.telemetryMetadata || {}),
         } as Record<string, AttributeValue>,
       };
 
@@ -1464,15 +1486,14 @@ export class AISDKAgent implements Agent {
 
     // Record pre-streamText errors to Langfuse (post-streamText errors are captured by AI SDK OTEL)
     if (!ctx.streamTextStarted) {
-      const telemetryMetadata = (ctx.originalInput.forwardedProps as UseAIForwardedProps | undefined)?.telemetryMetadata;
       span.recordError({
         runId: ctx.runId,
         errorCategory: 'pre_stream_error',
         errorMessage,
-        sessionId: ctx.session.clientId,
+        sessionId: this.runSessionId(ctx),
         threadId: ctx.session.threadId,
         ipAddress: ctx.session.ipAddress,
-        metadata: { errorCode, toolCount: ctx.tools.length, messageCount: ctx.messages.length, ...telemetryMetadata },
+        metadata: { ...this.clientTelemetryMetadata(ctx), errorCode, toolCount: ctx.tools.length, messageCount: ctx.messages.length },
       });
     }
 
