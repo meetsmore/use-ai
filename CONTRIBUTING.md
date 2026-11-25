@@ -51,9 +51,7 @@ Thank you for your interest in contributing to use-ai! This document provides gu
 ├── packages/
 │   ├── client/                  # React hooks and components
 │   ├── core/                    # Shared types (AG-UI protocol)
-│   ├── server/                  # Socket.IO server
-│   ├── plugin-workflows/        # Workflow execution plugin
-│   └── plugin-workflows-client/ # Client hooks for workflows
+│   └── server/                  # Socket.IO server
 ```
 
 ## Development Workflow

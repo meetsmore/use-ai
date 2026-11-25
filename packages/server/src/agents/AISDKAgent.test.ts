@@ -3,7 +3,7 @@ import { AISDKAgent } from './AISDKAgent';
 import { logger } from '../logger';
 import * as telemetry from '../telemetry';
 import type { AgentInput, EventEmitter, AGUIEventExtended } from './types';
-import { EventType, ErrorCode } from '../types';
+import { EventType, ErrorCode, TOOL_APPROVAL_REQUEST } from '../types';
 import type { ToolDefinition } from '../types';
 import type { RemoteToolDefinition } from '../mcp';
 import type { ServerToolDefinition } from '../tools/types';
@@ -2153,6 +2153,131 @@ describe('AISDKAgent', () => {
       expect(content).not.toContain('serverSideTool');
     });
 
+    test('overlapping runs on one session each call MCP with their own headers', async () => {
+      // Answer with text once the tool result is in the prompt, otherwise call the MCP tool.
+      const mockModel = new MockLanguageModelV3({
+        doStream: async ({ prompt }) => {
+          const hasToolResult = prompt.some(m => m.role === 'tool');
+          const toolCallId = `call-${uuidv4()}`;
+          if (hasToolResult) {
+            return { stream: simulateReadableStream({ chunks: [
+              { type: 'text-start' as const, id: 'text-1' },
+              { type: 'text-delta' as const, id: 'text-1', delta: 'done' },
+              { type: 'text-end' as const, id: 'text-1' },
+              { type: 'finish' as const, finishReason: 'stop' as const, usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 } },
+            ] }) };
+          }
+          return { stream: simulateReadableStream({ chunks: [
+            { type: 'tool-call' as const, toolCallId, toolName: 'mcp_search', input: '{}' },
+            { type: 'finish' as const, finishReason: 'tool-calls' as const, usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 } },
+          ] }) };
+        },
+      });
+
+      // Hold the first MCP call until the second run's call arrives, so both runs are in flight.
+      const seenHeaders: unknown[] = [];
+      let releaseFirst!: () => void;
+      const firstHeld = new Promise<void>(resolve => { releaseFirst = resolve; });
+      const executeTool = mock(async (_name: string, _args: unknown, headers: unknown) => {
+        seenHeaders.push(headers);
+        if (seenHeaders.length === 1) {
+          await firstHeld;
+        } else {
+          releaseFirst();
+        }
+        return { ok: true };
+      });
+
+      const mcpTool: RemoteToolDefinition = {
+        name: 'mcp_search',
+        description: 'MCP search tool',
+        parameters: { type: 'object', properties: {}, required: [] },
+        _remote: {
+          provider: { executeTool } as unknown as RemoteToolDefinition['_remote']['provider'],
+          originalName: 'search',
+        },
+      };
+
+      const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
+      const eventEmitter: EventEmitter = { emit: () => {} };
+      const headersA = { 'http://mcp.test/*': { headers: { Authorization: 'Bearer user-a' } } };
+      const headersB = { 'http://mcp.test/*': { headers: { Authorization: 'Bearer user-b' } } };
+
+      const inputA = createTestInput({ tools: [mcpTool] });
+      inputA.session.tools = [mcpTool] as ToolDefinition[];
+      const inputB: AgentInput = { ...createTestInput({ tools: [mcpTool] }), session: inputA.session, mcpHeaders: headersB };
+      inputA.mcpHeaders = headersA;
+
+      const runA = agent.run(inputA, eventEmitter);
+      const runB = agent.run(inputB, eventEmitter);
+      await Promise.all([runA, runB]);
+
+      expect(executeTool).toHaveBeenCalledTimes(2);
+      expect(seenHeaders).toContainEqual(headersA);
+      expect(seenHeaders).toContainEqual(headersB);
+    });
+
+    test('re-calls MCP with the run headers after a confirmation_required response is approved', async () => {
+      let callCount = 0;
+      const mockModel = new MockLanguageModelV3({
+        doStream: async () => {
+          callCount++;
+          if (callCount === 1) {
+            return { stream: simulateReadableStream({ chunks: [
+              { type: 'tool-call' as const, toolCallId: 'call-confirm', toolName: 'mcp_delete', input: '{}' },
+              { type: 'finish' as const, finishReason: 'tool-calls' as const, usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 } },
+            ] }) };
+          }
+          return { stream: simulateReadableStream({ chunks: [
+            { type: 'text-start' as const, id: 'text-1' },
+            { type: 'text-delta' as const, id: 'text-1', delta: 'done' },
+            { type: 'text-end' as const, id: 'text-1' },
+            { type: 'finish' as const, finishReason: 'stop' as const, usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 } },
+          ] }) };
+        },
+      });
+
+      // First call asks for confirmation, the second (phase 2) succeeds.
+      const seenHeaders: unknown[] = [];
+      const executeTool = mock(async (_name: string, _args: unknown, headers: unknown) => {
+        seenHeaders.push(headers);
+        return seenHeaders.length === 1
+          ? { _use_ai_internal: true, _use_ai_type: 'confirmation_required', _use_ai_metadata: { message: 'Delete?' } }
+          : { ok: true };
+      });
+
+      const mcpTool: RemoteToolDefinition = {
+        name: 'mcp_delete',
+        description: 'MCP delete tool',
+        parameters: { type: 'object', properties: {}, required: [] },
+        _remote: {
+          provider: { executeTool } as unknown as RemoteToolDefinition['_remote']['provider'],
+          originalName: 'delete',
+        },
+      };
+
+      const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
+      const headers = { 'http://mcp.test/*': { headers: { Authorization: 'Bearer user-a' } } };
+      const input = createTestInput({ tools: [mcpTool] });
+      input.session.tools = [mcpTool] as ToolDefinition[];
+      input.mcpHeaders = headers;
+
+      // Approve as soon as the request is emitted; waitForApproval registers the resolver right after.
+      const eventEmitter: EventEmitter = {
+        emit: (event) => {
+          if (event.type === TOOL_APPROVAL_REQUEST) {
+            const { toolCallId } = event as { toolCallId: string };
+            setTimeout(() => input.session.pendingToolApprovals.get(toolCallId)!({ approved: true }), 0);
+          }
+        },
+      };
+
+      await agent.run(input, eventEmitter);
+
+      expect(executeTool).toHaveBeenCalledTimes(2);
+      expect(seenHeaders).toEqual([headers, headers]);
+    });
+
     test('emits TOOL_CALL_RESULT event with actual output for server-side tool execution', async () => {
       // Server-side tools (defined via defineServerTool) also execute on the server.
       // They should emit TOOL_CALL_RESULT just like MCP tools so the client can
@@ -2555,7 +2680,9 @@ describe('AISDKAgent', () => {
       });
 
       // Mock the telemetry module to spy on span.recordError
-      const telemetryModule = await import('../telemetry');
+      // Snapshot the exports: mock.module() patches the live namespace in place, so
+      // restoring with the namespace object itself would keep the mocked startRunSpan.
+      const telemetryModule = { ...(await import('../telemetry')) };
 
       const recordedCalls: Array<{ runId: string; errorCategory: string; errorMessage: string }> = [];
       mock.module('../telemetry', () => ({

@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach, afterEach, spyOn } from 'bun:test';
+import { describe, test, expect, beforeEach, afterEach, spyOn, mock } from 'bun:test';
 import type { UseAIClientMessage } from './types';
 import { installSocketIOMock } from '../test/socketIOMock';
 import { FakeWebSocket, FakeWebSocketConstructor, waitUntil } from '../test/fakeWebSocket';
@@ -351,6 +351,41 @@ describe.each(HARNESSES)('UseAIClient over %s', (_name, createHarness) => {
         agent: 'claude-opus',
         telemetryMetadata: { userId: 'user-123' },
       });
+    });
+  });
+
+  describe('onToolResult()', () => {
+    let consoleErrorSpy: ReturnType<typeof spyOn>;
+    beforeEach(() => {
+      consoleErrorSpy = spyOn(console, 'error').mockImplementation(() => {});
+    });
+    afterEach(() => {
+      consoleErrorSpy.mockRestore();
+    });
+
+    test('a throwing handler stops neither the other handlers nor sending the result', async () => {
+      await harness.open();
+      const second = mock(() => {});
+      client.onToolResult(() => { throw new Error('handler failed'); });
+      client.onToolResult(second);
+
+      client.sendToolResponse('toolu_1', { ok: true });
+
+      expect(second).toHaveBeenCalledWith('toolu_1', '{"ok":true}');
+      expect(lastSent()).toMatchObject({ type: 'tool_result', data: { toolCallId: 'toolu_1' } });
+      expect(consoleErrorSpy).toHaveBeenCalledWith('[UseAI] onToolResult handler threw:', expect.any(Error));
+    });
+
+    // JSON.stringify(undefined) is undefined, which a saved chat cannot read back.
+    test('records a tool that returns nothing as null', async () => {
+      await harness.open();
+      const handler = mock(() => {});
+      client.onToolResult(handler);
+
+      client.sendToolResponse('toolu_1', undefined);
+
+      expect(handler).toHaveBeenCalledWith('toolu_1', 'null');
+      expect(lastSent()).toMatchObject({ type: 'tool_result', data: { content: 'null' } });
     });
   });
 

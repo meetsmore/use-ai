@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'bun:test';
-import { resolveAttachmentParts, countRefParts } from './attachmentResolution';
+import { resolveAttachmentParts, countRefParts, dropRemoteUrlParts } from './attachmentResolution';
 import type { Message, MultimodalContent, ResolveAttachmentsContext } from '@meetsmore-oss/use-ai-core';
 
 const ctx: ResolveAttachmentsContext = { forwardedProps: { token: 'jwt-123' } };
@@ -124,5 +124,57 @@ describe('countRefParts', () => {
       msg('user', 'plain string'),
     ];
     expect(countRefParts(messages)).toBe(0);
+  });
+});
+
+describe('dropRemoteUrlParts', () => {
+  it.each([
+    ['http', 'http://169.254.169.254/latest/meta-data/'],
+    ['https', 'https://internal.example/secret'],
+    ['file', 'file:///proc/self/environ'],
+  ])('drops image_url and file_url parts with a %s url', (_scheme, url) => {
+    const messages = [
+      msg('user', [
+        { type: 'text', text: 'read this' },
+        { type: 'image_url', url },
+        { type: 'file_url', url, mimeType: 'text/plain', name: 'x.txt' },
+      ]),
+    ];
+    const result = dropRemoteUrlParts(messages);
+    expect(result.dropped).toBe(2);
+    expect(result.messages[0].content).toEqual([{ type: 'text', text: 'read this' }]);
+  });
+
+  it('drops url parts whose url is not a string', () => {
+    const messages = [msg('user', [{ type: 'file_url', url: { href: 'http://x' }, mimeType: 'text/plain', name: 'x' }])];
+    expect(dropRemoteUrlParts(messages).dropped).toBe(1);
+  });
+
+  it('drops url parts in non-user messages too', () => {
+    const messages = [msg('assistant', [{ type: 'image_url', url: 'http://x/a.png' }])];
+    expect(dropRemoteUrlParts(messages).dropped).toBe(1);
+  });
+
+  it('keeps data urls, raw base64, refs and text, returning the original reference', () => {
+    const messages = [
+      msg('user', [
+        { type: 'text', text: 'a' },
+        { type: 'image_url', url: 'data:image/png;base64,AAAA' },
+        { type: 'file_url', url: 'DATA:application/pdf;base64,JVBERi0=', mimeType: 'application/pdf', name: 'd.pdf' },
+        { type: 'file_url', url: 'JVBERi0xLjQK', mimeType: 'application/pdf', name: 'raw.pdf' },
+        { type: 'image_ref', ref: 'REF-1' },
+      ]),
+      msg('user', 'plain string'),
+    ];
+    const result = dropRemoteUrlParts(messages);
+    expect(result.dropped).toBe(0);
+    expect(result.messages).toBe(messages);
+  });
+
+  it('does not mutate the input messages', () => {
+    const original = msg('user', [{ type: 'image_url', url: 'http://x/a.png' }]);
+    const snapshot = JSON.parse(JSON.stringify(original));
+    dropRemoteUrlParts([original]);
+    expect(original).toEqual(snapshot);
   });
 });

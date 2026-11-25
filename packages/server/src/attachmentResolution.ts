@@ -40,6 +40,47 @@ export function countRefParts(messages: Message[]): number {
 }
 
 /**
+ * Whether the AI SDK would fetch `url` on this server instead of using it inline.
+ * Mirrors the SDK's own check: a string that parses as a URL is downloaded unless
+ * it is a `data:` URL; a string that does not parse is treated as base64.
+ */
+function isFetchedUrl(url: unknown): boolean {
+  if (typeof url !== 'string') return true;
+  return URL.canParse(url) && new URL(url).protocol !== 'data:';
+}
+
+function isFetchedUrlPart(part: unknown): boolean {
+  if (typeof part !== 'object' || part === null) return false;
+  const p = part as { type?: unknown; url?: unknown };
+  return (p.type === 'image_url' || p.type === 'file_url') && isFetchedUrl(p.url);
+}
+
+/**
+ * Removes client-supplied `image_url` / `file_url` parts whose url the AI SDK would
+ * download on this server (http(s), file:, ...), which would otherwise let a client
+ * make the server fetch internal or local resources (SSRF). Inline `data:` urls
+ * and raw base64 are kept.
+ *
+ * Must run before {@link resolveAttachmentParts}: urls returned by the host's
+ * resolver are trusted and must not be filtered.
+ *
+ * Returns the original `messages` reference when nothing is removed.
+ */
+export function dropRemoteUrlParts(messages: Message[]): { messages: Message[]; dropped: number } {
+  let dropped = 0;
+  const out = messages.map((msg) => {
+    const content = (msg as { content?: unknown }).content;
+    if (!Array.isArray(content) || !content.some(isFetchedUrlPart)) {
+      return msg;
+    }
+    const kept = content.filter((part) => !isFetchedUrlPart(part));
+    dropped += content.length - kept.length;
+    return { ...msg, content: kept } as Message;
+  });
+  return { messages: dropped > 0 ? out : messages, dropped };
+}
+
+/**
  * Collects ref-bearing attachment parts across the run's whole message history,
  * calls the host's `resolve` once, and puts the returned parts back in place.
  * The input is not mutated. See core's {@link ResolveAttachments} for the

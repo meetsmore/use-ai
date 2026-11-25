@@ -51,8 +51,6 @@ export interface ClientSession {
   state: unknown;
   /** Map of pending tool calls awaiting results from the client. Key: toolCallId, Value: resolver function */
   pendingToolCalls: Map<string, (content: string) => void>;
-  /** MCP headers configuration for the current request (temporary, cleared after request) */
-  currentMcpHeaders?: import('@meetsmore-oss/use-ai-core').McpHeadersMap;
   /** AbortController for cancelling the current run */
   abortController?: AbortController;
   /** Cached MCP tools for this session, keyed by endpoint URL */
@@ -84,6 +82,11 @@ export interface AgentInput {
   systemPrompt?: string;
   /** The original RunAgentInput from AG-UI protocol (for emitting RUN_STARTED event) */
   originalInput: import('../types').RunAgentInput;
+  /**
+   * MCP headers sent with this run. Kept per run, not on the session, so that
+   * overlapping runs on one connection cannot overwrite or clear each other's headers.
+   */
+  mcpHeaders?: import('@meetsmore-oss/use-ai-core').McpHeadersMap;
 }
 
 /**

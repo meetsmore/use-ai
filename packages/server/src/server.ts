@@ -2,14 +2,13 @@ import { Server as SocketIOServer } from 'socket.io';
 import { ModelMessage, ToolModelMessage } from 'ai';
 import { createHash } from 'crypto';
 import { EventType, type McpHeadersMap, type UseAIForwardedProps, type ResolveAttachments } from '@meetsmore-oss/use-ai-core';
-import { resolveAttachmentParts, countRefParts } from './attachmentResolution';
+import { resolveAttachmentParts, countRefParts, dropRemoteUrlParts } from './attachmentResolution';
 import type {
   UseAIServerConfig,
   McpEndpointConfig,
   ToolDefinition,
   UseAIClientMessage,
   RunAgentMessage,
-  RunWorkflowMessage,
   ToolResultMessage,
   AbortRunMessage,
   ToolApprovalResponseMessage,
@@ -242,6 +241,9 @@ export class UseAIServer {
       onPollingConnection: (sessionId, ip) => {
         this.clientIpTracker.trackPollingConnection(sessionId, ip);
       },
+      onPollingClose: (sessionId) => {
+        this.clientIpTracker.removePollingConnection(sessionId);
+      },
     });
     logger.info('UseAI server ready', { port: this.config.port, transport: this.config.transport });
   }
@@ -296,7 +298,7 @@ export class UseAIServer {
    * Register a custom message handler for a specific message type.
    * Used by plugins to handle custom message types.
    *
-   * @param type - The message type to handle (e.g., 'run_workflow')
+   * @param type - The message type to handle (e.g., 'message_feedback')
    * @param handler - The handler function to call when this message type is received
    */
   public registerMessageHandler(type: string, handler: MessageHandler): void {
@@ -316,8 +318,19 @@ export class UseAIServer {
       ipAddress: session.ipAddress,
     });
 
-    connection.onMessage((message) => {
-      void this.receiveClientMessage(session, message);
+    connection.onMessage((message: unknown) => {
+      // Client input is untrusted: a message without a string `type` (e.g. `null`) cannot be dispatched.
+      if (typeof message !== 'object' || message === null || typeof (message as { type?: unknown }).type !== 'string') {
+        logger.warn('Discarding malformed message', { clientId: session.clientId });
+        return;
+      }
+      // A rejection escaping here would be unhandled and terminate the process for every tenant.
+      this.receiveClientMessage(session, message as UseAIClientMessage).catch((error: unknown) => {
+        logger.error('Unhandled error while handling message', {
+          error: error instanceof Error ? error.message : 'Unknown error',
+          clientId: session.clientId,
+        });
+      });
     });
 
     connection.onClose(() => {
@@ -494,9 +507,6 @@ export class UseAIServer {
     // Create AbortController for this run (used to cancel pending tool calls/approvals on disconnect)
     session.abortController = new AbortController();
 
-    // Store MCP headers for this request (will be cleared after run completes)
-    session.currentMcpHeaders = mcpHeaders;
-
     // Merge client tools with MCP tools from all endpoints
     const clientTools = tools.map(t => ({
       ...t,
@@ -614,12 +624,21 @@ export class UseAIServer {
       return '';
     };
 
+    // Before resolving refs, so that urls from the trusted resolver are not filtered.
+    const { messages: safeMessages, dropped: droppedUrlParts } = dropRemoteUrlParts(messages);
+    if (droppedUrlParts > 0) {
+      logger.warn('Dropped client-supplied attachment urls that would be fetched by the server', {
+        runId,
+        droppedUrlParts,
+      });
+    }
+
     // Resolve refs once at run start, before AI SDK conversion (not per step; see ResolveAttachments for the contract).
-    let resolvedMessages = messages;
+    let resolvedMessages = safeMessages;
     let resolveErrored = false;
     if (this.resolveAttachments) {
       try {
-        resolvedMessages = await resolveAttachmentParts(messages, this.resolveAttachments, { forwardedProps });
+        resolvedMessages = await resolveAttachmentParts(safeMessages, this.resolveAttachments, { forwardedProps });
       } catch (error) {
         // A resolver failure must not bring down the whole run. Degrade and continue unresolved
         // (respond with text only), dropping the attachment; the WARN below records it.
@@ -628,7 +647,7 @@ export class UseAIServer {
           runId,
           error: error instanceof Error ? error.message : String(error),
         });
-        resolvedMessages = messages;
+        resolvedMessages = safeMessages;
       }
     }
 
@@ -830,6 +849,7 @@ export class UseAIServer {
       state,
       systemPrompt,
       originalInput: message.data,
+      mcpHeaders,
     };
 
     // Run beforeRunAgent hooks from all plugins
@@ -848,12 +868,7 @@ export class UseAIServer {
     }
 
     // Delegate to selected agent
-    try {
-      await selectedAgent.run(agentInput, eventEmitter);
-    } finally {
-      // Clear MCP headers after run completes (success or failure)
-      delete session.currentMcpHeaders;
-    }
+    await selectedAgent.run(agentInput, eventEmitter);
   }
 
   private buildSystemPrompt(session: ClientSession, state: unknown): string | undefined {

@@ -129,6 +129,20 @@ describe('Error Handling', () => {
     socket.disconnect();
   });
 
+  test('Server survives malformed messages and keeps serving the connection', async () => {
+    const socket = await cleanup.createTestClient(testPort);
+
+    for (const malformed of [null, undefined, 'run_agent', 42, [], {}, { type: 123 }]) {
+      socket.emit('message', malformed);
+    }
+
+    sendRunAgent(socket, { prompt: 'still alive?', tools: [] });
+    const finished = await waitForEventType(socket, EventType.RUN_FINISHED);
+    expect(finished.type).toBe(EventType.RUN_FINISHED);
+
+    socket.disconnect();
+  });
+
   test('user stops generation while a tool call is pending → RUN_ERROR(ABORTED) with no STEP_FINISHED for the aborted step', async () => {
     // Create a custom server with slow tool execution
     const abortPort = 9302;

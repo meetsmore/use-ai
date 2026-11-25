@@ -23,6 +23,7 @@ function makeToolSystem(): UseToolSystemReturn {
     storePendingToolCall: mock(),
     approveAll: mock(async () => undefined),
     rejectAll: mock(),
+    endRun: mock(),
   } as unknown as UseToolSystemReturn;
 }
 
