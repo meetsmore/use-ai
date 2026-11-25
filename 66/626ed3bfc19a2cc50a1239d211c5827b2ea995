@@ -1,0 +1,25 @@
+packages/server/src/agents/AISDKAgent.trace-attributes.test.ts
+  s_5b6ae52c5982e2::t_aae04792d5c557 138-139,167-173
+packages/server/src/agents/AISDKAgent.ts
+  s_5b6ae52c5982e2::t_8965fd8d7eb37d 427-443,665-666,671-672,674-677,681-682,684-690,709,1516
+packages/server/src/instrumentation.ts
+  s_5b6ae52c5982e2::t_8965fd8d7eb37d 75,78-79
+packages/server/src/instrumentation.test.ts
+  s_5b6ae52c5982e2::t_aae04792d5c557 152-155,163-164
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "66626ed3bfc19a2cc50a1239d211c5827b2ea995",
+  "prompts": {},
+  "sessions": {
+    "s_5b6ae52c5982e2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f6e97dc5-3649-469f-8723-97876212976e",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "yuma.ito <yuma.ito@meetsmore.com>"
+    }
+  }
+}
