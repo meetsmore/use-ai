@@ -1,7 +1,7 @@
 import { Server as SocketIOServer } from 'socket.io';
 import { ModelMessage, ToolModelMessage } from 'ai';
 import { createHash } from 'crypto';
-import { EventType, type McpHeadersMap, type UseAIForwardedProps, type ResolveAttachments } from '@meetsmore-oss/use-ai-core';
+import { EventType, ErrorCode, type McpHeadersMap, type UseAIForwardedProps, type ResolveAttachments } from '@meetsmore-oss/use-ai-core';
 import { resolveAttachmentParts, countRefParts, dropRemoteUrlParts } from './attachmentResolution';
 import type {
   UseAIServerConfig,
@@ -405,9 +405,10 @@ export class UseAIServer {
           metadata: { ...unhandledForwardedProps?.telemetryMetadata },
         });
       }
+      // The raw message may expose internal details (hostnames, stack info); it is logged above.
       this.sendEvent(session.socket, {
         type: EventType.RUN_ERROR,
-        message: error instanceof Error ? error.message : 'Unknown error',
+        message: ErrorCode.UNKNOWN_ERROR,
         timestamp: Date.now(),
       });
     }

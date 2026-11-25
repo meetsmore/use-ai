@@ -51,6 +51,7 @@ bun run kill                   # Kill processes on ports 3000, 3002, 8081
 - `ANTHROPIC_API_KEY` (required)
 - `ANTHROPIC_WORKSPACE_ID` (required for an identity-linked key): sent as the `anthropic-workspace-id` header
 - `LOG_FORMAT` (optional): `pretty` (default) or `json`
+- `LOG_CONTENT` (optional): `true` to also log user prompts, AI responses and tool results (off by default)
 - `RATE_LIMIT_MAX_REQUESTS` (optional): Max requests per window (0 = unlimited)
 - `RATE_LIMIT_WINDOW_MS` (optional): Window in ms (default: 60000)
 - `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_BASE_URL` (optional): LLM observability

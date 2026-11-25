@@ -1332,7 +1332,7 @@ export class AISDKAgent implements Agent {
         // for the failed tool), and after server restart the Anthropic API
         // rejects with: "tool_use ids were found without tool_result blocks"
         const errorContent = chunk.error instanceof Error ? chunk.error.message : String(chunk.error);
-        logger.toolResult(chunk.toolName, `ERROR: ${errorContent}`);
+        logger.toolError(chunk.toolName, chunk.toolCallId, chunk.error);
 
         events.emit<ToolCallResultEvent>({
           type: EventType.TOOL_CALL_RESULT,
