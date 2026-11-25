@@ -613,6 +613,7 @@ function EditableApproval({ approvals, onApprove, onApproveWithArgs, onReject }:
 - Invalid edits do not run the tool; the AI receives an error result that names each failing field.
 - MCP `confirmation_required` tools: edited arguments go through phase 1 again. A new `confirmation_required` asks the user again, with the `message`, `metadata` and `additional_columns` phase 1 returns for the edited arguments; any other phase-1 result is returned as the tool result. Phase 2 only runs arguments phase 1 has seen.
 - Client tools: the browser runs the tool with the edited arguments, and the tool's Zod schema validates them. Invalid ones return the validation error to the AI.
+- Client tools run only with the arguments the user approved. Without edits, the arguments shown in the approval request must equal the arguments of the tool call. If they differ, or the tool names differ, the tool does not run and the AI receives an error result.
 - Omitting the edited arguments (`onApprove`, or no entry for a call) behaves exactly as a plain approval.
 - Runtime approvals requested with `ctx.requestApproval` do not accept edits: `acceptsModifiedArgs` is unset, and an edited approval that reaches the server is denied rather than run with the original arguments.
 - The AI's history keeps the arguments it proposed, followed by the result of the edited call, so return what was actually done in the tool result.
