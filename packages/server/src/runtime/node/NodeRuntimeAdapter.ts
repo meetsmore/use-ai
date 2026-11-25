@@ -1,9 +1,9 @@
-import { createServer, type Server as HttpServer } from 'http';
+import { createServer, type IncomingHttpHeaders, type Server as HttpServer } from 'http';
 import type { Server as SocketIOServer } from 'socket.io';
 import { WebSocketServer } from 'ws';
 import type { RuntimeAdapter, RuntimeListener, RuntimeServerConfig, RuntimeServerHandle, WebSocketListener } from '../types';
 import { forwardedClientIp } from '../clientIp';
-import { isOriginAllowed } from '../origin';
+import { isOriginAllowed, type OriginCheckHeaders } from '../origin';
 import { NodeRawWebSocket } from './rawWebSocket';
 
 /**
@@ -61,7 +61,7 @@ export class NodeRuntimeAdapter implements RuntimeAdapter {
       } : undefined,
       // Runs on each handshake, polling or WebSocket. Later requests belong to an accepted session.
       allowRequest: config.allowedOrigins
-        ? (req, callback) => callback(null, isOriginAllowed(req.headers.origin, config.allowedOrigins))
+        ? (req, callback) => callback(null, isOriginAllowed(originCheckHeaders(req.headers), config.allowedOrigins))
         : undefined,
     });
 
@@ -91,7 +91,7 @@ export class NodeRuntimeAdapter implements RuntimeAdapter {
         socket.destroy();
         return;
       }
-      if (!isOriginAllowed(req.headers.origin, config.allowedOrigins)) {
+      if (!isOriginAllowed(originCheckHeaders(req.headers), config.allowedOrigins)) {
         socket.end('HTTP/1.1 403 Forbidden\r\nConnection: close\r\nContent-Length: 0\r\n\r\n');
         return;
       }
@@ -102,4 +102,13 @@ export class NodeRuntimeAdapter implements RuntimeAdapter {
     });
     return wss;
   }
+}
+
+/** Reads the origin check headers from a Node request. A repeated header is ignored. */
+function originCheckHeaders(headers: IncomingHttpHeaders): OriginCheckHeaders {
+  const secFetchSite = headers['sec-fetch-site'];
+  return {
+    origin: headers.origin,
+    secFetchSite: typeof secFetchSite === 'string' ? secFetchSite : undefined,
+  };
 }

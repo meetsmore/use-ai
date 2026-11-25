@@ -46,8 +46,9 @@ function webSocketOpens(url: string, origin?: string): Promise<boolean> {
 }
 
 /** Status of a Socket.IO polling handshake sent with the given Origin. */
-async function pollingHandshakeStatus(port: number, origin?: string): Promise<number> {
+async function pollingHandshakeStatus(port: number, origin?: string, secFetchSite?: string): Promise<number> {
   const headers: Record<string, string> = origin ? { Origin: origin } : {};
+  if (secFetchSite) headers['Sec-Fetch-Site'] = secFetchSite;
   const response = await fetch(`http://localhost:${port}/socket.io/?EIO=4&transport=polling`, { headers });
   await response.text();
   return response.status;
@@ -107,6 +108,23 @@ describe.each(RUNTIMES)('Origin check: %s runtime', (runtime) => {
 
       test('refuses a polling handshake without an Origin header', async () => {
         expect(await pollingHandshakeStatus(restrictedPort)).toBe(403);
+      });
+
+      // Browsers do not send Origin on a same-origin GET, for example when the app and
+      // the server share an origin behind a reverse proxy.
+      test('accepts a polling handshake without Origin when Sec-Fetch-Site is same-origin', async () => {
+        expect(await pollingHandshakeStatus(restrictedPort, undefined, 'same-origin')).toBe(200);
+      });
+
+      test.each(['same-site', 'cross-site', 'none'])(
+        'refuses a polling handshake without Origin when Sec-Fetch-Site is %s',
+        async (secFetchSite) => {
+          expect(await pollingHandshakeStatus(restrictedPort, undefined, secFetchSite)).toBe(403);
+        },
+      );
+
+      test('refuses a polling handshake from another origin even when Sec-Fetch-Site is same-origin', async () => {
+        expect(await pollingHandshakeStatus(restrictedPort, OTHER, 'same-origin')).toBe(403);
       });
     }
 

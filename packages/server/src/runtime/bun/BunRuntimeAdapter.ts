@@ -64,7 +64,10 @@ export class BunRuntimeAdapter implements RuntimeAdapter {
           return new Response('Not Found', { status: 404, headers: corsHeaders });
         }
 
-        if (!isOriginAllowed(requestOrigin, config.allowedOrigins)) {
+        if (!isOriginAllowed(
+          { origin: requestOrigin, secFetchSite: req.headers.get('Sec-Fetch-Site') || undefined },
+          config.allowedOrigins,
+        )) {
           return new Response('Forbidden', { status: 403, headers: corsHeaders });
         }
 

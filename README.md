@@ -1179,7 +1179,12 @@ To refuse connections from other sites, set `allowedOrigins` on `UseAIServer`, o
 - With `transport: 'socketio'`, the server refuses the handshake (polling or WebSocket) with HTTP 403.
 - With `transport: 'websocket'`, the server refuses the upgrade at `/` with HTTP 403.
 
-Each entry must match the `Origin` header exactly: scheme, host and port, with no trailing slash, for example `https://app.example.com`. The server also refuses a request that has no `Origin` header. Browsers always send this header on a WebSocket upgrade and on a cross-origin request.
+Each entry must match the `Origin` header exactly: scheme, host and port, with no trailing slash, for example `https://app.example.com`. Browsers always send the `Origin` header on a WebSocket upgrade and on a cross-origin request. But a browser does not send it on a same-origin GET. An example is the first Socket.IO polling handshake when the app and the server share an origin behind a reverse proxy. For a request that has no `Origin` header, the server reads `Sec-Fetch-Site`:
+
+- If `Sec-Fetch-Site` is `same-origin`, the server accepts the request.
+- In all other cases, the server refuses the request. This includes a missing header, `same-site`, `cross-site` and `none`.
+
+A page cannot set `Sec-Fetch-Site`, so another site cannot make the browser send `same-origin`. The browser compares the page with the server's own origin, not with `allowedOrigins`. As a result, any page on the server's own origin can connect, even if `allowedOrigins` does not name that origin. Do not serve untrusted content on the same origin as the server.
 
 A non-browser client can send any `Origin` header. The origin check stops other sites in a browser, but it does not replace authentication. Use an auth plugin as well.
 
