@@ -25,7 +25,7 @@ export interface ClientConnection {
  * Contains all state needed for multi-turn conversations and tool coordination.
  */
 export interface ClientSession {
-  /** Unique identifier for this client connection */
+  /** Unique identifier for this client connection (`client-<uuid v4>`, unique across processes) */
   clientId: string;
   /** IP address of the client (used for rate limiting) */
   ipAddress: string;
