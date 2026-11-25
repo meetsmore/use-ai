@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import type { CommandRepository, SavedCommand } from '../commands/types';
 import { LocalStorageCommandRepository } from '../commands/LocalStorageCommandRepository';
+import { logger } from '../utils/logger';
 
 export interface UseCommandManagementOptions {
   /** Custom command repository. Defaults to LocalStorageCommandRepository. */
@@ -61,7 +62,7 @@ export function useCommandManagement({
     try {
       const cmdList = await repositoryRef.current.listCommands();
       setCommands(cmdList);
-      console.log('[CommandManagement] Loaded', cmdList.length, 'commands');
+      logger.debug('[CommandManagement] Loaded', cmdList.length, 'commands');
     } catch (err) {
       console.error('[CommandManagement] Failed to load commands:', err);
     }
@@ -70,7 +71,7 @@ export function useCommandManagement({
   const saveCommand = useCallback(async (name: string, text: string): Promise<string> => {
     const id = await repositoryRef.current.createCommand({ name, text });
     await refreshCommands();
-    console.log('[CommandManagement] Saved command:', name);
+    logger.debug('[CommandManagement] Saved command:', name);
     return id;
   }, [refreshCommands]);
 
@@ -80,13 +81,13 @@ export function useCommandManagement({
     command.name = newName.trim();
     await repositoryRef.current.updateCommand(command);
     await refreshCommands();
-    console.log('[CommandManagement] Renamed command:', id, 'to', newName);
+    logger.debug('[CommandManagement] Renamed command:', id, 'to', newName);
   }, [refreshCommands]);
 
   const deleteCommand = useCallback(async (id: string): Promise<void> => {
     await repositoryRef.current.deleteCommand(id);
     await refreshCommands();
-    console.log('[CommandManagement] Deleted command:', id);
+    logger.debug('[CommandManagement] Deleted command:', id);
   }, [refreshCommands]);
 
   // Load commands on mount

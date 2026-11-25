@@ -21,6 +21,7 @@ import type { UseAIStrings } from '../theme';
 import type { PersistedMessage, MessageDisplayMode } from '../providers/chatRepository/types';
 import { extractTurnMessages } from '../utils/messageConversion';
 import { getToolCallStatus } from '../utils/toolCalls';
+import { logger } from '../utils/logger';
 
 export interface UseServerEventsOptions {
   /** Tool system for executing tools and looking up tool metadata */
@@ -395,7 +396,7 @@ export function useServerEvents({
       // Server and MCP tools are never sent by the client. The server runs
       // them and sends their result as TOOL_CALL_RESULT, so leave them to it.
       if (!tool && !runTool) {
-        console.log(`[ServerEvents] Tool "${name}" is not a client tool, the server runs it`);
+        logger.debug(`[ServerEvents] Tool "${name}" is not a client tool, the server runs it`);
         return;
       }
 
@@ -409,7 +410,7 @@ export function useServerEvents({
 
       // Defer execution if tool requires approval
       if (destructive) {
-        console.log(`[ServerEvents] Tool "${name}" requires approval, deferring execution`);
+        logger.debug(`[ServerEvents] Tool "${name}" requires approval, deferring execution`);
         ts.storePendingToolCall(toolCallId, name, input, toolCallData);
         return;
       }

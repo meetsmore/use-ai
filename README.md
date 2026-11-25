@@ -50,6 +50,7 @@ A React client/framework for easily enabling AI to control your users frontend.
     - [Theme Customization](#theme-customization)
     - [Internationalization](#internationalization)
     - [Multi-agent Support](#multi-agent-support)
+    - [Debug Logs](#debug-logs)
   - [Server](#server)
     - ['Batteries included' server](#batteries-included-server)
     - [`UseAIServer`](#useaiserver)
@@ -1093,6 +1094,18 @@ await chat.sendMessage('Summarize this file', { newChat: true, agent: 'document-
 ```
 
 Chats created without `agent` follow the global selection. An `agent` in forwarded props, from `forwardedPropsProvider` or from the message, still overrides both. A custom `ChatRepository` must persist the chat's `agent` field.
+
+### Debug Logs
+
+The client does not write debug logs to the browser console by default. Debug logs can contain user data, such as tool arguments, workflow inputs and chat IDs. On a shared machine, the next user can read them in DevTools.
+
+To turn on debug logs, use one of these:
+
+- Set the `debug` prop: `<UseAIProvider serverUrl="..." debug>`.
+- Run `localStorage.setItem('use-ai:debug', 'true')` in the browser console.
+- Call `setDebugLogging(true)` when you use `UseAIClient` without the provider.
+
+Do not turn on debug logs in production. Warnings and errors are always written. They do not include tool arguments, workflow inputs or message content.
 
 ## Server
 

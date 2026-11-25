@@ -6,6 +6,7 @@ import { installSocketIOMock } from '../../test/socketIOMock';
 // instead: see client.test.ts.
 const sio = installSocketIOMock();
 const { SocketIOTransport } = await import('./SocketIOTransport');
+const { setDebugLogging } = await import('../utils/logger');
 
 describe('SocketIOTransport', () => {
   let consoleLogSpy: ReturnType<typeof spyOn>;
@@ -17,6 +18,7 @@ describe('SocketIOTransport', () => {
   });
 
   afterEach(() => {
+    setDebugLogging(false);
     consoleLogSpy.mockRestore();
     consoleWarnSpy.mockRestore();
   });
@@ -86,7 +88,15 @@ describe('SocketIOTransport', () => {
     expect(consoleWarnSpy).toHaveBeenCalledTimes(2);
   });
 
-  test('logs transport upgrades', () => {
+  test('does not log the transport when debug logs are off', () => {
+    new SocketIOTransport('http://localhost:8081').connect();
+    sio.fire('connect');
+
+    expect(consoleLogSpy).not.toHaveBeenCalled();
+  });
+
+  test('logs transport upgrades when debug logs are on', () => {
+    setDebugLogging(true);
     new SocketIOTransport('http://localhost:8081').connect();
     sio.fire('connect');
 
