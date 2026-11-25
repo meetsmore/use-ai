@@ -88,6 +88,8 @@ export class UseAIClient {
   // Session state
   private _threadId: string | null = null;
   private _tools: ToolDefinition[] = [];
+  // Every client tool sent to the server during the current run, by name. See getRunTool().
+  private _runTools: Map<string, ToolDefinition> = new Map();
   private _messages: Message[] = [];
   // Message buffer of the in-flight run when it belongs to a thread other than the one shown
   // (dispatched for another thread, or the thread changed mid-run). null: the run uses _messages.
@@ -452,6 +454,8 @@ export class UseAIClient {
       },
     };
 
+    this._runTools = new Map();
+    this.rememberRunTools();
     this.send({
       type: 'run_agent',
       data: runInput,
@@ -493,6 +497,7 @@ export class UseAIClient {
     // API ordering: assistant(toolCalls) → tool results → assistant(text))
     this.recordToolResult(this._pendingToolResults, toolCallId, toolResultMessage.data.content, toolResultMessage.data.messageId);
 
+    this.rememberRunTools();
     this.send(toolResultMessage);
   }
 
@@ -667,6 +672,27 @@ export class UseAIClient {
    */
   getToolCallData(toolCallId: string): { name: string; args: string } | undefined {
     return this.currentToolCalls.get(toolCallId);
+  }
+
+  /**
+   * Finds a client tool that this client sent to the server during the current
+   * run, as last sent. The server waits for the client's result of a call to
+   * such a tool, even when the tool was removed since. Server and MCP tools are
+   * never sent by the client, so this returns `undefined` for them: the server
+   * runs them and sends their result itself.
+   *
+   * @param name - The tool name the model called, e.g. "Row 1_updateLabel"
+   * @returns The tool definition as last sent, or undefined
+   */
+  getRunTool(name: string): ToolDefinition | undefined {
+    return this._runTools.get(name);
+  }
+
+  /** Adds the client tools that go to the server now (`_tools`) to the current run's tools. */
+  private rememberRunTools(): void {
+    for (const tool of this._tools) {
+      this._runTools.set(tool.name, tool);
+    }
   }
 
   /**

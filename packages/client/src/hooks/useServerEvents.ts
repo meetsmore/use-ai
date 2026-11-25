@@ -390,15 +390,25 @@ export function useServerEvents({
       const name = toolCallData.name;
       const input = JSON.parse(toolCallData.args);
 
-      // Skip tools not in our registry
       const tool = ts.aggregatedToolsRef.current[name];
-      if (!tool) {
-        console.log(`[ServerEvents] Tool "${name}" not found in useAI tools, skipping`);
+      const runTool = client.getRunTool(name);
+      // Server and MCP tools are never sent by the client. The server runs
+      // them and sends their result as TOOL_CALL_RESULT, so leave them to it.
+      if (!tool && !runTool) {
+        console.log(`[ServerEvents] Tool "${name}" is not a client tool, the server runs it`);
         return;
       }
 
+      // A client tool that is gone from the registry (for example, its
+      // component unmounted during the run) still goes through
+      // executeToolCall: it sends an error result, so the server does not
+      // wait for a result that never comes.
+      const destructive = tool
+        ? tool._options?.annotations?.destructiveHint === true
+        : runTool?.annotations?.destructiveHint === true;
+
       // Defer execution if tool requires approval
-      if (tool._options?.annotations?.destructiveHint === true) {
+      if (destructive) {
         console.log(`[ServerEvents] Tool "${name}" requires approval, deferring execution`);
         ts.storePendingToolCall(toolCallId, name, input, toolCallData);
         return;
