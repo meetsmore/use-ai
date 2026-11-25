@@ -166,10 +166,44 @@ describe('Plugin Architecture', () => {
     sessionServer.close();
   });
 
-  test('WorkflowsPlugin enables headless workflow execution', () => {
-    // WorkflowsPlugin is tested in the workflows package
-    // This test just verifies the concept
-    expect(true).toBe(true);
+  test('clientId is unique across server instances (pods and restarts)', async () => {
+    // Two server instances stand for two pods, or one pod before and after a restart.
+    // A per-process counter gives "client-1" on both, which merges tenants in Langfuse and Dify.
+    const ports = [9018, 9019];
+    const clientIds: string[] = [];
+
+    class CapturePlugin implements UseAIServerPlugin {
+      getName(): string {
+        return 'capture-client-id';
+      }
+
+      registerHandlers(): void {}
+
+      onClientConnect(session: ClientSession): void {
+        clientIds.push(session.clientId);
+      }
+    }
+
+    for (const port of ports) {
+      const instance = new UseAIServer({
+        port,
+        agents: { test: createTestAgent() },
+        defaultAgent: 'test',
+        plugins: [new CapturePlugin()],
+      });
+      cleanup.trackServer(instance);
+
+      const socket = await cleanup.createTestClient(port);
+      await new Promise(resolve => setTimeout(resolve, 100));
+      socket.disconnect();
+      instance.close();
+    }
+
+    expect(clientIds).toHaveLength(2);
+    expect(clientIds[0]).not.toBe(clientIds[1]);
+    for (const clientId of clientIds) {
+      expect(clientId).toMatch(/^client-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+    }
   });
 
   test('beforeRunAgent hook is called before agent execution', async () => {
@@ -197,14 +231,17 @@ describe('Plugin Architecture', () => {
 
     const socket = await cleanup.createTestClient(hookPort);
 
+    const mcpHeaders = { 'http://mcp.test/*': { headers: { Authorization: 'Bearer user-token' } } };
     const eventsPromise = collectEventsUntil(socket, EventType.RUN_FINISHED);
-    sendRunAgent(socket, { prompt: 'Hello' });
+    sendRunAgent(socket, { prompt: 'Hello', forwardedProps: { mcpHeaders } });
     await eventsPromise;
 
     expect(hookCalledWith).not.toBeNull();
     expect(hookCalledWith!.session).toBeDefined();
     expect(hookCalledWith!.runId).toBeDefined();
     expect(hookCalledWith!.messages).toBeDefined();
+    // MCP headers belong to the run, not the shared session
+    expect(hookCalledWith!.mcpHeaders).toEqual(mcpHeaders);
 
     socket.disconnect();
     hookServer.close();

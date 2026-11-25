@@ -15,7 +15,6 @@ COPY package.json bun.lock ./
 COPY packages/core/package.json ./packages/core/
 COPY packages/client/package.json ./packages/client/
 COPY packages/server/package.json ./packages/server/
-COPY packages/plugin-workflows/package.json ./packages/plugin-workflows/
 COPY apps/use-ai-server-app/package.json ./apps/use-ai-server-app/
 COPY apps/example/package.json ./apps/example/
 COPY apps/example-nest-mcp-server/package.json ./apps/example-nest-mcp-server/
@@ -30,14 +29,12 @@ FROM base AS build
 COPY --from=install /app/node_modules ./node_modules
 COPY --from=install /app/packages/core/node_modules ./packages/core/node_modules
 COPY --from=install /app/packages/server/node_modules ./packages/server/node_modules
-COPY --from=install /app/packages/plugin-workflows/node_modules ./packages/plugin-workflows/node_modules
 COPY --from=install /app/apps/use-ai-server-app/node_modules ./apps/use-ai-server-app/node_modules
 
 # Copy source files
 COPY package.json bun.lock turbo.json tsconfig.json ./
 COPY packages/core ./packages/core
 COPY packages/server ./packages/server
-COPY packages/plugin-workflows ./packages/plugin-workflows
 COPY apps/use-ai-server-app ./apps/use-ai-server-app
 
 # Build all packages
@@ -64,11 +61,6 @@ COPY --from=build /app/packages/core/node_modules ./packages/core/node_modules
 COPY --from=build /app/packages/server/dist ./packages/server/dist
 COPY --from=build /app/packages/server/package.json ./packages/server/
 COPY --from=build /app/packages/server/node_modules ./packages/server/node_modules
-
-# Copy built plugin-workflows package
-COPY --from=build /app/packages/plugin-workflows/dist ./packages/plugin-workflows/dist
-COPY --from=build /app/packages/plugin-workflows/package.json ./packages/plugin-workflows/
-COPY --from=build /app/packages/plugin-workflows/node_modules ./packages/plugin-workflows/node_modules
 
 # Copy built server app
 COPY --from=build /app/apps/use-ai-server-app/dist ./apps/use-ai-server-app/dist
@@ -108,8 +100,6 @@ LABEL config.env.required.anthropic_api_key="Anthropic Claude API key (required 
       config.env.optional.langfuse_public_key="Langfuse public key for observability" \
       config.env.optional.langfuse_secret_key="Langfuse secret key for observability" \
       config.env.optional.langfuse_base_url="Langfuse base URL (default: https://cloud.langfuse.com)" \
-      config.env.optional.dify_api_url="Dify API base URL for workflow integration" \
-      config.env.pattern.dify_workflow_keys="DIFY_<WORKFLOW>_KEY for workflow-specific API keys" \
       config.env.pattern.mcp_endpoints="MCP_ENDPOINT_<NAME>_URL/NAMESPACE/TIMEOUT for MCP servers"
 
 # --- Server Configuration ---

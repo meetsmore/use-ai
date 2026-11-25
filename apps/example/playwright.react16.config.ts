@@ -51,6 +51,8 @@ export default defineConfig({
         OPENAI_API_KEY: process.env.OPENAI_API_KEY!,
         MCP_ENDPOINT_LOCALDEV_URL: 'http://localhost:3002/mcp',
         MCP_ENDPOINT_LOCALDEV_NAMESPACE: 'mcp',
+        // The example MCP server authenticates with X-API-Key sent from the client
+        MCP_ENDPOINT_LOCALDEV_ALLOWED_CLIENT_HEADERS: 'Authorization,X-API-Key',
         LOG_SILENT: 'true',
       },
     },
