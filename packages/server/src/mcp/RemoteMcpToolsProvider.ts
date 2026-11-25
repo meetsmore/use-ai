@@ -75,13 +75,7 @@ export class RemoteMcpToolsProvider {
   async fetchToolsWithHeaders(headers: Record<string, string> = {}): Promise<RemoteToolDefinition[]> {
     const timeout = this.config.timeout || 30000;
 
-    // Merge: Content-Type + server-wide headers + per-user auth headers
-    const mergedHeaders: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json, text/event-stream',
-      ...this.config.headers,  // Server-wide headers
-      ...headers,              // Per-user auth headers (override)
-    };
+    const mergedHeaders = this.buildHeaders(headers);
 
     const hasHeaders = Object.keys(mergedHeaders).length > 2; // More than Content-Type and Accept
     if (hasHeaders) {
@@ -194,32 +188,14 @@ export class RemoteMcpToolsProvider {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-    // Build headers: server-wide config + per-request headers override
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json, text/event-stream',
-      ...this.config.headers,  // Server-wide configured headers
-    };
-
-    // Apply per-request headers if provided and matches this endpoint
-    if (mcpHeaders) {
-      const matchingConfig = findMcpHeadersForUrl(this.url, mcpHeaders);
-
-      if (matchingConfig) {
-        const headerStr = this.formatHeaders(matchingConfig.headers);
-        logger.debug(`[MCP] Applying matched headers to ${this.url}`, {
-          headers: headerStr,
-        });
-        Object.assign(headers, matchingConfig.headers);
-      } else {
-        logger.debug(`[MCP] No matching headers found for ${this.url}`);
-      }
-    } else if (this.config.headers && Object.keys(this.config.headers).length > 0) {
-      const headerStr = this.formatHeaders(this.config.headers);
-      logger.debug(`[MCP] Using configured headers for ${this.url}`, {
-        headers: headerStr,
-      });
+    const matchingConfig = mcpHeaders ? findMcpHeadersForUrl(this.url, mcpHeaders) : undefined;
+    if (mcpHeaders && !matchingConfig) {
+      logger.debug(`[MCP] No matching headers found for ${this.url}`);
     }
+    const headers = this.buildHeaders(matchingConfig?.headers);
+    logger.debug(`[MCP] Request headers for ${this.url}`, {
+      headers: this.formatHeaders(headers),
+    });
 
     try {
       const response = await fetch(this.url, {
@@ -295,6 +271,43 @@ export class RemoteMcpToolsProvider {
    */
   getUrl(): string {
     return this.url;
+  }
+
+  /**
+   * Builds request headers from the client-supplied headers and the server config.
+   * Client headers are limited to `allowedClientHeaders`, and can never replace a
+   * header the server configures, so a client cannot change the identity, tenant or
+   * scope that the server-side config pins.
+   */
+  private buildHeaders(clientHeaders: Record<string, string> = {}): Record<string, string> {
+    const serverHeaders = this.config.headers ?? {};
+    const allowed = new Set(
+      (this.config.allowedClientHeaders ?? ['authorization']).map(name => name.toLowerCase())
+    );
+    // Header names are case-insensitive, so `authorization` from the client must not
+    // be sent next to a server-configured `Authorization`.
+    const serverNames = new Set(Object.keys(serverHeaders).map(name => name.toLowerCase()));
+
+    const accepted: Record<string, string> = {};
+    const dropped: string[] = [];
+    for (const [name, value] of Object.entries(clientHeaders)) {
+      const lower = name.toLowerCase();
+      if (allowed.has(lower) && !serverNames.has(lower)) {
+        accepted[name] = value;
+      } else {
+        dropped.push(name);
+      }
+    }
+    if (dropped.length > 0) {
+      logger.warn(`[MCP] Dropped client headers not allowed for ${this.url}`, { headers: dropped });
+    }
+
+    return {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json, text/event-stream',
+      ...accepted,
+      ...serverHeaders,
+    };
   }
 
   /**

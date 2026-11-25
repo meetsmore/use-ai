@@ -234,7 +234,7 @@ export { EventType } from '@ag-ui/core';
 // use-ai Extensions
 // ============================================================================
 // The following types are use-ai-specific extensions and are NOT part of the
-// AG-UI protocol. They provide additional functionality (like headless workflows)
+// AG-UI protocol. They provide additional functionality (like tool approval and feedback)
 // while keeping the core AG-UI protocol pure and compliant.
 
 /**
@@ -356,6 +356,9 @@ export interface UseAIForwardedProps {
  * - Constant strings: `'https://api.example.com'` - Exact match
  * - Glob patterns: `'https://*.meetsmore.com'` - Wildcard matching using picomatch
  *
+ * The server forwards only the header names allowed by the endpoint's
+ * `allowedClientHeaders` (default: `Authorization`) and drops the others.
+ *
  * Every pattern must name a domain. The host must be a literal host, or `*.` followed
  * by a domain that is not a public suffix. Globs are allowed in the scheme and the path.
  * The server ignores other patterns (for example a wildcard host) and never sends their headers.
@@ -381,20 +384,15 @@ export interface UseAIForwardedProps {
 export type McpHeadersMap = Record<string, McpHeadersConfig>;
 
 /**
- * Status of a workflow execution.
- */
-export type WorkflowStatus = 'idle' | 'running' | 'completed' | 'error';
-
-/**
  * Extended message type for use-ai.
  * Includes AG-UI protocol messages ('run_agent', 'tool_result', 'abort_run')
- * plus use-ai-specific extensions ('run_workflow', 'message_feedback', 'tool_approval_response').
+ * plus use-ai-specific extensions ('message_feedback', 'tool_approval_response').
  *
- * Note: This extends beyond AG-UI protocol to support headless workflow triggers.
+ * Note: This extends beyond AG-UI protocol.
  * For AG-UI compliance, use ClientMessage instead.
  */
 export interface UseAIClientMessage {
-  type: 'run_agent' | 'tool_result' | 'abort_run' | 'run_workflow' | 'message_feedback' | 'tool_approval_response';
+  type: 'run_agent' | 'tool_result' | 'abort_run' | 'message_feedback' | 'tool_approval_response';
   data: unknown;
 }
 
@@ -419,56 +417,6 @@ export interface FeedbackMessage {
     traceId: string;
     /** Feedback value: 'upvote' for positive, 'downvote' for negative, null to remove */
     feedback: FeedbackValue;
-  };
-}
-
-/**
- * Message sent from client to server to run a workflow (headless execution).
- *
- * This is a use-ai-specific extension, NOT part of AG-UI protocol.
- * Used for triggering workflows without chat UI (e.g., button click, file upload).
- *
- * Workflows differ from agents:
- * - No conversation history (stateless)
- * - No chat UI involvement
- * - Can use external platforms (Dify, Flowise, etc.)
- * - Still supports tool calls to frontend
- *
- * @example
- * ```typescript
- * socket.emit('message', {
- *   type: 'run_workflow',
- *   data: {
- *     runner: 'dify',
- *     workflowId: 'pdf-processor',
- *     inputs: { file: pdfData },
- *     tools: [insertTextTool],
- *     runId: uuidv4(),
- *     threadId: uuidv4(),
- *   }
- * });
- * ```
- */
-export interface RunWorkflowMessage {
-  type: 'run_workflow';
-  data: {
-    /** The runner to use (e.g., 'dify', 'flowise') */
-    runner: string;
-    /** The workflow identifier (depends on which platform you are using) */
-    workflowId: string;
-    /** Input data for the workflow */
-    inputs: Record<string, any>;
-    /** Available tools that the workflow can call */
-    tools?: ToolDefinition[];
-    /** Run ID for tracking */
-    runId: string;
-    /** Thread ID for conversation tracking */
-    threadId: string;
-    /**
-     * AG-UI extension point for additional fields in messages.
-     * @see UseAIForwardedProps
-     */
-    forwardedProps?: UseAIForwardedProps
   };
 }
 

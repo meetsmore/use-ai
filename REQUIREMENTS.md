@@ -197,48 +197,6 @@ This document lists user-facing capabilities in requirements format with test co
 
 ---
 
-## Workflow Features
-
-### Workflow Execution
-
-✅ Headless workflows can be triggered via the `useAIWorkflow` hook
-✅ Workflows are stateless (no conversation history) unlike chat-based agents
-✅ Multiple workflow runners can be configured (e.g., Dify, Flowise)
-✅ Workflows execute via the WorkflowsPlugin on the server
-✅ Only one workflow can run at a time per useAIWorkflow hook instance
-✅ Workflow execution status is tracked (idle, running, completed, error)
-
-### Dify Integration
-
-✅ Dify workflows can be integrated via the DifyWorkflowRunner
-✅ Dify API base URL is configurable
-✅ Workflow IDs map to Dify app API keys
-✅ The system sends requests to Dify's /workflows/run endpoint
-✅ The system handles Dify's Server-Sent Events (SSE) streaming responses
-✅ Text output from Dify workflows is streamed to the client in real-time
-✅ The system implements timeouts for Dify requests (100 seconds)
-✅ The system provides helpful error messages for Dify API failures (404, 401, 500)
-
-### Workflow Lifecycle & Callbacks
-
-✅ Workflow inputs can be provided as arbitrary JSON data
-✅ Progress callbacks can track workflow execution (onProgress, onComplete, onError)
-✅ The onProgress callback is called with status updates and accumulated text
-✅ The onComplete callback is called with final results when workflow finishes
-✅ The onError callback is called with error details when workflow fails
-✅ Workflows emit AG-UI protocol events (RUN_STARTED, TEXT_MESSAGE_*, RUN_FINISHED, RUN_ERROR)
-
-### Workflow Tool Integration
-
-✅ Workflows can call back to client-side tools defined with defineTool
-      ⚠️ **NOTE**: DifyWorkflowRunner does not implement tool callbacks yet.
-✅ Tools can be provided to workflows via the trigger options
-✅ Tool calls from workflows are tracked with names, arguments, and results
-✅ The onProgress callback receives updated tool call information after each execution
-✅ Tool execution errors are sent back to the workflow
-
----
-
 ## Protocol & Types
 
 ### AG-UI Protocol

@@ -9,7 +9,6 @@ import type {
   ToolDefinition,
   UseAIClientMessage,
   RunAgentMessage,
-  RunWorkflowMessage,
   ToolResultMessage,
   AbortRunMessage,
   ToolApprovalResponseMessage,
@@ -109,7 +108,6 @@ export class UseAIServer {
   };
   private rateLimiter: RateLimiter;
   private cleanupInterval: NodeJS.Timeout;
-  private clientIdCounter = 0;
   private plugins: UseAIServerPlugin[] = [];
   private messageHandlers: Map<string, MessageHandler> = new Map();
   private mcpEndpoints: RemoteMcpToolsProvider[] = [];
@@ -241,6 +239,9 @@ export class UseAIServer {
       onPollingConnection: (sessionId, ip) => {
         this.clientIpTracker.trackPollingConnection(sessionId, ip);
       },
+      onPollingClose: (sessionId) => {
+        this.clientIpTracker.removePollingConnection(sessionId);
+      },
     });
     logger.info('UseAI server ready', { port: this.config.port, transport: this.config.transport });
   }
@@ -295,7 +296,7 @@ export class UseAIServer {
    * Register a custom message handler for a specific message type.
    * Used by plugins to handle custom message types.
    *
-   * @param type - The message type to handle (e.g., 'run_workflow')
+   * @param type - The message type to handle (e.g., 'message_feedback')
    * @param handler - The handler function to call when this message type is received
    */
   public registerMessageHandler(type: string, handler: MessageHandler): void {
@@ -342,7 +343,9 @@ export class UseAIServer {
    */
   private createSession(connection: ClientConnection): ClientSession {
     const session: ClientSession = {
-      clientId: `client-${++this.clientIdCounter}`,
+      // Random, not a per-process counter: a counter repeats across pods and restarts,
+      // which merges unrelated clients under one Langfuse session or Dify user.
+      clientId: `client-${uuidv4()}`,
       ipAddress: connection.ipAddress,
       socket: connection,
       threadId: uuidv4(),
@@ -503,9 +506,6 @@ export class UseAIServer {
 
     // Create AbortController for this run (used to cancel pending tool calls/approvals on disconnect)
     session.abortController = new AbortController();
-
-    // Store MCP headers for this request (will be cleared after run completes)
-    session.currentMcpHeaders = mcpHeaders;
 
     // Merge client tools with MCP tools from all endpoints
     const clientTools = tools.map(t => ({
@@ -849,6 +849,7 @@ export class UseAIServer {
       state,
       systemPrompt,
       originalInput: message.data,
+      mcpHeaders,
     };
 
     // Run beforeRunAgent hooks from all plugins
@@ -867,12 +868,7 @@ export class UseAIServer {
     }
 
     // Delegate to selected agent
-    try {
-      await selectedAgent.run(agentInput, eventEmitter);
-    } finally {
-      // Clear MCP headers after run completes (success or failure)
-      delete session.currentMcpHeaders;
-    }
+    await selectedAgent.run(agentInput, eventEmitter);
   }
 
   private buildSystemPrompt(session: ClientSession, state: unknown): string | undefined {

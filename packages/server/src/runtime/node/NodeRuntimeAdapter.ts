@@ -66,7 +66,9 @@ export class NodeRuntimeAdapter implements RuntimeAdapter {
         if (socket.transport.name === 'polling') {
           const ip = forwardedClientIp(socket.request.headers['x-forwarded-for'], socket.request.socket?.remoteAddress);
           if (ip) {
-            config.onPollingConnection!(socket.id, ip);
+            const sessionId = socket.id;
+            config.onPollingConnection!(sessionId, ip);
+            socket.once('close', () => config.onPollingClose?.(sessionId));
           }
         }
       });
