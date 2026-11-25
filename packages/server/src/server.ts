@@ -107,6 +107,8 @@ export class UseAIServer {
     transport: 'socketio' | 'websocket';
   };
   private rateLimiter: RateLimiter;
+  // Counts LLM calls (one for each agent step), not runs. Off when rateLimitMaxLlmCalls is 0.
+  private llmCallRateLimiter: RateLimiter;
   private cleanupInterval: NodeJS.Timeout;
   private plugins: UseAIServerPlugin[] = [];
   private messageHandlers: Map<string, MessageHandler> = new Map();
@@ -132,6 +134,7 @@ export class UseAIServer {
       port: config.port ?? 8081,
       rateLimitMaxRequests: config.rateLimitMaxRequests ?? 0,
       rateLimitWindowMs: config.rateLimitWindowMs ?? 60000,
+      rateLimitMaxLlmCalls: config.rateLimitMaxLlmCalls ?? 0,
       maxHttpBufferSize: config.maxHttpBufferSize ?? 20 * 1024 * 1024, // 20MB default
       cors: config.cors,
       idleTimeout: config.idleTimeout ?? 30,
@@ -163,12 +166,17 @@ export class UseAIServer {
       maxRequests: this.config.rateLimitMaxRequests,
       windowMs: this.config.rateLimitWindowMs,
     });
+    this.llmCallRateLimiter = new RateLimiter({
+      maxRequests: this.config.rateLimitMaxLlmCalls,
+      windowMs: this.config.rateLimitWindowMs,
+    });
 
     // Create client IP tracker
     this.clientIpTracker = createClientIpTracker();
 
     this.cleanupInterval = setInterval(() => {
       this.rateLimiter.cleanup();
+      this.llmCallRateLimiter.cleanup();
     }, this.config.rateLimitWindowMs);
 
     // Create RemoteMcpToolsProvider instances (to reference remote tools)
@@ -227,6 +235,12 @@ export class UseAIServer {
     if (this.rateLimiter.isEnabled()) {
       logger.info('Rate limiting enabled', {
         maxRequests: this.config.rateLimitMaxRequests,
+        windowMs: this.config.rateLimitWindowMs,
+      });
+    }
+    if (this.llmCallRateLimiter.isEnabled()) {
+      logger.info('LLM call rate limiting enabled', {
+        maxLlmCalls: this.config.rateLimitMaxLlmCalls,
         windowMs: this.config.rateLimitWindowMs,
       });
     }
@@ -850,6 +864,10 @@ export class UseAIServer {
       systemPrompt,
       originalInput: message.data,
       mcpHeaders,
+      // Uses the same key as the run rate limit above.
+      llmCallLimit: this.llmCallRateLimiter.isEnabled()
+        ? { consume: () => this.llmCallRateLimiter.checkLimit(session.ipAddress) }
+        : undefined,
     };
 
     // Run beforeRunAgent hooks from all plugins

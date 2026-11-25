@@ -5,7 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { AISDKAgent } from './AISDKAgent';
 import type { AgentInput, EventEmitter, AGUIEventExtended } from './types';
 import type { ServerToolDefinition } from '../tools/types';
-import { EventType } from '@meetsmore-oss/use-ai-core';
+import { EventType, ErrorCode } from '@meetsmore-oss/use-ai-core';
 
 function createToolLoopMockModel(toolName: string, calls: { count: number }) {
   return new MockLanguageModelV3({
@@ -280,5 +280,81 @@ describe('AISDKAgent maxSteps', () => {
     expect(result.success).toBe(true);
     // Only 1 call — no graceful summary needed when last step had no tool calls
     expect(calls.count).toBe(1);
+  });
+
+  describe('llmCallLimit', () => {
+    function createCountingLimit(maxCalls: number) {
+      const counter = { consumed: 0 };
+      return {
+        counter,
+        limit: {
+          consume: () => {
+            if (counter.consumed >= maxCalls) {
+              return { allowed: false, retryAfterMs: 1000 };
+            }
+            counter.consumed++;
+            return { allowed: true };
+          },
+        },
+      };
+    }
+
+    test('consumes one unit of the budget for each LLM call', async () => {
+      const calls = { count: 0 };
+      const mockModel = createToolLoopMockModel(loopToolName, calls);
+      const agent = new AISDKAgent({
+        hooks: { loadConfig: () => ({ model: mockModel, maxSteps: 2 }) },
+      });
+      const { counter, limit } = createCountingLimit(100);
+
+      const emittedEvents: AGUIEventExtended[] = [];
+      const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
+
+      const result = await agent.run({ ...createTestInput([loopTool]), llmCallLimit: limit }, eventEmitter);
+
+      expect(result.success).toBe(true);
+      // 2 main iterations + 1 graceful summary call = 3 LLM calls
+      expect(calls.count).toBe(3);
+      expect(counter.consumed).toBe(3);
+    });
+
+    test('stops the run with RUN_ERROR RATE_LIMITED when the budget runs out mid-run', async () => {
+      const calls = { count: 0 };
+      const mockModel = createToolLoopMockModel(loopToolName, calls);
+      const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
+      const { limit } = createCountingLimit(2);
+
+      const emittedEvents: AGUIEventExtended[] = [];
+      const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
+
+      const result = await agent.run({ ...createTestInput([loopTool]), llmCallLimit: limit }, eventEmitter);
+
+      expect(result.success).toBe(false);
+      // Only the 2 allowed calls reach the model; the default maxSteps (10) is not reached
+      expect(calls.count).toBe(2);
+
+      const runErrors = emittedEvents.filter(e => e.type === EventType.RUN_ERROR);
+      expect(runErrors).toHaveLength(1);
+      expect((runErrors[0] as { message: string }).message).toBe(ErrorCode.RATE_LIMITED);
+      expect(emittedEvents.some(e => e.type === EventType.RUN_FINISHED)).toBe(false);
+    });
+
+    test('does not call the model when the budget is already used up', async () => {
+      const calls = { count: 0 };
+      const mockModel = createToolLoopMockModel(loopToolName, calls);
+      const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
+      const { limit } = createCountingLimit(0);
+
+      const emittedEvents: AGUIEventExtended[] = [];
+      const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
+
+      const result = await agent.run({ ...createTestInput([loopTool]), llmCallLimit: limit }, eventEmitter);
+
+      expect(result.success).toBe(false);
+      expect(calls.count).toBe(0);
+      const runErrors = emittedEvents.filter(e => e.type === EventType.RUN_ERROR);
+      expect(runErrors).toHaveLength(1);
+      expect((runErrors[0] as { message: string }).message).toBe(ErrorCode.RATE_LIMITED);
+    });
   });
 });

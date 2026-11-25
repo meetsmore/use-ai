@@ -13,6 +13,7 @@ type AgentModel = ConstructorParameters<typeof AISDKAgent>[0]['model'];
 const port = Number(process.env.PORT) || 8081;
 const rateLimitMaxRequests = Number(process.env.RATE_LIMIT_MAX_REQUESTS) || 0;
 const rateLimitWindowMs = Number(process.env.RATE_LIMIT_WINDOW_MS) || 60000;
+const rateLimitMaxLlmCalls = Number(process.env.RATE_LIMIT_MAX_LLM_CALLS) || 0;
 const logFormat = process.env.LOG_FORMAT || 'pretty';
 // Max HTTP buffer size for file uploads (default 20MB)
 const maxHttpBufferSize = process.env.MAX_HTTP_BUFFER_SIZE
@@ -328,6 +329,7 @@ logger.info('Starting UseAI server', { logFormat });
       defaultAgent,
       rateLimitMaxRequests,
       rateLimitWindowMs,
+      rateLimitMaxLlmCalls,
       plugins,
       mcpEndpoints: mcpEndpoints.length > 0 ? mcpEndpoints : undefined,
       tools: serverTools,
