@@ -1,0 +1,19 @@
+packages/server/src/error-handling.integration.test.ts
+  s_5b6ae52c5982e2::t_e33535c1122166 777,793-795,834,846-847
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b7f220bc76837f08cd41561393ec461416550a3f",
+  "prompts": {},
+  "sessions": {
+    "s_5b6ae52c5982e2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f6e97dc5-3649-469f-8723-97876212976e",
+        "model": "unknown"
+      },
+      "human_author": "yuma.ito <yuma.ito@meetsmore.com>"
+    }
+  }
+}
