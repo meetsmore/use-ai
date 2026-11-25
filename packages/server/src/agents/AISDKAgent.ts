@@ -425,6 +425,23 @@ function extractReasoningSignature(
 }
 
 /**
+ * Metadata keys the server sets on the run span, the steps and the error traces.
+ * A client `telemetryMetadata` value under one of these names is dropped (`sessionId` is read separately by `runSessionId`).
+ */
+const SERVER_TELEMETRY_METADATA_KEYS = [
+  'sessionId', 'threadId', 'runId', 'ipAddress',
+  'toolCount', 'stepIteration', 'gracefulSummary', 'truncationFallback',
+  'errorCode', 'messageCount',
+] as const;
+
+type RunTelemetryMetadata = Record<string, unknown> & {
+  sessionId: string;
+  threadId?: string;
+  runId: string;
+  ipAddress?: string;
+};
+
+/**
  * Agent implementation for AI SDK models (Anthropic, OpenAI, Google, etc.).
  *
  * This agent is provider-agnostic and works with any AI SDK LanguageModel:
@@ -645,26 +662,32 @@ export class AISDKAgent implements Agent {
     });
   }
 
-  /** The client's `forwardedProps.telemetryMetadata`, or an empty object. */
-  private clientTelemetryMetadata(ctx: RunContext): Record<string, unknown> {
+  /** The client's `forwardedProps.telemetryMetadata` as sent, or an empty object. */
+  private rawClientTelemetryMetadata(ctx: RunContext): Record<string, unknown> {
     return (ctx.originalInput.forwardedProps as UseAIForwardedProps | undefined)?.telemetryMetadata ?? {};
   }
 
   /**
-   * Langfuse session of the run: the client's `telemetryMetadata.sessionId` when it is a non-empty string,
-   * else the socket client id. Used for the run span, every step and the error trace, so one run has one session.
+   * The client's `telemetryMetadata` without the keys the server sets on run, step and error metadata,
+   * so a client value under those names never reaches a trace (also on steps that do not set the key).
    */
-  private runSessionId(ctx: RunContext): string {
-    const sessionId = this.clientTelemetryMetadata(ctx).sessionId;
-    return typeof sessionId === 'string' && sessionId !== '' ? sessionId : ctx.session.clientId;
+  private clientTelemetryMetadata(ctx: RunContext): Record<string, unknown> {
+    const metadata = { ...this.rawClientTelemetryMetadata(ctx) };
+    for (const key of SERVER_TELEMETRY_METADATA_KEYS) delete metadata[key];
+    return metadata;
   }
 
   /**
-   * Telemetry metadata shared by the run span and every step.
-   * The client metadata goes first, so the server's run id, thread id and IP address always win,
-   * also when the server value is undefined.
+   * Langfuse session of the run span and its steps: the client's `telemetryMetadata.sessionId`
+   * when it is a non-empty string (documented option), else the socket client id.
    */
-  private runTelemetryMetadata(ctx: RunContext): Record<string, unknown> {
+  private runSessionId(ctx: RunContext): string {
+    const sessionId = this.rawClientTelemetryMetadata(ctx).sessionId;
+    return typeof sessionId === 'string' && sessionId !== '' ? sessionId : ctx.session.clientId;
+  }
+
+  /** Telemetry metadata shared by the run span and every step. The server keys come last and always win. */
+  private runTelemetryMetadata(ctx: RunContext): RunTelemetryMetadata {
     return {
       ...this.clientTelemetryMetadata(ctx),
       sessionId: this.runSessionId(ctx),
@@ -683,7 +706,7 @@ export class AISDKAgent implements Agent {
     for (const [key, value] of Object.entries(metadata)) {
       if (value != null) attributes[`ai.telemetry.metadata.${key}`] = value as AttributeValue;
     }
-    const span = startRunSpan({ runId: runId as string, sessionId: sessionId as string, attributes });
+    const span = startRunSpan({ runId, sessionId, attributes });
 
     const lastUserMessage = [...ctx.messages].reverse().find(m => m.role === 'user');
     if (lastUserMessage) {
@@ -1490,7 +1513,7 @@ export class AISDKAgent implements Agent {
         runId: ctx.runId,
         errorCategory: 'pre_stream_error',
         errorMessage,
-        sessionId: this.runSessionId(ctx),
+        sessionId: ctx.session.clientId,
         threadId: ctx.session.threadId,
         ipAddress: ctx.session.ipAddress,
         metadata: { ...this.clientTelemetryMetadata(ctx), errorCode, toolCount: ctx.tools.length, messageCount: ctx.messages.length },

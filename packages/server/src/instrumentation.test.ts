@@ -149,7 +149,10 @@ describe('recordErrorTrace', () => {
 
     recordErrorTrace({
       ...baseParams,
-      metadata: { runId: 'spoofed-run', errorCategory: 'spoofed', ipAddress: '203.0.113.9', source: 'spoofed', userId: 'user-1' },
+      metadata: {
+        runId: 'spoofed-run', errorCategory: 'spoofed', ipAddress: '203.0.113.9', source: 'spoofed',
+        sessionId: 'spoofed-session', threadId: 'spoofed-thread', userId: 'user-1',
+      },
     });
 
     const root = (await finishedSpans()).find((s: { name: string }) => s.name === 'use-ai-error');
@@ -157,6 +160,8 @@ describe('recordErrorTrace', () => {
     expect(root.attributes[`${A.TRACE_METADATA}.errorCategory`]).toBe('agent_not_found');
     expect(root.attributes[`${A.TRACE_METADATA}.ipAddress`]).toBe('127.0.0.1');
     expect(root.attributes[`${A.TRACE_METADATA}.source`]).toBe('use-ai-server');
+    expect(root.attributes[`${A.TRACE_METADATA}.sessionId`]).toBe('client-1');
+    expect(root.attributes[`${A.TRACE_METADATA}.threadId`]).toBe('thread-abc');
     expect(root.attributes[`${A.TRACE_METADATA}.userId`]).toBe('user-1');
   });
 

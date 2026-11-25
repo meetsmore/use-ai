@@ -135,6 +135,8 @@ describe('AISDKAgent trace-level attributes', () => {
       ipAddress: '203.0.113.9',
       toolCount: 99,
       stepIteration: 99,
+      gracefulSummary: true,
+      truncationFallback: true,
       userId: 'user-1',
     };
 
@@ -162,6 +164,13 @@ describe('AISDKAgent trace-level attributes', () => {
       const streamText = withMetadata.find(s => s.name === 'ai.streamText')!;
       expect(streamText.attributes['ai.telemetry.metadata.toolCount']).toBe(0);
       expect(streamText.attributes['ai.telemetry.metadata.stepIteration']).toBe(0);
+      for (const span of withMetadata) {
+        const m = (key: string) => span.attributes[`ai.telemetry.metadata.${key}`];
+        expect({ span: span.name, gracefulSummary: m('gracefulSummary'), truncationFallback: m('truncationFallback') })
+          .toEqual({ span: span.name, gracefulSummary: undefined, truncationFallback: undefined });
+      }
+      const root = withMetadata.find(s => s.name === 'use-ai.agent.run')!;
+      expect(root.attributes['ai.telemetry.metadata.toolCount']).toBeUndefined();
     });
 
     test('a client ipAddress is dropped when the server has none', async () => {

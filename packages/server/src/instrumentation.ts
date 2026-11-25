@@ -72,9 +72,11 @@ export function recordErrorTrace(params: ErrorTraceParams): void {
   if (!langfuse.enabled) return;
   try {
     const metadata: Record<string, string> = {};
-    // Client metadata goes first, so the server-set keys win (also when ipAddress is undefined).
+    // Client metadata goes first, so the server-set keys win (also when ipAddress or threadId is undefined).
     for (const [key, value] of Object.entries({
       ...params.metadata,
+      sessionId: params.sessionId,
+      threadId: params.threadId,
       runId: params.runId,
       errorCategory: params.errorCategory,
       ipAddress: params.ipAddress,
