@@ -1,5 +1,6 @@
-import { describe, test, expect, mock, beforeEach, afterEach } from 'bun:test';
+import { describe, test, expect, mock, spyOn, beforeEach, afterEach } from 'bun:test';
 import { RemoteMcpToolsProvider } from './RemoteMcpToolsProvider';
+import { logger } from '../logger';
 
 describe('RemoteMcpToolsProvider', () => {
   const originalFetch = globalThis.fetch;
@@ -48,6 +49,34 @@ describe('RemoteMcpToolsProvider', () => {
       expect(options.headers).toMatchObject({
         Authorization: 'Bearer token123',
       });
+    });
+
+    test('never logs header values', async () => {
+      const debugSpy = spyOn(logger, 'debug');
+      try {
+        const provider = new RemoteMcpToolsProvider({
+          url: 'http://mcp.test/rpc',
+          headers: { 'X-Server-Key': 'server-secret' },
+        });
+
+        // Covers every path that logs headers: tools/list, and tools/call with
+        // matched per-request headers and with configured headers only.
+        await provider.fetchToolsWithHeaders({ Authorization: 'Bearer user-token' });
+        await provider.executeTool('test-tool', {}, {
+          'http://mcp.test/*': { headers: { Authorization: 'Bearer user-token' } },
+        });
+        await provider.executeTool('test-tool', {});
+
+        const logged = debugSpy.mock.calls.map(args => JSON.stringify(args)).join('\n');
+        expect(logged).toContain('Authorization');
+        expect(logged).toContain('X-Server-Key');
+        expect(logged).not.toContain('user-token');
+        expect(logged).not.toContain('server-secret');
+        // Masking must not reveal the value length either.
+        expect(logged).not.toContain('*'.repeat('server-secret'.length));
+      } finally {
+        debugSpy.mockRestore();
+      }
     });
 
     test('merges server-wide and per-user headers', async () => {
