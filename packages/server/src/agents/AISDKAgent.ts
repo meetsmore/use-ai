@@ -7,6 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
 import type { Agent, AgentInput, EventEmitter, AgentResult, ClientSession } from './types';
 import type { ToolDefinition, UseAIForwardedProps } from '../types';
+import type { McpHeadersMap } from '@meetsmore-oss/use-ai-core';
 import type { RemoteToolDefinition } from '../mcp';
 import { isUseAIInternalResponse } from '../mcp/useAIInternalResponse';
 import { isMcpConfirmationResponse, handleMcpConfirmation } from '../mcp/mcpConfirmation';
@@ -134,6 +135,7 @@ interface RunContext {
   readonly tools: ToolDefinition[];
   readonly state: unknown;
   readonly originalInput: AgentInput['originalInput'];
+  readonly mcpHeaders: AgentInput['mcpHeaders'];
   readonly staticSystemMessages: SystemModelMessage[] | undefined;
   /** Effective config for this run (from hooks.loadConfig, defaults applied) */
   readonly resolved: ResolvedRunConfig;
@@ -547,7 +549,7 @@ export class AISDKAgent implements Agent {
    * config. Builds the system messages and initializes all mutable state.
    */
   private createRunContext(input: AgentInput, runConfig: AISDKRunConfig): RunContext {
-    const { session, runId, messages, tools, state, systemPrompt: runtimeSystemPrompt, originalInput, llmCallLimit } = input;
+    const { session, runId, messages, tools, state, systemPrompt: runtimeSystemPrompt, originalInput, mcpHeaders, llmCallLimit } = input;
 
     // Sync session.tools with input.tools if not already set
     // This ensures tools are available for step-by-step execution
@@ -571,6 +573,7 @@ export class AISDKAgent implements Agent {
       tools,
       state,
       originalInput,
+      mcpHeaders,
       staticSystemMessages,
       llmCallLimit,
       resolved: {
@@ -749,7 +752,7 @@ export class AISDKAgent implements Agent {
       const stepConfig = {
         messages: messagesForStep,
         tools: stepCtx.currentTools.length > 0
-          ? (this.sanitizeToolsForAPI(this.filterTools(stepCtx.currentTools), ctx.session, events) as any)
+          ? (this.sanitizeToolsForAPI(this.filterTools(stepCtx.currentTools), ctx.session, events, ctx.mcpHeaders) as any)
           : undefined,
         metadata: {
           sessionId: ctx.session.clientId,
@@ -1632,7 +1635,8 @@ export class AISDKAgent implements Agent {
   private createMcpToolExecutor(
     remoteTool: RemoteToolDefinition,
     session: ClientSession,
-    events: EventEmitter
+    events: EventEmitter,
+    mcpHeaders: McpHeadersMap | undefined
   ): (args: ToolArguments, options: { toolCallId: string }) => Promise<ToolResult> {
     return async (args: ToolArguments, { toolCallId }) => {
       logger.info('[MCP] Executing remote tool', {
@@ -1644,7 +1648,7 @@ export class AISDKAgent implements Agent {
         const result = await remoteTool._remote.provider.executeTool(
           remoteTool._remote.originalName,
           args,
-          session.currentMcpHeaders  // Pass MCP headers from current request
+          mcpHeaders
         );
 
         // Intercept _use_ai_ internal responses from MCP tools
@@ -1661,7 +1665,7 @@ export class AISDKAgent implements Agent {
                   remoteTool._remote.provider,
                   session,
                   events,
-                  session.currentMcpHeaders
+                  mcpHeaders
                 );
               }
               break;
@@ -1689,7 +1693,8 @@ export class AISDKAgent implements Agent {
   private sanitizeToolsForAPI(
     tools: ToolDefinition[],
     session: ClientSession,
-    events: EventEmitter
+    events: EventEmitter,
+    mcpHeaders: McpHeadersMap | undefined
   ): Record<string, unknown> {
     const toolsObject: Record<string, unknown> = {};
     const clientToolExecutor = createClientToolExecutor(session);
@@ -1705,7 +1710,7 @@ export class AISDKAgent implements Agent {
       // Get the base executor based on tool type
       let baseExecutor;
       if (isRemoteTool(toolDef)) {
-        baseExecutor = this.createMcpToolExecutor(toolDef, session, events);
+        baseExecutor = this.createMcpToolExecutor(toolDef, session, events, mcpHeaders);
       } else if (isServerTool(toolDef)) {
         baseExecutor = createServerToolExecutor(toolDef, session, events);
       } else {

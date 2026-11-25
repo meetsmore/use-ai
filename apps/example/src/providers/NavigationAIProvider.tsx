@@ -24,7 +24,6 @@ const AVAILABLE_PAGES = [
   { path: '/file-transformers', label: 'File Transformers', description: 'File transformation before sending to AI' },
   { path: '/multimodal', label: 'Multimodal', description: 'File upload configuration with fileUploadConfig' },
   { path: '/multi-agent', label: 'Multi-Agent', description: 'Multiple agents, visibleAgentIds, agent selection' },
-  { path: '/workflow-demo', label: 'Workflow Integration', description: 'Headless workflow execution with Dify' },
   { path: '/error-tracing-test', label: 'Error Tracing', description: 'Error scenarios and Langfuse error traces' },
 ] as const;
 
