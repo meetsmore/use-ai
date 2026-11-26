@@ -2,34 +2,8 @@ import { describe, expect, test } from 'bun:test';
 import { z } from 'zod';
 import { createServerToolExecutor } from './serverToolExecutor';
 import type { ServerToolDefinition, ServerToolContext } from './types';
-import type { ClientSession, EventEmitter } from '../agents/types';
-
-/**
- * Helper to create a mock EventEmitter for testing
- */
-function createMockEvents(): EventEmitter {
-  return {
-    emit: () => {},
-  } as unknown as EventEmitter;
-}
-
-/**
- * Helper to create a minimal session for testing
- */
-function createTestSession(overrides: Partial<ClientSession> = {}): ClientSession {
-  return {
-    clientId: 'client-1',
-    ipAddress: '127.0.0.1',
-    socket: {} as never,
-    threadId: 'thread-1',
-    tools: [],
-    state: null,
-    pendingToolCalls: new Map(),
-    pendingToolApprovals: new Map(),
-    currentRunId: 'run-1',
-    ...overrides,
-  };
-}
+import type { EventEmitter } from '../agents/types';
+import { createTestSession, createMockEmitter } from '../../test/test-utils';
 
 function createTestServerTool(
   execute: ServerToolDefinition['_server']['execute'],
@@ -55,8 +29,8 @@ describe('createServerToolExecutor', () => {
       return { result: 'ok' };
     });
 
-    const session = createTestSession({ state: { page: 'home' } });
-    const executor = createServerToolExecutor(tool, session, createMockEvents());
+    const session = createTestSession({ state: { page: 'home' }, currentRunId: 'run-1' });
+    const executor = createServerToolExecutor(tool, session, createMockEmitter());
     const result = await executor({ city: 'Tokyo' }, { toolCallId: 'tc-1' });
 
     expect(result).toEqual({ result: 'ok' });
@@ -73,7 +47,7 @@ describe('createServerToolExecutor', () => {
     });
 
     const session = createTestSession();
-    const executor = createServerToolExecutor(tool, session, createMockEvents());
+    const executor = createServerToolExecutor(tool, session, createMockEmitter());
 
     await expect(
       executor({}, { toolCallId: 'tc-1' })
@@ -86,7 +60,7 @@ describe('createServerToolExecutor', () => {
     });
 
     const session = createTestSession();
-    const executor = createServerToolExecutor(tool, session, createMockEvents());
+    const executor = createServerToolExecutor(tool, session, createMockEmitter());
     const result = await executor({ value: 21 }, { toolCallId: 'tc-1' });
 
     expect(result).toEqual({ doubled: 42 });
@@ -101,7 +75,7 @@ describe('createServerToolExecutor', () => {
     });
 
     const session = createTestSession({ currentRunId: undefined });
-    const executor = createServerToolExecutor(tool, session, createMockEvents());
+    const executor = createServerToolExecutor(tool, session, createMockEmitter());
     await executor({}, { toolCallId: 'tc-1' });
 
     expect(capturedContext!.runId).toBe('');
@@ -116,7 +90,7 @@ describe('createServerToolExecutor', () => {
     });
 
     const session = createTestSession({ state: { count: 0 } });
-    const executor = createServerToolExecutor(tool, session, createMockEvents());
+    const executor = createServerToolExecutor(tool, session, createMockEmitter());
 
     // Update state after creating executor but before calling it
     session.state = { count: 42 };
@@ -130,7 +104,7 @@ describe('createServerToolExecutor', () => {
     const tool = createTestServerTool(async () => 'result');
 
     const session = createTestSession();
-    const executor = createServerToolExecutor(tool, session, createMockEvents());
+    const executor = createServerToolExecutor(tool, session, createMockEmitter());
     await executor({}, { toolCallId: 'tc-1' });
 
     expect(session.pendingToolCalls.size).toBe(0);
@@ -145,7 +119,7 @@ describe('createServerToolExecutor', () => {
     });
 
     const session = createTestSession();
-    const executor = createServerToolExecutor(tool, session, createMockEvents());
+    const executor = createServerToolExecutor(tool, session, createMockEmitter());
     await executor({}, { toolCallId: 'tc-1' });
 
     expect(hasRequestApproval).toBe(true);
@@ -249,7 +223,7 @@ describe('createServerToolExecutor', () => {
         z.object({ id: z.string() })
       );
 
-      const executor = createServerToolExecutor(tool, createTestSession(), createMockEvents());
+      const executor = createServerToolExecutor(tool, createTestSession(), createMockEmitter());
       const result = await executor({ id: { $ne: null } }, { toolCallId: 'tc-1' }) as { error: boolean; message: string };
 
       expect(called).toBe(false);
@@ -266,7 +240,7 @@ describe('createServerToolExecutor', () => {
         z.object({ id: z.string(), limit: z.number().default(10) })
       );
 
-      const executor = createServerToolExecutor(tool, createTestSession(), createMockEvents());
+      const executor = createServerToolExecutor(tool, createTestSession(), createMockEmitter());
       await executor({ id: 'u1', extra: 'x' }, { toolCallId: 'tc-1' });
 
       expect(capturedArgs).toEqual({ id: 'u1', limit: 10 });
@@ -279,7 +253,7 @@ describe('createServerToolExecutor', () => {
         z.object({ id: z.string() }).refine(async (v) => v.id !== 'blocked', { message: 'blocked id' })
       );
 
-      const executor = createServerToolExecutor(tool, createTestSession(), createMockEvents());
+      const executor = createServerToolExecutor(tool, createTestSession(), createMockEmitter());
 
       expect(await executor({ id: 'u1' }, { toolCallId: 'tc-1' })).toBe('ok');
       const rejected = await executor({ id: 'blocked' }, { toolCallId: 'tc-2' }) as { error: boolean; message: string };
@@ -291,7 +265,7 @@ describe('createServerToolExecutor', () => {
       let capturedArgs: unknown;
       const tool = createTestServerTool((args) => { capturedArgs = args; return 'ok'; });
 
-      const executor = createServerToolExecutor(tool, createTestSession(), createMockEvents());
+      const executor = createServerToolExecutor(tool, createTestSession(), createMockEmitter());
       await executor({ anything: 1 }, { toolCallId: 'tc-1' });
 
       expect(capturedArgs).toEqual({ anything: 1 });

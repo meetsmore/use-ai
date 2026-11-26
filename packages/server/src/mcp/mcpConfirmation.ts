@@ -8,9 +8,12 @@
  */
 
 import type { ClientSession, EventEmitter } from '../agents/types';
-import type { ToolApprovalRequestEvent } from '../types';
-import { TOOL_APPROVAL_REQUEST } from '../types';
-import { waitForApproval, denyInvalidModifiedArgs } from '../agents/toolApproval';
+import {
+  requestUserApproval,
+  deniedByUser,
+  denyInvalidModifiedArgs,
+  type ToolArguments,
+} from '../agents/toolApproval';
 import type { RemoteToolDefinition } from './RemoteMcpToolsProvider';
 import type { McpHeadersMap } from '@meetsmore-oss/use-ai-core';
 import { isMcpConfirmationResponse, type McpConfirmationResponse } from '@meetsmore-oss/use-ai-core';
@@ -24,7 +27,7 @@ export {
 /**
  * Handles an MCP confirmation response:
  * 1. Emits TOOL_APPROVAL_REQUEST to the client
- * 2. Waits for user approval via waitForApproval()
+ * 2. Waits for user approval (requestUserApproval() does steps 1 and 2)
  * 3. If approved → re-calls the same tool with { ...originalArgs, ...additional_columns }.
  *    When the approval carries modifiedArgs, they are validated against the tool's
  *    input schema (JSON Schema 2020-12; invalid ones return an error result) and phase 1 runs again
@@ -38,7 +41,7 @@ export async function handleMcpConfirmation(
   confirmation: McpConfirmationResponse,
   toolCallId: string,
   tool: RemoteToolDefinition,
-  originalArgs: Record<string, unknown>,
+  originalArgs: ToolArguments,
   session: ClientSession,
   events: EventEmitter,
   mcpHeaders?: McpHeadersMap
@@ -55,32 +58,25 @@ export async function handleMcpConfirmation(
   });
 
   // Emit approval request event to the client (expose originalArgs, not internal columns)
-  events.emit<ToolApprovalRequestEvent>({
-    type: TOOL_APPROVAL_REQUEST,
+  // and wait for the user response
+  const approvalResult = await requestUserApproval(session, events, {
     toolCallId,
     toolCallName,
     toolCallArgs: originalArgs,
     message,
     metadata,
-    timestamp: Date.now(),
     acceptsModifiedArgs: true,
   });
-
-  // Wait for user response
-  const approvalResult = await waitForApproval(session, toolCallId, { acceptsModifiedArgs: true });
 
   if (!approvalResult.approved) {
     logger.info('[MCP] Confirmation rejected by user', {
       toolCallId,
       reason: approvalResult.reason,
     });
-    return {
-      error: true,
-      message: `Tool execution denied by user: ${approvalResult.reason || 'Action was rejected'}`,
-    };
+    return deniedByUser(approvalResult.reason);
   }
 
-  const callTool = async (args: Record<string, unknown>, phase: 'phase 1' | 'phase 2') => {
+  const callTool = async (args: ToolArguments, phase: 'phase 1' | 'phase 2') => {
     try {
       return await provider.executeTool(originalToolName, args, mcpHeaders, paramHeaders);
     } catch (error) {

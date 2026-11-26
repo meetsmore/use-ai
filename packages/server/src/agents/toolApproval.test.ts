@@ -4,30 +4,14 @@ import { UseAIServer } from '../server';
 import { AISDKAgent } from './AISDKAgent';
 import { createServerToolExecutor, defineServerTool } from '../tools';
 import { createSequentialMockModel } from '../../test/integration-test-utils';
+import { createTestSession } from '../../test/test-utils';
 import { waitForApproval, createApprovalWrapper, type ToolArguments } from './toolApproval';
 import { abortRun, RunAbortedByUser, RunAbortedByClientDisconnect } from '../utils/abortReason';
 import { isServerTool } from '../utils/toolFilters';
-import type { ClientSession, EventEmitter } from './types';
+import type { EventEmitter } from './types';
 import type { ToolDefinition } from '../types';
 import type { ServerToolDefinition } from '../tools/types';
 import type { RemoteToolDefinition } from '../mcp';
-
-/**
- * Helper to create a minimal session for testing
- */
-function createTestSession(overrides: Partial<ClientSession> = {}): ClientSession {
-  return {
-    clientId: 'client-1',
-    ipAddress: '127.0.0.1',
-    socket: {} as never,
-    threadId: 'thread-1',
-    tools: [],
-    state: null,
-    pendingToolCalls: new Map(),
-    pendingToolApprovals: new Map(),
-    ...overrides,
-  };
-}
 
 describe('waitForApproval', () => {
   test('resolves when client approves', async () => {
