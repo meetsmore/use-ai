@@ -769,8 +769,7 @@ export function UseAIProvider({
       }
 
       // Persist the transformed text alongside attachment metadata so the
-      // full context survives a localStorage rehydration. See
-      // docs/plans/bugfix-transformed-file-persistence.md.
+      // full context survives a localStorage rehydration.
       persistedContent = buildPersistedParts(message, attachments, fileContent);
 
       multimodalContent = [...messageParts, ...fileContent];
