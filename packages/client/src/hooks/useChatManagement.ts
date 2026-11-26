@@ -5,6 +5,7 @@ import { generateMessageId } from '../providers/chatRepository/types';
 import type { UseAIClient } from '../client';
 import { getDisplayTextFromContent } from '../utils/messageContent';
 import { transformMessagesToClientFormat } from '../utils/messageConversion';
+import { logger } from '../utils/logger';
 
 // Constants
 const CHAT_TITLE_MAX_LENGTH = 50;
@@ -132,10 +133,10 @@ export function useChatManagement({
     try {
       const chat = await repository.loadChat(chatId);
       if (chat) {
-        console.log('[ChatManagement] Loaded', chat.messages.length, 'messages from storage for chat:', chatId);
+        logger.debug('[ChatManagement] Loaded', chat.messages.length, 'messages from storage for chat:', chatId);
         return chat.messages;
       } else {
-        console.log('[ChatManagement] Chat not found in storage:', chatId);
+        logger.debug('[ChatManagement] Chat not found in storage:', chatId);
         return [];
       }
     } catch (error) {
@@ -152,7 +153,7 @@ export function useChatManagement({
 
   /** Creates a new chat. */
   const createNewChat = useCallback(async (options?: CreateChatOptions): Promise<string> => {
-    console.log('[ChatManagement] createNewChat called - currentChatId:', currentChatId, 'pendingChatId:', pendingChatId, 'messages.length:', messages.length);
+    logger.debug('[ChatManagement] createNewChat called - currentChatId:', currentChatId, 'pendingChatId:', pendingChatId, 'messages.length:', messages.length);
 
     // Reuse last created blank chat if options match
     if (pendingChatId && messages.length === 0) {
@@ -162,12 +163,12 @@ export function useChatManagement({
         && deepEquals(existingChat.metadata, options?.metadata)
         && existingChat.agent === options?.agent;
       if (optionsMatch) {
-        console.log('[ChatManagement] Last created chat has matching options, reusing:', pendingChatId);
+        logger.debug('[ChatManagement] Last created chat has matching options, reusing:', pendingChatId);
         return pendingChatId;
       }
     }
 
-    console.log('[ChatManagement] Creating new chat...');
+    logger.debug('[ChatManagement] Creating new chat...');
     const chatId = await repository.createChat(options);
 
     // Set as pending - don't switch currentChatId until user sends a message
@@ -177,10 +178,10 @@ export function useChatManagement({
     // Set threadId to new chatId to ensure clean conversation state
     if (clientRef.current) {
       clientRef.current.setThreadId(chatId);
-      console.log('[ChatManagement] Set threadId to new chatId:', chatId);
+      logger.debug('[ChatManagement] Set threadId to new chatId:', chatId);
     }
 
-    console.log('[ChatManagement] Created pending chat:', chatId, '(will activate on first message)');
+    logger.debug('[ChatManagement] Created pending chat:', chatId, '(will activate on first message)');
     return chatId;
   }, [currentChatId, pendingChatId, messages, repository, clientRef, setMessages]);
 
@@ -193,10 +194,10 @@ export function useChatManagement({
     // Set threadId so the server recognizes this as a different conversation
     if (clientRef.current) {
       clientRef.current.setThreadId(chatId);
-      console.log('[ChatManagement] Set threadId to chatId:', chatId);
+      logger.debug('[ChatManagement] Set threadId to chatId:', chatId);
     }
 
-    console.log('[ChatManagement] Loaded pending chat:', chatId, '(will activate on first message)');
+    logger.debug('[ChatManagement] Loaded pending chat:', chatId, '(will activate on first message)');
   }, [reloadMessages, clientRef]);
 
   /** Deletes a chat by ID. */
@@ -213,7 +214,7 @@ export function useChatManagement({
       setMessages([]);
     }
 
-    console.log('[ChatManagement] Deleted chat:', chatId);
+    logger.debug('[ChatManagement] Deleted chat:', chatId);
   }, [currentChatId, pendingChatId, repository, setMessages]);
 
   /** Lists all available chats. */
@@ -230,7 +231,7 @@ export function useChatManagement({
       if (chat) {
         chat.messages = [];
         await repository.saveChat(chat);
-        console.log('[ChatManagement] Cleared current chat:', currentChatId);
+        logger.debug('[ChatManagement] Cleared current chat:', currentChatId);
       }
     }
   }, [currentChatId, repository, setMessages]);
@@ -267,13 +268,13 @@ export function useChatManagement({
   const activatePendingChat = useCallback((): string | null => {
     if (!pendingChatId) return null;
 
-    console.log('[ChatManagement] Activating pending chat:', pendingChatId);
+    logger.debug('[ChatManagement] Activating pending chat:', pendingChatId);
 
     // Load the chat's messages into the client for conversation history, also when the chat has
     // no messages, so the client's history is always the activated chat's.
     if (clientRef.current) {
       clientRef.current.loadMessages(transformMessagesToClientFormat(messages));
-      console.log('[ChatManagement] Loaded', messages.length, 'existing messages into client');
+      logger.debug('[ChatManagement] Loaded', messages.length, 'existing messages into client');
     }
 
     setCurrentChatId(pendingChatId);
@@ -313,7 +314,7 @@ export function useChatManagement({
       }
 
       await repository.saveChat(chat);
-      console.log('[ChatManagement] Saved user message to storage');
+      logger.debug('[ChatManagement] Saved user message to storage');
 
       // Append to local state directly if user is viewing this chat (no reload round-trip)
       const displayedChatId = pendingChatIdSnapshot.current || currentChatIdSnapshot.current;
@@ -389,7 +390,7 @@ export function useChatManagement({
       }
 
       await repository.saveChat(chat);
-      console.log('[ChatManagement] Saved AI response to storage for chatId:', currentChatIdValue);
+      logger.debug('[ChatManagement] Saved AI response to storage for chatId:', currentChatIdValue);
 
       // Append to local state directly if user is viewing this chat (no reload round-trip)
       if (displayedChatId === currentChatIdValue) {
@@ -418,7 +419,7 @@ export function useChatManagement({
           if (chats.length > 0) {
             // Load the most recent chat and activate it immediately (no AI response in progress at startup)
             const mostRecentChatId = chats[0].id;
-            console.log('[ChatManagement] Loading most recent chat on mount:', mostRecentChatId);
+            logger.debug('[ChatManagement] Loading most recent chat on mount:', mostRecentChatId);
             const loadedMessages = await loadChatMessages(mostRecentChatId);
 
             setCurrentChatId(mostRecentChatId);
@@ -428,13 +429,13 @@ export function useChatManagement({
             if (clientRef.current) {
               clientRef.current.setThreadId(mostRecentChatId);
               clientRef.current.loadMessages(transformMessagesToClientFormat(loadedMessages));
-              console.log('[ChatManagement] Set threadId and loaded messages for chat:', mostRecentChatId);
+              logger.debug('[ChatManagement] Set threadId and loaded messages for chat:', mostRecentChatId);
             }
 
-            console.log('[ChatManagement] Loaded and activated chat on mount:', mostRecentChatId);
+            logger.debug('[ChatManagement] Loaded and activated chat on mount:', mostRecentChatId);
           } else {
             // No chats exist, create a new one (will be pending until first message)
-            console.log('[ChatManagement] No existing chats, creating new one');
+            logger.debug('[ChatManagement] No existing chats, creating new one');
             await createNewChat();
           }
         } catch (err) {
@@ -462,7 +463,7 @@ export function useChatManagement({
           const loadedMessages = await loadChatMessages(currentChatId);
           if (loadedMessages.length > 0) {
             clientRef.current?.loadMessages(transformMessagesToClientFormat(loadedMessages));
-            console.log('[ChatManagement] Reloaded', loadedMessages.length, 'messages from storage on reconnect');
+            logger.debug('[ChatManagement] Reloaded', loadedMessages.length, 'messages from storage on reconnect');
           }
         })();
       }

@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import type { AgentInfo } from '../types';
 import type { UseAIClient } from '../client';
+import { logger } from '../utils/logger';
 
 export interface UseAgentSelectionOptions {
   /** Reference to the UseAIClient (can be null during initialization) */
@@ -132,7 +133,7 @@ export function useAgentSelection({
     if (clientRef.current) {
       clientRef.current.setAgent(agentId);
     }
-    console.log('[AgentSelection] Agent set to:', agentId ?? 'server default');
+    logger.debug('[AgentSelection] Agent set to:', agentId ?? 'server default');
   }, [clientRef]);
 
   // Subscribe to agent changes from the server
@@ -141,7 +142,7 @@ export function useAgentSelection({
     if (!client || !connected) return;
 
     const unsubscribe = client.onAgentsChange((agents, defaultAgentId) => {
-      console.log('[AgentSelection] Received agents:', agents, 'default:', defaultAgentId);
+      logger.debug('[AgentSelection] Received agents:', agents, 'default:', defaultAgentId);
       setServerAgents(agents);
       setDefaultAgent(defaultAgentId);
     });

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'bun:test';
 import { mergeAssistantMessagesForDisplay } from './mergeAssistantMessages';
+import { getTurnParts } from './toolCalls';
 import type { PersistedMessage } from '../providers/chatRepository/types';
 
 function msg(overrides: Partial<PersistedMessage> & { id: string; role: string }): PersistedMessage {
@@ -226,6 +227,24 @@ describe('mergeAssistantMessagesForDisplay', () => {
 
     const answer = result[result.length - 1];
     expect(answer.sourceMessages.map((source) => source.id)).toEqual(['6']);
+  });
+
+  it('hands a turn stopped before any text to the notice, so its tool calls survive a reload', () => {
+    const result = mergeAssistantMessagesForDisplay([
+      msg({ id: '1', role: 'user', content: 'Wait 5s' }),
+      msg({ id: '2', role: 'assistant', content: '', toolCalls: [tc('tc1', 'wait')] }),
+      msg({ id: '3', role: 'tool', content: '{"aborted":true}', toolCallId: 'tc1' }),
+      msg({ id: '4', role: 'assistant', content: 'Generation stopped.', displayMode: 'info' }),
+    ]);
+
+    // The notice is the only message the turn shows; it keeps its content and display mode.
+    expect(result).toHaveLength(2);
+    expect(result[1]).toMatchObject({ id: '4', content: 'Generation stopped.', displayMode: 'info' });
+    expect(result[1].sourceMessages.map((source) => source.id)).toEqual(['2', '3', '4']);
+    expect(getTurnParts(result[1].sourceMessages)).toEqual([
+      { kind: 'tool_call', toolCallId: 'tc1', name: 'wait', args: '{}', status: 'aborted', result: '{"aborted":true}' },
+      { kind: 'text', text: 'Generation stopped.', messageId: '4' },
+    ]);
   });
 
   it('keeps an info notice standalone after a plain text reply', () => {

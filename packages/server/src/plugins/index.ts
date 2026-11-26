@@ -1,2 +1,2 @@
-export type { UseAIServerPlugin, MessageHandler, BeforeRunAgentResult } from './types';
+export type { UseAIServerPlugin, MessageHandler, BeforeRunAgentResult, BeforeRunAuthorizedInput } from './types';
 export { FeedbackPlugin } from './FeedbackPlugin';

@@ -1,13 +1,11 @@
 #!/usr/bin/env bun
 import { UseAIServer, AISDKAgent, logger, defineServerTool, createMockReasoningModel } from '@meetsmore-oss/use-ai-server';
-import type { Agent, McpEndpointConfig, ServerToolConfig, UseAIServerPlugin, BeforeRunAgentResult, AgentInput } from '@meetsmore-oss/use-ai-server';
+import type { Agent, McpEndpointConfig, ServerToolConfig, UseAIServerPlugin, BeforeRunAgentResult, BeforeRunAuthorizedInput } from '@meetsmore-oss/use-ai-server';
 import type { UseAIForwardedProps } from '@meetsmore-oss/use-ai-core';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { createOpenAI } from '@ai-sdk/openai';
 import { createGateway } from '@ai-sdk/gateway';
 import type { JSONValue } from 'ai';
-import { WorkflowsPlugin, DifyWorkflowRunner } from '@meetsmore-oss/use-ai-plugin-workflows';
-import type { WorkflowRunner } from '@meetsmore-oss/use-ai-plugin-workflows';
 import { z } from 'zod';
 
 type AgentModel = ConstructorParameters<typeof AISDKAgent>[0]['model'];
@@ -15,6 +13,7 @@ type AgentModel = ConstructorParameters<typeof AISDKAgent>[0]['model'];
 const port = Number(process.env.PORT) || 8081;
 const rateLimitMaxRequests = Number(process.env.RATE_LIMIT_MAX_REQUESTS) || 0;
 const rateLimitWindowMs = Number(process.env.RATE_LIMIT_WINDOW_MS) || 60000;
+const rateLimitMaxLlmCalls = Number(process.env.RATE_LIMIT_MAX_LLM_CALLS) || 0;
 const logFormat = process.env.LOG_FORMAT || 'pretty';
 // Max HTTP buffer size for file uploads (default 20MB)
 const maxHttpBufferSize = process.env.MAX_HTTP_BUFFER_SIZE
@@ -22,6 +21,10 @@ const maxHttpBufferSize = process.env.MAX_HTTP_BUFFER_SIZE
   : undefined;
 // CORS origin for Socket.IO (e.g., '*' for local dev, 'https://example.com' for production)
 const corsOrigin = process.env.CORS_ORIGIN;
+// Comma-separated origins that may connect (e.g., 'https://app.example.com'). Unset: no Origin check.
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim()).filter(origin => origin.length > 0)
+  : undefined;
 // Runtime adapter: 'auto' (default), 'bun', or 'node'
 const runtime = (process.env.RUNTIME as 'auto' | 'bun' | 'node') || 'auto';
 const transport = (process.env.TRANSPORT as 'socketio' | 'websocket') || 'socketio';
@@ -181,56 +184,6 @@ function createAgents(): { agents: Record<string, Agent>; defaultAgent: string }
 }
 
 /**
- * Create workflow runners based on available configuration.
- * Returns a map of runner names to runner instances.
- */
-function createWorkflowRunners(): Map<string, WorkflowRunner> {
-  const runners = new Map<string, WorkflowRunner>();
-  const enabledRunners: string[] = [];
-
-  // Check for Dify configuration
-  const difyUrl = process.env.DIFY_API_URL;
-  if (difyUrl) {
-    // Build workflows mapping from environment variables
-    // Convention: DIFY_<WORKFLOW_NAME>_KEY maps to workflow name
-    const workflows: Record<string, string> = {};
-
-    // Example: DIFY_GREETING_WORKFLOW_KEY -> 'greeting-workflow'
-    // Example: DIFY_PDF_PROCESSOR_KEY -> 'pdf-processor'
-    Object.keys(process.env).forEach((key) => {
-      if (key.startsWith('DIFY_') && key.endsWith('_KEY')) {
-        const workflowName = key
-          .slice(5, -4) // Remove 'DIFY_' prefix and '_KEY' suffix
-          .toLowerCase()
-          .replace(/_/g, '-'); // Convert underscores to hyphens
-        workflows[workflowName] = process.env[key]!;
-      }
-    });
-
-    runners.set(
-      'dify',
-      new DifyWorkflowRunner({
-        apiBaseUrl: difyUrl,
-        workflows,
-      })
-    );
-
-    const workflowNames = Object.keys(workflows).join(', ');
-    enabledRunners.push(
-      `dify (${difyUrl}${workflowNames ? `, workflows: ${workflowNames}` : ''})`
-    );
-  }
-
-  if (logFormat === 'pretty' && enabledRunners.length > 0) {
-    console.log(`✓ Enabled workflow runners: ${enabledRunners.join(', ')}`);
-  } else if (enabledRunners.length > 0) {
-    logger.info('Workflow runners configured', { enabledRunners });
-  }
-
-  return runners;
-}
-
-/**
  * Create MCP endpoint configurations from environment variables.
  * Returns an array of MCP endpoint configs.
  */
@@ -249,14 +202,20 @@ function createMcpEndpoints(): McpEndpointConfig[] {
       // Look for corresponding namespace and timeout
       const namespaceKey = `MCP_ENDPOINT_${name}_NAMESPACE`;
       const timeoutKey = `MCP_ENDPOINT_${name}_TIMEOUT`;
+      const allowedClientHeadersKey = `MCP_ENDPOINT_${name}_ALLOWED_CLIENT_HEADERS`;
 
       const namespace = process.env[namespaceKey] || name.toLowerCase().replace(/_/g, '-');
       const timeout = Number(process.env[timeoutKey]) || 30000;
+      const allowedClientHeaders = process.env[allowedClientHeadersKey]
+        ?.split(',')
+        .map((name) => name.trim())
+        .filter(Boolean);
 
       endpoints.push({
         url,
         namespace,
         timeout,
+        allowedClientHeaders,
       });
 
       if (logFormat === 'pretty') {
@@ -330,7 +289,7 @@ function createServerTools(): Record<string, ServerToolConfig> | undefined {
 }
 
 /**
- * Example plugin demonstrating the beforeRunAgent hook.
+ * Example plugin demonstrating the beforeRunAuthorized hook.
  * Rejects any run where forwardedProps.token contains "invalid".
  */
 class TokenValidationPlugin implements UseAIServerPlugin {
@@ -342,7 +301,7 @@ class TokenValidationPlugin implements UseAIServerPlugin {
     // No custom message handlers needed
   }
 
-  async beforeRunAgent(input: AgentInput): Promise<BeforeRunAgentResult | void> {
+  async beforeRunAuthorized(input: BeforeRunAuthorizedInput): Promise<BeforeRunAgentResult | void> {
     const forwardedProps = input.originalInput.forwardedProps as UseAIForwardedProps | undefined;
     const token = forwardedProps?.token;
 
@@ -360,17 +319,13 @@ logger.info('Starting UseAI server', { logFormat });
 
 (async () => {
   try {
-    // Create agents and workflow runners
+    // Create agents
     const { agents, defaultAgent } = createAgents();
-    const workflowRunners = createWorkflowRunners();
     const mcpEndpoints = createMcpEndpoints();
     const serverTools = createServerTools();
 
     // Build plugins array
     const plugins: UseAIServerPlugin[] = [new TokenValidationPlugin()];
-    if (workflowRunners.size > 0) {
-      plugins.push(new WorkflowsPlugin({ runners: workflowRunners }));
-    }
 
     const server = new UseAIServer({
       port,
@@ -378,6 +333,7 @@ logger.info('Starting UseAI server', { logFormat });
       defaultAgent,
       rateLimitMaxRequests,
       rateLimitWindowMs,
+      rateLimitMaxLlmCalls,
       plugins,
       mcpEndpoints: mcpEndpoints.length > 0 ? mcpEndpoints : undefined,
       tools: serverTools,
@@ -389,6 +345,7 @@ logger.info('Starting UseAI server', { logFormat });
             credentials: true,
           }
         : undefined,
+      allowedOrigins,
       runtime,
       transport,
     });

@@ -41,8 +41,9 @@ export interface FileAttachment {
  * Result of preparing a file for send.
  *
  * Only one of the two is returned:
- * - `{ url }`: a directly usable url (an inline base64 data URL, or a remote url).
- *   The bytes travel along with the message.
+ * - `{ url }`: an inline base64 data URL. The bytes travel along with the message.
+ *   The server drops remote urls (http(s), file:, ...) so it is never made to fetch
+ *   them; return a `ref` for files kept in storage.
  * - `{ ref }`: a pointer into persistent storage (e.g. an S3 key). The bytes stay in
  *   storage; only the ref travels with the message and is kept in history. It is
  *   resolved on the server before being passed to the model.

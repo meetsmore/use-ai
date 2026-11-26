@@ -49,6 +49,11 @@ export interface RuntimeServerConfig {
   /** CORS configuration options */
   cors?: CorsOptions;
   /**
+   * When set, connections whose Origin header is not in this list are refused.
+   * When undefined, the Origin header is not checked.
+   */
+  allowedOrigins?: readonly string[];
+  /**
    * Idle timeout in seconds.
    * Only used by Bun runtime (ignored by Node.js).
    * @default 30
@@ -61,6 +66,12 @@ export interface RuntimeServerConfig {
    * Called when a polling transport connection is established.
    */
   onPollingConnection?: (sessionId: string, ip: string) => void;
+  /**
+   * Callback for releasing a client IP address captured by `onPollingConnection`.
+   * Called when the engine.io session closes for any reason, including a ping timeout.
+   * This also covers sessions that never open a Socket.IO namespace.
+   */
+  onPollingClose?: (sessionId: string) => void;
 }
 
 /**

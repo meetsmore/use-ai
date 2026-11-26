@@ -39,9 +39,7 @@ export type {
   AGUIEvent,
   // use-ai extensions
   ToolCallStartExtensions,
-  WorkflowStatus,
   UseAIClientMessage,
-  RunWorkflowMessage,
   FeedbackMessage,
   FeedbackValue,
   McpHeadersConfig,

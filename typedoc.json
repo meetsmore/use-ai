@@ -2,8 +2,7 @@
   "entryPoints": [
     "packages/core",
     "packages/client",
-    "packages/server",
-    "packages/plugin-workflows"
+    "packages/server"
   ],
   "entryPointStrategy": "packages",
   "out": "skills/use-ai/docs",

@@ -1,5 +1,5 @@
 import { describe, expect, test, beforeAll, afterAll } from 'bun:test';
-import { EventType, ErrorCode, TOOL_APPROVAL_REQUEST } from './types';
+import { EventType, ErrorCode, TOOL_APPROVAL_REQUEST, type RunErrorEvent } from './types';
 import { v4 as uuidv4 } from 'uuid';
 import {
   waitForEventType,
@@ -125,6 +125,20 @@ describe('Error Handling', () => {
 
     const errorEvent = await waitForEventType(socket, EventType.RUN_ERROR);
     expect((errorEvent as any).message).toContain('not found');
+
+    socket.disconnect();
+  });
+
+  test('Server survives malformed messages and keeps serving the connection', async () => {
+    const socket = await cleanup.createTestClient(testPort);
+
+    for (const malformed of [null, undefined, 'run_agent', 42, [], {}, { type: 123 }]) {
+      socket.emit('message', malformed);
+    }
+
+    sendRunAgent(socket, { prompt: 'still alive?', tools: [] });
+    const finished = await waitForEventType(socket, EventType.RUN_FINISHED);
+    expect(finished.type).toBe(EventType.RUN_FINISHED);
 
     socket.disconnect();
   });
@@ -868,7 +882,8 @@ describe('Error recording and abort handling', () => {
 
       const errorEvent = await waitForEventType(socket, EventType.RUN_ERROR);
       expect(errorEvent.type).toBe(EventType.RUN_ERROR);
-      expect((errorEvent as any).message).toContain('Unexpected agent failure');
+      // The raw message stays server-side (logs, trace); the client only gets the code.
+      expect((errorEvent as RunErrorEvent).message).toBe(ErrorCode.UNKNOWN_ERROR);
 
       const traces = await lf.errorTraces();
       expect(traces).toHaveLength(1);

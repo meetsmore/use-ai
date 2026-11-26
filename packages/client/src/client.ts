@@ -25,6 +25,7 @@ import type {
 import { SocketIOTransport } from './transport/SocketIOTransport';
 import type { UseAITransport } from './transport/types';
 import { v4 as uuidv4 } from 'uuid';
+import { logger } from './utils/logger';
 
 /**
  * Handler for AG-UI events from the server.
@@ -44,6 +45,15 @@ export type ToolCallHandler = (
   toolName: string,
   args: Record<string, unknown>
 ) => void;
+
+/**
+ * Receives a tool call's result as the client records it for the conversation
+ * history: the JSON string sent back to the model, e.g. `'{"success":true}'`,
+ * or one the client writes itself, `'{"rejected":true,...}'` for a call the
+ * user rejected and `'{"aborted":true,...}'` for one a stopped run never
+ * answered.
+ */
+export type ToolResultHandler = (toolCallId: string, content: string) => void;
 
 /**
  * Where a run goes: its thread, the history it carries, and its agent.
@@ -79,6 +89,8 @@ export class UseAIClient {
   // Session state
   private _threadId: string | null = null;
   private _tools: ToolDefinition[] = [];
+  // Every client tool sent to the server during the current run, by name. See getRunTool().
+  private _runTools: Map<string, ToolDefinition> = new Map();
   private _messages: Message[] = [];
   // Message buffer of the in-flight run when it belongs to a thread other than the one shown
   // (dispatched for another thread, or the thread changed mid-run). null: the run uses _messages.
@@ -96,6 +108,8 @@ export class UseAIClient {
 
   // Connection state handlers
   private connectionStateHandlers: Set<(connected: boolean) => void> = new Set();
+
+  private toolResultHandlers: Set<ToolResultHandler> = new Set();
 
   // Text message assembly
   private _currentMessageId: string | null = null;
@@ -144,12 +158,12 @@ export class UseAIClient {
   connect(): void {
     this.transportUnsubscribes.push(
       this.transport.onConnectionChange((connected, reason) => {
-        console.log(connected ? '[UseAI] Connected to server' : '[UseAI] Disconnected:', reason ?? '');
+        logger.debug(connected ? '[UseAI] Connected to server' : '[UseAI] Disconnected:', reason ?? '');
         this.connectionStateHandlers.forEach(handler => handler(connected));
       }),
       this.transport.onEvent((event) => {
         try {
-          console.log('[Client] Received event:', event.type);
+          logger.debug('[Client] Received event:', event.type);
           this.handleEvent(event);
         } catch (error) {
           console.error('[UseAI] Error handling event:', error);
@@ -167,7 +181,7 @@ export class UseAIClient {
   private handleCustomEvent(event: CustomEvent): boolean {
     if (event.name === 'agents') {
       const { agents, defaultAgent } = event.value as { agents: AgentInfo[]; defaultAgent: string };
-      console.log('[Client] Received available agents:', event.value);
+      logger.debug('[Client] Received available agents:', event.value);
       this._availableAgents = agents;
       this._defaultAgent = defaultAgent;
       this.agentsChangeHandlers.forEach(handler => handler(agents, defaultAgent));
@@ -175,7 +189,7 @@ export class UseAIClient {
     }
     if (event.name === 'config') {
       const { langfuseEnabled } = event.value as { langfuseEnabled?: boolean };
-      console.log('[Client] Received server config:', event.value);
+      logger.debug('[Client] Received server config:', event.value);
       this._langfuseEnabled = langfuseEnabled ?? false;
       this.langfuseConfigHandlers.forEach(handler => handler(this._langfuseEnabled));
       return true;
@@ -281,20 +295,19 @@ export class UseAIClient {
     // Handle server-side tool results (MCP tools, server tools).
     // The server emits TOOL_CALL_RESULT with the actual execution output so the
     // client can store it in conversation history instead of a placeholder.
-    // Client-side tools already have their results tracked via sendToolResponse(),
-    // so we skip those to avoid duplicate entries.
+    // The server sends it for client-side tools too, but those already have
+    // their results tracked via sendToolResponse() (or, when the user rejected
+    // the call, sendToolApprovalResponse()), so we skip those to avoid
+    // duplicate entries. The tracked result is the one kept: for a rejection
+    // the server sends `{ error: true }` where the client records
+    // `{ rejected: true }`.
     else if (event.type === EventType.TOOL_CALL_RESULT) {
       const e = event as ToolCallResultEvent;
       const alreadyTracked = this._pendingToolResults.some(
         r => 'toolCallId' in r && r.toolCallId === e.toolCallId
       );
       if (!alreadyTracked) {
-        this._pendingToolResults.push({
-          id: e.messageId,
-          role: 'tool',
-          content: e.content,
-          toolCallId: e.toolCallId,
-        });
+        this.recordToolResult(this._pendingToolResults, e.toolCallId, e.content, e.messageId);
       }
     }
 
@@ -442,6 +455,8 @@ export class UseAIClient {
       },
     };
 
+    this._runTools = new Map();
+    this.rememberRunTools();
     this.send({
       type: 'run_agent',
       data: runInput,
@@ -466,7 +481,9 @@ export class UseAIClient {
       data: {
         messageId: uuidv4(),
         toolCallId,
-        content: JSON.stringify(result),
+        // A tool that returns nothing (`() => { ... }`) is recorded as `null`:
+        // JSON.stringify(undefined) is undefined, which the history cannot read back.
+        content: JSON.stringify(result ?? null),
         role: 'tool',
         // use-ai extension: include current tools and state for mid-run updates
         // (e.g., when navigation causes new components to mount)
@@ -479,14 +496,9 @@ export class UseAIClient {
 
     // Collect tool result for deferred push at RUN_FINISHED (ensures correct
     // API ordering: assistant(toolCalls) → tool results → assistant(text))
-    const toolResultMsg: Message = {
-      id: toolResultMessage.data.messageId,
-      role: 'tool',
-      content: toolResultMessage.data.content,
-      toolCallId,
-    };
-    this._pendingToolResults.push(toolResultMsg);
+    this.recordToolResult(this._pendingToolResults, toolCallId, toolResultMessage.data.content, toolResultMessage.data.messageId);
 
+    this.rememberRunTools();
     this.send(toolResultMessage);
   }
 
@@ -599,12 +611,7 @@ export class UseAIClient {
       );
       for (const tc of this._currentAssistantToolCalls) {
         if (!respondedIds.has(tc.id)) {
-          this.runMessages.push({
-            id: uuidv4(),
-            role: 'tool',
-            content: JSON.stringify({ aborted: true, reason: 'Cancelled by user before tool finished' }),
-            toolCallId: tc.id,
-          });
+          this.recordToolResult(this.runMessages, tc.id, JSON.stringify({ aborted: true, reason: 'Cancelled by user before tool finished' }));
         }
       }
 
@@ -644,17 +651,13 @@ export class UseAIClient {
       },
     };
 
-    // When a tool is rejected, the server handles it internally and never sends
-    // a tool_result event back to the client. Track a synthetic tool result so
-    // the conversation history has the required tool_use → tool_result pairing.
+    // Track a synthetic tool result so the conversation history has the
+    // required tool_use → tool_result pairing and records the call as rejected.
+    // The server's TOOL_CALL_RESULT for it (`{ error: true, ... }`) arrives
+    // later and is skipped as already tracked.
     // (Approved tools get their result tracked via sendToolResponse after execution.)
     if (!approved) {
-      this._pendingToolResults.push({
-        id: uuidv4(),
-        role: 'tool',
-        content: JSON.stringify({ rejected: true, reason: reason || 'User rejected tool execution' }),
-        toolCallId,
-      });
+      this.recordToolResult(this._pendingToolResults, toolCallId, JSON.stringify({ rejected: true, reason: reason || 'User rejected tool execution' }));
     }
 
     this.send(message);
@@ -670,6 +673,27 @@ export class UseAIClient {
    */
   getToolCallData(toolCallId: string): { name: string; args: string } | undefined {
     return this.currentToolCalls.get(toolCallId);
+  }
+
+  /**
+   * Finds a client tool that this client sent to the server during the current
+   * run, as last sent. The server waits for the client's result of a call to
+   * such a tool, even when the tool was removed since. Server and MCP tools are
+   * never sent by the client, so this returns `undefined` for them: the server
+   * runs them and sends their result itself.
+   *
+   * @param name - The tool name the model called, e.g. "Row 1_updateLabel"
+   * @returns The tool definition as last sent, or undefined
+   */
+  getRunTool(name: string): ToolDefinition | undefined {
+    return this._runTools.get(name);
+  }
+
+  /** Adds the client tools that go to the server now (`_tools`) to the current run's tools. */
+  private rememberRunTools(): void {
+    for (const tool of this._tools) {
+      this._runTools.set(tool.name, tool);
+    }
   }
 
   /**
@@ -702,6 +726,46 @@ export class UseAIClient {
   }
 
   /**
+   * Listens for tool call results as they are recorded for the conversation
+   * history, once per call. The content is exactly what the history keeps, so
+   * a UI that reads results from here shows the same result before and after
+   * the chat is saved and reloaded. A handler that throws stops neither the
+   * recording nor the sending of the result; the error is logged.
+   *
+   * @example
+   * ```ts
+   * const unsubscribe = client.onToolResult((toolCallId, content) => {
+   *   console.log(toolCallId, JSON.parse(content));
+   * });
+   * ```
+   * @returns Cleanup function
+   */
+  onToolResult(handler: ToolResultHandler): () => void {
+    this.toolResultHandlers.add(handler);
+    return () => {
+      this.toolResultHandlers.delete(handler);
+    };
+  }
+
+  /**
+   * Writes a tool call's result into the history being built (`target`) and
+   * tells the `onToolResult` handlers. Every result the history keeps goes
+   * through here, so the handlers see exactly what is saved.
+   */
+  private recordToolResult(target: Message[], toolCallId: string, content: string, id: string = uuidv4()): void {
+    target.push({ id, role: 'tool', content, toolCallId });
+    for (const handler of this.toolResultHandlers) {
+      // A throwing handler must not stop the caller: sendToolResponse records
+      // first and sends after, so the server would never get the result.
+      try {
+        handler(toolCallId, content);
+      } catch (error) {
+        console.error('[UseAI] onToolResult handler threw:', error);
+      }
+    }
+  }
+
+  /**
    * Helper method to listen for tool call requests.
    * Aggregates TOOL_CALL_* events and calls handler with complete tool calls.
    *
@@ -719,7 +783,9 @@ export class UseAIClient {
             handler(e.toolCallId, toolCall.name, args);
             this.currentToolCalls.delete(e.toolCallId);
           } catch (error) {
-            console.error('Error parsing tool call args:', error);
+            // A JSON parse error message can quote the arguments, so it is a debug log only.
+            console.error(`[UseAI] Failed to parse arguments for tool call ${e.toolCallId}`);
+            logger.debug('[UseAI] Tool call argument parse error:', error);
           }
         }
       }
@@ -818,7 +884,7 @@ export class UseAIClient {
    */
   setAgent(agentId: string | null) {
     this._selectedAgent = agentId;
-    console.log('[Client] Agent set to:', agentId ?? 'server default');
+    logger.debug('[Client] Agent set to:', agentId ?? 'server default');
   }
 
   /**
@@ -865,7 +931,7 @@ export class UseAIClient {
    */
   setThreadId(threadId: string) {
     if (this._threadId !== threadId) {
-      console.log('[Client] ThreadId changed, clearing conversation state', {
+      logger.debug('[Client] ThreadId changed, clearing conversation state', {
         oldThreadId: this._threadId,
         newThreadId: threadId,
       });

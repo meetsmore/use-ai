@@ -2,6 +2,7 @@ import type { Server as SocketIOServer } from 'socket.io';
 import { Server as BunEngine } from '@socket.io/bun-engine';
 import type { RuntimeAdapter, RuntimeListener, RuntimeServerConfig, RuntimeServerHandle, WebSocketListener } from '../types';
 import { resolveCorsHeaders, resolvePreflightHeaders } from './cors';
+import { isOriginAllowed } from '../origin';
 import { BunRawWebSocket, type BunWebSocketData } from './rawWebSocket';
 
 type ServeOptions = Parameters<typeof Bun.serve>[0];
@@ -63,6 +64,13 @@ export class BunRuntimeAdapter implements RuntimeAdapter {
           return new Response('Not Found', { status: 404, headers: corsHeaders });
         }
 
+        if (!isOriginAllowed(
+          { origin: requestOrigin, secFetchSite: req.headers.get('Sec-Fetch-Site') || undefined },
+          config.allowedOrigins,
+        )) {
+          return new Response('Forbidden', { status: 403, headers: corsHeaders });
+        }
+
         const response = await handlers.upgrade(req, server);
         if (!response || Object.keys(corsHeaders).length === 0) return response;
 
@@ -94,7 +102,9 @@ export class BunRuntimeAdapter implements RuntimeAdapter {
       if (engineSocket.transport?.name === 'polling' && config.onPollingConnection) {
         const clientIp = bunServer.requestIP(req);
         if (clientIp) {
-          config.onPollingConnection(engineSocket.id, clientIp.address);
+          const sessionId = engineSocket.id;
+          config.onPollingConnection(sessionId, clientIp.address);
+          engineSocket.once('close', () => config.onPollingClose?.(sessionId));
         }
       }
     });

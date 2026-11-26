@@ -44,6 +44,13 @@ export interface McpEndpointConfig {
   /** Optional HTTP headers for authentication (e.g., { 'Authorization': 'Bearer token' }) */
   headers?: Record<string, string>;
   /**
+   * Header names a client may send to this endpoint through `forwardedProps.mcpHeaders`.
+   * Matched case-insensitively. Other client headers are dropped, and a client header
+   * never replaces one set in `headers`.
+   * Default: ['Authorization']
+   */
+  allowedClientHeaders?: string[];
+  /**
    * Tool execution timeout in milliseconds.
    * Default: 30000 (30 seconds)
    */
@@ -88,6 +95,15 @@ export interface UseAIServerConfig<TAgents extends Record<string, import('./agen
   rateLimitMaxRequests?: number;
   /** Time window in milliseconds for rate limiting. Default: 60000 (1 minute) */
   rateLimitWindowMs?: number;
+  /**
+   * Maximum number of LLM calls allowed per time window, for each rate-limit key.
+   * One run can call the LLM once for each step (up to maxSteps + 1 times), so
+   * `rateLimitMaxRequests` alone does not bound LLM calls. Each step counts as one call.
+   * If a run uses up the budget, the run stops with RUN_ERROR (`RATE_LIMITED`).
+   * Uses the same window (`rateLimitWindowMs`) and the same key as `rateLimitMaxRequests`.
+   * Set to 0 to disable. Default: 0
+   */
+  rateLimitMaxLlmCalls?: number;
   /** Optional array of plugins to extend server functionality */
   plugins?: import('./plugins/types').UseAIServerPlugin[];
   /**
@@ -109,7 +125,7 @@ export interface UseAIServerConfig<TAgents extends Record<string, import('./agen
   tools?: Record<string, import('./tools/types').ServerToolConfig>;
   /**
    * Optional array of MCP endpoints to fetch tools from.
-   * Tools from these endpoints will be automatically available to all agents and workflows.
+   * Tools from these endpoints will be automatically available to all agents.
    */
   mcpEndpoints?: McpEndpointConfig[];
   /**
@@ -137,6 +153,22 @@ export interface UseAIServerConfig<TAgents extends Record<string, import('./agen
    * @see https://socket.io/docs/v4/using-multiple-nodes/
    */
   cors?: CorsOptions;
+  /**
+   * Origins that may open a connection, for both transports.
+   * When set, the server refuses a Socket.IO handshake or a WebSocket upgrade whose
+   * Origin header is not in this list. A request without an Origin header is accepted
+   * only when its `Sec-Fetch-Site` header is `same-origin`, because browsers do not send
+   * Origin on a same-origin GET. Any page on the server's own origin can then connect.
+   * Each entry must match the Origin header exactly, for example `'https://app.example.com'`
+   * (scheme, host and port, with no trailing slash).
+   *
+   * Browsers always send the Origin header on a cross-origin request, so this check stops other
+   * sites from opening a connection from their users' browsers. A non-browser client can
+   * send any Origin header, so use an auth plugin as well.
+   *
+   * Default: undefined (the server does not check the Origin header).
+   */
+  allowedOrigins?: string[];
   /**
    * Idle timeout in seconds for the HTTP server.
    * Only used by the Bun runtime (ignored by Node.js).
@@ -230,9 +262,7 @@ export type {
   // use-ai extensions
   ToolAnnotations,
   ToolCallStartExtensions,
-  WorkflowStatus,
   UseAIClientMessage,
-  RunWorkflowMessage,
   UseAIForwardedProps,
   // Tool approval types
   ToolApprovalRequestEvent,

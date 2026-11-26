@@ -10,9 +10,51 @@ export type { ToolAnnotations };
  */
 export interface ToolExecutionContext {
   /**
+   * Id of this tool call, the same `toolCallId` the chat's tool call part
+   * (`ChatStreamingPart`) carries. Use it to connect the
+   * call to what the chat shows for it, e.g. to resolve a question with the
+   * answer the user picks in the question's card.
+   * @example "toolu_01abc123"
+   */
+  toolCallId: string;
+  /**
+   * Aborted when the run this call belongs to ends: stopped by the user,
+   * failed, disconnected or finished. A tool that waits on the user should
+   * stop waiting then: what it returns afterwards is dropped, as the run is
+   * over (after a user stop the call is recorded as aborted).
+   *
+   * @example
+   * ```typescript
+   * const askUser = defineTool(
+   *   'Ask the user to pick one option',
+   *   z.object({ options: z.array(z.string()) }),
+   *   (input, ctx) => new Promise((resolve) => {
+   *     // The run may have ended before the tool started.
+   *     if (ctx.signal.aborted) return resolve({ aborted: true });
+   *     // The signal also aborts when an answered run finishes normally,
+   *     // so stop listening once the user has answered.
+   *     const onAbort = () => {
+   *       questions.close(ctx.toolCallId);
+   *       resolve({ aborted: true });
+   *     };
+   *     ctx.signal.addEventListener('abort', onAbort, { once: true });
+   *     questions.open(ctx.toolCallId, input.options, (answer) => {
+   *       ctx.signal.removeEventListener('abort', onAbort);
+   *       resolve({ answer });
+   *     });
+   *   })
+   * );
+   * ```
+   */
+  signal: AbortSignal;
+  /**
    * Request user approval during tool execution.
    * Use this for conditional approval based on runtime values
    * (e.g., API endpoint, input values, computed risk).
+   *
+   * If the run ends before the user answers (stopped, failed, disconnected),
+   * this resolves with `{ approved: false }` and `ctx.signal` is already
+   * aborted: check `ctx.signal.aborted` to tell that apart from a rejection.
    *
    * @param input - Approval request details
    * @returns Promise resolving with approval decision
@@ -247,7 +289,7 @@ export async function executeDefinedTool(
 ): Promise<unknown> {
   const tool = tools[toolName];
   if (!tool) {
-    throw new Error(`Tool "${toolName}" not found`);
+    throw new Error(`Tool "${toolName}" is not available`);
   }
   return await tool._execute(input, ctx);
 }

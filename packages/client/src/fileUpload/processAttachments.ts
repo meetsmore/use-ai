@@ -42,37 +42,45 @@ export interface ProcessAttachmentsConfig {
 
 /**
  * In-memory cache for transformed file content.
- * Keyed by a SHA-256 hash of the file group identity.
+ * Keyed by a SHA-256 hash of the file group identity, which includes a
+ * SHA-256 hash of each file's bytes.
  */
 const transformationCache = new Map<string, string[]>();
 
 /**
- * Generate a cache key fragment for a single file based on its identity.
+ * Hash bytes with SHA-256 and return a lowercase hex string.
  */
-function getFileCacheKey(file: File): string {
-  return `${file.name}:${file.size}:${file.lastModified}`;
-}
-
-/**
- * Hash a group of files into a fixed-length cache key.
- * Each file is identified by name, size, and lastModified, then the
- * combined string is hashed with SHA-256 to keep key size constant
- * regardless of how many files are in the group.
- *
- * Order matters: [A, B] and [B, A] produce different cache keys because
- * transformer results are positional (results[i] corresponds to files[i]).
- *
- * @example
- * // Input:  ["report.pdf:1024:1700000000", "scan.pdf:2048:1700000001"]
- * // Hashed: "a3f1...b7c2" (64-char hex string)
- */
-async function hashGroupCacheKey(files: File[]): Promise<string> {
-  const raw = files.map(getFileCacheKey).join(', ');
-  const data = new TextEncoder().encode(raw);
+async function sha256Hex(data: BufferSource): Promise<string> {
   const hash = await crypto.subtle.digest('SHA-256', data);
   return Array.from(new Uint8Array(hash))
     .map((b) => b.toString(16).padStart(2, '0'))
     .join('');
+}
+
+/**
+ * Generate a cache key fragment for a single file.
+ *
+ * The fragment includes a SHA-256 hash of the file content. Metadata alone
+ * (name, size, lastModified) is not enough: two different files can have the
+ * same metadata, and one file would then get the other file's result.
+ */
+async function getFileCacheKey(file: File): Promise<[string, string, number, string]> {
+  const contentHash = await sha256Hex(await file.arrayBuffer());
+  return [file.name, file.type, file.size, contentHash];
+}
+
+/**
+ * Hash a group of files into a fixed-length cache key.
+ * Each file is identified by name, type, size and a SHA-256 hash of its
+ * content. The combined identity is hashed again with SHA-256 to keep the
+ * key size constant regardless of how many files are in the group.
+ *
+ * Order matters: [A, B] and [B, A] produce different cache keys because
+ * transformer results are positional (results[i] corresponds to files[i]).
+ */
+async function hashGroupCacheKey(files: File[]): Promise<string> {
+  const fragments = await Promise.all(files.map(getFileCacheKey));
+  return sha256Hex(new TextEncoder().encode(JSON.stringify(fragments)));
 }
 
 /**
