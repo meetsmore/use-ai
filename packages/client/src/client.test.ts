@@ -283,6 +283,29 @@ describe.each(HARNESSES)('UseAIClient over %s', (_name, createHarness) => {
     });
   });
 
+  describe('sendToolApprovalResponse()', () => {
+    test('sends modifiedArgs with an approval', async () => {
+      await harness.open();
+
+      client.sendToolApprovalResponse('tc-1', true, undefined, { title: 'Edited' });
+
+      expect(lastSent()).toEqual({
+        type: 'tool_approval_response',
+        data: { toolCallId: 'tc-1', approved: true, modifiedArgs: { title: 'Edited' } },
+      });
+    });
+
+    test('sends no modifiedArgs when none are given', async () => {
+      await harness.open();
+
+      client.sendToolApprovalResponse('tc-1', true);
+
+      const message = lastSent();
+      expect(message.type).toBe('tool_approval_response');
+      expect(message.data).not.toHaveProperty('modifiedArgs');
+    });
+  });
+
   describe('sendPrompt()', async () => {
     test('sends message without forwardedProps when not provided', async () => {
       await harness.open();

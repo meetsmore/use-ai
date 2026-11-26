@@ -179,6 +179,7 @@ export { useToolSystem } from './hooks/useToolSystem';
 export type {
   RegisterToolsOptions,
   PendingToolApproval,
+  ModifiedToolArgs,
   UseToolSystemOptions,
   UseToolSystemReturn,
 } from './hooks/useToolSystem';

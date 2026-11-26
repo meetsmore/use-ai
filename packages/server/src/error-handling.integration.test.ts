@@ -763,18 +763,19 @@ describe('Error recording and abort handling', () => {
 
       const socket = await cleanup.createTestClient(port);
 
+      const runId = uuidv4();
       socket.emit('message', {
         type: 'run_agent',
         data: {
           threadId: uuidv4(),
-          runId: uuidv4(),
+          runId,
           messages: [{ id: uuidv4(), role: 'user', content: 'test' }],
           tools: [],
           state: null,
           context: [],
           forwardedProps: {
             agent: 'nonexistent',
-            telemetryMetadata: { userId: 'user-123', tenantId: 'tenant-abc' },
+            telemetryMetadata: { userId: 'user-123', tenantId: 'tenant-abc', requestedAgent: 'spoofed', runId: 'spoofed-run' },
           },
         },
       });
@@ -790,6 +791,9 @@ describe('Error recording and abort handling', () => {
       // Verify telemetryMetadata is included in trace metadata
       expect(call.metadata.userId).toBe('user-123');
       expect(call.metadata.tenantId).toBe('tenant-abc');
+      // Server-set keys win over the same keys in telemetryMetadata
+      expect(call.metadata.requestedAgent).toBe('nonexistent');
+      expect(call.metadata.runId).toBe(runId);
 
       // Verify error span was created with ERROR level
       expect(call.span.name).toBe('agent_not_found');
@@ -828,7 +832,7 @@ describe('Error recording and abort handling', () => {
         prompt: 'second request',
         tools: [],
         forwardedProps: {
-          telemetryMetadata: { userId: 'rate-limited-user' },
+          telemetryMetadata: { userId: 'rate-limited-user', retryAfterSeconds: 0 },
         },
       });
       const errorEvent = await waitForEventType(socket, EventType.RUN_ERROR);
@@ -840,6 +844,8 @@ describe('Error recording and abort handling', () => {
       expect(call.tags).toEqual(['error', 'rate_limit_exceeded']);
       // Verify telemetryMetadata is included
       expect(call.metadata.userId).toBe('rate-limited-user');
+      // Server-set retryAfterSeconds wins over the same key in telemetryMetadata
+      expect(Number(call.metadata.retryAfterSeconds)).toBeGreaterThan(0);
 
       // Verify error span was created
       expect(call.span.level).toBe('ERROR');

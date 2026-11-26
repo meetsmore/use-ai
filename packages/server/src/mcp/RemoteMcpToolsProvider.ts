@@ -35,6 +35,8 @@ export interface RemoteToolDefinition extends ToolDefinition {
     provider: RemoteMcpToolsProvider;
     /** The original tool name (before namespace prefix) */
     originalName: string;
+    /** The complete input schema used to validate edited arguments. */
+    inputSchema: object;
     /** Header annotations from this specific tool listing. */
     paramHeaders?: readonly McpParamHeader[];
     /** MCP tool annotations (title, hints, etc.) */
@@ -121,11 +123,14 @@ export class RemoteMcpToolsProvider {
           type: 'object',
           properties: tool.inputSchema.properties,
           required: tool.inputSchema.required,
+          ...(tool.inputSchema.$defs !== undefined && { $defs: tool.inputSchema.$defs as Record<string, unknown> }),
+          ...(tool.inputSchema.definitions !== undefined && { definitions: tool.inputSchema.definitions as Record<string, unknown> }),
         },
         // Mark with remote execution metadata
         _remote: {
           provider: this,
           originalName: tool.name,
+          inputSchema: tool.inputSchema,
           ...(paramHeaders?.length ? { paramHeaders } : {}),
           annotations: tool.annotations,
         },

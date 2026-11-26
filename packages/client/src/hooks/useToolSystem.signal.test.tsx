@@ -77,7 +77,7 @@ describe('useToolSystem — ctx.toolCallId and ctx.signal', () => {
     await act(async () => { await approving; });
 
     expect(client.sendToolApprovalResponse).toHaveBeenCalledTimes(1);
-    expect(client.sendToolApprovalResponse).toHaveBeenCalledWith('tc1', true);
+    expect(client.sendToolApprovalResponse).toHaveBeenCalledWith('tc1', true, undefined, undefined);
   });
 
   it('answers a tool waiting in ctx.requestApproval with not approved when the run ends', async () => {

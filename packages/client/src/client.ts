@@ -640,14 +640,21 @@ export class UseAIClient {
    * @param toolCallId - The ID of the tool call being approved/rejected
    * @param approved - Whether the tool execution is approved
    * @param reason - Optional reason for rejection (shown to AI)
+   * @param modifiedArgs - Arguments edited by the user; on an approval the tool runs with these
    */
-  sendToolApprovalResponse(toolCallId: string, approved: boolean, reason?: string) {
+  sendToolApprovalResponse(
+    toolCallId: string,
+    approved: boolean,
+    reason?: string,
+    modifiedArgs?: Record<string, unknown>
+  ) {
     const message: ToolApprovalResponseMessage = {
       type: 'tool_approval_response',
       data: {
         toolCallId,
         approved,
         reason,
+        ...(modifiedArgs !== undefined ? { modifiedArgs } : {}),
       },
     };
 
