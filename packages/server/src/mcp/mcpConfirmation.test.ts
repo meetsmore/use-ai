@@ -5,33 +5,10 @@ import {
   type McpConfirmationResponse,
 } from './mcpConfirmation';
 import type { UseAIInternalResponse } from './useAIInternalResponse';
-import type { ClientSession, EventEmitter } from '../agents/types';
+import { createTestSession, createMockEmitter } from '../../test/test-utils';
 import type { RemoteMcpToolsProvider, RemoteToolDefinition } from './RemoteMcpToolsProvider';
 import { TOOL_APPROVAL_REQUEST } from '../types';
 import type { ToolDefinition } from '../types';
-
-function createTestSession(overrides: Partial<ClientSession> = {}): ClientSession {
-  return {
-    clientId: 'client-1',
-    ipAddress: '127.0.0.1',
-    socket: {} as never,
-    threadId: 'thread-1',
-    tools: [],
-    state: null,
-    pendingToolCalls: new Map(),
-    pendingToolApprovals: new Map(),
-    abortController: new AbortController(),
-    ...overrides,
-  };
-}
-
-function createMockEmitter(): EventEmitter & { emittedEvents: unknown[] } {
-  const emittedEvents: unknown[] = [];
-  return {
-    emit: (event: unknown) => { emittedEvents.push(event); },
-    emittedEvents,
-  } as EventEmitter & { emittedEvents: unknown[] };
-}
 
 function createMockProvider(
   executeResult: unknown = { success: true }
@@ -125,7 +102,7 @@ describe('handleMcpConfirmation', () => {
   };
 
   test('emits TOOL_APPROVAL_REQUEST with originalArgs (not merged args)', async () => {
-    const session = createTestSession();
+    const session = createTestSession({ abortController: new AbortController() });
     const events = createMockEmitter();
     const provider = createMockProvider();
 
@@ -149,7 +126,7 @@ describe('handleMcpConfirmation', () => {
   });
 
   test('calls phase-2 with originalToolName and merged args when approved', async () => {
-    const session = createTestSession();
+    const session = createTestSession({ abortController: new AbortController() });
     const events = createMockEmitter();
     const provider = createMockProvider({ success: true, message: 'Transferred' });
 
@@ -170,7 +147,7 @@ describe('handleMcpConfirmation', () => {
   });
 
   test('calls phase-2 with originalArgs only when no additional_columns', async () => {
-    const session = createTestSession();
+    const session = createTestSession({ abortController: new AbortController() });
     const events = createMockEmitter();
     const provider = createMockProvider({ success: true });
 
@@ -192,7 +169,7 @@ describe('handleMcpConfirmation', () => {
   });
 
   test('returns error result when rejected', async () => {
-    const session = createTestSession();
+    const session = createTestSession({ abortController: new AbortController() });
     const events = createMockEmitter();
     const provider = createMockProvider();
 
@@ -212,7 +189,7 @@ describe('handleMcpConfirmation', () => {
   });
 
   test('returns error result when rejection has no reason', async () => {
-    const session = createTestSession();
+    const session = createTestSession({ abortController: new AbortController() });
     const events = createMockEmitter();
     const provider = createMockProvider();
 
@@ -231,7 +208,7 @@ describe('handleMcpConfirmation', () => {
   });
 
   test('catches phase-2 execution error gracefully', async () => {
-    const session = createTestSession();
+    const session = createTestSession({ abortController: new AbortController() });
     const events = createMockEmitter();
     const provider = {
       executeTool: async () => { throw new Error('MCP endpoint down'); },
@@ -252,7 +229,7 @@ describe('handleMcpConfirmation', () => {
   });
 
   test('passes MCP headers to phase-2 call', async () => {
-    const session = createTestSession();
+    const session = createTestSession({ abortController: new AbortController() });
     const events = createMockEmitter();
     const mcpHeaders = { 'https://example.com/*': { headers: { Authorization: 'Bearer tok' } } };
     let capturedHeaders: unknown;
@@ -288,7 +265,7 @@ describe('handleMcpConfirmation', () => {
   const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
 
   test('re-runs phase 1 with edited args and asks again before phase 2 runs them', async () => {
-    const session = createTestSession();
+    const session = createTestSession({ abortController: new AbortController() });
     const events = createMockEmitter();
     const reconfirmation: McpConfirmationResponse = {
       _use_ai_internal: true,
@@ -336,7 +313,7 @@ describe('handleMcpConfirmation', () => {
   });
 
   test('returns the re-run phase-1 result when the edited args need no confirmation', async () => {
-    const session = createTestSession();
+    const session = createTestSession({ abortController: new AbortController() });
     const events = createMockEmitter();
     const { provider, executedCalls } = createSequencedProvider([{ success: true, message: 'Done' }]);
 
@@ -355,7 +332,7 @@ describe('handleMcpConfirmation', () => {
   });
 
   test('a re-confirmation that is rejected runs nothing further', async () => {
-    const session = createTestSession();
+    const session = createTestSession({ abortController: new AbortController() });
     const events = createMockEmitter();
     const { provider, executedCalls } = createSequencedProvider([confirmation]);
 
@@ -373,7 +350,7 @@ describe('handleMcpConfirmation', () => {
   });
 
   test('does not call phase-2 when modifiedArgs fail the input schema', async () => {
-    const session = createTestSession();
+    const session = createTestSession({ abortController: new AbortController() });
     const events = createMockEmitter();
     const provider = createMockProvider({ success: true });
 

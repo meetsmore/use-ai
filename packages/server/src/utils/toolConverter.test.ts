@@ -1,24 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { createClientToolExecutor } from './toolConverter';
 import { abortRun, RunAbortedByUser, RunAbortedByClientDisconnect } from './abortReason';
-import type { ClientSession } from '../agents/types';
-
-/**
- * Helper to create a minimal session for testing
- */
-function createTestSession(overrides: Partial<ClientSession> = {}): ClientSession {
-  return {
-    clientId: 'client-1',
-    ipAddress: '127.0.0.1',
-    socket: {} as never,
-    threadId: 'thread-1',
-    tools: [],
-    state: null,
-    pendingToolCalls: new Map(),
-    pendingToolApprovals: new Map(),
-    ...overrides,
-  };
-}
+import { createTestSession } from '../../test/test-utils';
 
 describe('createClientToolExecutor', () => {
   test('resolves when client sends result', async () => {

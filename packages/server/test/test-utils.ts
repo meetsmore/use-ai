@@ -7,6 +7,7 @@ import type {
   Message as AGUIMessage,
 } from '../src/types';
 import { EventType } from '../src/types';
+import type { ClientSession, EventEmitter } from '../src/agents/types';
 import { v4 as uuidv4 } from 'uuid';
 
 // AI SDK result type
@@ -323,4 +324,33 @@ export function extractToolCallsFromEvents(events: AGUIEvent[]): Array<{
       args,
     };
   });
+}
+
+/**
+ * Creates a minimal session for unit tests.
+ * The session has no abortController and no currentRunId unless `overrides` sets them.
+ */
+export function createTestSession(overrides: Partial<ClientSession> = {}): ClientSession {
+  return {
+    clientId: 'client-1',
+    ipAddress: '127.0.0.1',
+    socket: {} as never,
+    threadId: 'thread-1',
+    tools: [],
+    state: null,
+    pendingToolCalls: new Map(),
+    pendingToolApprovals: new Map(),
+    ...overrides,
+  };
+}
+
+/**
+ * Creates a mock EventEmitter that records each emitted event in `emittedEvents`.
+ */
+export function createMockEmitter(): EventEmitter & { emittedEvents: unknown[] } {
+  const emittedEvents: unknown[] = [];
+  return {
+    emit: (event: unknown) => { emittedEvents.push(event); },
+    emittedEvents,
+  } as EventEmitter & { emittedEvents: unknown[] };
 }
