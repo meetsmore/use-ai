@@ -92,6 +92,12 @@ export type ChatToolCallStatus =
   | 'rejected'
   | 'aborted';
 
+/**
+ * An empty list of streaming parts with a stable identity. Use it in place of
+ * a new empty array, so that a component that gets no parts does not re-render.
+ */
+export const EMPTY_STREAMING_PARTS: ChatStreamingPart[] = [];
+
 /** The `tool_call` member of {@link ChatStreamingPart}. */
 export type ChatToolCallPart = Extract<ChatStreamingPart, { kind: 'tool_call' }>;
 

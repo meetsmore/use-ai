@@ -1,10 +1,8 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import type { SavedCommand } from '../commands/types';
 import { validateCommandName } from '../commands/types';
-import { CommandAutocomplete, getFilteredCommandsCount } from '../components/CommandAutocomplete';
+import { CommandAutocomplete, filterCommands } from '../components/CommandAutocomplete';
 import { useTheme, useStrings } from '../theme';
-
-const MAX_VISIBLE_ITEMS = 8;
 
 /**
  * Options for the useSlashCommands hook.
@@ -189,7 +187,8 @@ export function useSlashCommands({
       return false;
     }
 
-    const filteredCount = getFilteredCommandsCount(commands, searchPrefix);
+    const filteredCommands = filterCommands(commands, searchPrefix);
+    const filteredCount = filteredCommands.length;
 
     if (e.key === 'ArrowDown') {
       e.preventDefault();
@@ -201,9 +200,6 @@ export function useSlashCommands({
       return true;
     } else if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      const filteredCommands = commands
-        .filter(c => c.name.toLowerCase().startsWith(searchPrefix.toLowerCase()))
-        .slice(0, MAX_VISIBLE_ITEMS);
       if (filteredCommands[highlightedIndex]) {
         selectCommand(filteredCommands[highlightedIndex]);
       }

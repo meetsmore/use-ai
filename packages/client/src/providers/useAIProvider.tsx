@@ -21,16 +21,13 @@ import { useToolSystem, type RegisterToolsOptions } from '../hooks/useToolSystem
 import type { SubmitMode } from '../utils/keyboard';
 import { usePromptState } from '../hooks/usePromptState';
 import { useFeedback } from '../hooks/useFeedback';
-import { useServerEvents, type ChatStreamingPart } from '../hooks/useServerEvents';
+import { useServerEvents, EMPTY_STREAMING_PARTS, type ChatStreamingPart } from '../hooks/useServerEvents';
 import { useMessageQueue, type SendMessageOptions } from '../hooks/useMessageQueue';
 import { ThemeContext, StringsContext, defaultTheme, defaultStrings } from '../theme';
 import type { UseAITheme, UseAIStrings } from '../theme';
 import type { UseAIChatComponentOverrides } from '../components/chatSlots';
 import { ChatRenderersContext, type UseAIChatRenderers } from '../components/chatRenderers';
 import { logger, setDebugLogging } from '../utils/logger';
-
-/** Stable identity so a hidden chat's streaming parts do not re-render consumers. */
-const EMPTY_STREAMING_PARTS: ChatStreamingPart[] = [];
 
 // ── Context Types ───────────────────────────────────────────────────────────
 
