@@ -11,10 +11,15 @@ type ToolArguments = Record<string, unknown>;
 /** Generic tool result type */
 type ToolResult = unknown;
 
+/** Formats a Zod issue path as `args/a/b`, the same in the log and in the error result. */
+function formatIssuePath(issue: ZodIssue): string {
+  return ['args', ...issue.path].join('/');
+}
+
 /** Formats Zod issues as `args/path message`, for the error result the AI reads. */
 function formatZodIssues(issues: ZodIssue[]): string {
   return issues
-    .map((issue) => `${['args', ...issue.path].join('/')} ${issue.message}`)
+    .map((issue) => `${formatIssuePath(issue)} ${issue.message}`)
     .join(', ');
 }
 
@@ -45,7 +50,7 @@ export function createServerToolExecutor(
         logger.warn('[Server Tool] Invalid arguments, not executing', {
           toolName: serverTool.name,
           toolCallId,
-          issues: parsed.error.issues.map((issue) => ({ path: issue.path.join('.'), code: issue.code })),
+          issues: parsed.error.issues.map((issue) => ({ path: formatIssuePath(issue), code: issue.code })),
         });
         return {
           error: true,
