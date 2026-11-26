@@ -1466,7 +1466,16 @@ export interface UseAIServerPlugin {
   onClientDisconnect?(session: ClientSession): void;
 
   /**
-   * Optional hook called before an agent run starts. Useful for things like authentication or quota enforcement.
+   * Optional hook called first for every run, before MCP `tools/list` and attachment resolution.
+   * Use this for authentication, so a rejected run causes no outbound requests.
+   * Return `{ abort: true, message: '...' }` to block the run.
+   * Reassign `input.mcpHeaders` to change the headers sent to MCP endpoints for this run.
+   */
+  beforeRunAuthorized?(input: BeforeRunAuthorizedInput): Promise<BeforeRunAgentResult | void>;
+
+  /**
+   * Optional hook called right before the agent runs, with the built messages and tools.
+   * Useful for things like quota enforcement. Runs after MCP `tools/list` and attachment resolution.
    * Return `{ abort: true, message: '...' }` to block the run.
    */
   beforeRunAgent?(input: AgentInput): Promise<BeforeRunAgentResult | void>;
