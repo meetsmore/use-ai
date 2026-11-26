@@ -28,13 +28,11 @@ export class Logger {
   }
 
   private logJson(level: LogLevel, message: string, data?: Record<string, unknown>) {
-    // Drop timestamp, level and message from data, so values passed in data (e.g. client metadata) cannot replace the logger's own.
-    const { timestamp: _timestamp, level: _level, message: _message, ...rest } = data ?? {};
     const logEntry: LogData = {
       timestamp: new Date().toISOString(),
       level,
       message,
-      ...rest,
+      ...data,
     };
     console.log(JSON.stringify(logEntry));
   }

@@ -810,7 +810,8 @@ export class AISDKAgent implements Agent {
       this.applyGracefulSummaryOverrides(isGracefulSummaryStep, stepConfig);
       this.applyTruncationFallbackOverrides(isTruncationFallbackStep, stepConfig);
 
-      logger.debug('Starting step iteration', { stepIteration, ...stepConfig.metadata });
+      // Nest the metadata: it holds client telemetryMetadata keys, which must not collide with the log's own fields (level, message, …).
+      logger.debug('Starting step iteration', { stepIteration, metadata: stepConfig.metadata });
 
       // Apply cache breakpoints for Anthropic prompt caching
       const messagesWithCache = applyCacheBreakpoints(

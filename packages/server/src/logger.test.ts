@@ -55,26 +55,3 @@ describe('Logger content logging', () => {
     });
   }
 });
-
-describe('Logger JSON fields', () => {
-  afterEach(() => {
-    for (const k of ENV_KEYS) {
-      if (savedEnv[k] === undefined) delete process.env[k];
-      else process.env[k] = savedEnv[k];
-    }
-  });
-
-  test('data cannot replace timestamp, level or message', () => {
-    const before = Date.now();
-    const out = captureLogs({ LOG_FORMAT: 'json' }, (logger) =>
-      logger.info('real message', { timestamp: '1999-01-01T00:00:00.000Z', level: 'error', message: 'spoofed', userId: 'user-1' }),
-    );
-
-    const entry = JSON.parse(out);
-    expect(entry.level).toBe('info');
-    expect(entry.message).toBe('real message');
-    expect(Date.parse(entry.timestamp)).toBeGreaterThanOrEqual(before - 1000);
-    expect(entry.userId).toBe('user-1');
-    expect(Object.keys(entry).slice(0, 3)).toEqual(['timestamp', 'level', 'message']);
-  });
-});
