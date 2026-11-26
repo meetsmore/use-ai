@@ -437,16 +437,6 @@ function extractReasoningSignature(
   return null;
 }
 
-/**
- * Step metadata flags the server sets to true only on fallback steps (applyGracefulSummaryOverrides /
- * applyTruncationFallbackOverrides). Spread after the client metadata on every step, so a client value
- * under these names never stays on the other steps.
- */
-const FALLBACK_STEP_FLAGS_UNSET: Record<string, AttributeValue | undefined> = {
-  gracefulSummary: undefined,
-  truncationFallback: undefined,
-};
-
 type RunTelemetryMetadata = Record<string, unknown> & {
   sessionId: string;
   threadId?: string;
@@ -797,7 +787,9 @@ export class AISDKAgent implements Agent {
           ...this.runTelemetryMetadata(ctx),
           toolCount: stepCtx.currentTools.length,
           stepIteration,
-          ...FALLBACK_STEP_FLAGS_UNSET,
+          // Set on every step (undefined on normal steps), after the client metadata, so a client value never stays.
+          gracefulSummary: isGracefulSummaryStep || undefined,
+          truncationFallback: isTruncationFallbackStep || undefined,
         } as Record<string, AttributeValue>,
       };
 
@@ -1624,7 +1616,7 @@ export class AISDKAgent implements Agent {
     if (!isGracefulSummaryStep) return;
     stepConfig.messages.push({ role: 'user', content: 'max steps reached, summarize progress' });
     stepConfig.tools = undefined;
-    Object.assign(stepConfig.metadata, { toolCount: 0, gracefulSummary: true });
+    stepConfig.metadata.toolCount = 0;
   }
 
   /** Disables tools for the truncation-acknowledgment fallback iteration. */
@@ -1634,7 +1626,7 @@ export class AISDKAgent implements Agent {
   ): void {
     if (!isTruncationFallbackStep) return;
     stepConfig.tools = undefined;
-    Object.assign(stepConfig.metadata, { toolCount: 0, truncationFallback: true });
+    stepConfig.metadata.toolCount = 0;
   }
 
   /**
