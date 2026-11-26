@@ -19,9 +19,9 @@
     "build": "tsc"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.4",
+    "@modelcontextprotocol/sdk": "^1.32.0",
     "@nestjs/common": "^11.0.0",
-    "@nestjs/core": "^11.0.0",
+    "@nestjs/core": "^11.1.18",
     "@nestjs/platform-express": "^11.0.0",
     "@rekog/mcp-nest": "^1.8.4",
     "express": "^5.1.0",
