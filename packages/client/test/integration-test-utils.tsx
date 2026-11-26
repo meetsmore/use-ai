@@ -54,7 +54,7 @@ export function setupMockWebSocket(url: string = 'ws://localhost:8081'): {
 }
 
 /**
- * Restore original Socket.IO client and close server
+ * Close the mock server and clear the sent messages.
  */
 export function restoreMockWebSocket(): void {
   if (mockServer) {
@@ -62,7 +62,8 @@ export function restoreMockWebSocket(): void {
     mockServer = null;
   }
   sentMessages.length = 0;
-  // Note: mock.module() mocks are automatically cleaned up between tests
+  // This function does not restore the real socket.io-client.
+  // Bun applies mock.module() to the whole process, and Bun does not remove the mock between tests or files.
 }
 
 /**
