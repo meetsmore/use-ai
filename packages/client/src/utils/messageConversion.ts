@@ -1,5 +1,6 @@
 import type { PersistedMessage } from '../providers/chatRepository/types';
 import type { Message as AGUIMessage, Message, MultimodalContent, ReasoningPart } from '../types';
+import { transformedFileToText } from '@meetsmore-oss/use-ai-core';
 import { getTextFromContent } from './messageContent';
 
 /**
@@ -36,8 +37,8 @@ export function transformMessagesToClientFormat(persistedMessages: PersistedMess
         }
         // Preserve the multipart structure so that, after reconstruction, the
         // LLM can still see the full original input (including transformed_file
-        // text). transformed_file parts are wrapped in the same shape the server
-        // emits on a fresh send (see packages/server/src/server.ts).
+        // text). transformed_file parts use the same transformedFileToText helper
+        // as the server, so the text is the same as on a fresh send.
         //
         // The wire parts below intentionally use use-ai's content shape
         // ({ type:'image_ref'|'file_ref', ref }, the canonical MultimodalContent) to
@@ -48,10 +49,7 @@ export function transformMessagesToClientFormat(persistedMessages: PersistedMess
             return [{ type: 'text', text: p.text }];
           }
           if (p.type === 'transformed_file') {
-            return [{
-              type: 'text',
-              text: `[Content of file "${p.originalFile.name}" (${p.originalFile.mimeType})]:\n\n${p.text}`,
-            }];
+            return [{ type: 'text', text: transformedFileToText(p) }];
           }
           if (p.type === 'attachment_ref') {
             // Resendable: restore the ref wire part so the resolver at run start

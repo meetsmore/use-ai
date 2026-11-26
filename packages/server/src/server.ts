@@ -1,8 +1,8 @@
 import { Server as SocketIOServer } from 'socket.io';
-import { ModelMessage, ToolModelMessage } from 'ai';
-import { createHash } from 'crypto';
-import { EventType, ErrorCode, type McpHeadersMap, type UseAIForwardedProps, type ResolveAttachments } from '@meetsmore-oss/use-ai-core';
+import type { ModelMessage } from 'ai';
+import { ErrorCode, type McpHeadersMap, type UseAIForwardedProps, type ResolveAttachments } from '@meetsmore-oss/use-ai-core';
 import { resolveAttachmentParts, countRefParts, dropRemoteUrlParts } from './attachmentResolution';
+import { toModelMessages } from './messageConversion';
 import type {
   UseAIServerConfig,
   McpEndpointConfig,
@@ -26,9 +26,10 @@ import type { UseAIServerPlugin, MessageHandler, BeforeRunAuthorizedInput } from
 import { FeedbackPlugin } from './plugins/FeedbackPlugin';
 import { isRemoteTool, isServerTool } from './utils/toolFilters';
 import { abortRun, RunAbortedByUser, RunAbortedByClientDisconnect } from './utils/abortReason';
+import { runError, runStarted } from './utils/runEvents';
 import { RemoteMcpToolsProvider, type RemoteToolDefinition } from './mcp';
 import type { ServerToolDefinition } from './tools/types';
-import { findMcpHeadersForUrl } from './mcp/mcpHeaderPatterns';
+import { McpToolCatalog } from './mcp/McpToolCatalog';
 import {
   createRuntimeAdapter,
   createClientIpTracker,
@@ -114,6 +115,7 @@ export class UseAIServer {
   private plugins: UseAIServerPlugin[] = [];
   private messageHandlers: Map<string, MessageHandler> = new Map();
   private mcpEndpoints: RemoteMcpToolsProvider[] = [];
+  private mcpToolCatalog: McpToolCatalog;
   private serverTools: ServerToolDefinition[] = [];
   // Optional host seam. Resolves attachment refs into model-readable parts at run start.
   private resolveAttachments?: ResolveAttachments;
@@ -189,6 +191,7 @@ export class UseAIServer {
         endpoints: this.mcpEndpoints.map(e => e.getUrl()),
       });
     }
+    this.mcpToolCatalog = new McpToolCatalog(this.mcpEndpoints);
 
     // Convert server tools config to ServerToolDefinition[]
     if (config.tools) {
@@ -424,11 +427,7 @@ export class UseAIServer {
         });
       }
       // The raw message may expose internal details (hostnames, stack info); it is logged above.
-      this.sendEvent(session.socket, {
-        type: EventType.RUN_ERROR,
-        message: ErrorCode.UNKNOWN_ERROR,
-        timestamp: Date.now(),
-      });
+      this.sendEvent(session.socket, runError(ErrorCode.UNKNOWN_ERROR));
     }
   }
 
@@ -488,11 +487,7 @@ export class UseAIServer {
           ipAddress: session.ipAddress,
           metadata: { ...forwardedProps?.telemetryMetadata, requestedAgent, availableAgents },
         });
-        this.sendEvent(session.socket, {
-          type: EventType.RUN_ERROR,
-          message: `Agent "${requestedAgent}" not found. Available agents: ${availableAgents.join(', ')}`,
-          timestamp: Date.now(),
-        });
+        this.sendEvent(session.socket, runError(`Agent "${requestedAgent}" not found. Available agents: ${availableAgents.join(', ')}`));
         return;
       }
     }
@@ -510,11 +505,7 @@ export class UseAIServer {
         ipAddress: session.ipAddress,
         metadata: { ...forwardedProps?.telemetryMetadata, retryAfterSeconds },
       });
-      this.sendEvent(session.socket, {
-        type: EventType.RUN_ERROR,
-        message: `Rate limit exceeded. Please try again in ${retryAfterSeconds} seconds.`,
-        timestamp: Date.now(),
-      });
+      this.sendEvent(session.socket, runError(`Rate limit exceeded. Please try again in ${retryAfterSeconds} seconds.`));
       return;
     }
 
@@ -540,11 +531,7 @@ export class UseAIServer {
         const result = await plugin.beforeRunAuthorized(beforeRunAuthorizedInput);
         if (result?.abort) {
           session.currentRunId = undefined;
-          this.sendEvent(session.socket, {
-            type: EventType.RUN_ERROR,
-            message: result.message,
-            timestamp: Date.now(),
-          });
+          this.sendEvent(session.socket, runError(result.message));
           return;
         }
       }
@@ -554,21 +541,67 @@ export class UseAIServer {
       logger.info('Run cancelled before start', { clientId: session.clientId, runId });
       // The client resets its run state on RUN_ERROR(ABORTED) after sending abort_run, and takes
       // the turn's start position from RUN_STARTED. The agent has not run yet, so send it here.
-      this.sendEvent(session.socket, {
-        type: EventType.RUN_STARTED,
-        threadId,
-        runId,
-        timestamp: Date.now(),
-      });
-      this.sendEvent(session.socket, {
-        type: EventType.RUN_ERROR,
-        message: ErrorCode.ABORTED,
-        timestamp: Date.now(),
-      });
+      this.sendEvent(session.socket, runStarted(threadId, runId));
+      this.sendEvent(session.socket, runError(ErrorCode.ABORTED));
       return;
     }
     const mcpHeaders = beforeRunAuthorizedInput.mcpHeaders;
 
+    session.tools = await this.mergeRunTools(session, tools, mcpHeaders);
+    session.state = state;
+
+    const incomingMessages = await this.prepareModelMessages(runId, messages, forwardedProps);
+
+    // Build system prompt
+    const systemPrompt = this.buildSystemPrompt(session, state);
+
+    // Create event emitter that forwards all events to client
+    const eventEmitter: EventEmitter = {
+      emit: <T extends AGUIEventExtended>(event: T) => {
+        this.sendEvent(session.socket, event);
+      },
+    };
+
+    // Build agent input
+    const agentInput = {
+      session,
+      runId,
+      messages: incomingMessages,
+      tools: session.tools,
+      state,
+      systemPrompt,
+      originalInput: message.data,
+      mcpHeaders,
+      // Uses the same key as the run rate limit above.
+      llmCallLimit: this.llmCallRateLimiter.isEnabled()
+        ? { consume: () => this.llmCallRateLimiter.checkLimit(session.ipAddress) }
+        : undefined,
+    };
+
+    // Run beforeRunAgent hooks from all plugins
+    for (const plugin of this.plugins) {
+      if (plugin.beforeRunAgent) {
+        const result = await plugin.beforeRunAgent(agentInput);
+        if (result?.abort) {
+          this.sendEvent(session.socket, runError(result.message));
+          return;
+        }
+      }
+    }
+
+    // Delegate to selected agent
+    await selectedAgent.run(agentInput, eventEmitter);
+  }
+
+  /**
+   * Merges the client tools of a run with the MCP tools and the server tools.
+   * MCP tools are fetched lazily and cached for each session.
+   */
+  private async mergeRunTools(
+    session: ClientSession,
+    tools: RunAgentMessage['data']['tools'],
+    mcpHeaders: McpHeadersMap | undefined,
+  ): Promise<ToolDefinition[]> {
     // Merge client tools with MCP tools from all endpoints
     const clientTools = tools.map(t => ({
       ...t,
@@ -578,114 +611,35 @@ export class UseAIServer {
     // Lazy fetch MCP tools (per-session caching with auth headers)
     let mcpTools: RemoteToolDefinition[] = [];
     if (this.mcpEndpoints.length > 0) {
-      mcpTools = await this.getMcpToolsForSession(session, mcpHeaders);
+      mcpTools = await this.mcpToolCatalog.getToolsForSession(session, mcpHeaders);
     }
 
     // Merge: client tools + MCP tools + server tools
-    session.tools = [...clientTools, ...mcpTools, ...this.serverTools];
+    const merged = [...clientTools, ...mcpTools, ...this.serverTools];
 
     if (mcpTools.length > 0 || this.serverTools.length > 0) {
       logger.debug('Merged tools', {
         clientTools: clientTools.length,
         mcpTools: mcpTools.length,
         serverTools: this.serverTools.length,
-        total: session.tools.length,
+        total: merged.length,
       });
     }
 
-    session.state = state;
+    return merged;
+  }
 
-    // Types for AG-UI content blocks
-    type TextBlock = { type: 'text'; text: string };
-    type ImageBlock = { type: 'image_url'; url: string };
-    type FileBlock = { type: 'file_url'; url: string; mimeType: string; name?: string };
-    type ContentBlock = TextBlock | ImageBlock | FileBlock | { type: string; [key: string]: unknown };
-    type MessageContent = string | ContentBlock[] | Record<string, unknown> | undefined;
-
-    // AI SDK content part types (matching AI SDK v6 UserContent)
-    type AISDKTextPart = { type: 'text'; text: string };
-    type AISDKImagePart = { type: 'image'; image: string };
-    type AISDKFilePart = { type: 'file'; data: string; mediaType: string };
-    type AISDKContentPart = AISDKTextPart | AISDKImagePart | AISDKFilePart;
-
-    // Type guard for tool messages with additional properties
-    type ToolMessage = Message & {
-      role: 'tool';
-      tool_call_id?: string;
-      toolCallId?: string;
-    };
-
-    const isToolMessage = (msg: Message): msg is ToolMessage => {
-      return msg.role === 'tool';
-    };
-
-    // Helper to extract text content as string (for assistant messages and tool results)
-    const getStringContent = (content: MessageContent): string => {
-      if (!content) return '';
-      if (typeof content === 'string') return content;
-      // If it's an array, extract text from text blocks
-      if (Array.isArray(content)) {
-        return content
-          .filter((block): block is TextBlock => block.type === 'text')
-          .map((block) => block.text)
-          .join('');
-      }
-      // If it's an object (Record), convert to JSON string
-      if (typeof content === 'object') {
-        return JSON.stringify(content);
-      }
-      return '';
-    };
-
-    // Helper to convert AG-UI content to AI SDK content format (preserves multimodal)
-    const convertToAISDKContent = (content: MessageContent): string | AISDKContentPart[] => {
-      if (!content) return '';
-      if (typeof content === 'string') return content;
-
-      // If it's an array, convert each block to AI SDK format
-      if (Array.isArray(content)) {
-        const parts: AISDKContentPart[] = [];
-
-        for (const block of content) {
-          if (block.type === 'text' && 'text' in block) {
-            parts.push({ type: 'text', text: block.text as string });
-          } else if (block.type === 'image_url' && 'url' in block) {
-            // AG-UI uses 'url', AI SDK uses 'image'
-            parts.push({ type: 'image', image: block.url as string });
-          } else if (block.type === 'file_url' && 'url' in block) {
-            // AG-UI uses 'url' and 'mimeType', AI SDK uses 'data' and 'mediaType'
-            parts.push({
-              type: 'file',
-              data: block.url as string,
-              mediaType: (block.mimeType as string) || 'application/octet-stream',
-            });
-          } else if (block.type === 'transformed_file' && 'text' in block) {
-            // Transformed file from client-side FileTransformer - convert to text
-            const originalFile = (block as { originalFile?: { name?: string; mimeType?: string } }).originalFile;
-            const fileName = originalFile?.name || 'file';
-            const mimeType = originalFile?.mimeType || 'application/octet-stream';
-            parts.push({
-              type: 'text',
-              text: `[Content of file "${fileName}" (${mimeType})]:\n\n${block.text as string}`,
-            });
-          }
-        }
-
-        // If only text parts, return as string for simplicity
-        if (parts.length === 1 && parts[0].type === 'text') {
-          return parts[0].text;
-        }
-
-        return parts.length > 0 ? parts : '';
-      }
-
-      // If it's an object (Record), convert to JSON string
-      if (typeof content === 'object') {
-        return JSON.stringify(content);
-      }
-      return '';
-    };
-
+  /**
+   * Prepares the run messages for the agent:
+   * 1. Drops client-supplied remote attachment urls.
+   * 2. Resolves attachment refs with the host resolver.
+   * 3. Converts AG-UI messages to AI SDK model messages.
+   */
+  private async prepareModelMessages(
+    runId: string,
+    messages: Message[],
+    forwardedProps: UseAIForwardedProps | undefined,
+  ): Promise<ModelMessage[]> {
     // Before resolving refs, so that urls from the trusted resolver are not filtered.
     const { messages: safeMessages, dropped: droppedUrlParts } = dropRemoteUrlParts(messages);
     if (droppedUrlParts > 0) {
@@ -728,213 +682,7 @@ export class UseAIServer {
       });
     }
 
-    // Convert AG-UI messages to AI SDK ModelMessage format
-    const incomingMessages: ModelMessage[] = resolvedMessages.map((msg, msgIndex) => {
-      if (msg.role === 'user') {
-        return {
-          role: 'user' as const,
-          content: convertToAISDKContent(msg.content),
-        };
-      } else if (msg.role === 'assistant') {
-        const textContent = getStringContent(msg.content);
-
-        // Check for reasoning parts (extended thinking, persisted from previous runs).
-        // encryptedValue contains JSON-serialized provider metadata (e.g., Anthropic signature).
-        // AISDKAgent.reasoningContentSchema transforms it to providerOptions
-        // (the format the AI SDK sends to the Anthropic API for signature verification).
-        const reasoningParts = (msg as { reasoningParts?: Array<{
-          text: string;
-          encryptedValue?: string;
-        }> }).reasoningParts;
-
-        // Check for AG-UI toolCalls on the message (sent by client on reconnection)
-        const toolCalls = (msg as { toolCalls?: Array<{
-          id: string;
-          type: string;
-          function: { name: string; arguments: string };
-          encryptedValue?: string;
-        }> }).toolCalls;
-
-        // Build content blocks when reasoning or tool calls are present
-        const hasReasoning = reasoningParts && reasoningParts.length > 0;
-        const hasToolCalls = toolCalls && toolCalls.length > 0;
-
-        if (hasReasoning || hasToolCalls) {
-          const content: Array<
-            | { type: 'text'; text: string }
-            | { type: 'tool-call'; toolCallId: string; toolName: string; input: unknown; providerMetadata?: Record<string, unknown> }
-            | { type: 'reasoning'; text: string; providerMetadata?: Record<string, unknown> }
-          > = [];
-
-          // Add reasoning parts first (before text/tool-calls) for multi-turn context
-          if (hasReasoning) {
-            for (const rp of reasoningParts) {
-              // Deserialize encryptedValue back to providerMetadata for AI SDK format
-              let providerMetadata: Record<string, unknown> | undefined;
-              if (rp.encryptedValue) {
-                try {
-                  providerMetadata = JSON.parse(rp.encryptedValue);
-                } catch {
-                  // Ignore malformed encryptedValue
-                }
-              }
-              content.push({
-                type: 'reasoning',
-                text: rp.text,
-                ...(providerMetadata ? { providerMetadata } : {}),
-              });
-            }
-          }
-
-          if (textContent) {
-            content.push({ type: 'text', text: textContent });
-          }
-
-          if (hasToolCalls) {
-            for (const tc of toolCalls) {
-              let input: unknown;
-              try {
-                input = JSON.parse(tc.function.arguments);
-              } catch {
-                input = tc.function.arguments;
-              }
-              // Deserialize encryptedValue to providerMetadata (Gemini thoughtSignature)
-              let tcProviderMetadata: Record<string, unknown> | undefined;
-              if (tc.encryptedValue) {
-                try {
-                  tcProviderMetadata = JSON.parse(tc.encryptedValue);
-                } catch {
-                  // Ignore malformed encryptedValue
-                }
-              }
-              content.push({
-                type: 'tool-call',
-                toolCallId: tc.id,
-                toolName: tc.function.name,
-                input,
-                ...(tcProviderMetadata ? { providerMetadata: tcProviderMetadata } : {}),
-              });
-            }
-          }
-
-          return {
-            role: 'assistant' as const,
-            content,
-          };
-        }
-
-        return {
-          role: 'assistant' as const,
-          content: textContent,
-        };
-      } else if (isToolMessage(msg)) {
-        // Tool messages in AI SDK v6 ModelMessage format.
-        // The output field requires a discriminated union: { type: "json"|"text", value }
-        const content = getStringContent(msg.content);
-        let output: { type: 'json'; value: unknown } | { type: 'text'; value: string };
-        try {
-          const parsed = JSON.parse(content);
-          output = { type: 'json', value: parsed };
-        } catch {
-          output = { type: 'text', value: content };
-        }
-        const toolCallId = msg.tool_call_id || msg.toolCallId || uuidv4();
-
-        // AG-UI ToolMessage has no toolName field. Resolve it by scanning back
-        // through the preceding assistant messages' toolCalls.
-        // Also look up encryptedValue for Gemini thoughtSignature propagation to tool results.
-        let toolName: string | undefined;
-        let toolEncryptedValue: string | undefined;
-        for (let i = msgIndex - 1; i >= 0; i--) {
-          const prevToolCalls = (resolvedMessages[i] as { toolCalls?: Array<{
-            id: string;
-            function: { name: string };
-            encryptedValue?: string;
-          }> }).toolCalls;
-          if (prevToolCalls) {
-            const match = prevToolCalls.find(tc => tc.id === toolCallId);
-            if (match) {
-              toolName = match.function.name;
-              toolEncryptedValue = match.encryptedValue;
-              break;
-            }
-          }
-        }
-
-        // Deserialize encryptedValue to providerMetadata for tool result
-        // (Gemini requires thoughtSignature on both tool-call and tool-result parts)
-        let toolResultProviderMetadata: Record<string, unknown> | undefined;
-        if (toolEncryptedValue) {
-          try {
-            toolResultProviderMetadata = JSON.parse(toolEncryptedValue);
-          } catch {
-            // Ignore malformed encryptedValue
-          }
-        }
-
-        return {
-          role: 'tool' as const,
-          content: [
-            {
-              type: 'tool-result' as const,
-              toolCallId,
-              toolName: toolName || 'unknown',
-              output,
-              ...(toolResultProviderMetadata ? { providerMetadata: toolResultProviderMetadata } : {}),
-            },
-          ],
-        } as ToolModelMessage;
-      }
-      // Default fallback
-      return {
-        role: 'user' as const,
-        content: convertToAISDKContent(msg.content),
-      };
-    });
-
-    // Build system prompt
-    const systemPrompt = this.buildSystemPrompt(session, state);
-
-    // Create event emitter that forwards all events to client
-    const eventEmitter: EventEmitter = {
-      emit: <T extends AGUIEventExtended>(event: T) => {
-        this.sendEvent(session.socket, event);
-      },
-    };
-
-    // Build agent input
-    const agentInput = {
-      session,
-      runId,
-      messages: incomingMessages,
-      tools: session.tools,
-      state,
-      systemPrompt,
-      originalInput: message.data,
-      mcpHeaders,
-      // Uses the same key as the run rate limit above.
-      llmCallLimit: this.llmCallRateLimiter.isEnabled()
-        ? { consume: () => this.llmCallRateLimiter.checkLimit(session.ipAddress) }
-        : undefined,
-    };
-
-    // Run beforeRunAgent hooks from all plugins
-    for (const plugin of this.plugins) {
-      if (plugin.beforeRunAgent) {
-        const result = await plugin.beforeRunAgent(agentInput);
-        if (result?.abort) {
-          this.sendEvent(session.socket, {
-            type: EventType.RUN_ERROR,
-            message: result.message,
-            timestamp: Date.now(),
-          });
-          return;
-        }
-      }
-    }
-
-    // Delegate to selected agent
-    await selectedAgent.run(agentInput, eventEmitter);
+    return toModelMessages(resolvedMessages);
   }
 
   private buildSystemPrompt(session: ClientSession, state: unknown): string | undefined {
@@ -1033,158 +781,6 @@ export class UseAIServer {
 
   private sendEvent<T = unknown>(connection: ClientConnection, event: T) {
     connection.emit('event', event);
-  }
-
-  /**
-   * Gets MCP tools for a session, using caching with authentication headers.
-   * Lazily fetches tools on first request, then caches per-session.
-   *
-   * Cache is invalidated when:
-   * 1. Headers hash changes (different user/token)
-   * 2. TTL expires (if configured per endpoint)
-   *
-   * @param session - The client session
-   * @param mcpHeaders - Optional MCP headers map with per-endpoint auth headers
-   * @returns Array of remote tool definitions from all MCP endpoints
-   */
-  private async getMcpToolsForSession(
-    session: ClientSession,
-    mcpHeaders?: McpHeadersMap
-  ): Promise<RemoteToolDefinition[]> {
-    const headersHash = this.hashMcpHeaders(mcpHeaders);
-    const now = Date.now();
-
-    // Check if cache is valid
-    const cacheValid = this.isMcpToolsCacheValid(session, headersHash, now);
-
-    if (cacheValid && session.mcpToolsCache) {
-      logger.debug('[MCP] Using cached tools for session', {
-        clientId: session.clientId,
-        toolCount: Array.from(session.mcpToolsCache.values()).flat().length,
-      });
-      return Array.from(session.mcpToolsCache.values()).flat() as RemoteToolDefinition[];
-    }
-
-    // Fetch tools from all endpoints
-    const toolsCache = new Map<string, ToolDefinition[]>();
-
-    for (const endpoint of this.mcpEndpoints) {
-      const headers = this.resolveHeadersForEndpoint(endpoint.getUrl(), mcpHeaders);
-      try {
-        const tools = await endpoint.fetchToolsWithHeaders(headers);
-        toolsCache.set(endpoint.getUrl(), tools);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        logger.warn(`[MCP] Failed to fetch tools from ${endpoint.getUrl()}`, { error: message });
-        toolsCache.set(endpoint.getUrl(), []); // Empty on error, don't block
-      }
-    }
-
-    // Update session cache
-    session.mcpToolsCache = toolsCache;
-    session.mcpHeadersHash = headersHash;
-    session.mcpToolsCacheTimestamp = now;
-
-    logger.debug('[MCP] Fetched and cached tools for session', {
-      clientId: session.clientId,
-      toolCount: Array.from(toolsCache.values()).flat().length,
-      endpoints: Array.from(toolsCache.keys()),
-    });
-
-    return Array.from(toolsCache.values()).flat() as RemoteToolDefinition[];
-  }
-
-  /**
-   * Checks if the MCP tools cache is still valid for a session.
-   *
-   * @param session - The client session
-   * @param currentHeadersHash - Hash of current auth headers
-   * @param now - Current timestamp
-   * @returns true if cache is valid, false if refresh is needed
-   */
-  private isMcpToolsCacheValid(
-    session: ClientSession,
-    currentHeadersHash: string,
-    now: number
-  ): boolean {
-    // No cache exists
-    if (!session.mcpToolsCache || !session.mcpToolsCacheTimestamp) {
-      return false;
-    }
-
-    // Headers changed (different user/token)
-    if (session.mcpHeadersHash !== currentHeadersHash) {
-      logger.debug('[MCP] Cache invalid: headers changed', {
-        clientId: session.clientId,
-        oldHash: session.mcpHeadersHash?.substring(0, 8),
-        newHash: currentHeadersHash.substring(0, 8),
-      });
-      return false;
-    }
-
-    // Check TTL for each endpoint
-    for (const endpoint of this.mcpEndpoints) {
-      const ttl = endpoint.getToolsCacheTtl();
-      if (ttl > 0) {
-        const age = now - session.mcpToolsCacheTimestamp;
-        if (age >= ttl) {
-          logger.debug('[MCP] Cache invalid: TTL expired', {
-            clientId: session.clientId,
-            endpoint: endpoint.getUrl(),
-            ttl,
-            age,
-          });
-          return false;
-        }
-      }
-    }
-
-    return true;
-  }
-
-  /**
-   * Creates a hash of MCP headers for use as a cache key.
-   *
-   * @param mcpHeaders - Optional MCP headers map
-   * @returns Hash string (16 chars), or 'no-auth' if no headers
-   */
-  private hashMcpHeaders(mcpHeaders?: McpHeadersMap): string {
-    if (!mcpHeaders || Object.keys(mcpHeaders).length === 0) {
-      return 'no-auth';
-    }
-
-    // Create stable JSON representation (sorted keys)
-    const sortedEntries = Object.entries(mcpHeaders)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([pattern, config]) => {
-        const sortedHeaders = Object.entries(config.headers || {})
-          .sort(([a], [b]) => a.localeCompare(b));
-        return [pattern, { headers: Object.fromEntries(sortedHeaders) }];
-      });
-
-    return createHash('sha256')
-      .update(JSON.stringify(sortedEntries))
-      .digest('hex')
-      .substring(0, 16);
-  }
-
-  /**
-   * Resolves headers for a specific MCP endpoint from the headers map.
-   *
-   * @param endpointUrl - The endpoint URL to match
-   * @param mcpHeaders - Optional MCP headers map
-   * @returns Headers to use for this endpoint (empty object if no match)
-   */
-  private resolveHeadersForEndpoint(
-    endpointUrl: string,
-    mcpHeaders?: McpHeadersMap
-  ): Record<string, string> {
-    if (!mcpHeaders) {
-      return {};
-    }
-
-    const matchingConfig = findMcpHeadersForUrl(endpointUrl, mcpHeaders);
-    return matchingConfig?.headers || {};
   }
 
   /**

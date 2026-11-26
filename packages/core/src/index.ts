@@ -85,3 +85,5 @@ export {
   isUseAIInternalResponse,
   isMcpConfirmationResponse,
 } from './useAIInternalResponse';
+
+export { transformedFileToText, type TransformedFileTextInput } from './transformedFile';
