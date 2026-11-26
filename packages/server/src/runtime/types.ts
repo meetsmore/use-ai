@@ -14,7 +14,7 @@ export interface RawWebSocket {
   /** Remote address of the peer, when the runtime exposes one. */
   readonly remoteAddress?: string;
   /** The `X-Forwarded-For` header of the upgrade request, if any. */
-  readonly forwardedFor?: string;
+  readonly forwardedFor?: string | string[];
   /** Whether the connection is still open. */
   readonly open: boolean;
   /** Sends a text frame. */

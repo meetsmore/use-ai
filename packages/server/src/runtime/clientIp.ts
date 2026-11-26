@@ -1,9 +1,9 @@
 /**
- * Client IP tracking for Socket.IO connections.
+ * Client addresses of connections.
  *
- * WebSocket connections can get the remote address directly from the socket.
- * Polling connections need to track the IP at connection time because the
- * transport socket may not be available later.
+ * The tracker keeps the peer address of Socket.IO polling connections, because the
+ * transport socket may not be available later. The peer is the proxy when there is one:
+ * use `resolveClientIp` to get the address to count a client under.
  */
 
 /**
@@ -34,9 +34,10 @@ export interface ClientIpTracker {
   removePollingConnection(sessionId: string): void;
 
   /**
-   * Get the client IP address for a connection.
+   * Get the peer address of a connection (the proxy's address behind a proxy).
    * For WebSocket: uses socket.remoteAddress directly.
    * For polling: uses the stored IP from trackPollingConnection.
+   * Pass the result to `resolveClientIp` rather than counting clients by it.
    */
   getClientIp(conn: ClientIpConnection): string | undefined;
 }
@@ -51,7 +52,9 @@ export interface ClientIpTracker {
  * the Nth entry from the right is the client. When the header has fewer entries, the leftmost
  * one is used. With 0, the header is ignored and the peer address is the client.
  *
- * Setting a count higher than the proxies really in front lets a client choose its address.
+ * A client that can reach any of the proxies, or the server, without passing through the ones
+ * in front of it can choose its address, as can any client when the count is higher than the
+ * proxies really in front.
  */
 export function resolveClientIp(
   peerAddress: string | undefined,

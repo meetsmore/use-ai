@@ -8,7 +8,7 @@ export class NodeRawWebSocket implements RawWebSocket {
   constructor(
     private ws: WebSocket,
     readonly remoteAddress?: string,
-    readonly forwardedFor?: string,
+    readonly forwardedFor?: string | string[],
   ) {}
 
   get open(): boolean {

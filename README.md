@@ -1208,7 +1208,7 @@ Set `trustedProxyCount` on `UseAIServer`, or `TRUSTED_PROXY_COUNT` on the Docker
 
 - The server reads the header of the first request of a connection: the Socket.IO handshake, or the WebSocket upgrade.
 - If the header has fewer entries than the count, the server uses the leftmost entry. If there is no header, it uses the peer address.
-- A client can write any value at the left of `X-Forwarded-For`. So do not set a count higher than the proxies really in front of the server. If clients can also reach the server without passing through the proxy, they can choose their own address.
+- A client can write any value at the left of `X-Forwarded-For`. So do not set a count higher than the proxies really in front of the server. If clients can also reach the server, or one of the inner proxies, without passing through the outer ones, they can choose their own address.
 - With `0` (the default), the server ignores the header.
 
 ### External MCPs

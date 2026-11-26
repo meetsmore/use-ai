@@ -146,9 +146,14 @@ describe('Rate limit behind a proxy', () => {
   });
 
   test('changing the forged entry does not give a client a new count', async () => {
-    const c = await client(`192.0.2.50, ${CLIENT}`);
-    sendRunAgent(c, { prompt: 'again', tools: [] });
-    const limited = await waitForEventType(c, EventType.RUN_ERROR);
+    const appended = '192.0.2.77';
+    const first = await client(`192.0.2.50, ${appended}`);
+    sendRunAgent(first, { prompt: 'first', tools: [] });
+    await waitForEventType(first, EventType.TEXT_MESSAGE_END);
+
+    const forgedAgain = await client(`192.0.2.51, ${appended}`);
+    sendRunAgent(forgedAgain, { prompt: 'again', tools: [] });
+    const limited = await waitForEventType(forgedAgain, EventType.RUN_ERROR);
     expect((limited as { message: string }).message).toContain('Rate limit exceeded');
   });
 });
