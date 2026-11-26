@@ -26,7 +26,7 @@ export interface SpanProcessor {
 // OTel tracing is started separately via `startTracing()`.
 export const langfuse = _initializeLangfuse();
 
-interface LangfuseApi {
+export interface LangfuseApi {
   enabled: boolean;
   /** Langfuse SDK client for score operations */
   client?: LangfuseClient;
