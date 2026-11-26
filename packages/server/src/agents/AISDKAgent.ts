@@ -1,13 +1,15 @@
-import { streamText, jsonSchema, LanguageModel, stepCountIs, type ModelMessage, type SystemModelMessage, type AssistantModelMessage, type ToolModelMessage, type JSONValue } from 'ai';
+import { streamText, jsonSchema, LanguageModel, stepCountIs, type TextStreamPart, type ToolSet, type ModelMessage, type SystemModelMessage, type AssistantModelMessage, type ToolModelMessage, type JSONValue } from 'ai';
 import type { AttributeValue } from '@opentelemetry/api';
 import type { JSONSchema7 } from 'json-schema';
 import { startRunSpan, flushTelemetry as flushAllTelemetry } from '../telemetry';
 import { abortReasonMessage } from '../utils/abortReason';
+import { runError, runStarted } from '../utils/runEvents';
 import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
 import type { Agent, AgentInput, EventEmitter, AgentResult, ClientSession } from './types';
 import type { ToolDefinition, UseAIForwardedProps } from '../types';
 import type { McpHeadersMap } from '@meetsmore-oss/use-ai-core';
+import { transformedFileToText } from '@meetsmore-oss/use-ai-core';
 import type { RemoteToolDefinition } from '../mcp';
 import { isUseAIInternalResponse } from '../mcp/useAIInternalResponse';
 import { isMcpConfirmationResponse, handleMcpConfirmation } from '../mcp/mcpConfirmation';
@@ -23,9 +25,7 @@ import type {
   ToolCallArgsEvent,
   ToolCallEndEvent,
   ToolCallResultEvent,
-  RunStartedEvent,
   RunFinishedEvent,
-  RunErrorEvent,
   StateSnapshotEvent,
   MessagesSnapshotEvent,
   StepStartedEvent,
@@ -621,17 +621,8 @@ export class AISDKAgent implements Agent {
       error: errorMessage,
     });
 
-    events.emit<RunStartedEvent>({
-      type: EventType.RUN_STARTED,
-      threadId: input.session.threadId,
-      runId: input.runId,
-      timestamp: Date.now(),
-    });
-    events.emit<RunErrorEvent>({
-      type: EventType.RUN_ERROR,
-      message: ErrorCode.UNKNOWN_ERROR,
-      timestamp: Date.now(),
-    });
+    events.emit(runStarted(input.session.threadId, input.runId));
+    events.emit(runError(ErrorCode.UNKNOWN_ERROR));
 
     return {
       success: false,
@@ -648,12 +639,7 @@ export class AISDKAgent implements Agent {
    * back over the connection, and the client already sent it.
    */
   private emitRunStartEvents(ctx: RunContext, events: EventEmitter): void {
-    events.emit<RunStartedEvent>({
-      type: EventType.RUN_STARTED,
-      threadId: ctx.session.threadId,
-      runId: ctx.runId,
-      timestamp: Date.now(),
-    });
+    events.emit(runStarted(ctx.session.threadId, ctx.runId));
 
     events.emit<MessagesSnapshotEvent>({
       type: EventType.MESSAGES_SNAPSHOT,
@@ -853,11 +839,7 @@ export class AISDKAgent implements Agent {
       // let finalizeAbortedRun synthesize the {aborted:true} results instead.
       if (ctx.session.abortController?.signal.aborted) {
         span.endWithError(abortReasonMessage(ctx.session.abortController?.signal));
-        events.emit<RunErrorEvent>({
-          type: EventType.RUN_ERROR,
-          message: ErrorCode.ABORTED,
-          timestamp: Date.now(),
-        });
+        events.emit(runError(ErrorCode.ABORTED));
         throw new AbortError();
       }
 
@@ -1080,9 +1062,8 @@ export class AISDKAgent implements Agent {
    * Processes a single stream chunk, emitting the appropriate AG-UI events.
    * Mutates stepCtx.stepHadToolCalls when a tool call is detected.
    */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private processStreamChunk(
-    chunk: any,
+    chunk: TextStreamPart<ToolSet>,
     ctx: RunContext,
     stepCtx: StepContext,
     events: EventEmitter,
@@ -1452,12 +1433,9 @@ export class AISDKAgent implements Agent {
     // Check for empty response (no text, no tool calls)
     if (!ctx.hasAnyContent) {
       span.endWithError('Empty response from AI');
-      events.emit<RunErrorEvent>({
-        type: EventType.RUN_ERROR,
-        message:
-          'AI returned an empty response. This may be due to an ambiguous request. Please try being more specific.',
-        timestamp: Date.now(),
-      });
+      events.emit(runError(
+        'AI returned an empty response. This may be due to an ambiguous request. Please try being more specific.',
+      ));
       return {
         success: false,
         error: 'Empty response from AI',
@@ -1515,22 +1493,14 @@ export class AISDKAgent implements Agent {
     // client persists partial state instead of seeing a generic error.
     if (ctx.session.abortController?.signal.aborted) {
       span.endWithError(abortReasonMessage(ctx.session.abortController?.signal));
-      events.emit<RunErrorEvent>({
-        type: EventType.RUN_ERROR,
-        message: ErrorCode.ABORTED,
-        timestamp: Date.now(),
-      });
+      events.emit(runError(ErrorCode.ABORTED));
       return { success: false, error: 'Run aborted', conversationHistory: ctx.messages };
     }
 
     span.endWithError(error instanceof Error ? error.message : String(error));
 
     if (error instanceof LlmCallLimitExceededError) {
-      events.emit<RunErrorEvent>({
-        type: EventType.RUN_ERROR,
-        message: ErrorCode.RATE_LIMITED,
-        timestamp: Date.now(),
-      });
+      events.emit(runError(ErrorCode.RATE_LIMITED));
       return { success: false, error: error.message, conversationHistory: ctx.messages };
     }
 
@@ -1554,11 +1524,7 @@ export class AISDKAgent implements Agent {
       });
     }
 
-    events.emit<RunErrorEvent>({
-      type: EventType.RUN_ERROR,
-      message: errorCode,
-      timestamp: Date.now(),
-    });
+    events.emit(runError(errorCode));
 
     return {
       success: false,
@@ -1850,7 +1816,7 @@ export class AISDKAgent implements Agent {
     }),
   }).transform((val) => ({
     type: 'text' as const,
-    text: `[Content of file "${val.originalFile.name}" (${val.originalFile.mimeType})]:\n\n${val.text}`,
+    text: transformedFileToText(val),
   }));
 
   /**
