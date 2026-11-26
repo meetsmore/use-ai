@@ -576,6 +576,57 @@ const deleteTodo = defineTool(
 );
 ```
 
+**Editing arguments before approval:**
+
+A custom `ToolApproval` slot can let the user correct proposed arguments in a form and submit them with approval. `onApproveWithArgs` takes edited arguments keyed by `toolCallId`; calls without an entry keep their proposed arguments. The slot also receives the request's `message` and `metadata` (set by MCP `confirmation_required` responses and runtime approvals).
+
+```tsx
+import type { ChatToolApprovalSlotProps } from '@meetsmore-oss/use-ai-client';
+
+function EditableApproval({ approvals, onApprove, onApproveWithArgs, onReject }: ChatToolApprovalSlotProps) {
+  const pending = approvals[0];
+  const [draft, setDraft] = useState<Record<string, unknown>>();
+  const [error, setError] = useState('');
+  const canEdit = pending.acceptsModifiedArgs && onApproveWithArgs;
+  const approve = async () => {
+    if (!canEdit || !draft) {
+      onApprove();
+      return;
+    }
+    try {
+      await canEdit({ [pending.toolCallId]: draft });
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    }
+  };
+  return (
+    <div>
+      <p>{pending.message}</p>
+      {/* Render editable fields when canEdit is set. Initialize them from
+          draft ?? pending.toolCallArgs and call setDraft when a field changes. */}
+      <button onClick={approve}>Approve</button>
+      <button onClick={() => onReject()}>Deny</button>
+      {error && <p role="alert">{error}</p>}
+    </div>
+  );
+}
+
+<UseAIProvider serverUrl="ws://localhost:8081" chatComponents={{ ToolApproval: EditableApproval }}>
+```
+
+- Only approvals with `acceptsModifiedArgs: true` take edits. The server sets it on `destructiveHint` approvals and MCP `confirmation_required` approvals. `onApproveWithArgs` returns `Promise<void>`; catch its rejection to report a refused edit. It rejects with an error, and sends nothing, when any edited call lacks it.
+- Server tools: `defineServerTool` parses edited arguments with the tool's Zod schema before execution, including async refinements and transforms. The tool receives the parsed value. Hand-written server tools without a Zod schema validate edits against their JSON Schema parameters.
+- MCP tools: the edited arguments are validated against the complete input schema the MCP server advertised (`$defs`, `$ref` and `additionalProperties` included), as JSON Schema 2020-12. A draft-07 tuple (`items: [...]`) does not compile under 2020-12, so edits to such a tool are denied.
+- Invalid edits do not run the tool; the AI receives an error result that names each failing field.
+- MCP `confirmation_required` tools: edited arguments go through phase 1 again. A new `confirmation_required` asks the user again, with the `message`, `metadata` and `additional_columns` phase 1 returns for the edited arguments; any other phase-1 result is returned as the tool result. Phase 2 only runs arguments phase 1 has seen.
+- Client tools: the browser runs the tool with the edited arguments, and the tool's Zod schema validates them. Invalid ones return the validation error to the AI.
+- Client tools run only with the arguments the user approved. Without edits, the arguments shown in the approval request must equal the arguments of the tool call. If they differ, or the tool names differ, the tool does not run and the AI receives an error result.
+- Omitting the edited arguments (`onApprove`, or no entry for a call) behaves exactly as a plain approval.
+- Runtime approvals requested with `ctx.requestApproval` do not accept edits: `acceptsModifiedArgs` is unset, and an edited approval that reaches the server is denied rather than run with the original arguments.
+- The AI's history keeps the arguments it proposed, followed by the result of the edited call, so return what was actually done in the tool result.
+- Upgrade the server before the client. An older server never sets `acceptsModifiedArgs`, so the client refuses every edit instead of having the server drop it.
+- Over the wire this is an optional `modifiedArgs` field on the `tool_approval_response` message, honored only when `approved` is `true`. `UseAIClient.sendToolApprovalResponse(toolCallId, approved, reason, modifiedArgs)` sends it outside the chat slots.
+
 ### Chat History
 
 By default, there is locally stored chat history for up to 20 chats.
@@ -1130,8 +1181,10 @@ ANTHROPIC_API_KEY=sk-ant-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 # PORT=8081
 # LOG_FORMAT=pretty
 # LOG_SILENT=true                                     # Disable all logging
+# LOG_LLM_CONTENT=true                                # Also log user prompts, AI responses and tool results
 # DEBUG=1                                             # Log MCP header values in plaintext (local development only)
 # MAX_HTTP_BUFFER_SIZE=10485760                       # Max payload size in bytes
+# ALLOWED_ORIGINS=https://app.example.com             # Comma-separated. Refuse connections from other origins
 
 # Rate Limiting (optional)
 # RATE_LIMIT_MAX_REQUESTS=0
@@ -1163,6 +1216,7 @@ const server = new UseAIServer({
   },
   defaultAgent: 'claude',
   transport: 'socketio',  // or 'websocket', see 'Transports'
+  allowedOrigins: ['https://app.example.com'], // optional, see 'Origin check'
   rateLimitMaxRequests: 1_000,
   rateLimitWindowMs: 60_000,
   plugins: [              // see 'Plugins'
@@ -1172,15 +1226,35 @@ const server = new UseAIServer({
     url: 'http://my-app.com/mcp',
     namespace: 'my-app',
     timeout: 30_000,
-    toolsCacheTtl: 60_000  // cache tool definitions for 60s
+    toolsCacheTtl: 60_000, // cache tool definitions for 60s
+    protocolVersion: '2026-07-28', // optional: send MCP 2026-07-28 request headers and _meta
   }],
 });
 ```
+
+#### Origin check
+
+By default, the server does not check the `Origin` header. CORS does not apply to WebSocket upgrades, so any site can open a connection from its users' browsers.
+
+To refuse connections from other sites, set `allowedOrigins` on `UseAIServer`, or `ALLOWED_ORIGINS` (comma-separated) on the Docker image. The check applies to both transports:
+
+- With `transport: 'socketio'`, the server refuses the handshake (polling or WebSocket) with HTTP 403.
+- With `transport: 'websocket'`, the server refuses the upgrade at `/` with HTTP 403.
+
+Each entry must match the `Origin` header exactly: scheme, host and port, with no trailing slash, for example `https://app.example.com`. Browsers always send the `Origin` header on a WebSocket upgrade and on a cross-origin request. But a browser does not send it on a same-origin GET. An example is the first Socket.IO polling handshake when the app and the server share an origin behind a reverse proxy. For a request that has no `Origin` header, the server reads `Sec-Fetch-Site`:
+
+- If `Sec-Fetch-Site` is `same-origin`, the server accepts the request.
+- In all other cases, the server refuses the request. This includes a missing header, `same-site`, `cross-site` and `none`.
+
+A page cannot set `Sec-Fetch-Site`, so another site cannot make the browser send `same-origin`. The browser compares the page with the server's own origin, not with `allowedOrigins`. As a result, any page on the server's own origin can connect, even if `allowedOrigins` does not name that origin. Do not serve untrusted content on the same origin as the server.
+
+A non-browser client can send any `Origin` header. The origin check stops other sites in a browser, but it does not replace authentication. Use an auth plugin as well.
 
 ### External MCPs
 
 `use-ai` supports providing additional tools using external MCPs, defined by `mcpEndpoints`.
 These MCP endpoints should follow the MCP protocol to return a set of tools when called.
+They are called over [Streamable HTTP](https://modelcontextprotocol.io/specification/2026-07-28/basic/transports/streamable-http): each response may be `application/json` or a `text/event-stream`. SSE streams are not resumed: if the server closes one before the response, the call fails.
 
 The server will invoke these on start, with a refresh interval to reload them periodically.
 
@@ -1247,6 +1321,33 @@ The headers are scoped to the run that sent them. The server only forwards the h
 
 The client can omit `mcpHeaders`, and then the MCP endpoint is called with only the server-configured `headers`. Do not put a credential with broader access than a single user in `headers` unless every run is authenticated before it reaches the MCP endpoint.
 
+#### `mcpHeaders` patterns must name a domain
+
+The client's patterns decide which configured MCP endpoint gets which headers. The server only uses a pattern that names a domain:
+
+- The pattern has the form `scheme://host[:port][/path]`. The scheme and the path can use globs. If there is no path, the pattern matches only `/`.
+- The host is a literal host (`api.example.com`, `localhost`, `127.0.0.1`, `[::1]`), or `*.` followed by a domain (`*.example.com`).
+- `*.example.com` matches subdomains at any depth (`a.example.com`, `a.b.example.com`). It does not match `example.com`.
+- The domain after `*.` must not be a public suffix, such as `*.jp`, `*.co.jp` or `*.com`.
+- The subdomains of the domain after `*.` must not be public suffixes. For example, the Public Suffix List rule `*.kawasaki.jp` makes each `foo.kawasaki.jp` a public suffix, so `*.kawasaki.jp` is not allowed.
+- The port is a literal number. If there is no port, the pattern matches only the default port of the scheme.
+- No other globs are allowed in the host or the port. For example, `*`, `api*.example.com` and `a.*.example.com` are not allowed.
+
+The server ignores a pattern that breaks these rules. It never sends that pattern's headers, and it logs a warning with the pattern.
+
+This rule exists because the client and the server config change at different times. An operator can add a new MCP endpoint to the server config later, for example a third-party server. A broad pattern such as `*://*/api/mcp` would then send the user's token to that endpoint, and nobody would notice.
+
+Use the exact MCP URL when you can:
+
+```tsx
+forwardedPropsProvider={() => ({
+  mcpHeaders: {
+    // Before (ignored now): '*://*/api/mcp'
+    [`${apiUrl}/api/mcp`]: { headers: { Authorization: `Bearer ${token}` } },
+  },
+})}
+```
+
 ### Server-Side Tools
 
 Server-side tools execute directly in the server process using `defineServerTool()`. Unlike client tools (which round-trip via Socket.IO) or MCP tools (which call remote HTTP endpoints), server tools are simple function calls with no network overhead.
@@ -1275,6 +1376,10 @@ const server = new UseAIServer({
   },
 });
 ```
+
+**Argument validation:**
+
+Before `execute` runs, proposed or user-edited arguments are parsed with the tool's Zod schema. `execute` receives the parsed value, with any defaults and transforms applied. If parsing fails, the AI gets an error result and `execute` does not run. A tool without parameters gets an empty object schema. For a hand-written `ServerToolConfig` without a Zod schema, the approval flow checks edits against `parameters`.
 
 **Execution Context:**
 
@@ -1418,7 +1523,16 @@ export interface UseAIServerPlugin {
   onClientDisconnect?(session: ClientSession): void;
 
   /**
-   * Optional hook called before an agent run starts. Useful for things like authentication or quota enforcement.
+   * Optional hook called first for every run, before MCP `tools/list` and attachment resolution.
+   * Use this for authentication, so a rejected run causes no outbound requests.
+   * Return `{ abort: true, message: '...' }` to block the run.
+   * Reassign `input.mcpHeaders` to change the headers sent to MCP endpoints for this run.
+   */
+  beforeRunAuthorized?(input: BeforeRunAuthorizedInput): Promise<BeforeRunAgentResult | void>;
+
+  /**
+   * Optional hook called right before the agent runs, with the built messages and tools.
+   * Useful for things like quota enforcement. Runs after MCP `tools/list` and attachment resolution.
    * Return `{ abort: true, message: '...' }` to block the run.
    */
   beforeRunAgent?(input: AgentInput): Promise<BeforeRunAgentResult | void>;

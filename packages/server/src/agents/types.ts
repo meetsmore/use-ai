@@ -2,6 +2,16 @@ import type { ModelMessage } from 'ai';
 import type { ToolDefinition, AGUIEvent, ToolApprovalRequestEvent, UseAIClientMessage } from '../types';
 
 /**
+ * The user's answer to a tool approval request.
+ * `modifiedArgs` is set only on an approval that carried edited arguments.
+ */
+export interface ToolApprovalResult {
+  approved: boolean;
+  reason?: string;
+  modifiedArgs?: Record<string, unknown>;
+}
+
+/**
  * One client connection, whatever protocol carries it. The server accepts every
  * connection through this interface, so protocol details stay in its implementations.
  */
@@ -50,7 +60,7 @@ export interface ClientSession {
   /** Timestamp when MCP tools cache was populated (for TTL-based invalidation) */
   mcpToolsCacheTimestamp?: number;
   /** Map of pending tool approvals awaiting user decision. Key: toolCallId, Value: resolver function */
-  pendingToolApprovals: Map<string, (result: { approved: boolean; reason?: string }) => void>;
+  pendingToolApprovals: Map<string, (result: ToolApprovalResult) => void>;
 }
 
 /**
@@ -70,7 +80,10 @@ export interface AgentInput {
   state: unknown;
   /** Optional system prompt to guide the agent */
   systemPrompt?: string;
-  /** The original RunAgentInput from AG-UI protocol (for emitting RUN_STARTED event) */
+  /**
+   * The RunAgentInput the client sent (AG-UI protocol), after plugins ran.
+   * Do not put it on RUN_STARTED as `input`: its forwardedProps carry auth tokens and MCP headers.
+   */
   originalInput: import('../types').RunAgentInput;
   /**
    * MCP headers sent with this run. Kept per run, not on the session, so that

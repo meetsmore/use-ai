@@ -8,25 +8,23 @@ describe('RemoteMcpToolsProvider', () => {
 
   beforeEach(() => {
     mockFetch = mock(() =>
-      Promise.resolve({
-        ok: true,
-        json: () =>
-          Promise.resolve({
-            result: {
-              tools: [
-                {
-                  name: 'test-tool',
-                  description: 'A test tool',
-                  inputSchema: {
-                    type: 'object',
-                    properties: { input: { type: 'string' } },
-                    required: ['input'],
-                  },
+      Promise.resolve(
+        Response.json({
+          result: {
+            tools: [
+              {
+                name: 'test-tool',
+                description: 'A test tool',
+                inputSchema: {
+                  type: 'object',
+                  properties: { input: { type: 'string' } },
+                  required: ['input'],
                 },
-              ],
-            },
-          }),
-      } as Response)
+              },
+            ],
+          },
+        })
+      )
     );
     globalThis.fetch = mockFetch as unknown as typeof fetch;
   });
@@ -199,6 +197,42 @@ describe('RemoteMcpToolsProvider', () => {
       });
     });
 
+    test('carries $defs and definitions of the input schema into the parameters', async () => {
+      const inputSchema = {
+        type: 'object',
+        properties: { item: { $ref: '#/$defs/Item' }, legacy: { $ref: '#/definitions/Legacy' } },
+        required: ['item'],
+        $defs: { Item: { type: 'number' } },
+        definitions: { Legacy: { type: 'string' } },
+      };
+      mockFetch.mockImplementation(async () => Response.json({
+        result: { tools: [{ name: 'refs', description: 'Refs', inputSchema }] },
+      }));
+      const provider = new RemoteMcpToolsProvider({ url: 'http://mcp.test/rpc' });
+
+      const tools = await provider.fetchToolsWithHeaders();
+
+      expect(tools[0].parameters).toEqual(inputSchema as typeof tools[0]['parameters']);
+    });
+
+    test('keeps the complete input schema, top-level constraints included, on _remote', async () => {
+      const inputSchema = {
+        type: 'object',
+        properties: { title: { type: 'string' } },
+        required: ['title'],
+        additionalProperties: false,
+        minProperties: 1,
+      };
+      mockFetch.mockImplementation(async () => Response.json({
+        result: { tools: [{ name: 'strict', description: 'Strict', inputSchema }] },
+      }));
+      const provider = new RemoteMcpToolsProvider({ url: 'http://mcp.test/rpc' });
+
+      const tools = await provider.fetchToolsWithHeaders();
+
+      expect(tools[0]._remote.inputSchema).toEqual(inputSchema);
+    });
+
     test('applies namespace prefix to tool names', async () => {
       const provider = new RemoteMcpToolsProvider({
         url: 'http://mcp.test/rpc',
@@ -213,11 +247,7 @@ describe('RemoteMcpToolsProvider', () => {
 
     test('throws on HTTP error', async () => {
       mockFetch.mockImplementation(() =>
-        Promise.resolve({
-          ok: false,
-          status: 500,
-          statusText: 'Internal Server Error',
-        } as Response)
+        Promise.resolve(new Response(null, { status: 500, statusText: 'Internal Server Error' }))
       );
 
       const provider = new RemoteMcpToolsProvider({
@@ -231,13 +261,7 @@ describe('RemoteMcpToolsProvider', () => {
 
     test('throws on MCP error response', async () => {
       mockFetch.mockImplementation(() =>
-        Promise.resolve({
-          ok: true,
-          json: () =>
-            Promise.resolve({
-              error: { message: 'Tool listing failed' },
-            }),
-        } as Response)
+        Promise.resolve(Response.json({ error: { message: 'Tool listing failed' } }))
       );
 
       const provider = new RemoteMcpToolsProvider({
@@ -294,6 +318,30 @@ describe('RemoteMcpToolsProvider', () => {
 
       await provider.executeTool('test-tool', {}, {
         'http://other.test/*': { headers: { Authorization: 'Bearer user-token' } },
+      });
+
+      const [, options] = mockFetch.mock.calls[0];
+      expect(options.headers.Authorization).toBeUndefined();
+    });
+  });
+
+  describe('executeTool client headers', () => {
+    test('sends headers from a pattern with a domain', async () => {
+      const provider = new RemoteMcpToolsProvider({ url: 'https://api.example.com/api/mcp' });
+
+      await provider.executeTool('test-tool', {}, {
+        'https://*.example.com/api/mcp': { headers: { Authorization: 'Bearer user-jwt' } },
+      });
+
+      const [, options] = mockFetch.mock.calls[0];
+      expect(options.headers.Authorization).toBe('Bearer user-jwt');
+    });
+
+    test('does not send headers from a pattern without a domain', async () => {
+      const provider = new RemoteMcpToolsProvider({ url: 'https://api.example.com/api/mcp' });
+
+      await provider.executeTool('test-tool', {}, {
+        '*://*/api/mcp': { headers: { Authorization: 'Bearer user-jwt' } },
       });
 
       const [, options] = mockFetch.mock.calls[0];

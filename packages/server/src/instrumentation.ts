@@ -72,12 +72,15 @@ export function recordErrorTrace(params: ErrorTraceParams): void {
   if (!langfuse.enabled) return;
   try {
     const metadata: Record<string, string> = {};
+    // Client metadata goes first, so the server-set keys win (also when ipAddress or threadId is undefined).
+    // A client `sessionId` (documented option) stays in the metadata; the trace session is `params.sessionId`.
     for (const [key, value] of Object.entries({
+      ...params.metadata,
+      threadId: params.threadId,
       runId: params.runId,
       errorCategory: params.errorCategory,
       ipAddress: params.ipAddress,
       source: 'use-ai-server',
-      ...params.metadata,
     })) {
       if (value !== undefined) metadata[key] = typeof value === 'string' ? value : JSON.stringify(value);
     }
@@ -142,20 +145,7 @@ export function startTracing(customProcessors: SpanProcessor[] = []): void {
   try {
     const { NodeSDK } = require('@opentelemetry/sdk-node');
 
-    // Capture trace IDs from AI SDK spans for feedback linking
-    const traceIdCaptureProcessor = {
-      onStart(span: { spanContext(): { traceId: string }; attributes?: Record<string, unknown>; setAttribute(key: string, value: unknown): void }) {
-        const runId = span.attributes?.['ai.telemetry.metadata.runId'] as string | undefined;
-        if (runId) {
-          pushTraceIdForRun(runId, span.spanContext().traceId);
-        }
-      },
-      onEnd() { /** `popTraceIdForRun` is called in AISDKAgent when RUN_FINISHED is called. */ },
-      shutdown() { return Promise.resolve(); },
-      forceFlush() { return Promise.resolve(); },
-    };
-
-    const spanProcessors: SpanProcessor[] = [traceIdCaptureProcessor];
+    const spanProcessors: SpanProcessor[] = [_createTraceIdCaptureProcessor()];
 
     let langfuseSpanProcessor: SpanProcessor | undefined;
 
@@ -182,6 +172,26 @@ export function startTracing(customProcessors: SpanProcessor[] = []): void {
       error: error instanceof Error ? error.message : 'Unknown error',
     });
   }
+}
+
+/**
+ * Creates the span processor that captures trace IDs from use-ai and AI SDK spans for feedback linking.
+ * It keys them by `ai.telemetry.metadata.runId`, which the server always sets to the real run id
+ * (client telemetry metadata cannot replace it), so `popTraceIdForRun` removes every entry at run end.
+ * Only exported for testing purposes.
+ */
+export function _createTraceIdCaptureProcessor(): SpanProcessor {
+  return {
+    onStart(span) {
+      const runId = span.attributes?.['ai.telemetry.metadata.runId'] as string | undefined;
+      if (runId) {
+        pushTraceIdForRun(runId, span.spanContext().traceId);
+      }
+    },
+    onEnd() { /** `popTraceIdForRun` is called in AISDKAgent when RUN_FINISHED is called. */ },
+    shutdown() { return Promise.resolve(); },
+    forceFlush() { return Promise.resolve(); },
+  };
 }
 
 /**

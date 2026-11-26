@@ -2,6 +2,7 @@ import type { Server as SocketIOServer } from 'socket.io';
 import { Server as BunEngine } from '@socket.io/bun-engine';
 import type { RuntimeAdapter, RuntimeListener, RuntimeServerConfig, RuntimeServerHandle, WebSocketListener } from '../types';
 import { resolveCorsHeaders, resolvePreflightHeaders } from './cors';
+import { isOriginAllowed } from '../origin';
 import { BunRawWebSocket, type BunWebSocketData } from './rawWebSocket';
 
 type ServeOptions = Parameters<typeof Bun.serve>[0];
@@ -61,6 +62,13 @@ export class BunRuntimeAdapter implements RuntimeAdapter {
 
         if (!url.pathname.startsWith(handlers.path)) {
           return new Response('Not Found', { status: 404, headers: corsHeaders });
+        }
+
+        if (!isOriginAllowed(
+          { origin: requestOrigin, secFetchSite: req.headers.get('Sec-Fetch-Site') || undefined },
+          config.allowedOrigins,
+        )) {
+          return new Response('Forbidden', { status: 403, headers: corsHeaders });
         }
 
         const response = await handlers.upgrade(req, server);

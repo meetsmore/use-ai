@@ -11,7 +11,7 @@ export type { Agent, AgentInput, EventEmitter, AgentResult, LlmCallLimit } from 
 export { AISDKAgent, type AISDKAgentConfig, type AISDKAgentHooks, type AISDKRunConfig, type MessageWithCacheContext, type CacheTtl, type CacheBreakpointResult, type CacheBreakpointFn, createMockReasoningModel } from './agents';
 
 // Export plugin types and built-in plugins
-export type { UseAIServerPlugin, MessageHandler, BeforeRunAgentResult } from './plugins';
+export type { UseAIServerPlugin, MessageHandler, BeforeRunAgentResult, BeforeRunAuthorizedInput } from './plugins';
 export { FeedbackPlugin } from './plugins';
 
 // Export span processor type for custom OTel setup

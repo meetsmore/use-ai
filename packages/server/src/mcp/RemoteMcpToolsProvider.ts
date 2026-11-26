@@ -1,7 +1,9 @@
 import type { ToolDefinition, McpHeadersMap, ToolAnnotations } from '@meetsmore-oss/use-ai-core';
 import type { McpEndpointConfig } from '../types';
 import { logger } from '../logger';
-import { findMatch } from '../utils/patternMatcher';
+import { findMcpHeadersForUrl } from './mcpHeaderPatterns';
+import { McpHttpClient, McpRequestTimeoutError } from './McpHttpClient';
+import { buildMcpParamHeaders, readMcpParamHeaders, type McpParamHeader } from './mcpParamHeaders';
 
 /**
  * Schema format returned by MCP endpoints.
@@ -21,10 +23,6 @@ interface McpToolSchema {
   annotations?: ToolAnnotations;
 }
 
-interface McpSchemaResponse {
-  tools: McpToolSchema[];
-}
-
 /**
  * Server-only extension of ToolDefinition with remote execution metadata.
  * This type is used internally by the server and never exposed to the client.
@@ -37,6 +35,10 @@ export interface RemoteToolDefinition extends ToolDefinition {
     provider: RemoteMcpToolsProvider;
     /** The original tool name (before namespace prefix) */
     originalName: string;
+    /** The complete input schema used to validate edited arguments. */
+    inputSchema: object;
+    /** Header annotations from this specific tool listing. */
+    paramHeaders?: readonly McpParamHeader[];
     /** MCP tool annotations (title, hints, etc.) */
     annotations?: ToolAnnotations;
   };
@@ -52,10 +54,12 @@ export interface RemoteToolDefinition extends ToolDefinition {
 export class RemoteMcpToolsProvider {
   private readonly url: string;
   private readonly config: McpEndpointConfig;
+  private readonly client: McpHttpClient;
 
   constructor(config: McpEndpointConfig) {
     this.config = config;
     this.url = config.url;
+    this.client = new McpHttpClient(config.url, config.timeout || 30000, config.protocolVersion);
   }
 
   /**
@@ -73,8 +77,6 @@ export class RemoteMcpToolsProvider {
    * @returns List of tools the user is authorized to access
    */
   async fetchToolsWithHeaders(headers: Record<string, string> = {}): Promise<RemoteToolDefinition[]> {
-    const timeout = this.config.timeout || 30000;
-
     const mergedHeaders = this.buildHeaders(headers);
 
     const hasHeaders = Object.keys(mergedHeaders).length > 2; // More than Content-Type and Accept
@@ -85,57 +87,31 @@ export class RemoteMcpToolsProvider {
       logger.debug(`[MCP] Fetching tools from ${this.url}`);
     }
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeout);
-
-    try {
-      const response = await fetch(this.url, {
-        method: 'POST',
-        headers: mergedHeaders,
-        body: JSON.stringify({
-          jsonrpc: '2.0',
-          method: 'tools/list',
-          id: Date.now(),
-        }),
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const rpcResponse = (await response.json()) as Record<string, unknown>;
-
-      if (rpcResponse.error) {
-        const error = rpcResponse.error as { message?: string };
-        throw new Error(`MCP error: ${error.message || 'Unknown error'}`);
-      }
-
-      const result = rpcResponse.result as { tools?: McpToolSchema[] } | undefined;
-      const tools = result?.tools || [];
-
-      const toolDefinitions = this.convertToToolDefinitions({ tools });
-      logger.info(`[MCP] Fetched ${toolDefinitions.length} tool(s) from ${this.url}`);
-
-      return toolDefinitions;
-    } catch (error) {
-      clearTimeout(timeoutId);
-
-      if (error instanceof Error && error.name === 'AbortError') {
-        throw new Error(`Request timeout after ${timeout}ms`);
-      }
-
-      throw error;
+    const rpcResponse = await this.client.request('tools/list', undefined, { headers: mergedHeaders });
+    if (rpcResponse.error) {
+      const error = rpcResponse.error as { message?: string };
+      throw new Error(`MCP error: ${error.message || 'Unknown error'}`);
     }
+
+    const result = rpcResponse.result as { tools?: McpToolSchema[] } | undefined;
+    const toolDefinitions = this.convertToToolDefinitions(result?.tools || []);
+    logger.info(`[MCP] Fetched ${toolDefinitions.length} tool(s) from ${this.url}`);
+
+    return toolDefinitions;
   }
 
   /**
    * Converts MCP tool schemas to RemoteToolDefinition format.
    */
-  private convertToToolDefinitions(schema: McpSchemaResponse): RemoteToolDefinition[] {
-    return schema.tools.map((tool) => {
+  private convertToToolDefinitions(tools: McpToolSchema[]): RemoteToolDefinition[] {
+    const definitions: RemoteToolDefinition[] = [];
+    for (const tool of tools) {
+      const paramHeaders = this.config.protocolVersion ? readMcpParamHeaders(tool.inputSchema) : undefined;
+      if (typeof paramHeaders === 'string') {
+        logger.warn(`[MCP] Excluding tool "${tool.name}" from ${this.url}: ${paramHeaders}`);
+        continue;
+      }
+
       // Apply namespace prefix if configured
       const name = this.config.namespace ? `${this.config.namespace}_${tool.name}` : tool.name;
 
@@ -147,11 +123,15 @@ export class RemoteMcpToolsProvider {
           type: 'object',
           properties: tool.inputSchema.properties,
           required: tool.inputSchema.required,
+          ...(tool.inputSchema.$defs !== undefined && { $defs: tool.inputSchema.$defs as Record<string, unknown> }),
+          ...(tool.inputSchema.definitions !== undefined && { definitions: tool.inputSchema.definitions as Record<string, unknown> }),
         },
         // Mark with remote execution metadata
         _remote: {
           provider: this,
           originalName: tool.name,
+          inputSchema: tool.inputSchema,
+          ...(paramHeaders?.length ? { paramHeaders } : {}),
           annotations: tool.annotations,
         },
       };
@@ -161,8 +141,9 @@ export class RemoteMcpToolsProvider {
         toolDef.annotations = tool.annotations;
       }
 
-      return toolDef;
-    });
+      definitions.push(toolDef);
+    }
+    return definitions;
   }
 
   /**
@@ -178,17 +159,18 @@ export class RemoteMcpToolsProvider {
    *
    * @param toolName - The name of the tool to execute
    * @param args - Arguments to pass to the tool
-   * @param mcpHeaders - Optional MCP headers map (per-request headers override)
+   * @param mcpHeaders - Optional per-request authentication headers
+   * @param paramHeaders - Header annotations from the selected tool definition
    */
-  async executeTool(toolName: string, args: any, mcpHeaders?: McpHeadersMap): Promise<any> {
-    const timeout = this.config.timeout || 30000;
-
+  async executeTool(
+    toolName: string,
+    args: any,
+    mcpHeaders?: McpHeadersMap,
+    paramHeaders?: readonly McpParamHeader[],
+  ): Promise<any> {
     logger.debug(`[MCP] Executing tool "${toolName}" at ${this.url}`);
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeout);
-
-    const matchingConfig = mcpHeaders ? findMatch(this.url, mcpHeaders) : undefined;
+    const matchingConfig = mcpHeaders ? findMcpHeadersForUrl(this.url, mcpHeaders) : undefined;
     if (mcpHeaders && !matchingConfig) {
       logger.debug(`[MCP] No matching headers found for ${this.url}`);
     }
@@ -198,28 +180,15 @@ export class RemoteMcpToolsProvider {
     });
 
     try {
-      const response = await fetch(this.url, {
-        method: 'POST',
-        headers,  // Use merged headers
-        body: JSON.stringify({
-          jsonrpc: '2.0',
-          method: 'tools/call',
-          params: {
-            name: toolName,
-            arguments: args,
-          },
-          id: Date.now(),
-        }),
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const rpcResponse = (await response.json()) as any;
+      const extraHeaders = paramHeaders && buildMcpParamHeaders(args, paramHeaders);
+      const rpcResponse = await this.client.request(
+        'tools/call',
+        { name: toolName, arguments: args },
+        { headers, extraHeaders },
+      ) as {
+        error?: { message: string };
+        result?: { content?: { type: string; text: string }[] };
+      };
 
       if (rpcResponse.error) {
         throw new Error(`MCP error: ${rpcResponse.error.message}`);
@@ -229,7 +198,7 @@ export class RemoteMcpToolsProvider {
       const content = rpcResponse.result?.content || [];
 
       // Find text content
-      const textContent = content.find((c: any) => c.type === 'text');
+      const textContent = content.find((c) => c.type === 'text');
       if (textContent) {
         // Try to parse as JSON
         try {
@@ -244,10 +213,8 @@ export class RemoteMcpToolsProvider {
 
       return {};
     } catch (error) {
-      clearTimeout(timeoutId);
-
-      if (error instanceof Error && error.name === 'AbortError') {
-        const errorMsg = `Tool execution timeout after ${timeout}ms`;
+      if (error instanceof McpRequestTimeoutError) {
+        const errorMsg = `Tool execution timeout after ${error.timeout}ms`;
         logger.error(`[MCP] ${errorMsg}`);
         throw new Error(errorMsg);
       }

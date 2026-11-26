@@ -67,6 +67,16 @@ export interface McpEndpointConfig {
    * Default: 0 (cache for entire session, no TTL)
    */
   toolsCacheTtl?: number;
+  /**
+   * MCP protocol revision to declare on every request.
+   * `'2026-07-28'` sends the `MCP-Protocol-Version`, `Mcp-Method` and `Mcp-Name` headers
+   * and the `io.modelcontextprotocol/*` fields in `params._meta`. On `tools/call` it mirrors
+   * arguments annotated with `x-mcp-header` into `Mcp-Param-*` headers, and `tools/list`
+   * excludes tools whose `x-mcp-header` annotations are invalid.
+   * Default: unset (no protocol metadata is sent, `x-mcp-header` is ignored).
+   * @see https://modelcontextprotocol.io/specification/2026-07-28/basic/transports/streamable-http#request-metadata
+   */
+  protocolVersion?: '2026-07-28';
 }
 
 /**
@@ -143,6 +153,22 @@ export interface UseAIServerConfig<TAgents extends Record<string, import('./agen
    * @see https://socket.io/docs/v4/using-multiple-nodes/
    */
   cors?: CorsOptions;
+  /**
+   * Origins that may open a connection, for both transports.
+   * When set, the server refuses a Socket.IO handshake or a WebSocket upgrade whose
+   * Origin header is not in this list. A request without an Origin header is accepted
+   * only when its `Sec-Fetch-Site` header is `same-origin`, because browsers do not send
+   * Origin on a same-origin GET. Any page on the server's own origin can then connect.
+   * Each entry must match the Origin header exactly, for example `'https://app.example.com'`
+   * (scheme, host and port, with no trailing slash).
+   *
+   * Browsers always send the Origin header on a cross-origin request, so this check stops other
+   * sites from opening a connection from their users' browsers. A non-browser client can
+   * send any Origin header, so use an auth plugin as well.
+   *
+   * Default: undefined (the server does not check the Origin header).
+   */
+  allowedOrigins?: string[];
   /**
    * Idle timeout in seconds for the HTTP server.
    * Only used by the Bun runtime (ignored by Node.js).

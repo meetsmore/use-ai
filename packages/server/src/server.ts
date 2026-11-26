@@ -1,7 +1,7 @@
 import { Server as SocketIOServer } from 'socket.io';
 import { ModelMessage, ToolModelMessage } from 'ai';
 import { createHash } from 'crypto';
-import { EventType, type McpHeadersMap, type UseAIForwardedProps, type ResolveAttachments } from '@meetsmore-oss/use-ai-core';
+import { EventType, ErrorCode, type McpHeadersMap, type UseAIForwardedProps, type ResolveAttachments } from '@meetsmore-oss/use-ai-core';
 import { resolveAttachmentParts, countRefParts, dropRemoteUrlParts } from './attachmentResolution';
 import type {
   UseAIServerConfig,
@@ -22,13 +22,13 @@ import { recordErrorTrace, startTracing } from './instrumentation';
 import { v4 as uuidv4 } from 'uuid';
 import type { Agent, EventEmitter, AGUIEventExtended } from './agents/types';
 import type { ClientConnection, ClientSession } from './agents/types';
-import type { UseAIServerPlugin, MessageHandler } from './plugins/types';
+import type { UseAIServerPlugin, MessageHandler, BeforeRunAuthorizedInput } from './plugins/types';
 import { FeedbackPlugin } from './plugins/FeedbackPlugin';
 import { isRemoteTool, isServerTool } from './utils/toolFilters';
 import { abortRun, RunAbortedByUser, RunAbortedByClientDisconnect } from './utils/abortReason';
 import { RemoteMcpToolsProvider, type RemoteToolDefinition } from './mcp';
 import type { ServerToolDefinition } from './tools/types';
-import { findMatch } from './utils/patternMatcher';
+import { findMcpHeadersForUrl } from './mcp/mcpHeaderPatterns';
 import {
   createRuntimeAdapter,
   createClientIpTracker,
@@ -100,11 +100,12 @@ export class UseAIServer {
   private clients: Map<string, ClientSession> = new Map();
   // Sent to every client on connect; constant after construction.
   private agentsPayload: { agents: Array<{ id: string; name: string; annotation?: string }>; defaultAgent: string };
-  private config: Required<Omit<UseAIServerConfig, 'defaultAgent' | 'agents' | 'plugins' | 'tools' | 'mcpEndpoints' | 'maxHttpBufferSize' | 'cors' | 'idleTimeout' | 'runtime' | 'spanProcessors' | 'resolveAttachments' | 'transport'>> & {
+  private config: Required<Omit<UseAIServerConfig, 'defaultAgent' | 'agents' | 'plugins' | 'tools' | 'mcpEndpoints' | 'maxHttpBufferSize' | 'cors' | 'idleTimeout' | 'runtime' | 'spanProcessors' | 'resolveAttachments' | 'transport' | 'allowedOrigins'>> & {
     maxHttpBufferSize: number;
     cors?: CorsOptions;
     idleTimeout: number;
     transport: 'socketio' | 'websocket';
+    allowedOrigins?: readonly string[];
   };
   private rateLimiter: RateLimiter;
   // Counts LLM calls (one for each agent step), not runs. Off when rateLimitMaxLlmCalls is 0.
@@ -139,6 +140,7 @@ export class UseAIServer {
       cors: config.cors,
       idleTimeout: config.idleTimeout ?? 30,
       transport: config.transport ?? 'socketio',
+      allowedOrigins: config.allowedOrigins ? [...config.allowedOrigins] : undefined,
     };
 
     // Set agents registry
@@ -197,6 +199,7 @@ export class UseAIServer {
         annotations: toolConfig.annotations,
         _server: {
           execute: toolConfig.execute,
+          schema: toolConfig.schema,
         },
       }));
       logger.info('[Server Tools] Registered server tools', {
@@ -249,6 +252,7 @@ export class UseAIServer {
       port: this.config.port,
       idleTimeout: this.config.idleTimeout,
       cors: this.config.cors,
+      allowedOrigins: this.config.allowedOrigins,
       maxHttpBufferSize: this.config.maxHttpBufferSize,
       onPollingConnection: (sessionId, ip) => {
         this.clientIpTracker.trackPollingConnection(sessionId, ip);
@@ -419,9 +423,10 @@ export class UseAIServer {
           metadata: { ...unhandledForwardedProps?.telemetryMetadata },
         });
       }
+      // The raw message may expose internal details (hostnames, stack info); it is logged above.
       this.sendEvent(session.socket, {
         type: EventType.RUN_ERROR,
-        message: error instanceof Error ? error.message : 'Unknown error',
+        message: ErrorCode.UNKNOWN_ERROR,
         timestamp: Date.now(),
       });
     }
@@ -459,7 +464,6 @@ export class UseAIServer {
 
     // Extract use-ai extensions from forwardedProps (AG-UI extension point)
     const forwardedProps = rawForwardedProps as UseAIForwardedProps | undefined;
-    const mcpHeaders = forwardedProps?.mcpHeaders;
     const requestedAgent = forwardedProps?.agent;
 
     // Select agent: use requested agent if valid, otherwise fall back to default
@@ -482,7 +486,7 @@ export class UseAIServer {
           sessionId: session.clientId,
           threadId,
           ipAddress: session.ipAddress,
-          metadata: { requestedAgent, availableAgents, ...forwardedProps?.telemetryMetadata },
+          metadata: { ...forwardedProps?.telemetryMetadata, requestedAgent, availableAgents },
         });
         this.sendEvent(session.socket, {
           type: EventType.RUN_ERROR,
@@ -504,7 +508,7 @@ export class UseAIServer {
         sessionId: session.clientId,
         threadId,
         ipAddress: session.ipAddress,
-        metadata: { retryAfterSeconds, ...forwardedProps?.telemetryMetadata },
+        metadata: { ...forwardedProps?.telemetryMetadata, retryAfterSeconds },
       });
       this.sendEvent(session.socket, {
         type: EventType.RUN_ERROR,
@@ -519,7 +523,51 @@ export class UseAIServer {
     session.currentRunId = runId;
 
     // Create AbortController for this run (used to cancel pending tool calls/approvals on disconnect)
-    session.abortController = new AbortController();
+    // Kept locally too: another run_agent on this session may replace it while a hook awaits.
+    const runAbortController = new AbortController();
+    session.abortController = runAbortController;
+
+    // beforeRunAuthorized hooks run before any external call, so a rejected run cannot
+    // trigger MCP tools/list or attachment resolution.
+    const beforeRunAuthorizedInput: BeforeRunAuthorizedInput = {
+      session,
+      runId,
+      originalInput: message.data,
+      mcpHeaders: forwardedProps?.mcpHeaders,
+    };
+    for (const plugin of this.plugins) {
+      if (plugin.beforeRunAuthorized) {
+        const result = await plugin.beforeRunAuthorized(beforeRunAuthorizedInput);
+        if (result?.abort) {
+          session.currentRunId = undefined;
+          this.sendEvent(session.socket, {
+            type: EventType.RUN_ERROR,
+            message: result.message,
+            timestamp: Date.now(),
+          });
+          return;
+        }
+      }
+    }
+    // A disconnect or abort_run may arrive while a hook awaits (e.g. an identity provider call).
+    if (runAbortController.signal.aborted) {
+      logger.info('Run cancelled before start', { clientId: session.clientId, runId });
+      // The client resets its run state on RUN_ERROR(ABORTED) after sending abort_run, and takes
+      // the turn's start position from RUN_STARTED. The agent has not run yet, so send it here.
+      this.sendEvent(session.socket, {
+        type: EventType.RUN_STARTED,
+        threadId,
+        runId,
+        timestamp: Date.now(),
+      });
+      this.sendEvent(session.socket, {
+        type: EventType.RUN_ERROR,
+        message: ErrorCode.ABORTED,
+        timestamp: Date.now(),
+      });
+      return;
+    }
+    const mcpHeaders = beforeRunAuthorizedInput.mcpHeaders;
 
     // Merge client tools with MCP tools from all endpoints
     const clientTools = tools.map(t => ({
@@ -944,11 +992,18 @@ export class UseAIServer {
   }
 
   private handleToolApprovalResponse(session: ClientSession, message: ToolApprovalResponseMessage) {
-    const { toolCallId, approved, reason } = message.data;
+    const { toolCallId, approved, reason, modifiedArgs } = message.data;
     const resolver = session.pendingToolApprovals.get(toolCallId);
 
     if (resolver) {
-      resolver({ approved, reason });
+      if (approved && modifiedArgs !== undefined) {
+        const isObject = typeof modifiedArgs === 'object' && modifiedArgs !== null && !Array.isArray(modifiedArgs);
+        resolver(isObject
+          ? { approved, reason, modifiedArgs }
+          : { approved: false, reason: 'modifiedArgs must be a JSON object' });
+      } else {
+        resolver({ approved, reason });
+      }
       session.pendingToolApprovals.delete(toolCallId);
       logger.info('Tool approval response received', {
         clientId: session.clientId,
@@ -1128,7 +1183,7 @@ export class UseAIServer {
       return {};
     }
 
-    const matchingConfig = findMatch(endpointUrl, mcpHeaders);
+    const matchingConfig = findMcpHeadersForUrl(endpointUrl, mcpHeaders);
     return matchingConfig?.headers || {};
   }
 

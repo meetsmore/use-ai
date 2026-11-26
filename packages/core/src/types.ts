@@ -116,6 +116,10 @@ export interface ToolDefinition {
     type: 'object';
     properties: Record<string, unknown>;
     required?: string[];
+    /** Subschemas referenced by `$ref` (JSON Schema 2019-09 and later) */
+    $defs?: Record<string, unknown>;
+    /** Subschemas referenced by `$ref` (JSON Schema draft-07 and earlier) */
+    definitions?: Record<string, unknown>;
   };
   /** MCP-aligned annotations for tool behavior hints */
   annotations?: ToolAnnotations;
@@ -297,6 +301,11 @@ export interface ToolApprovalRequestEvent {
   message?: string;
   /** Optional metadata for the approval request (runtime approval) */
   metadata?: Record<string, unknown>;
+  /**
+   * True when the server applies `modifiedArgs` sent with an approval of this
+   * request. Absent for runtime approvals, and from servers that predate edits.
+   */
+  acceptsModifiedArgs?: boolean;
 }
 
 /**
@@ -311,6 +320,13 @@ export interface ToolApprovalResponseMessage {
     approved: boolean;
     /** Optional reason for rejection (shown to AI) */
     reason?: string;
+    /**
+     * Arguments edited by the user. Only read when `approved` is true: the tool
+     * runs with these instead of the arguments the AI proposed. Tools executed
+     * on the server (server tools, MCP tools) validate them against their input
+     * schema; client tools validate them with their own schema when they run.
+     */
+    modifiedArgs?: Record<string, unknown>;
   };
 }
 
@@ -358,6 +374,11 @@ export interface UseAIForwardedProps {
  *
  * The server forwards only the header names allowed by the endpoint's
  * `allowedClientHeaders` (default: `Authorization`) and drops the others.
+ *
+ * Every pattern must name a domain. The host must be a literal host, or `*.` followed
+ * by a domain that is not a public suffix and whose subdomains are not public suffixes.
+ * Globs are allowed in the scheme and the path.
+ * The server ignores other patterns (for example a wildcard host) and never sends their headers.
  *
  * @example
  * ```typescript
