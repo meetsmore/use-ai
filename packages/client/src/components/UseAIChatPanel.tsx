@@ -12,7 +12,7 @@ import { useSlashCommands } from '../hooks/useSlashCommands';
 import { useFileUpload } from '../hooks/useFileUpload';
 import { useStrings, useTheme } from '../theme';
 import type { UseAIStrings, UseAITheme } from '../theme';
-import type { ChatStreamingPart, ExecutingToolDisplay } from '../hooks/useServerEvents';
+import { EMPTY_STREAMING_PARTS, type ChatStreamingPart, type ExecutingToolDisplay } from '../hooks/useServerEvents';
 import type { ModifiedToolArgs } from '../hooks/useToolSystem';
 import {
   Slot,
@@ -43,9 +43,6 @@ type Message = PersistedMessage;
  * buttons or persisted reasoning parts yet.
  */
 type DisplayMessage = MergedMessage & { streaming?: boolean };
-
-/** Stable identity so an omitted `streamingParts` does not re-render the slot. */
-const EMPTY_STREAMING_PARTS: ChatStreamingPart[] = [];
 
 /** Key for the provisional streaming message when no persisted id is known. */
 const PROVISIONAL_MESSAGE_ID = 'streaming-answer';

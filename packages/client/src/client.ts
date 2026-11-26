@@ -29,8 +29,9 @@ import { logger } from './utils/logger';
 
 /**
  * Handler for AG-UI events from the server.
+ * The client catches and logs an error that the handler throws or that its promise rejects with.
  */
-export type AGUIEventHandler = (event: AGUIEvent) => void;
+export type AGUIEventHandler = (event: AGUIEvent) => void | Promise<void>;
 
 /**
  * Simplified message handler for text responses.
@@ -350,8 +351,18 @@ export class UseAIClient {
       this._currentRunId = null;
     }
 
-    // Notify all registered handlers
-    this.eventHandlers.forEach((handler) => handler(event));
+    // Notify all registered handlers. A failing handler must not stop the
+    // other handlers, and a rejected promise must not go unhandled.
+    this.eventHandlers.forEach((handler) => {
+      try {
+        const result = handler(event);
+        if (result instanceof Promise) {
+          result.catch((error: unknown) => console.error('[UseAI] Error in event handler:', error));
+        }
+      } catch (error) {
+        console.error('[UseAI] Error in event handler:', error);
+      }
+    });
   }
 
   /**

@@ -45,7 +45,7 @@ function makeClient(overrides: Partial<{
     currentReasoningBlocks: overrides.currentReasoningBlocks ?? [],
     currentRunId: overrides.currentRunId ?? null,
     finalizeRun,
-    currentToolCalls: new Map(),
+    getToolCallData: () => undefined,
   } as unknown as UseAIClient;
   return { client, finalizeRun };
 }

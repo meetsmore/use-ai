@@ -92,6 +92,12 @@ export type ChatToolCallStatus =
   | 'rejected'
   | 'aborted';
 
+/**
+ * An empty list of streaming parts with a stable identity. Use it in place of
+ * a new empty array, so that a component that gets no parts does not re-render.
+ */
+export const EMPTY_STREAMING_PARTS: ChatStreamingPart[] = [];
+
 /** The `tool_call` member of {@link ChatStreamingPart}. */
 export type ChatToolCallPart = Extract<ChatStreamingPart, { kind: 'tool_call' }>;
 
@@ -132,8 +138,8 @@ export interface UseServerEventsReturn {
   handleToolResult: (toolCallId: string, content: string) => void;
   /**
    * Handles a server event. Called from the provider's client subscription.
-   * Takes the client instance so it can access client-internal state
-   * (currentToolCalls, currentMessageContent).
+   * Takes the client instance so it can read the run's state
+   * (tool call data, currentMessageContent).
    */
   handleServerEvent: (client: UseAIClient, event: AGUIEvent) => Promise<void>;
   /**
@@ -382,14 +388,13 @@ export function useServerEvents({
       setExecutingTool(prev => prev?.toolCallId === toolCallId ? null : prev);
       updateToolCallPart(toolCallId, part => ({ ...part, status: 'running' }));
 
-      const toolCallData = (client as unknown as { currentToolCalls: Map<string, { name: string; args: string }> }).currentToolCalls.get(toolCallId);
+      const toolCallData = client.getToolCallData(toolCallId);
       if (!toolCallData) {
         console.error(`[ServerEvents] Tool call ${toolCallId} not found`);
         return;
       }
 
       const name = toolCallData.name;
-      const input = JSON.parse(toolCallData.args);
 
       const tool = ts.aggregatedToolsRef.current[name];
       const runTool = client.getRunTool(name);
@@ -397,6 +402,18 @@ export function useServerEvents({
       // them and sends their result as TOOL_CALL_RESULT, so leave them to it.
       if (!tool && !runTool) {
         logger.debug(`[ServerEvents] Tool "${name}" is not a client tool, the server runs it`);
+        return;
+      }
+
+      // The server waits for a result of each client tool call. If the args
+      // are not valid JSON, send an error result, so that the run continues.
+      let input: unknown;
+      try {
+        input = JSON.parse(toolCallData.args);
+      } catch (err) {
+        const reason = err instanceof Error ? err.message : String(err);
+        console.error(`[ServerEvents] Invalid args for tool call ${toolCallId}:`, reason);
+        client.sendToolResponse(toolCallId, { error: `Invalid tool arguments: ${reason}` });
         return;
       }
 
@@ -474,11 +491,14 @@ export function useServerEvents({
   }, [resetRunUiState]);
 
   // Compute display value for UI
-  const executingTool: ExecutingToolDisplay | null = executingToolRaw ? {
+  // Memoized so that the chat context value keeps its identity between renders.
+  // The fallback ref changes only together with executingToolRaw.
+  const defaultFallbackMessage = strings.toolExecution.fallbackMessages[0];
+  const executingTool = useMemo<ExecutingToolDisplay | null>(() => executingToolRaw ? {
     toolCallId: executingToolRaw.toolCallId,
     name: executingToolRaw.name,
-    displayText: executingToolRaw.title ?? executingToolFallbackRef.current ?? strings.toolExecution.fallbackMessages[0],
-  } : null;
+    displayText: executingToolRaw.title ?? executingToolFallbackRef.current ?? defaultFallbackMessage,
+  } : null, [executingToolRaw, defaultFallbackMessage]);
 
   // A call waiting for approval shows as such until the user answers. Derived
   // from the pending approvals rather than stored in the part, so approving or

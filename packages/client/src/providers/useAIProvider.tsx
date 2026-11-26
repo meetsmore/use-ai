@@ -21,16 +21,13 @@ import { useToolSystem, type RegisterToolsOptions } from '../hooks/useToolSystem
 import type { SubmitMode } from '../utils/keyboard';
 import { usePromptState } from '../hooks/usePromptState';
 import { useFeedback } from '../hooks/useFeedback';
-import { useServerEvents, type ChatStreamingPart } from '../hooks/useServerEvents';
+import { useServerEvents, EMPTY_STREAMING_PARTS, type ChatStreamingPart } from '../hooks/useServerEvents';
 import { useMessageQueue, type SendMessageOptions } from '../hooks/useMessageQueue';
 import { ThemeContext, StringsContext, defaultTheme, defaultStrings } from '../theme';
 import type { UseAITheme, UseAIStrings } from '../theme';
 import type { UseAIChatComponentOverrides } from '../components/chatSlots';
 import { ChatRenderersContext, type UseAIChatRenderers } from '../components/chatRenderers';
 import { logger, setDebugLogging } from '../utils/logger';
-
-/** Stable identity so a hidden chat's streaming parts do not re-render consumers. */
-const EMPTY_STREAMING_PARTS: ChatStreamingPart[] = [];
 
 // ── Context Types ───────────────────────────────────────────────────────────
 
@@ -545,8 +542,8 @@ export function UseAIProvider({
     ? undefined
     : (fileUploadConfigProp ?? DEFAULT_FILE_UPLOAD_CONFIG);
 
-  const theme = { ...defaultTheme, ...customTheme };
-  const strings = { ...defaultStrings, ...customStrings };
+  const theme = useMemo(() => ({ ...defaultTheme, ...customTheme }), [customTheme]);
+  const strings = useMemo(() => ({ ...defaultStrings, ...customStrings }), [customStrings]);
 
   // ── Core State ──────────────────────────────────────────────────────────
 
@@ -592,10 +589,14 @@ export function UseAIProvider({
     strings,
   });
 
+  const getDisplayedChatId = useCallback(
+    () => chatManagement.displayedChatId,
+    [chatManagement.displayedChatId],
+  );
   const feedback = useFeedback({
     clientRef,
     repository: repositoryRef.current,
-    getDisplayedChatId: () => chatManagement.displayedChatId,
+    getDisplayedChatId,
     setMessages,
   });
 
@@ -630,8 +631,9 @@ export function UseAIProvider({
 
   useEffect(() => {
     logger.debug('[UseAIProvider] Initializing client for', resolvedServerUrl);
-    // `transport` is deliberately not a dependency: an inline object must not
-    // re-create the client on every render.
+    // The effect depends on the resolved URL, not on the `transport` object.
+    // An inline transport object is new on each render, but its URL is the same.
+    // So the client is created again only when the URL changes.
     const client = new UseAIClient(transport ?? serverUrl!);
 
     const unsubscribeConnection = client.onConnectionStateChange((isConnected) => {
@@ -668,7 +670,7 @@ export function UseAIProvider({
       // waiting for the user) would otherwise wait forever.
       toolSystem.endRun();
     };
-  }, [serverUrl]);
+  }, [resolvedServerUrl]);
 
   // The file transformation cache is module-level and outlives the provider.
   // Clear it on unmount so results from one session (for example, before a
@@ -768,8 +770,7 @@ export function UseAIProvider({
       }
 
       // Persist the transformed text alongside attachment metadata so the
-      // full context survives a localStorage rehydration. See
-      // docs/plans/bugfix-transformed-file-persistence.md.
+      // full context survives a localStorage rehydration.
       persistedContent = buildPersistedParts(message, attachments, fileContent);
 
       multimodalContent = [...messageParts, ...fileContent];
@@ -808,7 +809,17 @@ export function UseAIProvider({
         : undefined,
       runTarget
     );
-  }, [chatManagement, serverEvents, fileUploadConfig, forwardedPropsProvider]);
+  }, [
+    chatManagement.activatePendingChat,
+    chatManagement.currentChatId,
+    chatManagement.getChat,
+    chatManagement.saveUserMessage,
+    serverEvents.clearStreamingParts,
+    serverEvents.streamingChatIdRef,
+    serverEvents.setLoading,
+    fileUploadConfig,
+    forwardedPropsProvider,
+  ]);
 
   // ── Message Queue (programmatic sendMessage) ────────────────────────────
 
@@ -823,10 +834,11 @@ export function UseAIProvider({
 
   // ── Context Values ──────────────────────────────────────────────────────
 
-  const value: UseAIContextValue = {
+  const currentClient = clientRef.current;
+  const value = useMemo<UseAIContextValue>(() => ({
     serverUrl: resolvedServerUrl,
     connected,
-    client: clientRef.current,
+    client: currentClient,
     tools: {
       register: toolSystem.registerTools,
       unregister: toolSystem.unregisterTools,
@@ -862,7 +874,36 @@ export function UseAIProvider({
       delete: deleteCommand,
     },
     abortRun,
-  };
+  }), [
+    resolvedServerUrl,
+    connected,
+    currentClient,
+    toolSystem.registerTools,
+    toolSystem.unregisterTools,
+    toolSystem.signalReady,
+    toolSystem.registerWaiter,
+    toolSystem.unregisterWaiter,
+    promptState.updatePrompt,
+    chatManagement.currentChatId,
+    chatManagement.createNewChat,
+    chatManagement.loadChat,
+    chatManagement.deleteChat,
+    chatManagement.listChats,
+    chatManagement.clearCurrentChat,
+    messageQueue.sendMessage,
+    chatManagement.getCurrentChat,
+    chatManagement.updateMetadata,
+    availableAgents,
+    defaultAgent,
+    selectedAgent,
+    setAgent,
+    commands,
+    refreshCommands,
+    saveCommand,
+    renameCommand,
+    deleteCommand,
+    abortRun,
+  ]);
 
   // ── Chat UI ─────────────────────────────────────────────────────────────
 
@@ -875,7 +916,7 @@ export function UseAIProvider({
   const loadingInCurrentChat = serverEvents.loading
     && serverEvents.streamingChatIdRef.current === chatManagement.displayedChatId;
 
-  const chatUIContextValue: ChatUIContextValue = {
+  const chatUIContextValue = useMemo<ChatUIContextValue>(() => ({
     connected,
     loading: serverEvents.loading,
     loadingInCurrentChat,
@@ -927,7 +968,45 @@ export function UseAIProvider({
     },
     submitMode,
     components: chatComponents,
-  };
+  }), [
+    connected,
+    serverEvents.loading,
+    loadingInCurrentChat,
+    handleSendMessage,
+    abortRun,
+    messages,
+    effectiveStreamingMessageId,
+    effectiveStreamingParts,
+    promptState.aggregatedSuggestions,
+    fileUploadConfig,
+    effectiveFileProcessing,
+    chatManagement.displayedChatId,
+    chatManagement.createNewChat,
+    chatManagement.loadChat,
+    chatManagement.deleteChat,
+    chatManagement.listChats,
+    chatManagement.getCurrentChat,
+    availableAgents,
+    defaultAgent,
+    selectedAgent,
+    setAgent,
+    commands,
+    saveCommand,
+    renameCommand,
+    deleteCommand,
+    enabledFeatures,
+    isChatOpen,
+    handleSetChatOpen,
+    serverEvents.executingTool,
+    toolSystem.pendingApprovals,
+    toolSystem.approveAll,
+    toolSystem.approveWithArgs,
+    toolSystem.rejectAll,
+    feedback.enabled,
+    feedback.submitFeedback,
+    submitMode,
+    chatComponents,
+  ]);
 
   // Keyed on the inner map, so an inline `chatRenderers={{ codeBlocks }}` does
   // not hand every consumer a new context value on each provider render.
@@ -955,6 +1034,7 @@ export function UseAIProvider({
     onLoadChat: chatManagement.loadChat,
     onDeleteChat: chatManagement.deleteChat,
     onListChats: chatManagement.listChats,
+    onGetChat: chatManagement.getCurrentChat,
     suggestions: promptState.aggregatedSuggestions,
     availableAgents,
     defaultAgent,

@@ -12,7 +12,22 @@ interface CommandAutocompleteProps {
   onClose: () => void;
 }
 
+/** The maximum number of commands that the autocomplete list shows. */
 const MAX_VISIBLE_ITEMS = 8;
+
+/**
+ * Returns the commands that the autocomplete list shows for a prefix.
+ * The match ignores case. The result has at most {@link MAX_VISIBLE_ITEMS} commands.
+ *
+ * @param commands - All saved commands
+ * @param prefix - The text after the slash, for example "rev" for "/rev"
+ */
+export function filterCommands(commands: SavedCommand[], prefix: string): SavedCommand[] {
+  const lowerPrefix = prefix.toLowerCase();
+  return commands
+    .filter(c => c.name.toLowerCase().startsWith(lowerPrefix))
+    .slice(0, MAX_VISIBLE_ITEMS);
+}
 
 /**
  * Dropdown autocomplete for slash commands.
@@ -34,9 +49,7 @@ export function CommandAutocomplete({
   const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   // Filter commands by prefix
-  const filteredCommands = commands.filter(c =>
-    c.name.toLowerCase().startsWith(searchPrefix.toLowerCase())
-  ).slice(0, MAX_VISIBLE_ITEMS);
+  const filteredCommands = filterCommands(commands, searchPrefix);
 
   // Scroll highlighted item into view
   useEffect(() => {
@@ -185,18 +198,5 @@ export function CommandAutocomplete({
         </div>
       ))}
     </div>
-  );
-}
-
-/**
- * Returns the number of filtered commands for keyboard navigation bounds.
- */
-export function getFilteredCommandsCount(
-  commands: SavedCommand[],
-  searchPrefix: string
-): number {
-  return Math.min(
-    commands.filter(c => c.name.toLowerCase().startsWith(searchPrefix.toLowerCase())).length,
-    MAX_VISIBLE_ITEMS
   );
 }
