@@ -6,14 +6,16 @@ interface LogData {
   [key: string]: unknown;
 }
 
-/** Exported for tests; use the `logger` instance. */
 export class Logger {
   private format: 'json' | 'pretty';
   private silent: boolean;
+  // User prompts, model output and tool I/O are only logged when explicitly enabled.
+  private logLlmContent: boolean;
 
   constructor() {
     this.format = (process.env.LOG_FORMAT as 'json' | 'pretty') || 'pretty';
     this.silent = process.env.LOG_SILENT === 'true' || process.env.LOG_SILENT === '1';
+    this.logLlmContent = process.env.LOG_LLM_CONTENT === 'true' || process.env.LOG_LLM_CONTENT === '1';
   }
 
   private log(level: LogLevel, message: string, data?: Record<string, unknown>) {
@@ -91,10 +93,13 @@ export class Logger {
   apiRequest(data: {
     tools: string[];
     messageCount: number;
-    messages: Array<{ role: string; preview: string }>;
+    messages?: Array<{ role: string; preview: string }>;
     systemMessages?: string[];
   }) {
     if (this.silent) return;
+    if (!this.logLlmContent) {
+      data = { tools: data.tools, messageCount: data.messageCount };
+    }
     if (this.format === 'json') {
       this.logJson('info', 'API request', data);
       return;
@@ -105,7 +110,7 @@ export class Logger {
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log('🔧 TOOLS:', data.tools.join(', '));
     console.log('💬 MESSAGES:', data.messageCount, 'total');
-    data.messages.forEach((msg, i) => {
+    data.messages?.forEach((msg, i) => {
       console.log(`  ${i + 1}. [${msg.role}] ${msg.preview}`);
     });
     if (data.systemMessages && data.systemMessages.length > 0) {
@@ -118,7 +123,7 @@ export class Logger {
   }
 
   aiResponse(textBlocks: string[]) {
-    if (this.silent) return;
+    if (this.silent || !this.logLlmContent) return;
     if (this.format === 'json') {
       this.logJson('info', 'AI response', { responseCount: textBlocks.length, responses: textBlocks });
       return;
@@ -132,7 +137,7 @@ export class Logger {
   }
 
   toolCalls(tools: Array<{ name: string; input: unknown }>) {
-    if (this.silent) return;
+    if (this.silent || !this.logLlmContent) return;
     if (this.format === 'json') {
       this.logJson('info', 'Tool calls', { toolCount: tools.length, tools });
       return;
@@ -144,8 +149,22 @@ export class Logger {
     });
   }
 
-  toolResult(toolName: string, result: unknown) {
+  toolError(toolName: string, toolCallId: string, error: unknown) {
     if (this.silent) return;
+    if (this.logLlmContent) {
+      this.toolResult(toolName, `ERROR: ${error instanceof Error ? error.message : String(error)}`);
+      return;
+    }
+    // The message can embed tool input, so only the error name is logged.
+    this.warn('Tool execution failed', {
+      toolName,
+      toolCallId,
+      errorName: error instanceof Error ? error.name : typeof error,
+    });
+  }
+
+  toolResult(toolName: string, result: unknown) {
+    if (this.silent || !this.logLlmContent) return;
     if (this.format === 'json') {
       this.logJson('info', 'Tool result', { toolName, result });
       return;

@@ -96,6 +96,17 @@ class AbortError extends Error {
 }
 
 /**
+ * Thrown before an LLM call when the server's LLM call budget (`llmCallLimit`)
+ * is used up. Caught by handleRunError, which ends the run with RUN_ERROR(RATE_LIMITED).
+ */
+class LlmCallLimitExceededError extends Error {
+  constructor(readonly retryAfterMs: number | undefined) {
+    super('LLM call rate limit exceeded');
+    this.name = 'LlmCallLimitExceededError';
+  }
+}
+
+/**
  * Effective configuration for a single run: the {@link AISDKRunConfig} returned
  * by `hooks.loadConfig`, with library defaults filled in for omitted fields.
  *
@@ -128,6 +139,8 @@ interface RunContext {
   readonly staticSystemMessages: SystemModelMessage[] | undefined;
   /** Effective config for this run (from hooks.loadConfig, defaults applied) */
   readonly resolved: ResolvedRunConfig;
+  /** Optional LLM call budget from the server. Consumed once before each LLM call. */
+  readonly llmCallLimit: AgentInput['llmCallLimit'];
 
   // Streaming state (mutated during run)
   streamTextStarted: boolean;
@@ -553,7 +566,7 @@ export class AISDKAgent implements Agent {
    * config. Builds the system messages and initializes all mutable state.
    */
   private createRunContext(input: AgentInput, runConfig: AISDKRunConfig): RunContext {
-    const { session, runId, messages, tools, state, systemPrompt: runtimeSystemPrompt, originalInput, mcpHeaders } = input;
+    const { session, runId, messages, tools, state, systemPrompt: runtimeSystemPrompt, originalInput, mcpHeaders, llmCallLimit } = input;
 
     // Sync session.tools with input.tools if not already set
     // This ensures tools are available for step-by-step execution
@@ -579,6 +592,7 @@ export class AISDKAgent implements Agent {
       originalInput,
       mcpHeaders,
       staticSystemMessages,
+      llmCallLimit,
       resolved: {
         model: runConfig.model,
         temperature: runConfig.temperature,
@@ -808,6 +822,10 @@ export class AISDKAgent implements Agent {
         ctx.resolved.model
       );
 
+      // Each step is one LLM call. Count it against the LLM call budget, so a
+      // long run of tool calls cannot make more LLM calls than the budget allows.
+      this.consumeLlmCallBudget(ctx, events);
+
       ctx.streamTextStarted = true;
       const stepMaxOutputTokens = isTruncationFallbackStep
         ? Math.min(ctx.resolved.maxOutputTokens, TRUNCATION_FALLBACK_MAX_TOKENS)
@@ -906,6 +924,27 @@ export class AISDKAgent implements Agent {
         updatedToolCount: ctx.session.tools.length,
       });
     }
+  }
+
+  /**
+   * Consumes one unit of the LLM call budget, if the server set one.
+   * Throws LlmCallLimitExceededError when the budget is used up, so the
+   * LLM is not called and handleRunError ends the run with RUN_ERROR.
+   */
+  private consumeLlmCallBudget(ctx: RunContext, events: EventEmitter): void {
+    if (!ctx.llmCallLimit) return;
+    const check = ctx.llmCallLimit.consume();
+    if (check.allowed) return;
+
+    logger.warn('LLM call rate limit exceeded; ending run', {
+      clientId: ctx.session.clientId,
+      runId: ctx.runId,
+      stepNumber: ctx.currentStepNumber,
+      retryAfterMs: check.retryAfterMs,
+    });
+    // A truncation fallback step can carry an open TEXT_MESSAGE. Close it before the run ends.
+    this.flushPendingTextMessage(ctx, events);
+    throw new LlmCallLimitExceededError(check.retryAfterMs);
   }
 
   /**
@@ -1377,7 +1416,7 @@ export class AISDKAgent implements Agent {
         // for the failed tool), and after server restart the Anthropic API
         // rejects with: "tool_use ids were found without tool_result blocks"
         const errorContent = chunk.error instanceof Error ? chunk.error.message : String(chunk.error);
-        logger.toolResult(chunk.toolName, `ERROR: ${errorContent}`);
+        logger.toolError(chunk.toolName, chunk.toolCallId, chunk.error);
 
         events.emit<ToolCallResultEvent>({
           type: EventType.TOOL_CALL_RESULT,
@@ -1499,6 +1538,15 @@ export class AISDKAgent implements Agent {
     }
 
     span.endWithError(error instanceof Error ? error.message : String(error));
+
+    if (error instanceof LlmCallLimitExceededError) {
+      events.emit<RunErrorEvent>({
+        type: EventType.RUN_ERROR,
+        message: ErrorCode.RATE_LIMITED,
+        timestamp: Date.now(),
+      });
+      return { success: false, error: error.message, conversationHistory: ctx.messages };
+    }
 
     logger.error('Error calling AI SDK model', {
       error: error instanceof Error ? error.message : 'Unknown error',

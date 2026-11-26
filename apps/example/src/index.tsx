@@ -15,7 +15,7 @@ root.render(
     enabledFeatures={{ inputDisclaimer: true }}
     forwardedPropsProvider={() => ({
       mcpHeaders: {
-        'http://localhost:3002': {
+        'http://localhost:3002/mcp': {
           headers: { 'X-API-Key': 'secret-api-key-123' },
         },
       },

@@ -27,6 +27,7 @@ import { ThemeContext, StringsContext, defaultTheme, defaultStrings } from '../t
 import type { UseAITheme, UseAIStrings } from '../theme';
 import type { UseAIChatComponentOverrides } from '../components/chatSlots';
 import { ChatRenderersContext, type UseAIChatRenderers } from '../components/chatRenderers';
+import { logger, setDebugLogging } from '../utils/logger';
 
 /** Stable identity so a hidden chat's streaming parts do not re-render consumers. */
 const EMPTY_STREAMING_PARTS: ChatStreamingPart[] = [];
@@ -411,6 +412,16 @@ export interface UseAIProviderOptions {
    */
   visibleAgentIds?: AgentInfo['id'][];
   /**
+   * Writes debug logs to the browser console.
+   * Debug logs can contain user data, such as tool arguments and workflow inputs.
+   * Do not turn them on in production.
+   *
+   * You can also set `localStorage.setItem('use-ai:debug', 'true')` in the browser console.
+   *
+   * @default false
+   */
+  debug?: boolean;
+  /**
    * Callback when the chat open state should change.
    * Called by programmatic actions like `sendMessage({ openChat: true })`.
    * Useful when `renderChat=false` and you control the chat panel's visibility externally.
@@ -524,7 +535,12 @@ export function UseAIProvider({
   visibleAgentIds,
   onOpenChange,
   submitMode = 'enter',
+  debug = false,
 }: UseAIProviderProps) {
+  // Set during render, not in an effect, so that the debug logs of the first
+  // effects (the client connection, for example) also follow the prop.
+  setDebugLogging(debug);
+
   const fileUploadConfig = fileUploadConfigProp === false
     ? undefined
     : (fileUploadConfigProp ?? DEFAULT_FILE_UPLOAD_CONFIG);
@@ -613,13 +629,13 @@ export function UseAIProvider({
   const resolvedServerUrl = transport?.url ?? serverUrl!;
 
   useEffect(() => {
-    console.log('[UseAIProvider] Initializing client for', resolvedServerUrl);
+    logger.debug('[UseAIProvider] Initializing client for', resolvedServerUrl);
     // `transport` is deliberately not a dependency: an inline object must not
     // re-create the client on every render.
     const client = new UseAIClient(transport ?? serverUrl!);
 
     const unsubscribeConnection = client.onConnectionStateChange((isConnected) => {
-      console.log('[UseAIProvider] Connection state changed:', isConnected);
+      logger.debug('[UseAIProvider] Connection state changed:', isConnected);
       setConnected(isConnected);
       if (!isConnected) {
         // The server destroys its session on disconnect (keyed by connection id),
@@ -630,7 +646,7 @@ export function UseAIProvider({
       }
     });
 
-    console.log('[UseAIProvider] Connecting...');
+    logger.debug('[UseAIProvider] Connecting...');
     client.connect();
 
     const unsubscribe = client.onEvent('globalChat', async (event: AGUIEvent) => {
@@ -673,23 +689,23 @@ export function UseAIProvider({
       if (lastRegisteredToolsRef.current !== '') {
         lastRegisteredToolsRef.current = '';
         client.registerTools([]);
-        console.log('[Provider] All tools unregistered, clearing client tools');
+        logger.debug('[Provider] All tools unregistered, clearing client tools');
       }
       return;
     }
 
     const toolKeys = Object.keys(toolSystem.aggregatedTools).sort().join(',');
     if (toolKeys === lastRegisteredToolsRef.current) {
-      console.log('[Provider] Skipping re-registration, tools unchanged');
+      logger.debug('[Provider] Skipping re-registration, tools unchanged');
       return;
     }
 
     lastRegisteredToolsRef.current = toolKeys;
-    console.log('[Provider] Registering tools:', toolKeys);
+    logger.debug('[Provider] Registering tools:', toolKeys);
 
     try {
       const toolDefinitions = convertToolsToDefinitions(toolSystem.aggregatedTools);
-      console.log(`[Provider] Registering ${toolDefinitions.length} tools`);
+      logger.debug(`[Provider] Registering ${toolDefinitions.length} tools`);
       client.registerTools(toolDefinitions);
     } catch (err) {
       console.error('Failed to register tools:', err);
