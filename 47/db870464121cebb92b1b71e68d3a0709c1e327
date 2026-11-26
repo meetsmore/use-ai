@@ -1,0 +1,23 @@
+packages/server/src/plugins.integration.test.ts
+  s_0b9ea23bddf25f::t_c2fb45318771cc 592
+packages/server/src/agents/AISDKAgent.test.ts
+  s_0b9ea23bddf25f::t_c2fb45318771cc 156-175,3773-3775
+packages/server/src/agents/AISDKAgent.ts
+  s_0b9ea23bddf25f::t_c9bd7aa9a2408e 638-641
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "47db870464121cebb92b1b71e68d3a0709c1e327",
+  "prompts": {},
+  "sessions": {
+    "s_0b9ea23bddf25f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a0ccb196-f38d-4c1a-8b9d-23b45793da21",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "yuma.ito <yuma.ito@meetsmore.com>"
+    }
+  }
+}
