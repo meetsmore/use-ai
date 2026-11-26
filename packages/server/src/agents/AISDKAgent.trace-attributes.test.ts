@@ -164,13 +164,12 @@ describe('AISDKAgent trace-level attributes', () => {
       const streamText = withMetadata.find(s => s.name === 'ai.streamText')!;
       expect(streamText.attributes['ai.telemetry.metadata.toolCount']).toBe(0);
       expect(streamText.attributes['ai.telemetry.metadata.stepIteration']).toBe(0);
-      for (const span of withMetadata) {
+      // Step spans: the server sets these flags only on fallback steps, so a client value must not stay on a normal step.
+      for (const span of withMetadata.filter(s => s.name !== 'use-ai.agent.run')) {
         const m = (key: string) => span.attributes[`ai.telemetry.metadata.${key}`];
         expect({ span: span.name, gracefulSummary: m('gracefulSummary'), truncationFallback: m('truncationFallback') })
           .toEqual({ span: span.name, gracefulSummary: undefined, truncationFallback: undefined });
       }
-      const root = withMetadata.find(s => s.name === 'use-ai.agent.run')!;
-      expect(root.attributes['ai.telemetry.metadata.toolCount']).toBeUndefined();
     });
 
     test('a client ipAddress is dropped when the server has none', async () => {

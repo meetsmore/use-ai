@@ -438,14 +438,14 @@ function extractReasoningSignature(
 }
 
 /**
- * Metadata keys the server sets on the run span and the steps. A client `telemetryMetadata` value under one of
- * these names is dropped, also on steps where the server does not set the key (e.g. `gracefulSummary`).
- * `sessionId` is not listed: it is a documented client option, resolved for spans by `runSessionId`.
+ * Step metadata flags the server sets to true only on fallback steps (applyGracefulSummaryOverrides /
+ * applyTruncationFallbackOverrides). Spread after the client metadata on every step, so a client value
+ * under these names never stays on the other steps.
  */
-const SERVER_TELEMETRY_METADATA_KEYS = [
-  'threadId', 'runId', 'ipAddress',
-  'toolCount', 'stepIteration', 'gracefulSummary', 'truncationFallback',
-] as const;
+const FALLBACK_STEP_FLAGS_UNSET: Record<string, AttributeValue | undefined> = {
+  gracefulSummary: undefined,
+  truncationFallback: undefined,
+};
 
 type RunTelemetryMetadata = Record<string, unknown> & {
   sessionId: string;
@@ -676,16 +676,9 @@ export class AISDKAgent implements Agent {
     });
   }
 
-  /** The client's `forwardedProps.telemetryMetadata` as sent, or an empty object. */
-  private rawClientTelemetryMetadata(ctx: RunContext): Record<string, unknown> {
-    return (ctx.originalInput.forwardedProps as UseAIForwardedProps | undefined)?.telemetryMetadata ?? {};
-  }
-
-  /** The client's `telemetryMetadata` without `SERVER_TELEMETRY_METADATA_KEYS`. */
+  /** The client's `forwardedProps.telemetryMetadata`, or an empty object. */
   private clientTelemetryMetadata(ctx: RunContext): Record<string, unknown> {
-    const metadata = { ...this.rawClientTelemetryMetadata(ctx) };
-    for (const key of SERVER_TELEMETRY_METADATA_KEYS) delete metadata[key];
-    return metadata;
+    return (ctx.originalInput.forwardedProps as UseAIForwardedProps | undefined)?.telemetryMetadata ?? {};
   }
 
   /**
@@ -693,7 +686,7 @@ export class AISDKAgent implements Agent {
    * when it is a non-empty string (documented option), else the socket client id.
    */
   private runSessionId(ctx: RunContext): string {
-    const sessionId = this.rawClientTelemetryMetadata(ctx).sessionId;
+    const sessionId = this.clientTelemetryMetadata(ctx).sessionId;
     return typeof sessionId === 'string' && sessionId !== '' ? sessionId : ctx.session.clientId;
   }
 
@@ -804,6 +797,7 @@ export class AISDKAgent implements Agent {
           ...this.runTelemetryMetadata(ctx),
           toolCount: stepCtx.currentTools.length,
           stepIteration,
+          ...FALLBACK_STEP_FLAGS_UNSET,
         } as Record<string, AttributeValue>,
       };
 
