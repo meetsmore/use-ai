@@ -80,7 +80,10 @@ export interface AgentInput {
   state: unknown;
   /** Optional system prompt to guide the agent */
   systemPrompt?: string;
-  /** The original RunAgentInput from AG-UI protocol (for emitting RUN_STARTED event) */
+  /**
+   * The RunAgentInput the client sent (AG-UI protocol), after plugins ran.
+   * Do not put it on RUN_STARTED as `input`: its forwardedProps carry auth tokens and MCP headers.
+   */
   originalInput: import('../types').RunAgentInput;
   /**
    * MCP headers sent with this run. Kept per run, not on the session, so that

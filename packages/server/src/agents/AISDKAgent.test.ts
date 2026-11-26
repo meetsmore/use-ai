@@ -153,6 +153,26 @@ describe('AISDKAgent', () => {
     expect((runStartedEvent as { runId: string }).runId).toBe(input.runId);
   });
 
+  test('RUN_STARTED does not echo the request input (forwardedProps carry auth tokens)', async () => {
+    const mockModel = createStreamingTextMockModel('Hello');
+    const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
+
+    const emittedEvents: AGUIEventExtended[] = [];
+    const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
+
+    const base = createTestInput();
+    const forwardedProps = {
+      token: 'test-token-not-echoed',
+      mcpHeaders: { 'https://mcp.example.test': { headers: { Authorization: 'Bearer test-token-not-echoed' } } },
+    };
+    await agent.run(createTestInput({ originalInput: { ...base.originalInput, forwardedProps } }), eventEmitter);
+
+    const runStartedEvent = emittedEvents.find(e => e.type === EventType.RUN_STARTED);
+    expect(runStartedEvent).toBeDefined();
+    expect(runStartedEvent).not.toHaveProperty('input');
+    expect(JSON.stringify(emittedEvents)).not.toContain('test-token-not-echoed');
+  });
+
   test('run emits TEXT_MESSAGE events for text response', async () => {
     const mockModel = createStreamingTextMockModel('Hello world');
     const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
@@ -3776,7 +3796,9 @@ describe('AISDKAgent', () => {
       expect(result.success).toBe(false);
       expect(result.error).toBe('Langfuse unavailable');
       // The client still sees a well-formed lifecycle: RUN_STARTED then RUN_ERROR.
-      expect(emittedEvents.find(e => e.type === EventType.RUN_STARTED)).toBeDefined();
+      const runStartedEvent = emittedEvents.find(e => e.type === EventType.RUN_STARTED);
+      expect(runStartedEvent).toBeDefined();
+      expect(runStartedEvent).not.toHaveProperty('input');
       expect(emittedEvents.find(e => e.type === EventType.RUN_ERROR)).toBeDefined();
     });
 

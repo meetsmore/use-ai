@@ -589,6 +589,7 @@ describe('Plugin Architecture', () => {
       // RUN_STARTED must precede ABORTED: the client takes the turn's start position from it.
       expect(events.map((e) => e.type)).toEqual([EventType.RUN_STARTED, EventType.RUN_ERROR]);
       expect(events[0].runId).toBe(runId);
+      expect(events[0]).not.toHaveProperty('input');
       expect(events[1].message).toBe(ErrorCode.ABORTED);
       expect(setup.agentRuns()).toBe(0);
       expect(setup.resolveCalls()).toBe(0);
