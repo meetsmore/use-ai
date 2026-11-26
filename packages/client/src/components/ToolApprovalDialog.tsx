@@ -5,7 +5,7 @@ import type { UseAITheme, UseAIStrings } from '../theme';
 /**
  * A single pending tool approval item.
  */
-export interface PendingToolItem {
+interface PendingToolItem {
   toolCallId: string;
   toolCallName: string;
   toolCallArgs: Record<string, unknown>;
@@ -17,7 +17,7 @@ export interface PendingToolItem {
 /**
  * Props for the ToolApprovalDialog component.
  */
-export interface ToolApprovalDialogProps {
+interface ToolApprovalDialogProps {
   /** The name of the tool requesting approval (first tool in batch) */
   toolCallName: string;
   /** The arguments passed to the tool (first tool in batch) */

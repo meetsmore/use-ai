@@ -3,7 +3,7 @@ import React from 'react';
 /**
  * Props for the Spinner component.
  */
-export interface SpinnerProps {
+interface SpinnerProps {
   /** Size of the spinner in pixels (default: 16) */
   size?: number;
   /** Color of the spinner (default: currentColor) */

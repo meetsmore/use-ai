@@ -3,7 +3,7 @@ import React from 'react';
 /**
  * Props for the CircularProgress component.
  */
-export interface ProgressBarProps {
+interface ProgressBarProps {
   /** Progress value from 0 to 100 */
   progress: number;
   /** Size of the progress indicator in pixels (default: 16) */

@@ -1,9 +1,20 @@
 import { describe, test, expect, spyOn } from 'bun:test';
 import type { McpHeadersMap } from '@meetsmore-oss/use-ai-core';
-import { validateMcpHeaderPattern, findMcpHeadersForUrl } from './mcpHeaderPatterns';
+import { findMcpHeadersForUrl } from './mcpHeaderPatterns';
 import { logger } from '../logger';
 
-describe('validateMcpHeaderPattern', () => {
+/** Returns true if findMcpHeadersForUrl ignores the pattern as invalid and logs a warning. */
+function isRejected(pattern: string): boolean {
+  const warnSpy = spyOn(logger, 'warn');
+  try {
+    findMcpHeadersForUrl('https://unrelated.example.org/mcp', { [pattern]: { headers: {} } });
+    return warnSpy.mock.calls.length > 0;
+  } finally {
+    warnSpy.mockRestore();
+  }
+}
+
+describe('mcpHeaders pattern validation', () => {
   describe('accepts a pattern with a domain', () => {
     test.each([
       ['literal host', 'https://api.example.com/api/mcp'],
@@ -21,7 +32,7 @@ describe('validateMcpHeaderPattern', () => {
       ['*. before a PSL exception domain (city.kawasaki.jp)', 'https://*.city.kawasaki.jp/api/mcp'],
       ['*. before a domain under a PSL wildcard suffix', 'https://*.foo.bar.kawasaki.jp/api/mcp'],
     ])('%s: %s', (_name, pattern) => {
-      expect(validateMcpHeaderPattern(pattern)).toBeNull();
+      expect(isRejected(pattern)).toBe(false);
     });
   });
 
@@ -54,7 +65,7 @@ describe('validateMcpHeaderPattern', () => {
       ['bare wildcard', '*'],
       ['empty string', ''],
     ])('%s: %s', (_name, pattern) => {
-      expect(validateMcpHeaderPattern(pattern)).toEqual(expect.any(String));
+      expect(isRejected(pattern)).toBe(true);
     });
   });
 });

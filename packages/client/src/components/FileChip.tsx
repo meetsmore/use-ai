@@ -7,7 +7,7 @@ import { ProgressBar } from './ProgressBar';
 /**
  * Props for the FileChip component.
  */
-export interface FileChipProps {
+interface FileChipProps {
   /** The file attachment to display */
   attachment: FileAttachment;
   /** Callback when the remove button is clicked */
@@ -208,7 +208,7 @@ export function FileChip({ attachment, onRemove, disabled, processingState }: Fi
 /**
  * Props for the FilePlaceholder component.
  */
-export interface FilePlaceholderProps {
+interface FilePlaceholderProps {
   /** File name to display */
   name: string;
   /** File size in bytes */

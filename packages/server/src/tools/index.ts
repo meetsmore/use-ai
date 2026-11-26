@@ -4,5 +4,4 @@ export type {
   ServerToolConfig,
   ServerToolDefinition,
   ServerToolContext,
-  ServerToolExecuteFn,
 } from './types';
