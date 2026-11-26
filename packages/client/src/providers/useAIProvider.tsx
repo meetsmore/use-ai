@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useLayoutEffect, ReactNode, useCallback, useRef, useMemo } from 'react';
 import type { UseAIConfig, AGUIEvent, AgentInfo, UseAIForwardedProps, EnabledFeatures } from '../types';
 import { UseAIFloatingButton } from '../components/UseAIFloatingButton';
 import { UseAIChatPanel } from '../components/UseAIChatPanel';
@@ -722,15 +722,20 @@ export function UseAIProvider({
   // Also covers an approval that arrives after the user switched away.
   // Not endRun(): it answers nothing, so the server would wait forever and
   // `loading` would never clear.
-  const runChatId = serverEvents.streamingChatIdRef.current;
+  // A layout effect, so an approval that arrives while the user is in another
+  // chat is rejected before it is painted there.
+  const { streamingChatIdRef } = serverEvents;
   const displayedChatId = chatManagement.displayedChatId;
   const { pendingApprovals, rejectAll } = toolSystem;
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (pendingApprovals.length === 0) return;
-    if (runChatId === null || runChatId === displayedChatId) return;
+    // Approvals exist only while a run is in flight, and the run's chat is
+    // set when it is sent. It is null when the run was sent with no chat open.
+    const runChatId = streamingChatIdRef.current;
+    if (runChatId === displayedChatId) return;
     logger.debug('[Provider] Rejecting approvals of a run in another chat:', runChatId);
     rejectAll('The user switched to another chat');
-  }, [pendingApprovals, displayedChatId, runChatId, rejectAll]);
+  }, [pendingApprovals, displayedChatId, streamingChatIdRef, rejectAll]);
 
   // ── Abort ───────────────────────────────────────────────────────────────
 

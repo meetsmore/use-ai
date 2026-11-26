@@ -162,6 +162,47 @@ describe('UseAIProvider — approvals outside the run\'s chat', () => {
     expect(deleteRuns).toBe(0);
   });
 
+  test('rejects the approval of a run sent with no chat open once a chat is opened', async () => {
+    render(
+      <UseAIProvider serverUrl="http://localhost:8081" renderChat={false}>
+        <Tools />
+        <ChatProbe />
+      </UseAIProvider>
+    );
+    await act(async () => {
+      socket.connected = true;
+      socketHandlers.get('connect')!();
+      await tick(0);
+    });
+    // Deleting the displayed chat leaves no chat open.
+    await act(async () => {
+      await chat.history.delete(chat.history.currentId!);
+      await tick();
+    });
+    expect(chat.history.currentId).toBeNull();
+    await act(async () => {
+      await chat.sendMessage('hi');
+      await tick();
+    });
+    const runAgent = sent.find(message => message.type === 'run_agent')!;
+    await act(async () => {
+      emit({ type: 'RUN_STARTED', threadId: runAgent.data.threadId, runId: runAgent.data.runId });
+      await tick();
+    });
+    await requestDeleteApproval();
+    expect(chat.tools.pending.tools).toHaveLength(1);
+
+    await act(async () => {
+      await chat.history.create();
+      await tick();
+    });
+
+    expect(chat.tools.pending.tools).toHaveLength(0);
+    expect(approvalResponses()).toEqual([
+      { toolCallId: 'tc1', approved: false, reason: 'The user switched to another chat' },
+    ]);
+  });
+
   test('keeps the approval when the user reopens the run\'s own chat', async () => {
     const run = await startRun();
     await requestDeleteApproval();
