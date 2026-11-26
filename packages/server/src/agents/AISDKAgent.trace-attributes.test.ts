@@ -192,6 +192,13 @@ describe('AISDKAgent trace-level attributes', () => {
       expect(popTraceIdForRun(input.runId)).toBeUndefined();
     });
 
+    test('client keys the server does not set on spans (errorCode, messageCount) are kept', async () => {
+      const spans = await runSpans(createInput({ errorCode: 'app-code', messageCount: 12 }));
+      const streamText = spans.find(s => s.name === 'ai.streamText')!;
+      expect(streamText.attributes['ai.telemetry.metadata.errorCode']).toBe('app-code');
+      expect(streamText.attributes['ai.telemetry.metadata.messageCount']).toBe(12);
+    });
+
     test('the run span and every AI SDK span share the client sessionId', async () => {
       const spans = await runSpans(createInput({ sessionId: 'chat-42' }));
       const withMetadata = spans.filter(s => s.attributes['ai.telemetry.metadata.runId'] !== undefined);

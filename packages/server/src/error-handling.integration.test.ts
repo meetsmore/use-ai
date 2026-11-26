@@ -763,11 +763,12 @@ describe('Error recording and abort handling', () => {
 
       const socket = await cleanup.createTestClient(port);
 
+      const runId = uuidv4();
       socket.emit('message', {
         type: 'run_agent',
         data: {
           threadId: uuidv4(),
-          runId: uuidv4(),
+          runId,
           messages: [{ id: uuidv4(), role: 'user', content: 'test' }],
           tools: [],
           state: null,
@@ -792,7 +793,7 @@ describe('Error recording and abort handling', () => {
       expect(call.metadata.tenantId).toBe('tenant-abc');
       // Server-set keys win over the same keys in telemetryMetadata
       expect(call.metadata.requestedAgent).toBe('nonexistent');
-      expect(call.metadata.runId).not.toBe('spoofed-run');
+      expect(call.metadata.runId).toBe(runId);
 
       // Verify error span was created with ERROR level
       expect(call.span.name).toBe('agent_not_found');

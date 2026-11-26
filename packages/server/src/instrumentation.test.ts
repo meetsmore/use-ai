@@ -144,14 +144,14 @@ describe('recordErrorTrace', () => {
     expect(child.spanContext().traceId).toBe(root.spanContext().traceId);
   });
 
-  test('client metadata cannot replace the server-set runId, errorCategory, ipAddress or source', async () => {
+  test('client metadata cannot replace the server-set threadId, runId, errorCategory, ipAddress or source', async () => {
     langfuse.enabled = true;
 
     recordErrorTrace({
       ...baseParams,
       metadata: {
         runId: 'spoofed-run', errorCategory: 'spoofed', ipAddress: '203.0.113.9', source: 'spoofed',
-        sessionId: 'spoofed-session', threadId: 'spoofed-thread', userId: 'user-1',
+        threadId: 'spoofed-thread', userId: 'user-1',
       },
     });
 
@@ -160,9 +160,18 @@ describe('recordErrorTrace', () => {
     expect(root.attributes[`${A.TRACE_METADATA}.errorCategory`]).toBe('agent_not_found');
     expect(root.attributes[`${A.TRACE_METADATA}.ipAddress`]).toBe('127.0.0.1');
     expect(root.attributes[`${A.TRACE_METADATA}.source`]).toBe('use-ai-server');
-    expect(root.attributes[`${A.TRACE_METADATA}.sessionId`]).toBe('client-1');
     expect(root.attributes[`${A.TRACE_METADATA}.threadId`]).toBe('thread-abc');
     expect(root.attributes[`${A.TRACE_METADATA}.userId`]).toBe('user-1');
+  });
+
+  test('a client sessionId stays in the metadata while the trace session is the server one', async () => {
+    langfuse.enabled = true;
+
+    recordErrorTrace({ ...baseParams, metadata: { sessionId: 'chat-42' } });
+
+    const root = (await finishedSpans()).find((s: { name: string }) => s.name === 'use-ai-error');
+    expect(root.attributes[A.TRACE_SESSION_ID]).toBe('client-1');
+    expect(root.attributes[`${A.TRACE_METADATA}.sessionId`]).toBe('chat-42');
   });
 
   test('a client ipAddress is dropped when the server has none', async () => {

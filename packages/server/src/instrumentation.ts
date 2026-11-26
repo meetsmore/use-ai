@@ -73,9 +73,9 @@ export function recordErrorTrace(params: ErrorTraceParams): void {
   try {
     const metadata: Record<string, string> = {};
     // Client metadata goes first, so the server-set keys win (also when ipAddress or threadId is undefined).
+    // A client `sessionId` (documented option) stays in the metadata; the trace session is `params.sessionId`.
     for (const [key, value] of Object.entries({
       ...params.metadata,
-      sessionId: params.sessionId,
       threadId: params.threadId,
       runId: params.runId,
       errorCategory: params.errorCategory,

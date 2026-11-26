@@ -438,13 +438,13 @@ function extractReasoningSignature(
 }
 
 /**
- * Metadata keys the server sets on the run span, the steps and the error traces.
- * A client `telemetryMetadata` value under one of these names is dropped (`sessionId` is read separately by `runSessionId`).
+ * Metadata keys the server sets on the run span and the steps. A client `telemetryMetadata` value under one of
+ * these names is dropped, also on steps where the server does not set the key (e.g. `gracefulSummary`).
+ * `sessionId` is not listed: it is a documented client option, resolved for spans by `runSessionId`.
  */
 const SERVER_TELEMETRY_METADATA_KEYS = [
-  'sessionId', 'threadId', 'runId', 'ipAddress',
+  'threadId', 'runId', 'ipAddress',
   'toolCount', 'stepIteration', 'gracefulSummary', 'truncationFallback',
-  'errorCode', 'messageCount',
 ] as const;
 
 type RunTelemetryMetadata = Record<string, unknown> & {
@@ -681,10 +681,7 @@ export class AISDKAgent implements Agent {
     return (ctx.originalInput.forwardedProps as UseAIForwardedProps | undefined)?.telemetryMetadata ?? {};
   }
 
-  /**
-   * The client's `telemetryMetadata` without the keys the server sets on run, step and error metadata,
-   * so a client value under those names never reaches a trace (also on steps that do not set the key).
-   */
+  /** The client's `telemetryMetadata` without `SERVER_TELEMETRY_METADATA_KEYS`. */
   private clientTelemetryMetadata(ctx: RunContext): Record<string, unknown> {
     const metadata = { ...this.rawClientTelemetryMetadata(ctx) };
     for (const key of SERVER_TELEMETRY_METADATA_KEYS) delete metadata[key];
