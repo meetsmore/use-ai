@@ -1131,7 +1131,12 @@ When multiple agents are configured, users can select which agent to use:
 ```
 
 ```tsx
-const { selectedAgent, availableAgents, selectAgent } = useAgentSelection();
+const { agents } = useAIContext();
+
+agents.available; // AgentInfo[] from the server, filtered by visibleAgentIds
+agents.selected;  // selected agent ID, or null for the server default
+agents.default;   // the server's default agent ID
+agents.set('gpt-4'); // select an agent. Pass null to use the server default.
 ```
 
 A chat can be bound to one agent when it is created. Every message sent in that chat goes to that agent, whatever the global selection is, including after a reload. Use this instead of choosing the agent from the conversation text:
@@ -1148,7 +1153,7 @@ Chats created without `agent` follow the global selection. An `agent` in forward
 
 ### Debug Logs
 
-The client does not write debug logs to the browser console by default. Debug logs can contain user data, such as tool arguments, workflow inputs and chat IDs. On a shared machine, the next user can read them in DevTools.
+The client does not write debug logs to the browser console by default. Debug logs can contain user data, such as tool arguments and chat IDs. On a shared machine, the next user can read them in DevTools.
 
 To turn on debug logs, use one of these:
 
@@ -1156,13 +1161,15 @@ To turn on debug logs, use one of these:
 - Run `localStorage.setItem('use-ai:debug', 'true')` in the browser console.
 - Call `setDebugLogging(true)` when you use `UseAIClient` without the provider.
 
-Do not turn on debug logs in production. Warnings and errors are always written. They do not include tool arguments, workflow inputs or message content.
+Do not turn on debug logs in production. Warnings and errors are always written. They do not include tool arguments or message content.
 
 ## Server
 
 ### 'Batteries included' server
 
-For most use cases, you can just use `@meetsmore-oss/use-ai-server` as-is, and customize only the environment variables:
+For most use cases, you can run the server app (`apps/use-ai-server-app`, published as the Docker image) and customize only the environment variables. The server app reads all the variables below.
+
+The `@meetsmore-oss/use-ai-server` package reads only `LANGFUSE_*`, `LOG_FORMAT`, `LOG_SILENT`, `LOG_LLM_CONTENT` and `DEBUG`. The `anthropic` provider from `@ai-sdk/anthropic` reads `ANTHROPIC_API_KEY`. If you use the package as a library, set the other values as `UseAIServer` options (see `UseAIServer`).
 
 ```bash
 # AI Provider (at least one required)
@@ -1258,7 +1265,7 @@ They are called over [Streamable HTTP](https://modelcontextprotocol.io/specifica
 
 The server will invoke these on start, with a refresh interval to reload them periodically.
 
-To configure these in `@meetsmore-oss/use-ai-server`, you can use the environment variables:
+To configure these in the server app (`apps/use-ai-server-app`), you can use the environment variables below. If you use `UseAIServer` as a library, set the `mcpEndpoints` option instead.
 
 ```bash
 # MCP_ENDPOINT_YOURMCPNAME_URL=http://localhost:3002
@@ -1312,7 +1319,7 @@ root.render(
 The flow works like this:
 
 1. [client] The user sends a message to the AI.
-2. [client] `use-ai` calls the `mcpHeadersProvider` and passes the full 'header map' to the server.
+2. [client] `use-ai` calls the `forwardedPropsProvider` and passes the full 'header map' to the server.
 3. [server] The server prompts the LLM.
 4. [LLM] The LLM decides to call a tool.
 5. [server] The server checks if the call will use a remote MCP, if it will, it adds the headers matching the URL pattern.
@@ -1536,6 +1543,14 @@ export interface UseAIServerPlugin {
    * Return `{ abort: true, message: '...' }` to block the run.
    */
   beforeRunAgent?(input: AgentInput): Promise<BeforeRunAgentResult | void>;
+
+  /**
+   * Optional cleanup hook called when the server is shutting down.
+   * Use this to flush pending data, close connections, etc.
+   *
+   * @returns Promise that resolves when cleanup is complete
+   */
+  close?(): Promise<void>;
 }
 ```
 

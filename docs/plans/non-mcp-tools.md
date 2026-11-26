@@ -214,7 +214,7 @@ export { isServerTool } from './utils';
 
 2. **Circular imports**: `tools/types.ts` imports `ClientSession` from `agents/types.ts`. This is one-directional (tools → agents). `AISDKAgent` imports from `tools/` which is also one-directional. No circularity.
 
-3. **Plugin access**: The WorkflowsPlugin currently fetches MCP tools independently. If workflows also need server tools, the plugin interface would need extension. Out of scope for V1.
+3. **Plugin access**: The WorkflowsPlugin currently fetches MCP tools independently. If workflows also need server tools, the plugin interface would need extension. Out of scope for V1. (Note: commit b03b643 removed the workflow plugin.)
 
 ## Verification
 

@@ -1,8 +1,8 @@
 /**
  * Debug logging for the use-ai client.
  *
- * Debug logs can contain user data: tool arguments, workflow inputs, chat IDs and
- * server config. On a shared machine, anyone who opens DevTools can read them.
+ * Debug logs can contain user data: tool arguments, chat IDs and server config.
+ * On a shared machine, anyone who opens DevTools can read them.
  * For this reason, debug logs are off by default.
  *
  * Turn them on with one of these:
@@ -11,7 +11,7 @@
  * - `localStorage.setItem('use-ai:debug', 'true')` in the browser console
  *
  * Warnings and errors do not go through this logger. They must not contain user data,
- * such as tool arguments, workflow inputs or message content.
+ * such as tool arguments or message content.
  */
 
 /** The localStorage key that turns on debug logs when its value is `'true'`. */
