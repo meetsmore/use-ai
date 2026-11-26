@@ -7,7 +7,7 @@ interface RecordedRequest {
   signal: AbortSignal;
   body: {
     jsonrpc: string;
-    id: number;
+    id: string;
     method: string;
     params?: Record<string, unknown> & { _meta?: Record<string, unknown> };
   };
@@ -120,7 +120,7 @@ describe('RemoteMcpToolsProvider over Streamable HTTP', () => {
             for (const chunk of [
               'data: {"jsonrpc":',
               '"2.0",\r',
-              `\ndata: "id":${id},"result":{"content":[{"type":"text","text":"done"}]}}\r\n\r\n`,
+              `\ndata: "id":${JSON.stringify(id)},"result":{"content":[{"type":"text","text":"done"}]}}\r\n\r\n`,
             ]) {
               controller.enqueue(encoder.encode(chunk));
               await Bun.sleep(20);
@@ -193,6 +193,21 @@ describe('RemoteMcpToolsProvider over Streamable HTTP', () => {
       const result = await new RemoteMcpToolsProvider({ url, timeout: 1000 }).executeTool('echo', {});
 
       expect(result).toEqual({ result: 'ok' });
+    });
+
+    test('the request timeout covers reading an open SSE body', async () => {
+      reply = () => new Response(
+        new ReadableStream({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode(': waiting\n\n'));
+          },
+        }),
+        { headers: { 'Content-Type': 'text/event-stream' } },
+      );
+
+      const provider = new RemoteMcpToolsProvider({ url, timeout: 200 });
+      await expect(provider.executeTool('echo', {})).rejects.toThrow('Tool execution timeout after 200ms');
+      expect(requests).toHaveLength(1);
     });
 
     test('the text/event-stream media type is matched case-insensitively', async () => {
@@ -327,16 +342,16 @@ describe('RemoteMcpToolsProvider over Streamable HTTP', () => {
 
     test('tools/call mirrors annotated arguments into Mcp-Param headers', async () => {
       const provider = new RemoteMcpToolsProvider({ url, protocolVersion: '2026-07-28' });
-      await provider.fetchToolsWithHeaders();
+      const [query] = await provider.fetchToolsWithHeaders();
 
-      await provider.executeTool('query', {
+      await provider.executeTool(query._remote.originalName, {
         region: 'us-west1',
         limit: 42,
         dryRun: false,
         target: { tenant: 'Hello, 世界' },
         note: null,
         sql: 'SELECT 1',
-      });
+      }, undefined, query._remote.paramHeaders);
 
       const { headers } = requests[1];
       expect(headers.get('Mcp-Param-Region')).toBe('us-west1');
@@ -345,6 +360,41 @@ describe('RemoteMcpToolsProvider over Streamable HTTP', () => {
       expect(headers.get('Mcp-Param-Tenant')).toBe('=?base64?SGVsbG8sIOS4lueVjA==?=');
       expect(headers.get('Mcp-Param-Note')).toBeNull();
       expect([...headers.keys()].filter((key) => key.startsWith('mcp-param-'))).toHaveLength(4);
+    });
+
+    test('uses the selected tool listing when the same tool has different schemas', async () => {
+      const other = tool('query', { region: { type: 'string', 'x-mcp-header': 'Location' } });
+      reply = ({ id, method }) => json({
+        jsonrpc: '2.0',
+        id,
+        result: method === 'tools/list'
+          ? { tools: [requests.at(-1)?.headers.get('authorization') === 'Bearer first' ? annotated : other] }
+          : { content: [] },
+      });
+      const provider = new RemoteMcpToolsProvider({ url, protocolVersion: '2026-07-28' });
+      const [first] = await provider.fetchToolsWithHeaders({ authorization: 'Bearer first' });
+      const [second] = await provider.fetchToolsWithHeaders({ authorization: 'Bearer second' });
+
+      await provider.executeTool(first._remote.originalName, { region: 'west' }, undefined, first._remote.paramHeaders);
+      await provider.executeTool(second._remote.originalName, { region: 'east' }, undefined, second._remote.paramHeaders);
+
+      expect(requests[2].headers.get('Mcp-Param-Region')).toBe('west');
+      expect(requests[2].headers.get('Mcp-Param-Location')).toBeNull();
+      expect(requests[3].headers.get('Mcp-Param-Region')).toBeNull();
+      expect(requests[3].headers.get('Mcp-Param-Location')).toBe('east');
+    });
+
+    test('rejects annotated integers outside the JavaScript safe range', async () => {
+      const provider = new RemoteMcpToolsProvider({ url, protocolVersion: '2026-07-28' });
+      const [query] = await provider.fetchToolsWithHeaders();
+
+      await expect(provider.executeTool(
+        query._remote.originalName,
+        { limit: Number.MAX_SAFE_INTEGER + 1 },
+        undefined,
+        query._remote.paramHeaders,
+      )).rejects.toThrow('expected a safe integer');
+      expect(requests).toHaveLength(1);
     });
 
     test('without protocolVersion annotations are ignored', async () => {

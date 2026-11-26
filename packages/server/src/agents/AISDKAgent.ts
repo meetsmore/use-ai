@@ -1648,7 +1648,8 @@ export class AISDKAgent implements Agent {
         const result = await remoteTool._remote.provider.executeTool(
           remoteTool._remote.originalName,
           args,
-          mcpHeaders
+          mcpHeaders,
+          remoteTool._remote.paramHeaders
         );
 
         // Intercept _use_ai_ internal responses from MCP tools
@@ -1665,7 +1666,8 @@ export class AISDKAgent implements Agent {
                   remoteTool._remote.provider,
                   session,
                   events,
-                  mcpHeaders
+                  mcpHeaders,
+                  remoteTool._remote.paramHeaders
                 );
               }
               break;

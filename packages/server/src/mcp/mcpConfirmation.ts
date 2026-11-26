@@ -11,6 +11,7 @@ import type { ToolApprovalRequestEvent } from '../types';
 import { TOOL_APPROVAL_REQUEST } from '../types';
 import { waitForApproval } from '../agents/toolApproval';
 import type { RemoteMcpToolsProvider } from './RemoteMcpToolsProvider';
+import type { McpParamHeader } from './mcpParamHeaders';
 import type { McpHeadersMap } from '@meetsmore-oss/use-ai-core';
 import type { McpConfirmationResponse } from '@meetsmore-oss/use-ai-core';
 import { logger } from '../logger';
@@ -38,7 +39,8 @@ export async function handleMcpConfirmation(
   provider: RemoteMcpToolsProvider,
   session: ClientSession,
   events: EventEmitter,
-  mcpHeaders?: McpHeadersMap
+  mcpHeaders?: McpHeadersMap,
+  paramHeaders?: readonly McpParamHeader[]
 ): Promise<unknown> {
   const { message, metadata, additional_columns } = confirmation._use_ai_metadata;
 
@@ -88,7 +90,8 @@ export async function handleMcpConfirmation(
     const result = await provider.executeTool(
       originalToolName,
       phase2Args,
-      mcpHeaders
+      mcpHeaders,
+      paramHeaders
     );
     return result;
   } catch (error) {
