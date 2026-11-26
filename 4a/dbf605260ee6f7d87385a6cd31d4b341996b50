@@ -1,0 +1,119 @@
+.env.example
+  s_5b6ae52c5982e2::t_df566d2ae91ceb 23
+CLAUDE.md
+  s_5b6ae52c5982e2::t_8d87bc8dda5abf 54,57-58,197-198
+README.md
+  s_5b6ae52c5982e2::t_78a5b450fd4a8c 53,143,1098-1109,1133,1136,1141,1168,1183-1200,1271-1297,1362,1376,1380-1391,1469-1478
+apps/example/src/index.react16.tsx
+  s_5b6ae52c5982e2::t_0c57bba2141db4 16
+apps/example/src/index.tsx
+  s_5b6ae52c5982e2::t_d5db7785f8f0b3 18
+apps/example/src/pages/RemoteMcpToolsPage.tsx
+  s_5b6ae52c5982e2::t_28d58d2420cac6 67
+apps/use-ai-server-app/src/index.ts
+  s_5b6ae52c5982e2::t_73bc37540fbd48 3,16,24-27,292,304,336,348
+bun.lock
+  s_5b6ae52c5982e2::t_be65d7d149efc6 123
+packages/client/src/client.test.ts
+  s_5b6ae52c5982e2::t_bd59327ab158b9 334-378
+packages/client/src/client.ts
+  s_5b6ae52c5982e2::t_354ec5006eccae 28,92-93,161,166,184,192,458-459,501,678-698,786-788,887,934
+packages/client/src/defineTool.ts
+  s_5b6ae52c5982e2::t_70fd4f9c3b9103 292
+packages/client/src/hooks/useAgentSelection.ts
+  s_5b6ae52c5982e2::t_7401308ef6da9a 4,136,145
+packages/client/src/hooks/useChatManagement.ts
+  s_5b6ae52c5982e2::t_83ef2c37b3b9e2 8,136,139,156,166,171,181,184,197,200,217,234,271,277,317,393,422,432,435,438,466
+packages/client/src/hooks/useCommandManagement.ts
+  s_5b6ae52c5982e2::t_79c5d0e7e2e55b 4,65,74,84,90
+packages/client/src/hooks/useFileUpload.tsx
+  s_5b6ae52c5982e2::t_6a0c3bd99f3968 9,241-243
+packages/client/src/hooks/useServerEvents.ts
+  s_5b6ae52c5982e2::t_a4012c009f32b9 24,395-399,403-410,412-413
+packages/client/src/hooks/useServerEvents.unknownTool.test.tsx
+  s_5b6ae52c5982e2::t_60e689b3996fb4 1-90
+packages/client/src/hooks/useToolSystem.signal.test.tsx
+  s_5b6ae52c5982e2::t_ae923aba737b7f 142-151
+packages/client/src/hooks/useToolSystem.ts
+  s_5b6ae52c5982e2::t_02a030b4909f16 7,310,338,363,378,380,383,385,389,391,394,414,431,456
+packages/client/src/index.ts
+  s_5b6ae52c5982e2::t_428231bd535ef6 8
+packages/client/src/providers/useAIProvider.tsx
+  s_5b6ae52c5982e2::t_0d377f1a90da07 30,414-423,538,540-543,632,638,649,692,699,704,708
+packages/client/src/transport/SocketIOTransport.test.ts
+  s_5b6ae52c5982e2::t_c5d8e24343963d 9,21,91-99
+packages/client/src/transport/SocketIOTransport.ts
+  s_5b6ae52c5982e2::t_607fe1fe380ea9 5,53,58
+packages/client/src/utils/logger.ts
+  s_5b6ae52c5982e2::t_671461a35ceab7 1-46
+packages/client/test/debug-logging.test.tsx
+  s_5b6ae52c5982e2::t_739f682673375c 1-124
+packages/core/src/types.ts
+  s_5b6ae52c5982e2::t_cc09b9411a3327 362-366
+packages/server/package.json
+  s_5b6ae52c5982e2::t_88856d76bff81b 42
+packages/server/src/agents/AISDKAgent.maxSteps.test.ts
+  s_5b6ae52c5982e2::t_c86af962ddfc1e 8,284-359
+packages/server/src/agents/AISDKAgent.ts
+  s_5b6ae52c5982e2::t_8fe9f814b6899b 98-108,142-143,569,595,825-828,929-949,1419,1542-1550
+packages/server/src/agents/index.ts
+  s_5b6ae52c5982e2::t_ee40d4225bd57a 6
+packages/server/src/agents/types.ts
+  s_5b6ae52c5982e2::t_0ac2a6abfc532c 80-95
+packages/server/src/error-handling.integration.test.ts
+  s_5b6ae52c5982e2::t_1999053a4c2a1c 2,890-891
+packages/server/src/index.ts
+  s_5b6ae52c5982e2::t_6b7a623ea2b378 10,14
+packages/server/src/logger.test.ts
+  s_5b6ae52c5982e2::t_ce796cce63e557 1,4-5,7-37,40-59,61-64,69-71,73
+packages/server/src/logger.ts
+  s_5b6ae52c5982e2::t_fe2eb9b5642472 12-13,18,96,100-102,113,126,140,152,154-167
+packages/server/src/mcp/RemoteMcpToolsProvider.test.ts
+  s_5b6ae52c5982e2::t_4a360ec25af87b 253-276
+packages/server/src/mcp/RemoteMcpToolsProvider.ts
+  s_5b6ae52c5982e2::t_80b44f52c14fb1 4,191
+packages/server/src/mcp/mcpHeaderPatterns.test.ts
+  s_5b6ae52c5982e2::t_183853c346f390 1-195
+packages/server/src/mcp/mcpHeaderPatterns.ts
+  s_5b6ae52c5982e2::t_487c1fb77bc74e 1-224
+packages/server/src/origin-check.integration.test.ts
+  s_5b6ae52c5982e2::t_fed84cba64e8f9 1-136
+packages/server/src/plugins.integration.test.ts
+  s_5b6ae52c5982e2::t_6fc60c57bd8740 2,4,365-620
+packages/server/src/plugins/index.ts
+  s_5b6ae52c5982e2::t_a59cf53acf2a93 1
+packages/server/src/plugins/types.ts
+  s_5b6ae52c5982e2::t_002f9270997dc1 1,14-15,22-47,110-123,126-129
+packages/server/src/rate-limiting.integration.test.ts
+  s_5b6ae52c5982e2::t_05b8e251b9ee0f 8-11,14-16,296-385
+packages/server/src/runtime/bun/BunRuntimeAdapter.ts
+  s_5b6ae52c5982e2::t_9568493f077e20 5,67-73
+packages/server/src/runtime/node/NodeRuntimeAdapter.ts
+  s_5b6ae52c5982e2::t_4f25b23ee11870 1,6,62-65,96-99,108-116
+packages/server/src/runtime/origin.test.ts
+  s_5b6ae52c5982e2::t_a12cc69648379d 1-26
+packages/server/src/runtime/origin.ts
+  s_5b6ae52c5982e2::t_9e16d040ae9484 1-38
+packages/server/src/runtime/types.ts
+  s_5b6ae52c5982e2::t_7f299a6a8d506b 51-55
+packages/server/src/server.ts
+  s_5b6ae52c5982e2::t_21dd1d62991a9e 4,25,31,103,108,111-112,138,143,171-174,181,243-248,254,425,428,525-570,915-918,1179
+packages/server/src/types.ts
+  s_5b6ae52c5982e2::t_30044f1ca1d3f0 88-96,146-161
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "4adbf605260ee6f7d87385a6cd31d4b341996b50",
+  "prompts": {},
+  "sessions": {
+    "s_5b6ae52c5982e2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f6e97dc5-3649-469f-8723-97876212976e",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "yuma.ito <yuma.ito@meetsmore.com>"
+    }
+  }
+}
