@@ -618,7 +618,6 @@ export class AISDKAgent implements Agent {
       type: EventType.RUN_STARTED,
       threadId: input.session.threadId,
       runId: input.runId,
-      input: input.originalInput,
       timestamp: Date.now(),
     });
     events.emit<RunErrorEvent>({
@@ -636,13 +635,16 @@ export class AISDKAgent implements Agent {
 
   /**
    * Emits initial lifecycle events: RUN_STARTED, MESSAGES_SNAPSHOT, STATE_SNAPSHOT.
+   *
+   * RUN_STARTED leaves out the optional `input`. Echoing the request would send its
+   * forwardedProps (auth tokens, MCP headers, and anything a plugin wrote into them)
+   * back over the connection, and the client already sent it.
    */
   private emitRunStartEvents(ctx: RunContext, events: EventEmitter): void {
     events.emit<RunStartedEvent>({
       type: EventType.RUN_STARTED,
       threadId: ctx.session.threadId,
       runId: ctx.runId,
-      input: ctx.originalInput,
       timestamp: Date.now(),
     });
 

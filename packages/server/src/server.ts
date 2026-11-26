@@ -557,7 +557,6 @@ export class UseAIServer {
         type: EventType.RUN_STARTED,
         threadId,
         runId,
-        input: message.data,
         timestamp: Date.now(),
       });
       this.sendEvent(session.socket, {
