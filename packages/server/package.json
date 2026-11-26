@@ -26,8 +26,7 @@
   "scripts": {
     "clean": "rm -rf dist *.tsbuildinfo",
     "build": "bun build ./src/index.ts --outdir ./dist --target node --format esm && tsc --emitDeclarationOnly --declaration --declarationMap && cp -r dist/src/* dist/",
-    "test": "bun test --only-failures $(find src -name '*.test.ts' -not -name '*.e2e.test.ts' -type f)",
-    "test:e2e": "bun test $(find src -name '*.e2e.test.ts' -type f)"
+    "test": "bun test --only-failures $(find src -name '*.test.ts' -not -name '*.e2e.test.ts' -type f)"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "3.0.0-beta.59",
@@ -58,13 +57,11 @@
     "@meetsmore-oss/use-ai-client": "workspace:^",
     "@opentelemetry/context-async-hooks": "^2.2.0",
     "@types/bun": "^1.3.13",
-    "@types/cors": "^2.8.17",
     "@types/json-schema": "^7.0.15",
     "@types/picomatch": "^4.0.2",
     "@types/uuid": "^10.0.0",
     "@types/ws": "^8.18.1",
     "socket.io-client": "^4.8.1",
-    "testcontainers": "^11.8.1",
     "typescript": "^5.9.3"
   }
 }

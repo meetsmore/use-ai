@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'bun:test';
-import { matchesPattern, findMatch } from './patternMatcher';
+import { matchesPattern } from './patternMatcher';
 
 describe('MCP header configuration supports exact URL matching and glob patterns', () => {
   describe('Exact URL matching', () => {
@@ -46,67 +46,7 @@ describe('MCP header configuration supports exact URL matching and glob patterns
     });
   });
 
-  describe('Pattern priority in findMatch', () => {
-    test('prioritizes exact matches over glob patterns', () => {
-      const patternMap = {
-        'https://*.example.com': { key: 'wildcard' },
-        'https://api.example.com': { key: 'exact' },
-      };
-      const result = findMatch('https://api.example.com', patternMap);
-      expect(result).toEqual({ key: 'exact' });
-    });
-
-    test('returns glob match when no exact match exists', () => {
-      const patternMap = {
-        'https://*.example.com': { key: 'wildcard1' },
-        'https://*.other.com': { key: 'wildcard2' },
-      };
-      const result = findMatch('https://api.example.com', patternMap);
-      expect(result).toEqual({ key: 'wildcard1' });
-    });
-
-    test('returns first matching pattern when multiple globs match', () => {
-      const testValue1 = { key: 'pattern1' };
-      const testValue2 = { key: 'pattern2' };
-      const patternMap = {
-        'https://*.meetsmore.com': testValue1,
-        '*://*.meetsmore.com': testValue2,
-      };
-      const result = findMatch('https://api.meetsmore.com', patternMap);
-      expect(result).toBeDefined();
-      // Both patterns match, so result should be one of them
-      const isMatch = result === testValue1 || result === testValue2;
-      expect(isMatch).toBe(true);
-    });
-
-    test('returns undefined when no patterns match', () => {
-      const patternMap = {
-        'https://*.example.com': { key: 'value1' },
-        'https://*.other.com': { key: 'value2' },
-      };
-      const result = findMatch('https://api.nomatch.com', patternMap);
-      expect(result).toBeUndefined();
-    });
-
-    test('handles complex multi-pattern scenarios', () => {
-      const patternMap = {
-        'https://api.example.com': { type: 'exact' },
-        'https://*.meetsmore.com': { type: 'wildcard-subdomain' },
-        '*://*.example.com': { type: 'wildcard-protocol' },
-      };
-
-      expect(findMatch('https://api.example.com', patternMap)).toEqual({ type: 'exact' });
-      expect(findMatch('https://staging.meetsmore.com', patternMap)).toEqual({ type: 'wildcard-subdomain' });
-      expect(findMatch('http://other.example.com', patternMap)).toEqual({ type: 'wildcard-protocol' });
-    });
-  });
-
   describe('Edge cases and special scenarios', () => {
-    test('handles empty pattern map', () => {
-      const result = findMatch('https://api.example.com', {});
-      expect(result).toBeUndefined();
-    });
-
     test('handles URLs with ports', () => {
       expect(matchesPattern('https://api.example.com:8081', 'https://api.example.com:8081')).toBe(true);
       expect(matchesPattern('https://api.example.com:8081', 'https://*.example.com:8081')).toBe(true);

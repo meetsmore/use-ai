@@ -3,7 +3,7 @@ import Ajv2020 from 'ajv/dist/2020';
 import addFormats from 'ajv-formats';
 
 /** JSON Schema dialect used to read a tool's input schema. */
-export type JsonSchemaDialect = 'draft-07' | '2020-12';
+type JsonSchemaDialect = 'draft-07' | '2020-12';
 
 type CompileResult = { validate: ValidateFunction; ajv: Ajv } | { error: string };
 

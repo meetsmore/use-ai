@@ -1,4 +1,4 @@
-export interface RateLimiterConfig {
+interface RateLimiterConfig {
   maxRequests: number;
   windowMs: number;
 }

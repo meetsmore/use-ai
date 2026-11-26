@@ -53,7 +53,7 @@ export type CacheBreakpointFn = (message: MessageWithCacheContext) => CacheBreak
 /**
  * Checks if the given model is an Anthropic model (Claude).
  */
-export function isAnthropicModel(model: LanguageModel): boolean {
+function isAnthropicModel(model: LanguageModel): boolean {
   // String format: "anthropic/claude-3-5-sonnet-20241022"
   if (typeof model === 'string') {
     return model.startsWith('anthropic/');

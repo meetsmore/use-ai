@@ -131,16 +131,6 @@ function parsePattern(pattern: string): ParseResult {
   };
 }
 
-/**
- * Checks that a client `mcpHeaders` pattern names a domain.
- *
- * @returns null if the pattern is valid, otherwise the reason it is not valid
- */
-export function validateMcpHeaderPattern(pattern: string): string | null {
-  const result = parsePattern(pattern);
-  return result.ok ? null : result.reason;
-}
-
 function matchesUrl(pattern: ParsedPattern, url: URL): boolean {
   const scheme = url.protocol.slice(0, -1);
   if (!pattern.matchScheme(scheme)) {

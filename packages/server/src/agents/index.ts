@@ -3,22 +3,12 @@
  * Provides pluggable AI agent backends that emit AG-UI protocol events.
  */
 
-export type { Agent, AgentInput, EventEmitter, AgentResult, ClientSession, LlmCallLimit, ToolApprovalResult } from './types';
+export type { Agent, AgentInput, EventEmitter, AgentResult, LlmCallLimit } from './types';
 export { AISDKAgent, type AISDKAgentConfig, type AISDKAgentHooks, type AISDKRunConfig } from './AISDKAgent';
 export { createMockReasoningModel } from './testing/MockReasoningModel';
-export {
-  applyCacheBreakpoints,
-  isAnthropicModel,
-  type MessageWithCacheContext,
-  type CacheTtl,
-  type CacheBreakpointResult,
-  type CacheBreakpointFn,
+export type {
+  MessageWithCacheContext,
+  CacheTtl,
+  CacheBreakpointResult,
+  CacheBreakpointFn,
 } from './anthropicCache';
-export {
-  toolNeedsApproval,
-  createApprovalWrapper,
-  waitForApproval,
-  type ToolArguments,
-  type ToolResult,
-  type ToolExecutor,
-} from './toolApproval';
