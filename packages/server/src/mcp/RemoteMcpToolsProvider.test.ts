@@ -252,10 +252,10 @@ describe('RemoteMcpToolsProvider', () => {
 
   describe('executeTool client headers', () => {
     test('sends headers from a pattern with a domain', async () => {
-      const provider = new RemoteMcpToolsProvider({ url: 'https://api.proone.jp/api/mcp' });
+      const provider = new RemoteMcpToolsProvider({ url: 'https://api.example.com/api/mcp' });
 
       await provider.executeTool('test-tool', {}, {
-        'https://*.proone.jp/api/mcp': { headers: { Authorization: 'Bearer user-jwt' } },
+        'https://*.example.com/api/mcp': { headers: { Authorization: 'Bearer user-jwt' } },
       });
 
       const [, options] = mockFetch.mock.calls[0];
@@ -263,7 +263,7 @@ describe('RemoteMcpToolsProvider', () => {
     });
 
     test('does not send headers from a pattern without a domain', async () => {
-      const provider = new RemoteMcpToolsProvider({ url: 'https://api.proone.jp/api/mcp' });
+      const provider = new RemoteMcpToolsProvider({ url: 'https://api.example.com/api/mcp' });
 
       await provider.executeTool('test-tool', {}, {
         '*://*/api/mcp': { headers: { Authorization: 'Bearer user-jwt' } },
