@@ -1,0 +1,126 @@
+apps/example/src/index.react16.tsx
+  s_5b6ae52c5982e2::t_b25dbd3bb8648d 16
+packages/server/src/mcp/RemoteMcpToolsProvider.ts
+  s_5b6ae52c5982e2::t_b25dbd3bb8648d 4,191
+apps/example/src/pages/RemoteMcpToolsPage.tsx
+  s_5b6ae52c5982e2::t_b25dbd3bb8648d 67
+packages/server/src/mcp/mcpHeaderPatterns.test.ts
+  s_5b6ae52c5982e2::t_b25dbd3bb8648d 1-195
+packages/client/src/providers/useAIProvider.tsx
+  s_5b6ae52c5982e2::t_b25dbd3bb8648d 30,414-423,538,540-543,632,638,649,692,699,704,708
+packages/client/src/hooks/useToolSystem.ts
+  s_5b6ae52c5982e2::t_b25dbd3bb8648d 7,310,338,363,378,380,383,385,389,391,394,414,431,456
+CLAUDE.md
+  s_5b6ae52c5982e2::t_b25dbd3bb8648d 54,57-58,197-198
+packages/server/src/logger.test.ts
+  s_5b6ae52c5982e2::t_1106ebc91692e0 57-59,61-64,69-71,73
+  s_5b6ae52c5982e2::t_b25dbd3bb8648d 1,4-5,7-37,40-56
+apps/use-ai-server-app/src/index.ts
+  s_5b6ae52c5982e2::t_b25dbd3bb8648d 3,16,24-27,292,304,336,348
+packages/server/src/agents/index.ts
+  s_5b6ae52c5982e2::t_b25dbd3bb8648d 6
+packages/server/src/error-handling.integration.test.ts
+  s_5b6ae52c5982e2::t_b25dbd3bb8648d 2,890-891
+packages/server/package.json
+  s_5b6ae52c5982e2::t_b25dbd3bb8648d 42
+packages/server/src/mcp/RemoteMcpToolsProvider.test.ts
+  s_5b6ae52c5982e2::t_b25dbd3bb8648d 253-276
+packages/server/src/logger.ts
+  s_5b6ae52c5982e2::t_b25dbd3bb8648d 12-13,18,96,100-102,113,126,140,152,154-167
+packages/server/src/server.ts
+  s_5b6ae52c5982e2::t_b25dbd3bb8648d 4,25,31,103,108,111-112,138,143,171-174,181,243-248,254,425,428,525-570,915-918,1179
+packages/server/src/types.ts
+  s_5b6ae52c5982e2::t_b25dbd3bb8648d 88-96,146-161
+README.md
+  s_5b6ae52c5982e2::t_b25dbd3bb8648d 53,143,1098-1109,1133,1136,1141,1168,1183-1200,1271-1297,1362,1376,1380-1391,1469-1478
+packages/client/src/client.test.ts
+  s_5b6ae52c5982e2::t_b25dbd3bb8648d 334-378
+.env.example
+  s_5b6ae52c5982e2::t_b25dbd3bb8648d 23
+packages/server/src/runtime/origin.ts
+  s_5b6ae52c5982e2::t_b25dbd3bb8648d 1-38
+packages/client/src/index.ts
+  s_5b6ae52c5982e2::t_b25dbd3bb8648d 8
+packages/client/src/hooks/useAgentSelection.ts
+  s_5b6ae52c5982e2::t_b25dbd3bb8648d 4,136,145
+packages/client/src/hooks/useToolSystem.signal.test.tsx
+  s_5b6ae52c5982e2::t_b25dbd3bb8648d 142-151
+packages/server/src/runtime/node/NodeRuntimeAdapter.ts
+  s_5b6ae52c5982e2::t_b25dbd3bb8648d 1,6,62-65,96-99,108-115
+  s_5b6ae52c5982e2::t_798d95f7a440ba 116
+packages/client/src/hooks/useChatManagement.ts
+  s_5b6ae52c5982e2::t_b25dbd3bb8648d 8,136,139,156,166,171,181,184,197,200,217,234,271,277,317,393,422,432,435,438,466
+packages/client/src/utils/logger.ts
+  s_5b6ae52c5982e2::t_b25dbd3bb8648d 1-46
+packages/server/src/plugins/index.ts
+  s_5b6ae52c5982e2::t_b25dbd3bb8648d 1
+packages/client/src/transport/SocketIOTransport.test.ts
+  s_5b6ae52c5982e2::t_b25dbd3bb8648d 9,21,91-99
+packages/server/src/agents/AISDKAgent.maxSteps.test.ts
+  s_5b6ae52c5982e2::t_b25dbd3bb8648d 8,284-358
+  s_5b6ae52c5982e2::t_2acaf439c3a927 359
+packages/client/test/debug-logging.test.tsx
+  s_5b6ae52c5982e2::t_b25dbd3bb8648d 1-124
+packages/client/src/transport/SocketIOTransport.ts
+  s_5b6ae52c5982e2::t_b25dbd3bb8648d 5,53,58
+apps/example/src/index.tsx
+  s_5b6ae52c5982e2::t_b25dbd3bb8648d 18
+packages/server/src/agents/AISDKAgent.ts
+  s_5b6ae52c5982e2::t_b25dbd3bb8648d 99-108,142-143,569,595,825-828,929-949,1419,1542-1549
+  s_5b6ae52c5982e2::t_ec32e5162731a3 98,1550
+packages/server/src/plugins/types.ts
+  s_5b6ae52c5982e2::t_b25dbd3bb8648d 1,14-15,22-47,110-123,126-129
+packages/client/src/hooks/useServerEvents.ts
+  s_5b6ae52c5982e2::t_b25dbd3bb8648d 24,395-399,403-410,412-413
+packages/client/src/defineTool.ts
+  s_5b6ae52c5982e2::t_b25dbd3bb8648d 292
+packages/client/src/hooks/useServerEvents.unknownTool.test.tsx
+  s_5b6ae52c5982e2::t_b25dbd3bb8648d 1-90
+packages/server/src/plugins.integration.test.ts
+  s_5b6ae52c5982e2::t_b25dbd3bb8648d 2,4,365-620
+packages/client/src/client.ts
+  s_5b6ae52c5982e2::t_b25dbd3bb8648d 28,92-93,161,166,184,192,458-459,501,678-698,786-788,887,934
+packages/server/src/origin-check.integration.test.ts
+  s_5b6ae52c5982e2::t_b25dbd3bb8648d 1-136
+packages/server/src/rate-limiting.integration.test.ts
+  s_5b6ae52c5982e2::t_b25dbd3bb8648d 8-11,14-16,296-384
+  s_5b6ae52c5982e2::t_fe5f6e9db46597 385
+packages/server/src/runtime/bun/BunRuntimeAdapter.ts
+  s_5b6ae52c5982e2::t_b25dbd3bb8648d 5,67-71
+  s_5b6ae52c5982e2::t_75ac8ac81a5895 72-73
+packages/client/src/hooks/useCommandManagement.ts
+  s_5b6ae52c5982e2::t_b25dbd3bb8648d 4,65,74,84,90
+packages/core/src/types.ts
+  s_5b6ae52c5982e2::t_b25dbd3bb8648d 362-366
+packages/server/src/mcp/mcpHeaderPatterns.ts
+  s_5b6ae52c5982e2::t_b25dbd3bb8648d 1-224
+packages/server/src/runtime/origin.test.ts
+  s_5b6ae52c5982e2::t_b25dbd3bb8648d 1-26
+packages/server/src/index.ts
+  s_5b6ae52c5982e2::t_b25dbd3bb8648d 10,14
+packages/server/src/agents/types.ts
+  s_5b6ae52c5982e2::t_b25dbd3bb8648d 80-95
+packages/server/src/runtime/types.ts
+  s_5b6ae52c5982e2::t_b25dbd3bb8648d 52-55
+  s_5b6ae52c5982e2::t_a07295fe2e78e2 51
+packages/client/src/hooks/useFileUpload.tsx
+  s_5b6ae52c5982e2::t_b25dbd3bb8648d 9,241-243
+bun.lock
+  s_5b6ae52c5982e2::t_52942c6ff0adf0 123
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a49305c566cf8789e67c48f5e04943ef456d890b",
+  "prompts": {},
+  "sessions": {
+    "s_5b6ae52c5982e2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f6e97dc5-3649-469f-8723-97876212976e",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "yuma.ito <yuma.ito@meetsmore.com>"
+    }
+  }
+}
