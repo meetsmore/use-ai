@@ -10,12 +10,12 @@ export class Logger {
   private format: 'json' | 'pretty';
   private silent: boolean;
   // User prompts, model output and tool I/O are only logged when explicitly enabled.
-  private logContent: boolean;
+  private logLlmContent: boolean;
 
   constructor() {
     this.format = (process.env.LOG_FORMAT as 'json' | 'pretty') || 'pretty';
     this.silent = process.env.LOG_SILENT === 'true' || process.env.LOG_SILENT === '1';
-    this.logContent = process.env.LOG_CONTENT === 'true' || process.env.LOG_CONTENT === '1';
+    this.logLlmContent = process.env.LOG_LLM_CONTENT === 'true' || process.env.LOG_LLM_CONTENT === '1';
   }
 
   private log(level: LogLevel, message: string, data?: Record<string, unknown>) {
@@ -95,7 +95,7 @@ export class Logger {
     systemMessages?: string[];
   }) {
     if (this.silent) return;
-    if (!this.logContent) {
+    if (!this.logLlmContent) {
       data = { tools: data.tools, messageCount: data.messageCount };
     }
     if (this.format === 'json') {
@@ -121,7 +121,7 @@ export class Logger {
   }
 
   aiResponse(textBlocks: string[]) {
-    if (this.silent || !this.logContent) return;
+    if (this.silent || !this.logLlmContent) return;
     if (this.format === 'json') {
       this.logJson('info', 'AI response', { responseCount: textBlocks.length, responses: textBlocks });
       return;
@@ -135,7 +135,7 @@ export class Logger {
   }
 
   toolCalls(tools: Array<{ name: string; input: unknown }>) {
-    if (this.silent || !this.logContent) return;
+    if (this.silent || !this.logLlmContent) return;
     if (this.format === 'json') {
       this.logJson('info', 'Tool calls', { toolCount: tools.length, tools });
       return;
@@ -149,7 +149,7 @@ export class Logger {
 
   toolError(toolName: string, toolCallId: string, error: unknown) {
     if (this.silent) return;
-    if (this.logContent) {
+    if (this.logLlmContent) {
       this.toolResult(toolName, `ERROR: ${error instanceof Error ? error.message : String(error)}`);
       return;
     }
@@ -162,7 +162,7 @@ export class Logger {
   }
 
   toolResult(toolName: string, result: unknown) {
-    if (this.silent || !this.logContent) return;
+    if (this.silent || !this.logLlmContent) return;
     if (this.format === 'json') {
       this.logJson('info', 'Tool result', { toolName, result });
       return;

@@ -1,7 +1,7 @@
 import { describe, test, expect, spyOn, afterEach } from 'bun:test';
 import { Logger } from './logger';
 
-const ENV_KEYS = ['LOG_CONTENT', 'LOG_FORMAT', 'LOG_SILENT'] as const;
+const ENV_KEYS = ['LOG_LLM_CONTENT', 'LOG_FORMAT', 'LOG_SILENT'] as const;
 const savedEnv = Object.fromEntries(ENV_KEYS.map((k) => [k, process.env[k]]));
 
 function captureLogs(env: Record<string, string>, run: (logger: Logger) => void): string {
@@ -45,8 +45,8 @@ describe('Logger content logging', () => {
       expect(out).not.toContain('secret');
     });
 
-    test(`logs user content when LOG_CONTENT=true (${format})`, () => {
-      const out = captureLogs({ LOG_FORMAT: format, LOG_CONTENT: 'true' }, logEverything);
+    test(`logs user content when LOG_LLM_CONTENT=true (${format})`, () => {
+      const out = captureLogs({ LOG_FORMAT: format, LOG_LLM_CONTENT: 'true' }, logEverything);
       expect(out).toContain('secret prompt');
       expect(out).toContain('secret answer');
       expect(out).toContain('secret tool input');

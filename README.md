@@ -1116,7 +1116,7 @@ ANTHROPIC_API_KEY=sk-ant-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 # PORT=8081
 # LOG_FORMAT=pretty
 # LOG_SILENT=true                                     # Disable all logging
-# LOG_CONTENT=true                                    # Also log user prompts, AI responses and tool results
+# LOG_LLM_CONTENT=true                                # Also log user prompts, AI responses and tool results
 # DEBUG=1                                             # Enable debug logging
 # MAX_HTTP_BUFFER_SIZE=10485760                       # Max payload size in bytes
 
