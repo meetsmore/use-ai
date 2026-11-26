@@ -1,15 +1,13 @@
 import type { ZodIssue } from 'zod';
 import type { ClientSession, EventEmitter } from '../agents/types';
-import type { ToolApprovalRequestEvent } from '../types';
-import { TOOL_APPROVAL_REQUEST } from '../types';
 import type { ServerToolDefinition, ServerToolContext } from './types';
-import { waitForApproval, type ToolExecutor } from '../agents/toolApproval';
+import {
+  requestUserApproval,
+  type ToolArguments,
+  type ToolExecutor,
+  type ToolResult,
+} from '../agents/toolApproval';
 import { logger } from '../logger';
-
-/** Generic tool arguments type */
-type ToolArguments = Record<string, unknown>;
-/** Generic tool result type */
-type ToolResult = unknown;
 
 /** Formats a Zod issue path as `args/a/b`, the same in the log and in the error result. */
 function formatIssuePath(issue: ZodIssue): string {
@@ -80,17 +78,14 @@ export function createServerToolExecutor(
           message,
         });
 
-        events.emit<ToolApprovalRequestEvent>({
-          type: TOOL_APPROVAL_REQUEST,
+        // Runtime approvals do not accept edited arguments
+        return requestUserApproval(session, events, {
           toolCallId: approvalId,
           toolCallName: serverTool.name,
           toolCallArgs: args,
-          timestamp: Date.now(),
           message,
           metadata,
         });
-
-        return waitForApproval(session, approvalId);
       },
     };
 

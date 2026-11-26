@@ -9,7 +9,7 @@ import { TOOL_APPROVAL_REQUEST } from '../types';
 import { getToolAnnotations } from '../utils';
 import { isRemoteTool, isServerTool } from '../utils/toolFilters';
 import { validateJsonSchemaArgs } from './validateToolArgs';
-import { createAbortError } from '../utils/abortReason';
+import { awaitPending } from '../utils/awaitPending';
 import { logger } from '../logger';
 
 /**
@@ -63,28 +63,57 @@ export function waitForApproval(
   toolCallId: string,
   options: { acceptsModifiedArgs?: boolean } = {}
 ): Promise<ToolApprovalResult> {
-  return new Promise((resolve, reject) => {
-    const signal = session.abortController?.signal;
-    // Check if already aborted (e.g., client disconnected before approval requested)
-    if (signal?.aborted) {
-      reject(createAbortError(signal));
-      return;
+  const signal = session.abortController?.signal;
+  return awaitPending(session.pendingToolApprovals, toolCallId, signal).then((result) => {
+    if (result.modifiedArgs !== undefined && !options.acceptsModifiedArgs) {
+      return { approved: false, reason: EDITS_NOT_ACCEPTED_REASON };
     }
-
-    session.pendingToolApprovals.set(toolCallId, (result) => {
-      if (result.modifiedArgs !== undefined && !options.acceptsModifiedArgs) {
-        resolve({ approved: false, reason: EDITS_NOT_ACCEPTED_REASON });
-        return;
-      }
-      resolve(result);
-    });
-
-    // Listen for abort signal to reject the promise (client disconnect or explicit abort)
-    signal?.addEventListener('abort', () => {
-      session.pendingToolApprovals.delete(toolCallId);
-      reject(createAbortError(signal));
-    }, { once: true });
+    return result;
   });
+}
+
+/**
+ * Fields of a TOOL_APPROVAL_REQUEST event. `requestUserApproval` adds `type` and `timestamp`.
+ */
+export type UserApprovalRequest = Omit<ToolApprovalRequestEvent, 'type' | 'timestamp'>;
+
+/**
+ * Asks the user to approve a tool call and waits for the answer.
+ * Emits TOOL_APPROVAL_REQUEST with the given fields, then calls `waitForApproval`.
+ *
+ * The approval accepts `modifiedArgs` only when `request.acceptsModifiedArgs` is true.
+ * The event and the wait thus always agree on whether edits are accepted.
+ *
+ * @param session - The client session for approval state
+ * @param events - Event emitter to send the approval request to the client
+ * @param request - The event fields. `request.toolCallId` is also the approval key.
+ * @returns Promise that resolves with the approval result
+ */
+export function requestUserApproval(
+  session: ClientSession,
+  events: EventEmitter,
+  request: UserApprovalRequest
+): Promise<ToolApprovalResult> {
+  events.emit<ToolApprovalRequestEvent>({
+    type: TOOL_APPROVAL_REQUEST,
+    ...request,
+    timestamp: Date.now(),
+  });
+  return waitForApproval(session, request.toolCallId, {
+    acceptsModifiedArgs: request.acceptsModifiedArgs === true,
+  });
+}
+
+/**
+ * Builds the error result that the AI gets when the user rejects a tool call.
+ *
+ * @param reason - The reason from the user, if there is one
+ */
+export function deniedByUser(reason: string | undefined): { error: true; message: string } {
+  return {
+    error: true,
+    message: `Tool execution denied by user: ${reason || 'Action was rejected'}`,
+  };
 }
 
 /**
@@ -152,19 +181,14 @@ export function createApprovalWrapper(
       toolName: toolDef.name,
     });
 
-    // Emit approval request event to client
-    events.emit<ToolApprovalRequestEvent>({
-      type: TOOL_APPROVAL_REQUEST,
+    // Emit approval request event to client and wait for the answer
+    const approvalResult = await requestUserApproval(session, events, {
       toolCallId: options.toolCallId,
       toolCallName: toolDef.name,
       toolCallArgs: args,
       annotations,
-      timestamp: Date.now(),
       acceptsModifiedArgs: true,
     });
-
-    // Wait for approval from client
-    const approvalResult = await waitForApproval(session, options.toolCallId, { acceptsModifiedArgs: true });
 
     if (approvalResult.approved) {
       const { modifiedArgs } = approvalResult;
@@ -184,10 +208,7 @@ export function createApprovalWrapper(
         reason: approvalResult.reason,
       });
       // Return error result that AI will see
-      return {
-        error: true,
-        message: `Tool execution denied by user: ${approvalResult.reason || 'Action was rejected'}`,
-      };
+      return deniedByUser(approvalResult.reason);
     }
   };
 }
