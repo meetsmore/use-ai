@@ -214,6 +214,29 @@ describe('processAttachments', () => {
       expect(callCount).toBe(2);
     });
 
+    it('does not share a cache entry between files with the same metadata but different content', async () => {
+      let callCount = 0;
+      const transformer: FileTransformer = {
+        transform: async (files, _context) => {
+          callCount++;
+          return Promise.all(files.map(async (f) => `OCR: ${await f.text()}`));
+        },
+      };
+
+      const config = { getCurrentChat: testGetCurrentChat, transformers: { 'application/pdf': transformer } };
+
+      // Same name, size, type and lastModified. Only the bytes differ.
+      const userAFile = new File(['secret-A'], 'scan.pdf', { type: 'application/pdf', lastModified: 1700000000000 });
+      const userBFile = new File(['secret-B'], 'scan.pdf', { type: 'application/pdf', lastModified: 1700000000000 });
+
+      const [first] = await processAttachments([{ id: '1', file: userAFile }], config);
+      const [second] = await processAttachments([{ id: '2', file: userBFile }], config);
+
+      expect(callCount).toBe(2);
+      expect((first as { text: string }).text).toBe('OCR: secret-A');
+      expect((second as { text: string }).text).toBe('OCR: secret-B');
+    });
+
     it('uses default handling for non-matching files', async () => {
       const transformer: FileTransformer = {
         transform: async (files, _context) => files.map(() => 'transformed'),

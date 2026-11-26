@@ -60,6 +60,9 @@ jobs:
         run: npm config set provenance true
 
       - name: Publish packages
+        env:
+          # pubz runs `gh release create`, which needs a token in Actions.
+          GH_TOKEN: ${{ github.token }}
         run: bunx pubz --ci --version ${{ inputs.version }} --registry https://registry.npmjs.org
 
       - name: Get published version

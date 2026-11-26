@@ -139,6 +139,16 @@ describe('useToolSystem — ctx.toolCallId and ctx.signal', () => {
     errorSpy.mockRestore();
   });
 
+  it('sends an error result for a tool that is not registered', async () => {
+    const { hook, client } = setup();
+    const errorSpy = spyOn(console, 'error').mockImplementation(() => {});
+
+    await act(async () => { await hook.result.current.executeToolCall('tc1', 'removedTool', {}); });
+
+    expect(client.sendToolResponse).toHaveBeenLastCalledWith('tc1', { error: 'Tool "removedTool" is not available' });
+    errorSpy.mockRestore();
+  });
+
   it('gives the next run a fresh signal', async () => {
     const { hook, client, contexts, release } = setup();
     act(() => hook.result.current.endRun());

@@ -5,6 +5,7 @@ export type { RunTarget, ToolResultHandler } from './client';
 export { SocketIOTransport, WebSocketTransport } from './transport';
 export type { UseAITransport, WebSocketTransportOptions } from './transport';
 export { defineTool, executeDefinedTool, convertToolsToDefinitions } from './defineTool';
+export { setDebugLogging, isDebugLoggingEnabled, DEBUG_STORAGE_KEY } from './utils/logger';
 /** @hidden */
 export { z } from 'zod';
 

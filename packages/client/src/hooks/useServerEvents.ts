@@ -21,6 +21,7 @@ import type { UseAIStrings } from '../theme';
 import type { PersistedMessage, MessageDisplayMode } from '../providers/chatRepository/types';
 import { extractTurnMessages } from '../utils/messageConversion';
 import { getToolCallStatus } from '../utils/toolCalls';
+import { logger } from '../utils/logger';
 
 export interface UseServerEventsOptions {
   /** Tool system for executing tools and looking up tool metadata */
@@ -390,16 +391,26 @@ export function useServerEvents({
       const name = toolCallData.name;
       const input = JSON.parse(toolCallData.args);
 
-      // Skip tools not in our registry
       const tool = ts.aggregatedToolsRef.current[name];
-      if (!tool) {
-        console.log(`[ServerEvents] Tool "${name}" not found in useAI tools, skipping`);
+      const runTool = client.getRunTool(name);
+      // Server and MCP tools are never sent by the client. The server runs
+      // them and sends their result as TOOL_CALL_RESULT, so leave them to it.
+      if (!tool && !runTool) {
+        logger.debug(`[ServerEvents] Tool "${name}" is not a client tool, the server runs it`);
         return;
       }
 
+      // A client tool that is gone from the registry (for example, its
+      // component unmounted during the run) still goes through
+      // executeToolCall: it sends an error result, so the server does not
+      // wait for a result that never comes.
+      const destructive = tool
+        ? tool._options?.annotations?.destructiveHint === true
+        : runTool?.annotations?.destructiveHint === true;
+
       // Defer execution if tool requires approval
-      if (tool._options?.annotations?.destructiveHint === true) {
-        console.log(`[ServerEvents] Tool "${name}" requires approval, deferring execution`);
+      if (destructive) {
+        logger.debug(`[ServerEvents] Tool "${name}" requires approval, deferring execution`);
         ts.storePendingToolCall(toolCallId, name, input, toolCallData);
         return;
       }

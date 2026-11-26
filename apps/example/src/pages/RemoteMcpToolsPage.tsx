@@ -64,7 +64,7 @@ You can help the user test these tools by calling them with various inputs.`,
         <CollapsibleCode>
 {`forwardedPropsProvider={() => ({
   mcpHeaders: {
-    'http://localhost:3002': {
+    'http://localhost:3002/mcp': {
       headers: { 'X-API-Key': 'secret-api-key-123' },
     },
   },

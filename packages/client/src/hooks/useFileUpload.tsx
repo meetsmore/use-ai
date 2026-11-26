@@ -6,6 +6,7 @@ import { findTransformerPattern } from '../fileUpload/mimeTypeMatcher';
 import { getTransformedContent } from '../fileUpload/processAttachments';
 import { v4 as uuidv4 } from 'uuid';
 import { useTheme, useStrings } from '../theme';
+import { logger } from '../utils/logger';
 
 /**
  * Props for the drop zone container element.
@@ -237,7 +238,9 @@ export function useFileUpload({
       // Mark as done
       setProcessingState(prev => new Map(prev).set(attachmentId, { status: 'done' }));
     } catch (error) {
-      console.error(`[useFileUpload] Transformation failed for ${file.name}:`, error);
+      // The file name is user data, so it is a debug log only.
+      console.error(`[useFileUpload] Transformation failed for attachment ${attachmentId}:`, error);
+      logger.debug(`[useFileUpload] Failed file: ${file.name}`);
       setProcessingState(prev => new Map(prev).set(attachmentId, { status: 'error' }));
     }
   }, [getCurrentChat, transformers]);

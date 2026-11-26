@@ -354,6 +354,51 @@ describe.each(HARNESSES)('UseAIClient over %s', (_name, createHarness) => {
     });
   });
 
+  describe('getRunTool()', () => {
+    const tool = (name: string, destructive = false) => ({
+      name,
+      description: name,
+      parameters: { type: 'object' as const, properties: {} },
+      ...(destructive ? { annotations: { destructiveHint: true } } : {}),
+    });
+
+    test('finds the tools sent with the run', async () => {
+      await harness.open();
+      client.registerTools([tool('addTodo', true)]);
+
+      await client.sendPrompt('Hello');
+
+      expect(client.getRunTool('addTodo')?.annotations?.destructiveHint).toBe(true);
+      // Server and MCP tools are never sent by the client.
+      expect(client.getRunTool('mcp_search')).toBeUndefined();
+    });
+
+    test('keeps a tool removed during the run, and adds tools sent with a tool result', async () => {
+      await harness.open();
+      client.registerTools([tool('addTodo')]);
+      await client.sendPrompt('Hello');
+
+      // The component that owned addTodo unmounts, another one mounts.
+      client.registerTools([tool('editRow')]);
+      client.sendToolResponse('toolu_1', { ok: true });
+
+      expect(client.getRunTool('addTodo')).toBeDefined();
+      expect(client.getRunTool('editRow')).toBeDefined();
+    });
+
+    test('forgets the tools of the previous run', async () => {
+      await harness.open();
+      client.registerTools([tool('addTodo')]);
+      await client.sendPrompt('Hello');
+
+      client.registerTools([tool('editRow')]);
+      await client.sendPrompt('Again');
+
+      expect(client.getRunTool('addTodo')).toBeUndefined();
+      expect(client.getRunTool('editRow')).toBeDefined();
+    });
+  });
+
   describe('onToolResult()', () => {
     let consoleErrorSpy: ReturnType<typeof spyOn>;
     beforeEach(() => {

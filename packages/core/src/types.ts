@@ -375,6 +375,11 @@ export interface UseAIForwardedProps {
  * The server forwards only the header names allowed by the endpoint's
  * `allowedClientHeaders` (default: `Authorization`) and drops the others.
  *
+ * Every pattern must name a domain. The host must be a literal host, or `*.` followed
+ * by a domain that is not a public suffix and whose subdomains are not public suffixes.
+ * Globs are allowed in the scheme and the path.
+ * The server ignores other patterns (for example a wildcard host) and never sends their headers.
+ *
  * @example
  * ```typescript
  * {

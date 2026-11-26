@@ -50,6 +50,7 @@ A React client/framework for easily enabling AI to control your users frontend.
     - [Theme Customization](#theme-customization)
     - [Internationalization](#internationalization)
     - [Multi-agent Support](#multi-agent-support)
+    - [Debug Logs](#debug-logs)
   - [Server](#server)
     - ['Batteries included' server](#batteries-included-server)
     - [`UseAIServer`](#useaiserver)
@@ -139,6 +140,7 @@ services:
       # - LOG_FORMAT=json
       # - RATE_LIMIT_MAX_REQUESTS=0
       # - RATE_LIMIT_WINDOW_MS=60000
+      # - RATE_LIMIT_MAX_LLM_CALLS=0
 
       # CORS: Set to '*' for local dev, or your frontend URL for production
       - CORS_ORIGIN=*
@@ -1139,6 +1141,18 @@ await chat.sendMessage('Summarize this file', { newChat: true, agent: 'document-
 
 Chats created without `agent` follow the global selection. An `agent` in forwarded props, from `forwardedPropsProvider` or from the message, still overrides both. A custom `ChatRepository` must persist the chat's `agent` field.
 
+### Debug Logs
+
+The client does not write debug logs to the browser console by default. Debug logs can contain user data, such as tool arguments, workflow inputs and chat IDs. On a shared machine, the next user can read them in DevTools.
+
+To turn on debug logs, use one of these:
+
+- Set the `debug` prop: `<UseAIProvider serverUrl="..." debug>`.
+- Run `localStorage.setItem('use-ai:debug', 'true')` in the browser console.
+- Call `setDebugLogging(true)` when you use `UseAIClient` without the provider.
+
+Do not turn on debug logs in production. Warnings and errors are always written. They do not include tool arguments, workflow inputs or message content.
+
 ## Server
 
 ### 'Batteries included' server
@@ -1162,12 +1176,15 @@ ANTHROPIC_API_KEY=sk-ant-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 # PORT=8081
 # LOG_FORMAT=pretty
 # LOG_SILENT=true                                     # Disable all logging
+# LOG_LLM_CONTENT=true                                # Also log user prompts, AI responses and tool results
 # DEBUG=1                                             # Enable debug logging
 # MAX_HTTP_BUFFER_SIZE=10485760                       # Max payload size in bytes
+# ALLOWED_ORIGINS=https://app.example.com             # Comma-separated. Refuse connections from other origins
 
 # Rate Limiting (optional)
 # RATE_LIMIT_MAX_REQUESTS=0
 # RATE_LIMIT_WINDOW_MS=60000
+# RATE_LIMIT_MAX_LLM_CALLS=0                          # Max LLM calls (agent steps) per window
 
 # Langfuse Observability (optional)
 # LANGFUSE_PUBLIC_KEY=pk-lf-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
@@ -1194,6 +1211,7 @@ const server = new UseAIServer({
   },
   defaultAgent: 'claude',
   transport: 'socketio',  // or 'websocket', see 'Transports'
+  allowedOrigins: ['https://app.example.com'], // optional, see 'Origin check'
   rateLimitMaxRequests: 1_000,
   rateLimitWindowMs: 60_000,
   plugins: [              // see 'Plugins'
@@ -1207,6 +1225,24 @@ const server = new UseAIServer({
   }],
 });
 ```
+
+#### Origin check
+
+By default, the server does not check the `Origin` header. CORS does not apply to WebSocket upgrades, so any site can open a connection from its users' browsers.
+
+To refuse connections from other sites, set `allowedOrigins` on `UseAIServer`, or `ALLOWED_ORIGINS` (comma-separated) on the Docker image. The check applies to both transports:
+
+- With `transport: 'socketio'`, the server refuses the handshake (polling or WebSocket) with HTTP 403.
+- With `transport: 'websocket'`, the server refuses the upgrade at `/` with HTTP 403.
+
+Each entry must match the `Origin` header exactly: scheme, host and port, with no trailing slash, for example `https://app.example.com`. Browsers always send the `Origin` header on a WebSocket upgrade and on a cross-origin request. But a browser does not send it on a same-origin GET. An example is the first Socket.IO polling handshake when the app and the server share an origin behind a reverse proxy. For a request that has no `Origin` header, the server reads `Sec-Fetch-Site`:
+
+- If `Sec-Fetch-Site` is `same-origin`, the server accepts the request.
+- In all other cases, the server refuses the request. This includes a missing header, `same-site`, `cross-site` and `none`.
+
+A page cannot set `Sec-Fetch-Site`, so another site cannot make the browser send `same-origin`. The browser compares the page with the server's own origin, not with `allowedOrigins`. As a result, any page on the server's own origin can connect, even if `allowedOrigins` does not name that origin. Do not serve untrusted content on the same origin as the server.
+
+A non-browser client can send any `Origin` header. The origin check stops other sites in a browser, but it does not replace authentication. Use an auth plugin as well.
 
 ### External MCPs
 
@@ -1278,6 +1314,33 @@ The headers are scoped to the run that sent them. The server only forwards the h
 
 The client can omit `mcpHeaders`, and then the MCP endpoint is called with only the server-configured `headers`. Do not put a credential with broader access than a single user in `headers` unless every run is authenticated before it reaches the MCP endpoint.
 
+#### `mcpHeaders` patterns must name a domain
+
+The client's patterns decide which configured MCP endpoint gets which headers. The server only uses a pattern that names a domain:
+
+- The pattern has the form `scheme://host[:port][/path]`. The scheme and the path can use globs. If there is no path, the pattern matches only `/`.
+- The host is a literal host (`api.example.com`, `localhost`, `127.0.0.1`, `[::1]`), or `*.` followed by a domain (`*.example.com`).
+- `*.example.com` matches subdomains at any depth (`a.example.com`, `a.b.example.com`). It does not match `example.com`.
+- The domain after `*.` must not be a public suffix, such as `*.jp`, `*.co.jp` or `*.com`.
+- The subdomains of the domain after `*.` must not be public suffixes. For example, the Public Suffix List rule `*.kawasaki.jp` makes each `foo.kawasaki.jp` a public suffix, so `*.kawasaki.jp` is not allowed.
+- The port is a literal number. If there is no port, the pattern matches only the default port of the scheme.
+- No other globs are allowed in the host or the port. For example, `*`, `api*.example.com` and `a.*.example.com` are not allowed.
+
+The server ignores a pattern that breaks these rules. It never sends that pattern's headers, and it logs a warning with the pattern.
+
+This rule exists because the client and the server config change at different times. An operator can add a new MCP endpoint to the server config later, for example a third-party server. A broad pattern such as `*://*/api/mcp` would then send the user's token to that endpoint, and nobody would notice.
+
+Use the exact MCP URL when you can:
+
+```tsx
+forwardedPropsProvider={() => ({
+  mcpHeaders: {
+    // Before (ignored now): '*://*/api/mcp'
+    [`${apiUrl}/api/mcp`]: { headers: { Authorization: `Bearer ${token}` } },
+  },
+})}
+```
+
 ### Server-Side Tools
 
 Server-side tools execute directly in the server process using `defineServerTool()`. Unlike client tools (which round-trip via Socket.IO) or MCP tools (which call remote HTTP endpoints), server tools are simple function calls with no network overhead.
@@ -1342,6 +1405,7 @@ You can configure it using environment variables if using `@meetsmore-oss/use-ai
 # Rate Limiting (optional)
 RATE_LIMIT_MAX_REQUESTS=0
 RATE_LIMIT_WINDOW_MS=60000
+RATE_LIMIT_MAX_LLM_CALLS=0
 ```
 
 Or you can use arguments to `UseAIServer`:
@@ -1355,8 +1419,21 @@ Or you can use arguments to `UseAIServer`:
     defaultAgent: 'claude',
     rateLimitMaxRequests: 1_000,
     rateLimitWindowMs: 60_000,
+    rateLimitMaxLlmCalls: 5_000,
   });
 ```
+
+The two limits count different things:
+
+- `RATE_LIMIT_MAX_REQUESTS` (`rateLimitMaxRequests`) counts runs. One run is one user message.
+- `RATE_LIMIT_MAX_LLM_CALLS` (`rateLimitMaxLlmCalls`) counts LLM calls. One run calls the LLM once for each step, up to `maxSteps + 1` times. A run that keeps calling tools uses many LLM calls.
+
+Both limits use the same window (`RATE_LIMIT_WINDOW_MS`) and the same key. A value of `0` disables a limit. Both are `0` by default.
+
+If you use rate limiting to control token spend, set `RATE_LIMIT_MAX_LLM_CALLS`. The run limit alone does not bound the number of LLM calls.
+If a run uses up the LLM call budget, the agent does not make the next LLM call. The run stops with a `RUN_ERROR` that has the `RATE_LIMITED` error code.
+
+A custom agent receives the budget as `input.llmCallLimit`. Call `input.llmCallLimit?.consume()` before each LLM call. If it returns `allowed: false`, do not call the LLM and end the run with `RUN_ERROR`.
 
 ### Langfuse
 
@@ -1435,7 +1512,16 @@ export interface UseAIServerPlugin {
   onClientDisconnect?(session: ClientSession): void;
 
   /**
-   * Optional hook called before an agent run starts. Useful for things like authentication or quota enforcement.
+   * Optional hook called first for every run, before MCP `tools/list` and attachment resolution.
+   * Use this for authentication, so a rejected run causes no outbound requests.
+   * Return `{ abort: true, message: '...' }` to block the run.
+   * Reassign `input.mcpHeaders` to change the headers sent to MCP endpoints for this run.
+   */
+  beforeRunAuthorized?(input: BeforeRunAuthorizedInput): Promise<BeforeRunAgentResult | void>;
+
+  /**
+   * Optional hook called right before the agent runs, with the built messages and tools.
+   * Useful for things like quota enforcement. Runs after MCP `tools/list` and attachment resolution.
    * Return `{ abort: true, message: '...' }` to block the run.
    */
   beforeRunAgent?(input: AgentInput): Promise<BeforeRunAgentResult | void>;

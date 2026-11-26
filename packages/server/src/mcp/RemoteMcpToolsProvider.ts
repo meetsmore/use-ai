@@ -1,7 +1,7 @@
 import type { ToolDefinition, McpHeadersMap, ToolAnnotations } from '@meetsmore-oss/use-ai-core';
 import type { McpEndpointConfig } from '../types';
 import { logger } from '../logger';
-import { findMatch } from '../utils/patternMatcher';
+import { findMcpHeadersForUrl } from './mcpHeaderPatterns';
 
 /**
  * Schema format returned by MCP endpoints.
@@ -193,7 +193,7 @@ export class RemoteMcpToolsProvider {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-    const matchingConfig = mcpHeaders ? findMatch(this.url, mcpHeaders) : undefined;
+    const matchingConfig = mcpHeaders ? findMcpHeadersForUrl(this.url, mcpHeaders) : undefined;
     if (mcpHeaders && !matchingConfig) {
       logger.debug(`[MCP] No matching headers found for ${this.url}`);
     }

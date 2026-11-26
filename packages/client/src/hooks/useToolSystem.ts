@@ -5,6 +5,7 @@ import type { ToolsDefinition, ToolExecutionContext } from '../defineTool';
 import { executeDefinedTool } from '../defineTool';
 import { jsonValuesEqual } from '../utils/jsonValuesEqual';
 import { isErrorResult } from '../utils/toolCalls';
+import { logger } from '../utils/logger';
 
 // ── Registry Types ──────────────────────────────────────────────────────────
 
@@ -318,7 +319,7 @@ export function useToolSystem({
   // ── Execution Methods ───────────────────────────────────────────────────
 
   const handleApprovalRequest = useCallback((event: ToolApprovalRequestEvent) => {
-    console.log('[useToolSystem] Tool approval requested:', event.toolCallName, event.toolCallId);
+    logger.debug('[useToolSystem] Tool approval requested:', event.toolCallName, event.toolCallId);
     setPendingApprovals(prev => [
       ...prev,
       {
@@ -347,7 +348,7 @@ export function useToolSystem({
 
     try {
       const ownerId = toolOwnershipRef.current.get(name);
-      console.log(`[useToolSystem] Tool "${name}" owned by component:`, ownerId);
+      logger.debug(`[useToolSystem] Tool "${name}" owned by component:`, ownerId);
 
       // Build ToolExecutionContext with requestApproval for runtime approvals
       const ctx: ToolExecutionContext = {
@@ -372,7 +373,7 @@ export function useToolSystem({
         },
       };
 
-      console.log('[useToolSystem] Executing tool...');
+      logger.debug('[useToolSystem] Executing tool...');
       const result = await executeDefinedTool(aggregatedToolsRef.current, name, input, ctx);
       // The run ended while the tool worked (e.g. a question gave up waiting on
       // `ctx.signal`). Nothing is left to receive the result, so skip waiting
@@ -387,23 +388,23 @@ export function useToolSystem({
       if (ownerId && !isError && !ownerIsInvisible) {
         const waiter = getWaiter(ownerId);
         if (waiter) {
-          console.log(`[useToolSystem] Waiting for prompt change from ${ownerId}...`);
+          logger.debug(`[useToolSystem] Waiting for prompt change from ${ownerId}...`);
           await waiter();
-          console.log('[useToolSystem] Prompt change wait complete');
+          logger.debug('[useToolSystem] Prompt change wait complete');
         }
       } else if (isError) {
-        console.log('[useToolSystem] Tool returned error, skipping prompt wait');
+        logger.debug('[useToolSystem] Tool returned error, skipping prompt wait');
       } else if (ownerIsInvisible) {
-        console.log('[useToolSystem] Component is invisible, skipping prompt wait');
+        logger.debug('[useToolSystem] Component is invisible, skipping prompt wait');
       }
 
       // Wait for tools to stabilize after execution (navigation/mount-unmount)
-      console.log('[useToolSystem] Waiting for tools to stabilize...');
+      logger.debug('[useToolSystem] Waiting for tools to stabilize...');
       await waitForToolsToStabilize();
-      console.log('[useToolSystem] Tools stabilized');
+      logger.debug('[useToolSystem] Tools stabilized');
 
       const updatedState = buildState();
-      console.log(`[useToolSystem] Updated state (aggregated from all hooks)`);
+      logger.debug(`[useToolSystem] Updated state (aggregated from all hooks)`);
 
       // The run may also have ended during the waits above.
       if (signal.aborted) return;
@@ -423,7 +424,7 @@ export function useToolSystem({
     input: unknown,
     toolCallData: { name: string; args: string }
   ) => {
-    console.log(`[useToolSystem] Storing pending tool call "${name}" for approval`);
+    logger.debug(`[useToolSystem] Storing pending tool call "${name}" for approval`);
     pendingApprovalToolCallsRef.current.set(toolCallId, { name, input, toolCallData });
   }, []);
 
@@ -470,7 +471,7 @@ export function useToolSystem({
         throw new Error(`[useToolSystem] Approval ${toolCallId} does not accept edited arguments`);
       }
     }
-    console.log('[useToolSystem] Approving all tool calls:', pendingApprovals.length);
+    logger.debug('[useToolSystem] Approving all tool calls:', pendingApprovals.length);
 
     const pendingTools = [...pendingApprovals];
     setPendingApprovals([]);
@@ -504,7 +505,7 @@ export function useToolSystem({
 
   const rejectAll = useCallback((reason?: string) => {
     if (!clientRef.current) return;
-    console.log('[useToolSystem] Rejecting all tool calls:', pendingApprovals.length, reason);
+    logger.debug('[useToolSystem] Rejecting all tool calls:', pendingApprovals.length, reason);
 
     const pendingTools = [...pendingApprovals];
     setPendingApprovals([]);
