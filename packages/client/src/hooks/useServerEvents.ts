@@ -491,11 +491,14 @@ export function useServerEvents({
   }, [resetRunUiState]);
 
   // Compute display value for UI
-  const executingTool: ExecutingToolDisplay | null = executingToolRaw ? {
+  // Memoized so that the chat context value keeps its identity between renders.
+  // The fallback ref changes only together with executingToolRaw.
+  const defaultFallbackMessage = strings.toolExecution.fallbackMessages[0];
+  const executingTool = useMemo<ExecutingToolDisplay | null>(() => executingToolRaw ? {
     toolCallId: executingToolRaw.toolCallId,
     name: executingToolRaw.name,
-    displayText: executingToolRaw.title ?? executingToolFallbackRef.current ?? strings.toolExecution.fallbackMessages[0],
-  } : null;
+    displayText: executingToolRaw.title ?? executingToolFallbackRef.current ?? defaultFallbackMessage,
+  } : null, [executingToolRaw, defaultFallbackMessage]);
 
   // A call waiting for approval shows as such until the user answers. Derived
   // from the pending approvals rather than stored in the part, so approving or

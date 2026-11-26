@@ -542,8 +542,8 @@ export function UseAIProvider({
     ? undefined
     : (fileUploadConfigProp ?? DEFAULT_FILE_UPLOAD_CONFIG);
 
-  const theme = { ...defaultTheme, ...customTheme };
-  const strings = { ...defaultStrings, ...customStrings };
+  const theme = useMemo(() => ({ ...defaultTheme, ...customTheme }), [customTheme]);
+  const strings = useMemo(() => ({ ...defaultStrings, ...customStrings }), [customStrings]);
 
   // ── Core State ──────────────────────────────────────────────────────────
 
@@ -589,10 +589,14 @@ export function UseAIProvider({
     strings,
   });
 
+  const getDisplayedChatId = useCallback(
+    () => chatManagement.displayedChatId,
+    [chatManagement.displayedChatId],
+  );
   const feedback = useFeedback({
     clientRef,
     repository: repositoryRef.current,
-    getDisplayedChatId: () => chatManagement.displayedChatId,
+    getDisplayedChatId,
     setMessages,
   });
 
@@ -805,7 +809,17 @@ export function UseAIProvider({
         : undefined,
       runTarget
     );
-  }, [chatManagement, serverEvents, fileUploadConfig, forwardedPropsProvider]);
+  }, [
+    chatManagement.activatePendingChat,
+    chatManagement.currentChatId,
+    chatManagement.getChat,
+    chatManagement.saveUserMessage,
+    serverEvents.clearStreamingParts,
+    serverEvents.streamingChatIdRef,
+    serverEvents.setLoading,
+    fileUploadConfig,
+    forwardedPropsProvider,
+  ]);
 
   // ── Message Queue (programmatic sendMessage) ────────────────────────────
 
@@ -820,10 +834,11 @@ export function UseAIProvider({
 
   // ── Context Values ──────────────────────────────────────────────────────
 
-  const value: UseAIContextValue = {
+  const currentClient = clientRef.current;
+  const value = useMemo<UseAIContextValue>(() => ({
     serverUrl: resolvedServerUrl,
     connected,
-    client: clientRef.current,
+    client: currentClient,
     tools: {
       register: toolSystem.registerTools,
       unregister: toolSystem.unregisterTools,
@@ -859,7 +874,36 @@ export function UseAIProvider({
       delete: deleteCommand,
     },
     abortRun,
-  };
+  }), [
+    resolvedServerUrl,
+    connected,
+    currentClient,
+    toolSystem.registerTools,
+    toolSystem.unregisterTools,
+    toolSystem.signalReady,
+    toolSystem.registerWaiter,
+    toolSystem.unregisterWaiter,
+    promptState.updatePrompt,
+    chatManagement.currentChatId,
+    chatManagement.createNewChat,
+    chatManagement.loadChat,
+    chatManagement.deleteChat,
+    chatManagement.listChats,
+    chatManagement.clearCurrentChat,
+    messageQueue.sendMessage,
+    chatManagement.getCurrentChat,
+    chatManagement.updateMetadata,
+    availableAgents,
+    defaultAgent,
+    selectedAgent,
+    setAgent,
+    commands,
+    refreshCommands,
+    saveCommand,
+    renameCommand,
+    deleteCommand,
+    abortRun,
+  ]);
 
   // ── Chat UI ─────────────────────────────────────────────────────────────
 
@@ -872,7 +916,7 @@ export function UseAIProvider({
   const loadingInCurrentChat = serverEvents.loading
     && serverEvents.streamingChatIdRef.current === chatManagement.displayedChatId;
 
-  const chatUIContextValue: ChatUIContextValue = {
+  const chatUIContextValue = useMemo<ChatUIContextValue>(() => ({
     connected,
     loading: serverEvents.loading,
     loadingInCurrentChat,
@@ -924,7 +968,45 @@ export function UseAIProvider({
     },
     submitMode,
     components: chatComponents,
-  };
+  }), [
+    connected,
+    serverEvents.loading,
+    loadingInCurrentChat,
+    handleSendMessage,
+    abortRun,
+    messages,
+    effectiveStreamingMessageId,
+    effectiveStreamingParts,
+    promptState.aggregatedSuggestions,
+    fileUploadConfig,
+    effectiveFileProcessing,
+    chatManagement.displayedChatId,
+    chatManagement.createNewChat,
+    chatManagement.loadChat,
+    chatManagement.deleteChat,
+    chatManagement.listChats,
+    chatManagement.getCurrentChat,
+    availableAgents,
+    defaultAgent,
+    selectedAgent,
+    setAgent,
+    commands,
+    saveCommand,
+    renameCommand,
+    deleteCommand,
+    enabledFeatures,
+    isChatOpen,
+    handleSetChatOpen,
+    serverEvents.executingTool,
+    toolSystem.pendingApprovals,
+    toolSystem.approveAll,
+    toolSystem.approveWithArgs,
+    toolSystem.rejectAll,
+    feedback.enabled,
+    feedback.submitFeedback,
+    submitMode,
+    chatComponents,
+  ]);
 
   // Keyed on the inner map, so an inline `chatRenderers={{ codeBlocks }}` does
   // not hand every consumer a new context value on each provider render.
