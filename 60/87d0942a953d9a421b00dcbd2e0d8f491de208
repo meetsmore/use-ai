@@ -1,0 +1,19 @@
+packages/server/src/agents/types.ts
+  s_0b9ea23bddf25f::t_7f4234b976780a 73-76
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "6087d0942a953d9a421b00dcbd2e0d8f491de208",
+  "prompts": {},
+  "sessions": {
+    "s_0b9ea23bddf25f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a0ccb196-f38d-4c1a-8b9d-23b45793da21",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "yuma.ito <yuma.ito@meetsmore.com>"
+    }
+  }
+}
