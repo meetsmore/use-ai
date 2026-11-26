@@ -18,6 +18,13 @@ describe('defineServerTool', () => {
       expect(tool.execute).toBeInstanceOf(Function);
     });
 
+    test('keeps the Zod schema so the arguments can be checked before execute', () => {
+      const schema = z.object({ city: z.string() });
+      const tool = defineServerTool('Get weather', schema, async ({ city }) => city);
+
+      expect(tool.schema).toBe(schema);
+    });
+
     test('converts required fields from Zod schema', () => {
       const tool = defineServerTool(
         'Test',
@@ -109,6 +116,12 @@ describe('defineServerTool', () => {
       expect(tool.description).toBe('Get server time');
       expect(tool.parameters).toEqual({ type: 'object', properties: {} });
       expect(tool.execute).toBeInstanceOf(Function);
+    });
+
+    test('sets an empty object schema, so undeclared arguments are dropped', () => {
+      const tool = defineServerTool('Ping', async () => 'pong');
+
+      expect(tool.schema?.parse({ injected: true })).toEqual({});
     });
 
     test('supports annotations on parameterless tools', () => {

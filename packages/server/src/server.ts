@@ -199,6 +199,7 @@ export class UseAIServer {
         annotations: toolConfig.annotations,
         _server: {
           execute: toolConfig.execute,
+          schema: toolConfig.schema,
         },
       }));
       logger.info('[Server Tools] Registered server tools', {
