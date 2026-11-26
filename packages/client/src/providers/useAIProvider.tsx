@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useLayoutEffect, ReactNode, useCallback, useRef, useMemo } from 'react';
 import type { UseAIConfig, AGUIEvent, AgentInfo, UseAIForwardedProps, EnabledFeatures } from '../types';
 import { UseAIFloatingButton } from '../components/UseAIFloatingButton';
 import { UseAIChatPanel } from '../components/UseAIChatPanel';
@@ -711,6 +711,31 @@ export function UseAIProvider({
       console.error('Failed to register tools:', err);
     }
   }, [toolSystem.hasTools, toolSystem.aggregatedTools, connected]);
+
+  // ── Approvals Outside the Run's Chat ────────────────────────────────────
+
+  // An approval belongs to the chat its run was sent from. Switching to
+  // another chat (or deleting the run's chat) does not end the run: the server
+  // keeps waiting for the answer, so the approval would show over a different
+  // chat and, if approved, run a tool for a conversation the user no longer
+  // sees. Reject it instead, so the run finishes and the user can send again.
+  // Also covers an approval that arrives after the user switched away.
+  // Not endRun(): it answers nothing, so the server would wait forever and
+  // `loading` would never clear.
+  // A layout effect, so an approval that arrives while the user is in another
+  // chat is rejected before it is painted there.
+  const { streamingChatIdRef } = serverEvents;
+  const displayedChatId = chatManagement.displayedChatId;
+  const { pendingApprovals, rejectAll } = toolSystem;
+  useLayoutEffect(() => {
+    if (pendingApprovals.length === 0) return;
+    // Approvals exist only while a run is in flight, and the run's chat is
+    // set when it is sent. It is null when the run was sent with no chat open.
+    const runChatId = streamingChatIdRef.current;
+    if (runChatId === displayedChatId) return;
+    logger.debug('[Provider] Rejecting approvals of a run in another chat:', runChatId);
+    rejectAll('The user switched to another chat');
+  }, [pendingApprovals, displayedChatId, streamingChatIdRef, rejectAll]);
 
   // ── Abort ───────────────────────────────────────────────────────────────
 
