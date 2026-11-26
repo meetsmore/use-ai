@@ -1,0 +1,29 @@
+packages/server/src/runtime/clientIp.ts
+  s_92af7bc6281499::t_9e1979bfd80dd9 2,4-6,37,40,55-57
+README.md
+  s_92af7bc6281499::t_9e1979bfd80dd9 1211
+packages/server/src/client-ip.integration.test.ts
+  s_92af7bc6281499::t_9e1979bfd80dd9 149-156
+packages/server/src/runtime/types.ts
+  s_92af7bc6281499::t_9e1979bfd80dd9 17
+packages/server/src/runtime/node/NodeRuntimeAdapter.ts
+  s_92af7bc6281499::t_9e1979bfd80dd9 100
+packages/server/src/runtime/node/rawWebSocket.ts
+  s_92af7bc6281499::t_9e1979bfd80dd9 11
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "6fed3347964066f09f4ae74532e230afcf9fbc9c",
+  "prompts": {},
+  "sessions": {
+    "s_92af7bc6281499": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5d759e49-fd6d-4f60-ab6f-2d488244b5b1",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "yuma.ito <yuma.ito@meetsmore.com>"
+    }
+  }
+}
