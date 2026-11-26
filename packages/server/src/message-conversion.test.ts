@@ -13,6 +13,7 @@ import {
 import { UseAIServer } from './server';
 import { AISDKAgent } from './agents/AISDKAgent';
 import { v4 as uuidv4 } from 'uuid';
+import { getFreePort } from '../test/ports';
 
 const cleanup = new TestCleanupManager();
 
@@ -68,7 +69,7 @@ function collectEventsUntilDone(
  */
 describe('Bug 2: Server message conversion preserves tool calls on reconnection', () => {
   test('assistant messages with toolCalls should be converted with tool-call content blocks, not text-only', async () => {
-    const port = 18901;
+    const port = await getFreePort();
 
     // Track what messages the AI SDK model receives
     let capturedPrompt: unknown[] = [];
@@ -241,7 +242,7 @@ describe('Bug 2: Server message conversion preserves tool calls on reconnection'
   });
 
   test('conversation should remain valid across multiple messages after reconnection with tool history', async () => {
-    const port = 18902;
+    const port = await getFreePort();
 
     const mockModel = createSequentialMockModel([
       { text: 'First follow-up' },
@@ -350,7 +351,7 @@ describe('Bug 2: Server message conversion preserves tool calls on reconnection'
 
 describe('Reasoning parts roundtrip through message conversion', () => {
   test('assistant messages with reasoningParts should include reasoning content blocks when sent to model', async () => {
-    const port = 18904;
+    const port = await getFreePort();
 
     // Track what messages the AI SDK model receives
     let capturedMessages: unknown[] = [];
@@ -438,7 +439,7 @@ describe('Reasoning parts roundtrip through message conversion', () => {
   });
 
   test('reasoning signature is converted from encryptedValue to providerOptions for API round-trip', async () => {
-    const port = 18905;
+    const port = await getFreePort();
 
     let capturedMessages: unknown[] = [];
 
@@ -537,7 +538,7 @@ describe('Reasoning parts roundtrip through message conversion', () => {
   });
 
   test('Gemini thoughtSignature on tool calls is converted from encryptedValue to providerOptions for API round-trip', async () => {
-    const port = 18906;
+    const port = await getFreePort();
 
     let capturedMessages: unknown[] = [];
 

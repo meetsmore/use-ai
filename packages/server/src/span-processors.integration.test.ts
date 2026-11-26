@@ -18,6 +18,7 @@ import {
   createTestAgent,
   TestCleanupManager,
 } from '../test/integration-test-utils';
+import { getFreePort } from '../test/ports';
 
 const cleanup = new TestCleanupManager();
 
@@ -51,9 +52,10 @@ function createRecordingSpanProcessor() {
 }
 
 describe('Custom Span Processors', () => {
-  const testPort = 9400;
+  let testPort: number;
 
-  beforeAll(() => {
+  beforeAll(async () => {
+    testPort = await getFreePort();
     _resetTracing();
   });
 

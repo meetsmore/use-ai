@@ -12,6 +12,7 @@ import {
   createServerConfig,
   TestCleanupManager,
 } from '../test/integration-test-utils';
+import { getFreePort } from '../test/ports';
 
 // Track all servers and sockets for cleanup
 const cleanup = new TestCleanupManager();
@@ -22,9 +23,10 @@ afterAll(() => {
 
 describe('Core Architecture', () => {
   let server: UseAIServer;
-  const testPort = 9150;
+  let testPort: number;
 
-  beforeAll(() => {
+  beforeAll(async () => {
+    testPort = await getFreePort();
     server = new UseAIServer(createServerConfig(testPort));
     cleanup.trackServer(server);
   });

@@ -19,6 +19,7 @@ import {
   createSequentialMockModel,
   createSystemPromptValidatorMockModel,
 } from '../test/integration-test-utils';
+import { getFreePort } from '../test/ports';
 
 // Track all servers and sockets for cleanup
 const cleanup = new TestCleanupManager();
@@ -29,9 +30,10 @@ afterAll(() => {
 
 describe('Agent System', () => {
   let server: UseAIServer;
-  const testPort = 9002;
+  let testPort: number;
 
-  beforeAll(() => {
+  beforeAll(async () => {
+    testPort = await getFreePort();
     // Create server with multiple agents
     const claudeAgent = createTestAgent('claude');
     const gptAgent = createTestAgent('gpt');
@@ -87,7 +89,7 @@ describe('Agent System', () => {
 
   test('Agents handle multi-step tool execution', async () => {
     // Create a custom server with dynamic mock responses for this test
-    const multiStepPort = 9100;
+    const multiStepPort = await getFreePort();
     const multiStepMockModel = createSequentialMockModel([
       {
         toolCalls: [{ toolCallId: 'tool1', toolName: 'step1', input: {} }],
@@ -200,7 +202,7 @@ describe('Agent System', () => {
     }
 
     // Create server with custom agent
-    const customPort = 9003;
+    const customPort = await getFreePort();
     const customAgent = new CustomAgent();
     const customServer = new UseAIServer({
       port: customPort,
@@ -227,7 +229,7 @@ describe('Agent System', () => {
 
   test('System builds dynamic system prompts with application state', async () => {
     // Create a custom server that verifies system prompt includes state
-    const statePort = 9101;
+    const statePort = await getFreePort();
     const stateMockModel = createSystemPromptValidatorMockModel((messages) => {
       const systemMessage = messages.find((m: any) => m.role === 'system');
       expect(systemMessage).toBeDefined();

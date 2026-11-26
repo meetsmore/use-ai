@@ -17,18 +17,14 @@ import {
   sendRunAgent,
   collectEventsUntil,
 } from '../test/test-utils';
-import type { LangfuseClient } from '@langfuse/client';
+import { createMockLangfuseClient as createMockLangfuseClientBase } from '../test/langfuse-mock';
+import { getFreePort } from '../test/ports';
 
-// Mock Langfuse client factory
+// Shared mocks, so that the tests can check calls on each client
 const mockScore = mock(() => {});
 const mockFlush = mock(() => Promise.resolve());
 
-function createMockLangfuseClient(): LangfuseClient {
-  return {
-    score: { create: mockScore },
-    flush: mockFlush,
-  } as unknown as LangfuseClient;
-}
+const createMockLangfuseClient = () => createMockLangfuseClientBase({ score: mockScore, flush: mockFlush });
 
 const cleanup = new TestCleanupManager();
 
@@ -44,7 +40,7 @@ describe('Feedback Integration', () => {
 
   describe('Client Configuration', () => {
     test('client receives langfuseEnabled=true when FeedbackPlugin is enabled', async () => {
-      const port = 9100;
+      const port = await getFreePort();
 
       const feedbackPlugin = new FeedbackPlugin(createMockLangfuseClient());
       expect(feedbackPlugin.isEnabled()).toBe(true);
@@ -74,9 +70,9 @@ describe('Feedback Integration', () => {
     });
 
     test('client receives langfuseEnabled=false when FeedbackPlugin is disabled', async () => {
-      const port = 9101;
+      const port = await getFreePort();
 
-      const feedbackPlugin = new FeedbackPlugin(undefined);
+      const feedbackPlugin = new FeedbackPlugin(undefined, { client: undefined });
       expect(feedbackPlugin.isEnabled()).toBe(false);
 
       const server = new UseAIServer({
@@ -106,7 +102,7 @@ describe('Feedback Integration', () => {
 
   describe('Feedback Submission', () => {
     test('feedback message triggers Langfuse score submission', async () => {
-      const port = 9102;
+      const port = await getFreePort();
 
       const feedbackPlugin = new FeedbackPlugin(createMockLangfuseClient());
       const server = new UseAIServer({
@@ -147,7 +143,7 @@ describe('Feedback Integration', () => {
     });
 
     test('thumbs down feedback submits value 0', async () => {
-      const port = 9103;
+      const port = await getFreePort();
 
       const feedbackPlugin = new FeedbackPlugin(createMockLangfuseClient());
       const server = new UseAIServer({
@@ -184,7 +180,7 @@ describe('Feedback Integration', () => {
     });
 
     test('null feedback (removal) does not submit to Langfuse', async () => {
-      const port = 9104;
+      const port = await getFreePort();
 
       const feedbackPlugin = new FeedbackPlugin(createMockLangfuseClient());
       const server = new UseAIServer({
@@ -216,9 +212,9 @@ describe('Feedback Integration', () => {
     });
 
     test('feedback is not submitted when plugin is disabled', async () => {
-      const port = 9105;
+      const port = await getFreePort();
 
-      const feedbackPlugin = new FeedbackPlugin(undefined);
+      const feedbackPlugin = new FeedbackPlugin(undefined, { client: undefined });
       const server = new UseAIServer({
         port,
         agents: { test: createTestAgent() },
@@ -250,7 +246,7 @@ describe('Feedback Integration', () => {
 
   describe('RUN_FINISHED Event', () => {
     test('RUN_FINISHED event includes runId for feedback linking', async () => {
-      const port = 9106;
+      const port = await getFreePort();
 
       const server = new UseAIServer({
         port,
@@ -285,7 +281,7 @@ describe('Feedback Integration', () => {
 
   describe('Feedback Update (Idempotency)', () => {
     test('updating feedback uses the same score ID', async () => {
-      const port = 9107;
+      const port = await getFreePort();
 
       const feedbackPlugin = new FeedbackPlugin(createMockLangfuseClient());
       const server = new UseAIServer({

@@ -5,6 +5,7 @@ import { sendRunAgent } from '../test/test-utils';
 import { TestCleanupManager } from '../test/integration-test-utils';
 import { UseAIServer } from './server';
 import { AISDKAgent } from './agents/AISDKAgent';
+import { getFreePort } from '../test/ports';
 
 const cleanup = new TestCleanupManager();
 
@@ -97,7 +98,7 @@ function filePartsSentToModel(captured: Awaited<ReturnType<typeof createServer>>
 describe('client-supplied attachment urls', () => {
   test('remote urls are not fetched by the server and never reach the model', async () => {
     const base = startTarget();
-    const { socket, captured } = await createServer(18911);
+    const { socket, captured } = await createServer(await getFreePort());
 
     const finished = await runUntilDone(socket, [
       { type: 'image_url', url: `${base}/image` },
@@ -111,7 +112,7 @@ describe('client-supplied attachment urls', () => {
   });
 
   test('inline data urls still reach the model', async () => {
-    const { socket, captured } = await createServer(18912);
+    const { socket, captured } = await createServer(await getFreePort());
 
     const finished = await runUntilDone(socket, [
       { type: 'image_url', url: 'data:image/png;base64,iVBORw0KGgo=' },
@@ -127,7 +128,7 @@ describe('client-supplied attachment urls', () => {
     const base = startTarget();
     const resolveAttachments: ResolveAttachments = async (parts: unknown[]) =>
       parts.map(() => ({ type: 'file_url', url: `${base}/signed`, mimeType: 'text/plain', name: 'r.txt' }));
-    const { socket, captured } = await createServer(18913, resolveAttachments);
+    const { socket, captured } = await createServer(await getFreePort(), resolveAttachments);
 
     const finished = await runUntilDone(socket, [
       { type: 'file_ref', ref: 'REF-1', mimeType: 'text/plain', name: 'r.txt' },

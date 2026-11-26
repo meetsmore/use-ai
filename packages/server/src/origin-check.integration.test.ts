@@ -2,6 +2,7 @@ import { describe, expect, test, beforeAll, afterAll } from 'bun:test';
 import WebSocket from 'ws';
 import { UseAIServer } from './server';
 import { createServerConfig, TestCleanupManager } from '../test/integration-test-utils';
+import { getFreePort } from '../test/ports';
 
 /**
  * Security finding I2: the server must be able to refuse connections whose Origin
@@ -54,15 +55,15 @@ async function pollingHandshakeStatus(port: number, origin?: string, secFetchSit
   return response.status;
 }
 
-let nextPort = 9600;
-
 describe.each(RUNTIMES)('Origin check: %s runtime', (runtime) => {
   describe.each(TRANSPORTS)('%s transport', (transport) => {
     const cleanup = new TestCleanupManager();
-    const restrictedPort = nextPort++;
-    const openPort = nextPort++;
+    let restrictedPort: number;
+    let openPort: number;
 
-    beforeAll(() => {
+    beforeAll(async () => {
+      restrictedPort = await getFreePort();
+      openPort = await getFreePort();
       cleanup.trackServer(new UseAIServer({
         ...createServerConfig(restrictedPort),
         runtime,
