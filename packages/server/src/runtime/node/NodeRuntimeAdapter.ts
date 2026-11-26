@@ -2,7 +2,6 @@ import { createServer, type IncomingHttpHeaders, type Server as HttpServer } fro
 import type { Server as SocketIOServer } from 'socket.io';
 import { WebSocketServer } from 'ws';
 import type { RuntimeAdapter, RuntimeListener, RuntimeServerConfig, RuntimeServerHandle, WebSocketListener } from '../types';
-import { forwardedClientIp } from '../clientIp';
 import { isOriginAllowed, type OriginCheckHeaders } from '../origin';
 import { NodeRawWebSocket } from './rawWebSocket';
 
@@ -69,7 +68,7 @@ export class NodeRuntimeAdapter implements RuntimeAdapter {
     if (config.onPollingConnection) {
       io.engine.on('connection', (socket) => {
         if (socket.transport.name === 'polling') {
-          const ip = forwardedClientIp(socket.request.headers['x-forwarded-for'], socket.request.socket?.remoteAddress);
+          const ip = socket.request.socket?.remoteAddress;
           if (ip) {
             const sessionId = socket.id;
             config.onPollingConnection!(sessionId, ip);
@@ -98,8 +97,12 @@ export class NodeRuntimeAdapter implements RuntimeAdapter {
         return;
       }
       wss.handleUpgrade(req, socket, head, (ws) => {
-        const remoteAddress = forwardedClientIp(req.headers['x-forwarded-for'], req.socket.remoteAddress);
-        onConnection(new NodeRawWebSocket(ws, remoteAddress));
+        const forwardedFor = req.headers['x-forwarded-for'];
+        onConnection(new NodeRawWebSocket(
+          ws,
+          req.socket.remoteAddress,
+          Array.isArray(forwardedFor) ? forwardedFor.join(',') : forwardedFor,
+        ));
       });
     });
     return wss;

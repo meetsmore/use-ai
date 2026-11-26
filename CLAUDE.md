@@ -56,6 +56,7 @@ bun run kill                   # Kill processes on ports 3000, 3002, 8081
 - `RATE_LIMIT_WINDOW_MS` (optional): Window in ms (default: 60000)
 - `RATE_LIMIT_MAX_LLM_CALLS` (optional): Max LLM calls per window (0 = unlimited). Each agent step is one LLM call, so one run can use up to `maxSteps + 1`. If the budget runs out mid-run, the run stops with `RUN_ERROR` (`RATE_LIMITED`). Same window and key as `RATE_LIMIT_MAX_REQUESTS`.
 - `ALLOWED_ORIGINS` (optional): comma-separated origins that may connect. Sets `allowedOrigins` on `UseAIServer`. Unset: no Origin check.
+- `TRUSTED_PROXY_COUNT` (optional): number of proxies in front that append to `X-Forwarded-For` (1 behind one AWS ALB). Sets `trustedProxyCount` on `UseAIServer`. The rate limits count per client address taken from that header, read from the right. Default 0: the peer address.
 - `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_BASE_URL` (optional): LLM observability
 
 ### WebSocket Protocol
@@ -194,7 +195,7 @@ Optional Langfuse integration tracks Claude API calls, token usage, tool calls, 
 
 ## Security
 
-- **Rate limiting**: Per-IP address (configured via env vars). `RATE_LIMIT_MAX_REQUESTS` counts runs. `RATE_LIMIT_MAX_LLM_CALLS` counts LLM calls (agent steps).
+- **Rate limiting**: Per client IP address (configured via env vars). Behind a proxy, set `trustedProxyCount` so the address comes from `X-Forwarded-For`. `RATE_LIMIT_MAX_REQUESTS` counts runs. `RATE_LIMIT_MAX_LLM_CALLS` counts LLM calls (agent steps).
 - **Origin check**: Optional. `allowedOrigins: string[]` on `UseAIServer` refuses a Socket.IO handshake or WebSocket upgrade with HTTP 403 when the `Origin` header is missing or not in the list. Both transports and both runtimes. Default: no check. A non-browser client can forge `Origin`, so this does not replace auth.
 - **Client-only scope**: AI can only see/manipulate what's on the page
 - **No backend API access**: V1 intentionally limits security risks

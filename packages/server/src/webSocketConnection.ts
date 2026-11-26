@@ -1,7 +1,7 @@
 import { EventType, type CustomEvent } from '@meetsmore-oss/use-ai-core';
 import type { ClientConnection } from './agents/types';
 import type { UseAIClientMessage } from './types';
-import type { RawWebSocket } from './runtime';
+import { resolveClientIp, type RawWebSocket } from './runtime';
 import { logger } from './logger';
 
 /**
@@ -15,8 +15,8 @@ import { logger } from './logger';
 export class WebSocketClientConnection implements ClientConnection {
   readonly ipAddress: string;
 
-  constructor(readonly id: string, private socket: RawWebSocket) {
-    this.ipAddress = socket.remoteAddress || id;
+  constructor(readonly id: string, private socket: RawWebSocket, trustedProxyCount: number) {
+    this.ipAddress = resolveClientIp(socket.remoteAddress, socket.forwardedFor, trustedProxyCount) || id;
   }
 
   get connected(): boolean {

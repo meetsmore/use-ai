@@ -125,14 +125,17 @@ export class BunRuntimeAdapter implements RuntimeAdapter {
       path: '/',
       upgrade: async (req, server) => {
         if (new URL(req.url).pathname !== '/') return new Response('Not Found', { status: 404 });
-        const data: BunWebSocketData = { remoteAddress: server.requestIP(req)?.address };
+        const data: BunWebSocketData = {
+          remoteAddress: server.requestIP(req)?.address,
+          forwardedFor: req.headers.get('x-forwarded-for') ?? undefined,
+        };
         if (server.upgrade(req, { data })) return undefined;
         return new Response('Expected a WebSocket upgrade', { status: 426 });
       },
       websocket: {
         open: (ws) => {
           const data = dataOf(ws);
-          data.connection = new BunRawWebSocket(ws, data.remoteAddress);
+          data.connection = new BunRawWebSocket(ws, data.remoteAddress, data.forwardedFor);
           onConnection(data.connection);
         },
         message: (ws, message) => {

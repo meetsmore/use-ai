@@ -25,6 +25,8 @@ const corsOrigin = process.env.CORS_ORIGIN;
 const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim()).filter(origin => origin.length > 0)
   : undefined;
+// Proxies in front that append to X-Forwarded-For (e.g. 1 behind one AWS ALB). 0: use the peer address.
+const trustedProxyCount = Number(process.env.TRUSTED_PROXY_COUNT) || 0;
 // Runtime adapter: 'auto' (default), 'bun', or 'node'
 const runtime = (process.env.RUNTIME as 'auto' | 'bun' | 'node') || 'auto';
 const transport = (process.env.TRANSPORT as 'socketio' | 'websocket') || 'socketio';
@@ -346,6 +348,7 @@ logger.info('Starting UseAI server', { logFormat });
           }
         : undefined,
       allowedOrigins,
+      trustedProxyCount,
       runtime,
       transport,
     });

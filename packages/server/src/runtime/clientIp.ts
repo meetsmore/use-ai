@@ -42,13 +42,28 @@ export interface ClientIpTracker {
 }
 
 /**
- * The client address behind a proxy: the first hop of `X-Forwarded-For`, else the fallback.
+ * The client address of a connection, from the peer address and the `X-Forwarded-For` header
+ * of its first request.
+ *
+ * `trustedProxyCount` is the number of proxies in front of the server that append the address
+ * they saw to `X-Forwarded-For` (an AWS ALB in its default `append` mode is one). The entries are
+ * read from the right, because a client can write any value at the left. With N trusted proxies,
+ * the Nth entry from the right is the client. When the header has fewer entries, the leftmost
+ * one is used. With 0, the header is ignored and the peer address is the client.
+ *
+ * Setting a count higher than the proxies really in front lets a client choose its address.
  */
-export function forwardedClientIp(
+export function resolveClientIp(
+  peerAddress: string | undefined,
   forwardedFor: string | string[] | undefined,
-  fallback: string | undefined,
+  trustedProxyCount: number,
 ): string | undefined {
-  return typeof forwardedFor === 'string' ? forwardedFor.split(',')[0].trim() : fallback;
+  if (trustedProxyCount <= 0 || forwardedFor === undefined) return peerAddress;
+  // Node joins repeated headers with ', ' for x-forwarded-for, but the type allows an array.
+  const header = Array.isArray(forwardedFor) ? forwardedFor.join(',') : forwardedFor;
+  const entries = header.split(',').map(entry => entry.trim()).filter(entry => entry.length > 0);
+  if (entries.length === 0) return peerAddress;
+  return entries[Math.max(entries.length - trustedProxyCount, 0)];
 }
 
 /**
