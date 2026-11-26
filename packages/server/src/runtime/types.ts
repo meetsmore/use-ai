@@ -66,6 +66,12 @@ export interface RuntimeServerConfig {
    * Called when a polling transport connection is established.
    */
   onPollingConnection?: (sessionId: string, ip: string) => void;
+  /**
+   * Callback for releasing a client IP address captured by `onPollingConnection`.
+   * Called when the engine.io session closes for any reason, including a ping timeout.
+   * This also covers sessions that never open a Socket.IO namespace.
+   */
+  onPollingClose?: (sessionId: string) => void;
 }
 
 /**

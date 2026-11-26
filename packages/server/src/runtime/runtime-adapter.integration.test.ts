@@ -93,6 +93,22 @@ describe.each(RUNTIMES)('Runtime Adapter: %s', (runtime) => {
     socket.disconnect();
   });
 
+  test('removes the IP record of a handshake-only polling session when the session closes', async () => {
+    const pollingUrl = `http://localhost:${basePort}/socket.io/?EIO=4&transport=polling`;
+    const tracker = server['clientIpTracker'];
+
+    // Handshake only: an engine.io session opens, but no Socket.IO namespace connect follows.
+    const handshake = await (await fetch(pollingUrl)).text();
+    const { sid } = JSON.parse(handshake.slice(1)) as { sid: string };
+    expect(tracker.getClientIp({ id: sid, transport: {} })).toBeDefined();
+
+    // Close the engine.io session with a close packet ("1").
+    await fetch(`${pollingUrl}&sid=${sid}`, { method: 'POST', body: '1' });
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    expect(tracker.getClientIp({ id: sid, transport: {} })).toBeUndefined();
+  });
+
   test('404 returned for unknown paths', async () => {
     const response = await fetch(`http://localhost:${basePort}/unknown-path`);
     expect(response.status).toBe(404);

@@ -21,9 +21,7 @@ export interface ToolExecutionContext {
    * Aborted when the run this call belongs to ends: stopped by the user,
    * failed, disconnected or finished. A tool that waits on the user should
    * stop waiting then: what it returns afterwards is dropped, as the run is
-   * over (after a user stop the call is recorded as aborted). A tool run by
-   * `useAIWorkflow` gets a signal that never aborts, as a workflow cannot be
-   * stopped.
+   * over (after a user stop the call is recorded as aborted).
    *
    * @example
    * ```typescript
@@ -291,7 +289,7 @@ export async function executeDefinedTool(
 ): Promise<unknown> {
   const tool = tools[toolName];
   if (!tool) {
-    throw new Error(`Tool "${toolName}" not found`);
+    throw new Error(`Tool "${toolName}" is not available`);
   }
   return await tool._execute(input, ctx);
 }

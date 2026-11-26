@@ -36,8 +36,8 @@ const skillMd = `---
 name: use-ai
 description: >
   API reference and architecture guide for the use-ai TypeScript monorepo.
-  Use when working with use-ai packages: core, client, server, or plugin-workflows.
-  Covers tool definitions (defineTool), useAI/useAIWorkflow hooks, Socket.IO protocol,
+  Use when working with use-ai packages: core, client, or server.
+  Covers tool definitions (defineTool), the useAI hook, Socket.IO protocol,
   AG-UI events, plugin architecture, and deployment patterns.
 ---
 

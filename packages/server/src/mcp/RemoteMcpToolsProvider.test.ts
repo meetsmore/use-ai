@@ -65,16 +65,53 @@ describe('RemoteMcpToolsProvider', () => {
       });
     });
 
-    test('per-user headers override server-wide headers', async () => {
+    test('server-wide headers cannot be overridden by per-user headers, regardless of case', async () => {
       const provider = new RemoteMcpToolsProvider({
         url: 'http://mcp.test/rpc',
         headers: { Authorization: 'Bearer server-token' },
       });
 
-      await provider.fetchToolsWithHeaders({ Authorization: 'Bearer user-token' });
+      await provider.fetchToolsWithHeaders({ authorization: 'Bearer user-token' });
 
       const [, options] = mockFetch.mock.calls[0];
-      expect(options.headers.Authorization).toBe('Bearer user-token');
+      expect(options.headers.Authorization).toBe('Bearer server-token');
+      expect(options.headers.authorization).toBeUndefined();
+    });
+
+    test('drops per-user headers that are not allowed', async () => {
+      const provider = new RemoteMcpToolsProvider({
+        url: 'http://mcp.test/rpc',
+      });
+
+      await provider.fetchToolsWithHeaders({
+        authorization: 'Bearer user-token',
+        'X-Tenant-Id': 'other-tenant',
+        Cookie: 'session=abc',
+        'Content-Type': 'text/plain',
+      });
+
+      const [, options] = mockFetch.mock.calls[0];
+      expect(options.headers).toEqual({
+        'Content-Type': 'application/json',
+        Accept: 'application/json, text/event-stream',
+        authorization: 'Bearer user-token',
+      });
+    });
+
+    test('allows per-user headers listed in allowedClientHeaders', async () => {
+      const provider = new RemoteMcpToolsProvider({
+        url: 'http://mcp.test/rpc',
+        allowedClientHeaders: ['x-tenant-id'],
+      });
+
+      await provider.fetchToolsWithHeaders({
+        Authorization: 'Bearer user-token',
+        'X-Tenant-Id': 'tenant-a',
+      });
+
+      const [, options] = mockFetch.mock.calls[0];
+      expect(options.headers['X-Tenant-Id']).toBe('tenant-a');
+      expect(options.headers.Authorization).toBeUndefined();
     });
 
     test('works without auth headers', async () => {
@@ -173,6 +210,67 @@ describe('RemoteMcpToolsProvider', () => {
       expect(body.jsonrpc).toBe('2.0');
       expect(body.method).toBe('tools/list');
       expect(body.id).toBeDefined();
+    });
+  });
+
+  describe('executeTool', () => {
+    test('sends matching per-user headers, with server-wide headers taking precedence', async () => {
+      const provider = new RemoteMcpToolsProvider({
+        url: 'http://mcp.test/rpc',
+        headers: { 'X-Tenant-Id': 'pinned-tenant' },
+        allowedClientHeaders: ['Authorization', 'X-Tenant-Id'],
+      });
+
+      await provider.executeTool('test-tool', {}, {
+        'http://mcp.test/*': {
+          headers: { Authorization: 'Bearer user-token', 'x-tenant-id': 'other-tenant', 'X-User-Id': 'admin' },
+        },
+      });
+
+      const [, options] = mockFetch.mock.calls[0];
+      expect(options.headers).toEqual({
+        'Content-Type': 'application/json',
+        Accept: 'application/json, text/event-stream',
+        Authorization: 'Bearer user-token',
+        'X-Tenant-Id': 'pinned-tenant',
+      });
+    });
+
+    test('sends no per-user headers when no pattern matches', async () => {
+      const provider = new RemoteMcpToolsProvider({
+        url: 'http://mcp.test/rpc',
+      });
+
+      await provider.executeTool('test-tool', {}, {
+        'http://other.test/*': { headers: { Authorization: 'Bearer user-token' } },
+      });
+
+      const [, options] = mockFetch.mock.calls[0];
+      expect(options.headers.Authorization).toBeUndefined();
+    });
+  });
+
+  describe('executeTool client headers', () => {
+    test('sends headers from a pattern with a domain', async () => {
+      const provider = new RemoteMcpToolsProvider({ url: 'https://api.example.com/api/mcp' });
+
+      await provider.executeTool('test-tool', {}, {
+        'https://*.example.com/api/mcp': { headers: { Authorization: 'Bearer user-jwt' } },
+      });
+
+      const [, options] = mockFetch.mock.calls[0];
+      expect(options.headers.Authorization).toBe('Bearer user-jwt');
+    });
+
+    test('does not send headers from a pattern without a domain', async () => {
+      const provider = new RemoteMcpToolsProvider({ url: 'https://api.example.com/api/mcp' });
+
+      await provider.executeTool('test-tool', {}, {
+        '*://*/api/mcp': { headers: { Authorization: 'Bearer user-jwt' } },
+      });
+
+      const [, options] = mockFetch.mock.calls[0];
+      expect(options.headers.Authorization).toBeUndefined();
     });
   });
 

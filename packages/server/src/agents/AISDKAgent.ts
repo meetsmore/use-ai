@@ -7,6 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
 import type { Agent, AgentInput, EventEmitter, AgentResult, ClientSession } from './types';
 import type { ToolDefinition, UseAIForwardedProps } from '../types';
+import type { McpHeadersMap } from '@meetsmore-oss/use-ai-core';
 import type { RemoteToolDefinition } from '../mcp';
 import { isUseAIInternalResponse } from '../mcp/useAIInternalResponse';
 import { isMcpConfirmationResponse, handleMcpConfirmation } from '../mcp/mcpConfirmation';
@@ -95,6 +96,17 @@ class AbortError extends Error {
 }
 
 /**
+ * Thrown before an LLM call when the server's LLM call budget (`llmCallLimit`)
+ * is used up. Caught by handleRunError, which ends the run with RUN_ERROR(RATE_LIMITED).
+ */
+class LlmCallLimitExceededError extends Error {
+  constructor(readonly retryAfterMs: number | undefined) {
+    super('LLM call rate limit exceeded');
+    this.name = 'LlmCallLimitExceededError';
+  }
+}
+
+/**
  * Effective configuration for a single run: the {@link AISDKRunConfig} returned
  * by `hooks.loadConfig`, with library defaults filled in for omitted fields.
  *
@@ -123,9 +135,12 @@ interface RunContext {
   readonly tools: ToolDefinition[];
   readonly state: unknown;
   readonly originalInput: AgentInput['originalInput'];
+  readonly mcpHeaders: AgentInput['mcpHeaders'];
   readonly staticSystemMessages: SystemModelMessage[] | undefined;
   /** Effective config for this run (from hooks.loadConfig, defaults applied) */
   readonly resolved: ResolvedRunConfig;
+  /** Optional LLM call budget from the server. Consumed once before each LLM call. */
+  readonly llmCallLimit: AgentInput['llmCallLimit'];
 
   // Streaming state (mutated during run)
   streamTextStarted: boolean;
@@ -534,7 +549,7 @@ export class AISDKAgent implements Agent {
    * config. Builds the system messages and initializes all mutable state.
    */
   private createRunContext(input: AgentInput, runConfig: AISDKRunConfig): RunContext {
-    const { session, runId, messages, tools, state, systemPrompt: runtimeSystemPrompt, originalInput } = input;
+    const { session, runId, messages, tools, state, systemPrompt: runtimeSystemPrompt, originalInput, mcpHeaders, llmCallLimit } = input;
 
     // Sync session.tools with input.tools if not already set
     // This ensures tools are available for step-by-step execution
@@ -558,7 +573,9 @@ export class AISDKAgent implements Agent {
       tools,
       state,
       originalInput,
+      mcpHeaders,
       staticSystemMessages,
+      llmCallLimit,
       resolved: {
         model: runConfig.model,
         temperature: runConfig.temperature,
@@ -735,7 +752,7 @@ export class AISDKAgent implements Agent {
       const stepConfig = {
         messages: messagesForStep,
         tools: stepCtx.currentTools.length > 0
-          ? (this.sanitizeToolsForAPI(this.filterTools(stepCtx.currentTools), ctx.session, events) as any)
+          ? (this.sanitizeToolsForAPI(this.filterTools(stepCtx.currentTools), ctx.session, events, ctx.mcpHeaders) as any)
           : undefined,
         metadata: {
           sessionId: ctx.session.clientId,
@@ -759,6 +776,10 @@ export class AISDKAgent implements Agent {
         this.cacheBreakpoint,
         ctx.resolved.model
       );
+
+      // Each step is one LLM call. Count it against the LLM call budget, so a
+      // long run of tool calls cannot make more LLM calls than the budget allows.
+      this.consumeLlmCallBudget(ctx, events);
 
       ctx.streamTextStarted = true;
       const stepMaxOutputTokens = isTruncationFallbackStep
@@ -858,6 +879,27 @@ export class AISDKAgent implements Agent {
         updatedToolCount: ctx.session.tools.length,
       });
     }
+  }
+
+  /**
+   * Consumes one unit of the LLM call budget, if the server set one.
+   * Throws LlmCallLimitExceededError when the budget is used up, so the
+   * LLM is not called and handleRunError ends the run with RUN_ERROR.
+   */
+  private consumeLlmCallBudget(ctx: RunContext, events: EventEmitter): void {
+    if (!ctx.llmCallLimit) return;
+    const check = ctx.llmCallLimit.consume();
+    if (check.allowed) return;
+
+    logger.warn('LLM call rate limit exceeded; ending run', {
+      clientId: ctx.session.clientId,
+      runId: ctx.runId,
+      stepNumber: ctx.currentStepNumber,
+      retryAfterMs: check.retryAfterMs,
+    });
+    // A truncation fallback step can carry an open TEXT_MESSAGE. Close it before the run ends.
+    this.flushPendingTextMessage(ctx, events);
+    throw new LlmCallLimitExceededError(check.retryAfterMs);
   }
 
   /**
@@ -1452,6 +1494,15 @@ export class AISDKAgent implements Agent {
 
     span.endWithError(error instanceof Error ? error.message : String(error));
 
+    if (error instanceof LlmCallLimitExceededError) {
+      events.emit<RunErrorEvent>({
+        type: EventType.RUN_ERROR,
+        message: ErrorCode.RATE_LIMITED,
+        timestamp: Date.now(),
+      });
+      return { success: false, error: error.message, conversationHistory: ctx.messages };
+    }
+
     logger.error('Error calling AI SDK model', {
       error: error instanceof Error ? error.message : 'Unknown error',
       clientId: ctx.session.clientId,
@@ -1584,7 +1635,8 @@ export class AISDKAgent implements Agent {
   private createMcpToolExecutor(
     remoteTool: RemoteToolDefinition,
     session: ClientSession,
-    events: EventEmitter
+    events: EventEmitter,
+    mcpHeaders: McpHeadersMap | undefined
   ): (args: ToolArguments, options: { toolCallId: string }) => Promise<ToolResult> {
     return async (args: ToolArguments, { toolCallId }) => {
       logger.info('[MCP] Executing remote tool', {
@@ -1596,7 +1648,7 @@ export class AISDKAgent implements Agent {
         const result = await remoteTool._remote.provider.executeTool(
           remoteTool._remote.originalName,
           args,
-          session.currentMcpHeaders  // Pass MCP headers from current request
+          mcpHeaders
         );
 
         // Intercept _use_ai_ internal responses from MCP tools
@@ -1613,7 +1665,7 @@ export class AISDKAgent implements Agent {
                   remoteTool._remote.provider,
                   session,
                   events,
-                  session.currentMcpHeaders
+                  mcpHeaders
                 );
               }
               break;
@@ -1641,7 +1693,8 @@ export class AISDKAgent implements Agent {
   private sanitizeToolsForAPI(
     tools: ToolDefinition[],
     session: ClientSession,
-    events: EventEmitter
+    events: EventEmitter,
+    mcpHeaders: McpHeadersMap | undefined
   ): Record<string, unknown> {
     const toolsObject: Record<string, unknown> = {};
     const clientToolExecutor = createClientToolExecutor(session);
@@ -1657,7 +1710,7 @@ export class AISDKAgent implements Agent {
       // Get the base executor based on tool type
       let baseExecutor;
       if (isRemoteTool(toolDef)) {
-        baseExecutor = this.createMcpToolExecutor(toolDef, session, events);
+        baseExecutor = this.createMcpToolExecutor(toolDef, session, events, mcpHeaders);
       } else if (isServerTool(toolDef)) {
         baseExecutor = createServerToolExecutor(toolDef, session, events);
       } else {
