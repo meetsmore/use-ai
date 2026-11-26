@@ -4,19 +4,12 @@ import { useServerEvents } from './useServerEvents';
 import { defaultStrings } from '../theme/strings';
 import { EventType } from '../types';
 import type { AGUIEvent } from '../types';
-import type { UseToolSystemReturn } from './useToolSystem';
 import type { UseAIClient } from '../client';
+import { makeToolSystem } from '../../test/toolSystemMock';
 
 function setup() {
   const order: string[] = [];
-  const toolSystem = {
-    aggregatedToolsRef: { current: {} },
-    executeToolCall: mock(async () => undefined),
-    storePendingToolCall: mock(),
-    handleApprovalRequest: mock(),
-    pendingApprovals: [],
-    endRun: mock(() => { order.push('abort'); }),
-  } as unknown as UseToolSystemReturn;
+  const toolSystem = makeToolSystem({ endRun: mock(() => { order.push('abort'); }) });
   const client = {
     runMessages: [],
     currentMessageContent: '',
