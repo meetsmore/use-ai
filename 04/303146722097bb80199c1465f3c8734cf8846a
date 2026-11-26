@@ -1,0 +1,53 @@
+packages/server/src/runtime/node/NodeRuntimeAdapter.ts
+  s_92af7bc6281499::t_f3df644f5ff0d2 71,100-105
+packages/server/src/client-ip.integration.test.ts
+  s_92af7bc6281499::t_eaaba41e6b18eb 1-162
+packages/server/src/runtime/bun/BunRuntimeAdapter.ts
+  s_92af7bc6281499::t_f3df644f5ff0d2 128-131,138
+packages/server/src/types.ts
+  s_92af7bc6281499::t_897cf816f4f5cf 163-174
+  s_92af7bc6281499::t_6ee6d80b1d2a7c 162
+packages/server/src/runtime/clientIp.test.ts
+  s_92af7bc6281499::t_e92a44ff2e39d6 1-35
+packages/server/src/runtime/bun/rawWebSocket.ts
+  s_92af7bc6281499::t_f3df644f5ff0d2 6,26-30
+README.md
+  s_92af7bc6281499::t_5085fc3a2acf2b 1142,1172,1203-1212
+  s_92af7bc6281499::t_76c7ab84e4e1ce 1213
+packages/server/src/server.ts
+  s_92af7bc6281499::t_897cf816f4f5cf 103,109,145,147-149,232-234,240-242
+packages/server/src/runtime/types.ts
+  s_92af7bc6281499::t_f3df644f5ff0d2 16-17
+packages/server/src/webSocketConnection.ts
+  s_92af7bc6281499::t_897cf816f4f5cf 4,18-19
+packages/server/src/runtime/node/rawWebSocket.ts
+  s_92af7bc6281499::t_f3df644f5ff0d2 8-12
+apps/use-ai-server-app/src/index.ts
+  s_92af7bc6281499::t_5085fc3a2acf2b 28-29,351
+CLAUDE.md
+  s_92af7bc6281499::t_5085fc3a2acf2b 59
+  s_92af7bc6281499::t_135528ab89b8d4 198
+packages/server/src/socketIOConnection.ts
+  s_92af7bc6281499::t_897cf816f4f5cf 4,14,19-22
+packages/server/src/runtime/clientIp.ts
+  s_92af7bc6281499::t_5f8db44a42dea5 45-54,56-57,59,61-65
+  s_92af7bc6281499::t_05f675c6ca81ac 66
+packages/server/src/runtime/index.ts
+  s_92af7bc6281499::t_5f8db44a42dea5 16
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "04303146722097bb80199c1465f3c8734cf8846a",
+  "prompts": {},
+  "sessions": {
+    "s_92af7bc6281499": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5d759e49-fd6d-4f60-ab6f-2d488244b5b1",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "yuma.ito <yuma.ito@meetsmore.com>"
+    }
+  }
+}
