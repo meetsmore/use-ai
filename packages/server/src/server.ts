@@ -22,7 +22,7 @@ import { recordErrorTrace, startTracing } from './instrumentation';
 import { v4 as uuidv4 } from 'uuid';
 import type { Agent, EventEmitter, AGUIEventExtended } from './agents/types';
 import type { ClientConnection, ClientSession } from './agents/types';
-import type { UseAIServerPlugin, MessageHandler, AuthorizeRunInput } from './plugins/types';
+import type { UseAIServerPlugin, MessageHandler, BeforeRunAuthorizedInput } from './plugins/types';
 import { FeedbackPlugin } from './plugins/FeedbackPlugin';
 import { isRemoteTool, isServerTool } from './utils/toolFilters';
 import { abortRun, RunAbortedByUser, RunAbortedByClientDisconnect } from './utils/abortReason';
@@ -508,17 +508,17 @@ export class UseAIServer {
     const runAbortController = new AbortController();
     session.abortController = runAbortController;
 
-    // authorizeRun hooks run before any external call, so a rejected run cannot
+    // beforeRunAuthorized hooks run before any external call, so a rejected run cannot
     // trigger MCP tools/list or attachment resolution.
-    const authorizeInput: AuthorizeRunInput = {
+    const beforeRunAuthorizedInput: BeforeRunAuthorizedInput = {
       session,
       runId,
       originalInput: message.data,
       mcpHeaders: forwardedProps?.mcpHeaders,
     };
     for (const plugin of this.plugins) {
-      if (plugin.authorizeRun) {
-        const result = await plugin.authorizeRun(authorizeInput);
+      if (plugin.beforeRunAuthorized) {
+        const result = await plugin.beforeRunAuthorized(beforeRunAuthorizedInput);
         if (result?.abort) {
           session.currentRunId = undefined;
           this.sendEvent(session.socket, {
@@ -549,7 +549,7 @@ export class UseAIServer {
       });
       return;
     }
-    const mcpHeaders = authorizeInput.mcpHeaders;
+    const mcpHeaders = beforeRunAuthorizedInput.mcpHeaders;
 
     // Merge client tools with MCP tools from all endpoints
     const clientTools = tools.map(t => ({

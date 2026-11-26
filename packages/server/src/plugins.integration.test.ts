@@ -1,5 +1,5 @@
 import { describe, expect, test, afterAll } from 'bun:test';
-import type { UseAIServerPlugin, BeforeRunAgentResult, AuthorizeRunInput } from './plugins/types';
+import type { UseAIServerPlugin, BeforeRunAgentResult, BeforeRunAuthorizedInput } from './plugins/types';
 import type { ClientSession, AgentInput } from './agents/types';
 import { EventType, ErrorCode } from './types';
 import { UseAIServer } from './server';
@@ -363,7 +363,7 @@ describe('Plugin Architecture', () => {
     passServer.close();
   });
 
-  test('authorizeRun runs before beforeRunAgent, which still gets the built input', async () => {
+  test('beforeRunAuthorized runs before beforeRunAgent, which still gets the built input', async () => {
     const port = 9032;
     const calls: string[] = [];
     let agentInput: AgentInput | null = null;
@@ -373,8 +373,8 @@ describe('Plugin Architecture', () => {
         return 'both-hooks';
       }
       registerHandlers(): void {}
-      async authorizeRun(): Promise<void> {
-        calls.push('authorizeRun');
+      async beforeRunAuthorized(): Promise<void> {
+        calls.push('beforeRunAuthorized');
       }
       async beforeRunAgent(input: AgentInput): Promise<void> {
         calls.push('beforeRunAgent');
@@ -395,7 +395,7 @@ describe('Plugin Architecture', () => {
     sendRunAgent(socket, { prompt: 'Hello' });
     await eventsPromise;
 
-    expect(calls).toEqual(['authorizeRun', 'beforeRunAgent']);
+    expect(calls).toEqual(['beforeRunAuthorized', 'beforeRunAgent']);
     expect(agentInput!.messages.length).toBe(1);
     expect(agentInput!.tools).toBeDefined();
 
@@ -403,7 +403,7 @@ describe('Plugin Architecture', () => {
     bothServer.close();
   });
 
-  describe('authorizeRun runs before external calls', () => {
+  describe('beforeRunAuthorized runs before external calls', () => {
     // Fake MCP endpoint that records each tools/list request's Authorization header.
     const mcpRequests: (string | null)[] = [];
     const mcpServer = Bun.serve({
@@ -430,7 +430,7 @@ describe('Plugin Architecture', () => {
           return 'rejecting-plugin';
         }
         registerHandlers(): void {}
-        async authorizeRun(): Promise<BeforeRunAgentResult> {
+        async beforeRunAuthorized(): Promise<BeforeRunAgentResult> {
           return { abort: true, message: 'Unauthorized' };
         }
       }
@@ -473,7 +473,7 @@ describe('Plugin Architecture', () => {
           return 'header-swap-plugin';
         }
         registerHandlers(): void {}
-        async authorizeRun(input: AuthorizeRunInput): Promise<void> {
+        async beforeRunAuthorized(input: BeforeRunAuthorizedInput): Promise<void> {
           input.mcpHeaders = { [mcpUrl]: { headers: { Authorization: 'Bearer server-issued' } } };
         }
       }
@@ -502,7 +502,7 @@ describe('Plugin Architecture', () => {
     });
   });
 
-  describe('run cancelled while authorizeRun is pending', () => {
+  describe('run cancelled while beforeRunAuthorized is pending', () => {
     // Simulates an auth hook that waits on an external identity provider.
     function createSlowAuthSetup(port: number) {
       let releaseHook!: () => void;
@@ -521,7 +521,7 @@ describe('Plugin Architecture', () => {
           return 'slow-auth';
         }
         registerHandlers(): void {}
-        async authorizeRun(input: AuthorizeRunInput): Promise<void> {
+        async beforeRunAuthorized(input: BeforeRunAuthorizedInput): Promise<void> {
           hookEntered(input.runId);
           await hookReleased;
         }

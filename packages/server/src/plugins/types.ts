@@ -11,7 +11,7 @@ import type { UseAIClientMessage } from '../types';
 export type MessageHandler = (session: ClientSession, message: UseAIClientMessage) => Promise<void> | void;
 
 /**
- * Result from a beforeRunAgent or authorizeRun hook indicating the run should be aborted.
+ * Result from a beforeRunAgent or beforeRunAuthorized hook indicating the run should be aborted.
  * Return this from either hook to block the run and send the message to the client as RUN_ERROR.
  */
 export interface BeforeRunAgentResult {
@@ -20,13 +20,13 @@ export interface BeforeRunAgentResult {
 }
 
 /**
- * Input passed to authorizeRun hooks.
+ * Input passed to beforeRunAuthorized hooks.
  *
- * authorizeRun runs before any external call for the run (MCP `tools/list`, attachment
+ * beforeRunAuthorized runs before any external call for the run (MCP `tools/list`, attachment
  * resolution), so messages and tools are not built yet; the raw client request is in
  * `originalInput`.
  */
-export interface AuthorizeRunInput {
+export interface BeforeRunAuthorizedInput {
   /**
    * The client session context. `threadId`, `currentRunId` and `abortController` are already set
    * for this run; `tools` and `state` still hold the previous run's values (read them from
@@ -119,14 +119,14 @@ export interface UseAIServerPlugin {
    * @param input - The raw run request and the MCP headers for this run
    * @returns Promise resolving to an abort result or void
    */
-  authorizeRun?(input: AuthorizeRunInput): Promise<BeforeRunAgentResult | void>;
+  beforeRunAuthorized?(input: BeforeRunAuthorizedInput): Promise<BeforeRunAgentResult | void>;
 
   /**
    * Optional hook called before an agent run starts.
    * Use this to perform pre-run checks that need the built run input, such as quota enforcement.
    *
-   * Runs after MCP `tools/list` and attachment resolution. Do authentication in `authorizeRun`
-   * instead, so unauthenticated runs cannot trigger those external calls.
+   * Runs after MCP `tools/list` and attachment resolution. Do authentication in
+   * `beforeRunAuthorized` instead, so unauthenticated runs cannot trigger those external calls.
    *
    * Return `{ abort: true, message: '...' }` to block the run — the message is sent
    * to the client as a RUN_ERROR event. Return `void` (or `undefined`) to allow the run.

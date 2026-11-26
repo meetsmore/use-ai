@@ -1394,7 +1394,7 @@ export interface UseAIServerPlugin {
    * Return `{ abort: true, message: '...' }` to block the run.
    * Reassign `input.mcpHeaders` to change the headers sent to MCP endpoints for this run.
    */
-  authorizeRun?(input: AuthorizeRunInput): Promise<BeforeRunAgentResult | void>;
+  beforeRunAuthorized?(input: BeforeRunAuthorizedInput): Promise<BeforeRunAgentResult | void>;
 
   /**
    * Optional hook called right before the agent runs, with the built messages and tools.

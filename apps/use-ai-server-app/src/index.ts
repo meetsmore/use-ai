@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 import { UseAIServer, AISDKAgent, logger, defineServerTool, createMockReasoningModel } from '@meetsmore-oss/use-ai-server';
-import type { Agent, McpEndpointConfig, ServerToolConfig, UseAIServerPlugin, BeforeRunAgentResult, AuthorizeRunInput } from '@meetsmore-oss/use-ai-server';
+import type { Agent, McpEndpointConfig, ServerToolConfig, UseAIServerPlugin, BeforeRunAgentResult, BeforeRunAuthorizedInput } from '@meetsmore-oss/use-ai-server';
 import type { UseAIForwardedProps } from '@meetsmore-oss/use-ai-core';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { createOpenAI } from '@ai-sdk/openai';
@@ -284,7 +284,7 @@ function createServerTools(): Record<string, ServerToolConfig> | undefined {
 }
 
 /**
- * Example plugin demonstrating the authorizeRun hook.
+ * Example plugin demonstrating the beforeRunAuthorized hook.
  * Rejects any run where forwardedProps.token contains "invalid".
  */
 class TokenValidationPlugin implements UseAIServerPlugin {
@@ -296,7 +296,7 @@ class TokenValidationPlugin implements UseAIServerPlugin {
     // No custom message handlers needed
   }
 
-  async authorizeRun(input: AuthorizeRunInput): Promise<BeforeRunAgentResult | void> {
+  async beforeRunAuthorized(input: BeforeRunAuthorizedInput): Promise<BeforeRunAgentResult | void> {
     const forwardedProps = input.originalInput.forwardedProps as UseAIForwardedProps | undefined;
     const token = forwardedProps?.token;
 
