@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test';
+import { z } from 'zod';
 import { createServerToolExecutor } from './serverToolExecutor';
 import type { ServerToolDefinition, ServerToolContext } from './types';
 import type { ClientSession, EventEmitter } from '../agents/types';
@@ -32,13 +33,14 @@ function createTestSession(overrides: Partial<ClientSession> = {}): ClientSessio
 
 function createTestServerTool(
   execute: ServerToolDefinition['_server']['execute'],
-  name = 'test_tool'
+  name = 'test_tool',
+  schema?: ServerToolDefinition['_server']['schema']
 ): ServerToolDefinition {
   return {
     name,
     description: 'Test tool',
     parameters: { type: 'object', properties: {} },
-    _server: { execute },
+    _server: { execute, schema },
   };
 }
 
@@ -236,5 +238,63 @@ describe('createServerToolExecutor', () => {
     const result = await executor({}, { toolCallId: 'tc-2' });
 
     expect(result).toEqual({ approved: false, reason: 'Too dangerous' });
+  });
+
+  describe('argument validation', () => {
+    test('does not run execute and returns an error result when the arguments fail the schema', async () => {
+      let called = false;
+      const tool = createTestServerTool(
+        () => { called = true; return 'ran'; },
+        'find_user',
+        z.object({ id: z.string() })
+      );
+
+      const executor = createServerToolExecutor(tool, createTestSession(), createMockEvents());
+      const result = await executor({ id: { $ne: null } }, { toolCallId: 'tc-1' }) as { error: boolean; message: string };
+
+      expect(called).toBe(false);
+      expect(result.error).toBe(true);
+      expect(result.message).toContain('Invalid arguments for tool find_user');
+      expect(result.message).toContain('args/id');
+    });
+
+    test('passes the parsed arguments: undeclared keys dropped, defaults applied', async () => {
+      let capturedArgs: unknown;
+      const tool = createTestServerTool(
+        (args) => { capturedArgs = args; return 'ok'; },
+        'test_tool',
+        z.object({ id: z.string(), limit: z.number().default(10) })
+      );
+
+      const executor = createServerToolExecutor(tool, createTestSession(), createMockEvents());
+      await executor({ id: 'u1', extra: 'x' }, { toolCallId: 'tc-1' });
+
+      expect(capturedArgs).toEqual({ id: 'u1', limit: 10 });
+    });
+
+    test('supports schemas with async refinements', async () => {
+      const tool = createTestServerTool(
+        () => 'ok',
+        'test_tool',
+        z.object({ id: z.string() }).refine(async (v) => v.id !== 'blocked', { message: 'blocked id' })
+      );
+
+      const executor = createServerToolExecutor(tool, createTestSession(), createMockEvents());
+
+      expect(await executor({ id: 'u1' }, { toolCallId: 'tc-1' })).toBe('ok');
+      const rejected = await executor({ id: 'blocked' }, { toolCallId: 'tc-2' }) as { error: boolean; message: string };
+      expect(rejected.error).toBe(true);
+      expect(rejected.message).toContain('blocked id');
+    });
+
+    test('runs execute with the arguments as given when the tool has no schema', async () => {
+      let capturedArgs: unknown;
+      const tool = createTestServerTool((args) => { capturedArgs = args; return 'ok'; });
+
+      const executor = createServerToolExecutor(tool, createTestSession(), createMockEvents());
+      await executor({ anything: 1 }, { toolCallId: 'tc-1' });
+
+      expect(capturedArgs).toEqual({ anything: 1 });
+    });
   });
 });

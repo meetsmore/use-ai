@@ -8,7 +8,7 @@ import type { ToolDefinition, ToolApprovalRequestEvent } from '../types';
 import { TOOL_APPROVAL_REQUEST } from '../types';
 import { getToolAnnotations } from '../utils';
 import { isRemoteTool, isServerTool } from '../utils/toolFilters';
-import { validateJsonSchemaArgs, validateZodArgs } from './validateToolArgs';
+import { validateJsonSchemaArgs } from './validateToolArgs';
 import { createAbortError } from '../utils/abortReason';
 import { logger } from '../logger';
 
@@ -25,7 +25,10 @@ export type ToolResult = unknown;
 /**
  * Tool executor function signature
  */
-export type ToolExecutor = (args: ToolArguments, options: { toolCallId: string }) => Promise<ToolResult>;
+export type ToolExecutor = (
+  args: ToolArguments,
+  options: { toolCallId: string; argsEdited?: boolean },
+) => Promise<ToolResult>;
 
 /**
  * Determines if a tool needs user approval before execution.
@@ -85,17 +88,14 @@ export function waitForApproval(
 }
 
 /**
- * Validates arguments the user edited on approval, for tools the server executes:
- * server tools made with defineServerTool use their Zod schema, MCP tools their
- * input schema as JSON Schema 2020-12, other server tools their parameters as draft-07.
+ * Validates JSON Schema for edited arguments. The server tool executor handles
+ * Zod schemas so refinements and transforms run once. Client tools validate locally.
  *
- * @returns undefined when valid or when the client validates (client tools), otherwise an error text
+ * @returns Error text when invalid, otherwise undefined.
  */
 export function validateModifiedArgs(toolDef: ToolDefinition, args: unknown): string | undefined {
   if (isServerTool(toolDef)) {
-    return toolDef._server.schema
-      ? validateZodArgs(toolDef._server.schema, args)
-      : validateJsonSchemaArgs(toolDef.parameters, args, 'draft-07');
+    return toolDef._server.schema ? undefined : validateJsonSchemaArgs(toolDef.parameters, args, 'draft-07');
   }
   if (isRemoteTool(toolDef)) {
     return validateJsonSchemaArgs(toolDef._remote.inputSchema, args, '2020-12');
@@ -177,7 +177,7 @@ export function createApprovalWrapper(
       }
       const invalid = denyInvalidModifiedArgs(toolDef, modifiedArgs, options.toolCallId);
       if (invalid) return invalid;
-      return actualExecutor(modifiedArgs, options);
+      return actualExecutor(modifiedArgs, { ...options, argsEdited: true });
     } else {
       logger.info('Tool rejected by user', {
         toolCallId: options.toolCallId,

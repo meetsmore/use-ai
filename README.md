@@ -615,7 +615,7 @@ function EditableApproval({ approvals, onApprove, onApproveWithArgs, onReject }:
 ```
 
 - Only approvals with `acceptsModifiedArgs: true` take edits. The server sets it on `destructiveHint` approvals and MCP `confirmation_required` approvals. `onApproveWithArgs` returns `Promise<void>`; catch its rejection to report a refused edit. It rejects with an error, and sends nothing, when any edited call lacks it.
-- Server tools: tools made with `defineServerTool` validate the edited arguments with their own Zod schema (refinements included). Unknown keys pass unless the schema is `.strict()`.
+- Server tools: `defineServerTool` parses edited arguments with the tool's Zod schema before execution, including async refinements and transforms. The tool receives the parsed value. Hand-written server tools without a Zod schema validate edits against their JSON Schema parameters.
 - MCP tools: the edited arguments are validated against the complete input schema the MCP server advertised (`$defs`, `$ref` and `additionalProperties` included), as JSON Schema 2020-12. A draft-07 tuple (`items: [...]`) does not compile under 2020-12, so edits to such a tool are denied.
 - Invalid edits do not run the tool; the AI receives an error result that names each failing field.
 - MCP `confirmation_required` tools: edited arguments go through phase 1 again. A new `confirmation_required` asks the user again, with the `message`, `metadata` and `additional_columns` phase 1 returns for the edited arguments; any other phase-1 result is returned as the tool result. Phase 2 only runs arguments phase 1 has seen.
@@ -1374,6 +1374,10 @@ const server = new UseAIServer({
   },
 });
 ```
+
+**Argument validation:**
+
+Before `execute` runs, proposed or user-edited arguments are parsed with the tool's Zod schema. `execute` receives the parsed value, with any defaults and transforms applied. If parsing fails, the AI gets an error result and `execute` does not run. A tool without parameters gets an empty object schema. For a hand-written `ServerToolConfig` without a Zod schema, the approval flow checks edits against `parameters`.
 
 **Execution Context:**
 

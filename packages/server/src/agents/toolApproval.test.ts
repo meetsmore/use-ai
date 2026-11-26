@@ -2,10 +2,11 @@ import { describe, expect, test, afterAll } from 'bun:test';
 import { z } from 'zod';
 import { UseAIServer } from '../server';
 import { AISDKAgent } from './AISDKAgent';
-import { defineServerTool } from '../tools';
+import { createServerToolExecutor, defineServerTool } from '../tools';
 import { createSequentialMockModel } from '../../test/integration-test-utils';
 import { waitForApproval, createApprovalWrapper, type ToolArguments } from './toolApproval';
 import { abortRun, RunAbortedByUser, RunAbortedByClientDisconnect } from '../utils/abortReason';
+import { isServerTool } from '../utils/toolFilters';
 import type { ClientSession, EventEmitter } from './types';
 import type { ToolDefinition } from '../types';
 import type { ServerToolDefinition } from '../tools/types';
@@ -257,11 +258,16 @@ describe('createApprovalWrapper with modifiedArgs', () => {
 describe('createApprovalWrapper modifiedArgs validation by tool kind', () => {
   function run(toolDef: ToolDefinition, modifiedArgs: Record<string, unknown>) {
     const session = createTestSession({ abortController: new AbortController() });
+    const events: EventEmitter = { emit: () => {} };
     const calls: ToolArguments[] = [];
-    const execute = createApprovalWrapper(toolDef, session, { emit: () => {} }, async (args) => {
+    const captureArgs = async (args: ToolArguments) => {
       calls.push(args);
       return { ok: true };
-    });
+    };
+    const baseExecutor = isServerTool(toolDef)
+      ? createServerToolExecutor({ ...toolDef, _server: { ...toolDef._server, execute: captureArgs } }, session, events)
+      : captureArgs;
+    const execute = createApprovalWrapper(toolDef, session, events, baseExecutor);
     const promise = execute({}, { toolCallId: 'tc-1' });
     session.pendingToolApprovals.get('tc-1')!({ approved: true, modifiedArgs });
     return promise.then((result) => ({ result: result as { error?: boolean; message?: string }, calls }));
@@ -292,6 +298,20 @@ describe('createApprovalWrapper modifiedArgs validation by tool kind', () => {
     const { result, calls } = await run(tool, { amount: 5 });
     expect(result).toEqual({ ok: true });
     expect(calls).toEqual([{ amount: 5 }]);
+  });
+
+  test('parses edited arguments once with the server tool’s async Zod schema', async () => {
+    let parses = 0;
+    const tool = serverToolFrom(z.object({ title: z.string().transform(async (value) => {
+      parses += 1;
+      return value.trim();
+    }) }));
+
+    const { result, calls } = await run(tool, { title: ' Edited ' });
+
+    expect(result).toEqual({ ok: true });
+    expect(calls).toEqual([{ title: 'Edited' }]);
+    expect(parses).toBe(1);
   });
 
   test('denies a defineServerTool edit that fails a Zod refinement, naming the field', async () => {

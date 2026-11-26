@@ -1,7 +1,6 @@
 import Ajv, { type ValidateFunction } from 'ajv';
 import Ajv2020 from 'ajv/dist/2020';
 import addFormats from 'ajv-formats';
-import type { ZodType } from 'zod';
 
 /** JSON Schema dialect used to read a tool's input schema. */
 export type JsonSchemaDialect = 'draft-07' | '2020-12';
@@ -52,17 +51,4 @@ export function validateJsonSchemaArgs(
   if ('error' in result) return result.error;
   if (result.validate(args)) return undefined;
   return result.ajv.errorsText(result.validate.errors, { dataVar: 'args' });
-}
-
-/**
- * Validates tool arguments against a Zod schema.
- *
- * @returns undefined when the arguments are valid, otherwise a readable error text
- */
-export function validateZodArgs(schema: ZodType, args: unknown): string | undefined {
-  const result = schema.safeParse(args);
-  if (result.success) return undefined;
-  return result.error.issues
-    .map((issue) => `${['args', ...issue.path].join('/')} ${issue.message}`)
-    .join(', ');
 }

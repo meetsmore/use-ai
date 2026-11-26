@@ -1,14 +1,27 @@
+import type { ZodIssue } from 'zod';
 import type { ClientSession, EventEmitter } from '../agents/types';
 import type { ToolApprovalRequestEvent } from '../types';
 import { TOOL_APPROVAL_REQUEST } from '../types';
 import type { ServerToolDefinition, ServerToolContext } from './types';
-import { waitForApproval } from '../agents/toolApproval';
+import { waitForApproval, type ToolExecutor } from '../agents/toolApproval';
 import { logger } from '../logger';
 
 /** Generic tool arguments type */
 type ToolArguments = Record<string, unknown>;
 /** Generic tool result type */
 type ToolResult = unknown;
+
+/** Formats a Zod issue path as `args/a/b`, the same in the log and in the error result. */
+function formatIssuePath(issue: ZodIssue): string {
+  return ['args', ...issue.path].join('/');
+}
+
+/** Formats Zod issues as `args/path message`, for the error result the AI reads. */
+function formatZodIssues(issues: ZodIssue[]): string {
+  return issues
+    .map((issue) => `${formatIssuePath(issue)} ${issue.message}`)
+    .join(', ');
+}
 
 /**
  * Creates an execute function for server-side tools.
@@ -24,8 +37,29 @@ export function createServerToolExecutor(
   serverTool: ServerToolDefinition,
   session: ClientSession,
   events: EventEmitter
-): (args: ToolArguments, options: { toolCallId: string }) => Promise<ToolResult> {
-  return async (args: ToolArguments, { toolCallId }): Promise<ToolResult> => {
+): ToolExecutor {
+  return async (rawArgs, { toolCallId, argsEdited }): Promise<ToolResult> => {
+    // The AI SDK passes tool input through without checking it against the schema,
+    // so the tool's own Zod schema is the only check before execute runs.
+    let args = rawArgs;
+    const schema = serverTool._server.schema;
+    if (schema) {
+      const parsed = await schema.safeParseAsync(rawArgs);
+      if (!parsed.success) {
+        // Issue messages can quote the received value, so only paths and codes are logged.
+        logger.warn('[Server Tool] Invalid arguments, not executing', {
+          toolName: serverTool.name,
+          toolCallId,
+          issues: parsed.error.issues.map((issue) => ({ path: formatIssuePath(issue), code: issue.code })),
+        });
+        const prefix = argsEdited
+          ? 'Tool execution denied: Edited arguments are invalid'
+          : `Invalid arguments for tool ${serverTool.name}`;
+        return { error: true, message: `${prefix}: ${formatZodIssues(parsed.error.issues)}` };
+      }
+      args = parsed.data as ToolArguments;
+    }
+
     logger.info('[Server Tool] Executing', {
       toolName: serverTool.name,
       toolCallId,

@@ -83,6 +83,8 @@ export function defineServerTool<TSchema extends z.ZodType>(
 
   if (isNoParamForm) {
     parameters = { type: 'object', properties: {} };
+    // Empty object schema, so arguments the AI adds are dropped before execute runs
+    schema = z.object({});
     execute = schemaOrExecute as ServerToolExecuteFn;
     actualOptions = (executeOrOptions as ServerToolOptions) || {};
   } else {
