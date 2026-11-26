@@ -449,6 +449,8 @@ else if (event.type === EventType.TEXT_MESSAGE_CONTENT) {
 
 ### Phase 4: Workflow Plugin (if applicable)
 
+> **Note:** Commit b03b643 removed the workflow plugin (`WorkflowsPlugin`, `DifyWorkflowRunner`, `packages/plugin-workflows/`).
+
 Check if `WorkflowsPlugin` or `DifyWorkflowRunner` need streaming updates. Current implementation in `packages/plugin-workflows/` may already handle SSE streaming from Dify.
 
 ---
@@ -722,6 +724,8 @@ socket.on('abort_run', () => {
 The `abort` chunk type in `fullStream` signals when abortion occurs.
 
 ### 7.3 Streaming for Workflows
+
+> **Note:** Commit b03b643 removed the workflow plugin (`WorkflowsPlugin`, `DifyWorkflowRunner`, `packages/plugin-workflows/`).
 
 The `DifyWorkflowRunner` already handles SSE streaming from Dify. This refactor focuses on `AISDKAgent` but similar patterns could apply to other runners.
 

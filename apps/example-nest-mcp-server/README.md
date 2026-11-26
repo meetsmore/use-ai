@@ -73,7 +73,7 @@ McpModule.forRoot({
 
 The server is configured in the use-ai example app's playwright config to:
 1. Start automatically before running E2E tests
-2. Provide remote tools to the UseAI server via the `MCP_ENDPOINT_URL` environment variable
+2. Provide remote tools to the UseAI server via the `MCP_ENDPOINT_<NAME>_URL` environment variable (the config uses `MCP_ENDPOINT_LOCALDEV_URL`)
 3. Tools are namespaced with "mcp_" prefix (e.g., `mcp_add`, `mcp_multiply`)
 
 ## Testing

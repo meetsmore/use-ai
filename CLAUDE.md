@@ -16,21 +16,21 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Development Commands
 
-**Never use `bun test` to run tests, always `bun run test`**.
+**Never use `bun test` from the repository root. Always use `bun run test`.**
 
 ```bash
 # Setup
 bun install
 export ANTHROPIC_API_KEY=...
 
-# Development (server must run first)
-bun run start:server           # Port 8081
-bun run dev                    # Port 3000
+# Development
+bun run dev                    # All apps: server 8081, example 3000, MCP example 3002
+cd apps/use-ai-server-app && bun run dev   # Server app only (port 8081)
 
 # Building
 bun run build                  # All packages
-bun run build:client           # Client only
-bun run build:server           # Server only
+bun run build --filter=@meetsmore-oss/use-ai-client   # Client only
+bun run build --filter=@meetsmore-oss/use-ai-server   # Server only
 
 # Testing
 bun run test                   # Unit tests
@@ -38,7 +38,7 @@ bun run test:e2e               # E2E tests (requires ANTHROPIC_API_KEY)
 bun run test:e2e:ui            # Interactive E2E UI
 
 # Single test file
-bun run test packages/server/src/agents/AISDKAgent.test.ts
+cd packages/server && bun test src/agents/AISDKAgent.test.ts
 cd apps/example && bunx playwright test test/chat-history.e2e.test.ts
 
 # Utilities
@@ -204,9 +204,9 @@ Following [Simon Willison's "Lethal Trifecta"](https://simonwillison.net/2025/Ju
 
 ## Testing Strategy
 
-- **Unit tests**: Alongside source files, run with `bun test`
+- **Unit tests**: Alongside source files, run with `bun run test`
 - **E2E tests**: Located in `apps/example/test/`, use Playwright with real Claude API calls
-- **Langfuse integration tests**: Use Testcontainers (~3-4 min runtime), run with `bun run test:e2e:langfuse`
+- **Langfuse integration tests**: `packages/server/src/langfuse.integration.test.ts` is a normal unit test. `bun run test` runs it.
 
 E2E tests are preferred for AI features to catch edge cases with real API interactions.
 
@@ -223,7 +223,7 @@ E2E tests are preferred for AI features to catch edge cases with real API intera
 2. Implement client-side changes first
 3. Update server if needed (rare)
 4. Add tests
-5. Build packages: `bun run build:client` and/or `bun run build:server`
+5. Build packages: `bun run build`, or `bun run build --filter=<package name>` for one package
 6. Verify in example app
 
 ### Debugging Socket.IO Issues
@@ -242,7 +242,7 @@ E2E tests are preferred for AI features to catch edge cases with real API intera
 ## Implementation Details
 
 ### Connection Management
-- Socket.IO client per `useAI` hook
+- One `UseAIClient` per `UseAIProvider`. All `useAI` hooks share it.
 - Automatic reconnection with exponential backoff
 - Provider monitors connection status
 
@@ -280,7 +280,7 @@ Server designed for Kubernetes deployment:
 
 ## Known Limitations (V1)
 
-- Conversation history is session-based (lost on disconnect)
+- Server session state is in memory (lost on disconnect). The client keeps chat history in a `ChatRepository` (localStorage by default).
 - No authentication/authorization built-in
 - Rate limiting is per-IP, not per-user
 - No backend tool execution support

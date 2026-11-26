@@ -120,11 +120,7 @@ console.log(agents.selected);   // 'claude' | null
 console.log(agents.default);    // 'claude'
 
 agents.set('gpt');     // Switch to GPT
-agents.set(null);      // Reset to default
-
-// Or use the dedicated hook
-import { useAgentSelection } from '@meetsmore-oss/use-ai-client';
-const { availableAgents, selectedAgent, setAgent } = useAgentSelection();`}
+agents.set(null);      // Reset to default`}
         </CollapsibleCode>
       </div>
 

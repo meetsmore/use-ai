@@ -62,8 +62,8 @@ Thank you for your interest in contributing to use-ai! This document provides gu
 # Run all unit tests
 bun run test
 
-# Run tests for a specific package
-bun run test packages/server/src/server.test.ts
+# Run one test file
+cd packages/server && bun test src/server.test.ts
 
 # Run E2E tests (requires ANTHROPIC_API_KEY)
 bun run test:e2e
@@ -79,8 +79,8 @@ bun run test:e2e:ui
 bun run build
 
 # Build specific packages
-bun run build:client
-bun run build:server
+bun run build --filter=@meetsmore-oss/use-ai-client
+bun run build --filter=@meetsmore-oss/use-ai-server
 ```
 
 ### Code Style
