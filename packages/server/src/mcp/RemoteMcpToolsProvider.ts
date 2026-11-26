@@ -279,13 +279,13 @@ export class RemoteMcpToolsProvider {
 
   /**
    * Formats headers for logging.
-   * By default, redacts all values.
-   * Set DEBUG=1 environment variable to print the values.
+   * By default, redacts all values without revealing their length, since they carry user
+   * JWTs and server keys. Set DEBUG=1 to print the values (local development only).
    */
   private formatHeaders(headers: Record<string, string>): string {
     const isDebug = process.env.DEBUG === '1';
     return Object.entries(headers)
-      .map(([key, value]) => `${key}: ${isDebug ? value : '*'.repeat(value.length)}`)
+      .map(([key, value]) => `${key}: ${isDebug ? value : '[REDACTED]'}`)
       .join(', ');
   }
 }

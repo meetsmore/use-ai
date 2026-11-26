@@ -1182,7 +1182,7 @@ ANTHROPIC_API_KEY=sk-ant-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 # LOG_FORMAT=pretty
 # LOG_SILENT=true                                     # Disable all logging
 # LOG_LLM_CONTENT=true                                # Also log user prompts, AI responses and tool results
-# DEBUG=1                                             # Enable debug logging
+# DEBUG=1                                             # Log MCP header values in plaintext (local development only)
 # MAX_HTTP_BUFFER_SIZE=10485760                       # Max payload size in bytes
 # ALLOWED_ORIGINS=https://app.example.com             # Comma-separated. Refuse connections from other origins
 

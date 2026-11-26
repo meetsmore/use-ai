@@ -1,5 +1,6 @@
-import { describe, test, expect, mock, beforeEach, afterEach } from 'bun:test';
+import { describe, test, expect, mock, spyOn, beforeEach, afterEach } from 'bun:test';
 import { RemoteMcpToolsProvider } from './RemoteMcpToolsProvider';
+import { logger } from '../logger';
 
 describe('RemoteMcpToolsProvider', () => {
   const originalFetch = globalThis.fetch;
@@ -45,6 +46,56 @@ describe('RemoteMcpToolsProvider', () => {
       expect(url).toBe('http://mcp.test/rpc');
       expect(options.headers).toMatchObject({
         Authorization: 'Bearer token123',
+      });
+    });
+
+    describe('header logging', () => {
+      const originalDebug = process.env.DEBUG;
+
+      afterEach(() => {
+        if (originalDebug === undefined) delete process.env.DEBUG;
+        else process.env.DEBUG = originalDebug;
+      });
+
+      // Runs every path that logs headers: tools/list, and tools/call with
+      // matched per-request headers and with configured headers only.
+      async function captureDebugLogs(): Promise<string> {
+        const debugSpy = spyOn(logger, 'debug');
+        try {
+          const provider = new RemoteMcpToolsProvider({
+            url: 'http://mcp.test/rpc',
+            headers: { 'X-Server-Key': 'server-secret' },
+          });
+          await provider.fetchToolsWithHeaders({ Authorization: 'Bearer user-token' });
+          await provider.executeTool('test-tool', {}, {
+            'http://mcp.test/*': { headers: { Authorization: 'Bearer user-token' } },
+          });
+          await provider.executeTool('test-tool', {});
+          return debugSpy.mock.calls.map(args => JSON.stringify(args)).join('\n');
+        } finally {
+          debugSpy.mockRestore();
+        }
+      }
+
+      test('redacts header values without revealing their length', async () => {
+        delete process.env.DEBUG;
+
+        const logged = await captureDebugLogs();
+
+        expect(logged).toContain('Authorization');
+        expect(logged).toContain('X-Server-Key');
+        expect(logged).not.toContain('user-token');
+        expect(logged).not.toContain('server-secret');
+        expect(logged).not.toContain('*'.repeat('server-secret'.length));
+      });
+
+      test('logs header values with DEBUG=1', async () => {
+        process.env.DEBUG = '1';
+
+        const logged = await captureDebugLogs();
+
+        expect(logged).toContain('Bearer user-token');
+        expect(logged).toContain('server-secret');
       });
     });
 
