@@ -3,7 +3,7 @@ import type { ClientSession, EventEmitter } from '../agents/types';
 import type { ToolApprovalRequestEvent } from '../types';
 import { TOOL_APPROVAL_REQUEST } from '../types';
 import type { ServerToolDefinition, ServerToolContext } from './types';
-import { waitForApproval } from '../agents/toolApproval';
+import { waitForApproval, type ToolExecutor } from '../agents/toolApproval';
 import { logger } from '../logger';
 
 /** Generic tool arguments type */
@@ -37,8 +37,8 @@ export function createServerToolExecutor(
   serverTool: ServerToolDefinition,
   session: ClientSession,
   events: EventEmitter
-): (args: ToolArguments, options: { toolCallId: string }) => Promise<ToolResult> {
-  return async (rawArgs: ToolArguments, { toolCallId }): Promise<ToolResult> => {
+): ToolExecutor {
+  return async (rawArgs, { toolCallId, argsEdited }): Promise<ToolResult> => {
     // The AI SDK passes tool input through without checking it against the schema,
     // so the tool's own Zod schema is the only check before execute runs.
     let args = rawArgs;
@@ -52,10 +52,10 @@ export function createServerToolExecutor(
           toolCallId,
           issues: parsed.error.issues.map((issue) => ({ path: formatIssuePath(issue), code: issue.code })),
         });
-        return {
-          error: true,
-          message: `Invalid arguments for tool ${serverTool.name}: ${formatZodIssues(parsed.error.issues)}`,
-        };
+        const prefix = argsEdited
+          ? 'Tool execution denied: Edited arguments are invalid'
+          : `Invalid arguments for tool ${serverTool.name}`;
+        return { error: true, message: `${prefix}: ${formatZodIssues(parsed.error.issues)}` };
       }
       args = parsed.data as ToolArguments;
     }

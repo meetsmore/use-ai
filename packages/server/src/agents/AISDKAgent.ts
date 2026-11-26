@@ -1659,10 +1659,8 @@ export class AISDKAgent implements Agent {
                 return handleMcpConfirmation(
                   result,
                   toolCallId,
-                  remoteTool.name,
-                  remoteTool._remote.originalName,
+                  remoteTool,
                   args as Record<string, unknown>,
-                  remoteTool._remote.provider,
                   session,
                   events,
                   mcpHeaders

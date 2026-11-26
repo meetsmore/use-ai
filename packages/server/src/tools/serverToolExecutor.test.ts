@@ -190,6 +190,29 @@ describe('createServerToolExecutor', () => {
     expect((event.toolCallId as string).startsWith('tc-1-approval-')).toBe(true);
   });
 
+  test('requestApproval does not accept edited arguments: an edited approval resolves as denied', async () => {
+    const emittedEvents: unknown[] = [];
+    const mockEvents = {
+      emit: (event: unknown) => { emittedEvents.push(event); },
+    } as unknown as EventEmitter;
+
+    const tool = createTestServerTool(async (_args, context) => {
+      const approvalPromise = context.requestApproval({ message: 'Confirm?' });
+      setTimeout(() => {
+        const event = emittedEvents[0] as { toolCallId: string };
+        session.pendingToolApprovals.get(event.toolCallId)?.({ approved: true, modifiedArgs: { env: 'staging' } });
+      }, 10);
+      return approvalPromise;
+    });
+
+    const session = createTestSession();
+    const result = await createServerToolExecutor(tool, session, mockEvents)({}, { toolCallId: 'tc-1' }) as { approved: boolean; reason?: string };
+
+    expect((emittedEvents[0] as Record<string, unknown>).acceptsModifiedArgs).toBeUndefined();
+    expect(result.approved).toBe(false);
+    expect(result.reason).toContain('does not accept edited arguments');
+  });
+
   test('requestApproval resolves with rejection when user rejects', async () => {
     const emittedEvents: unknown[] = [];
     const mockEvents = {

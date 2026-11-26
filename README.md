@@ -576,6 +576,57 @@ const deleteTodo = defineTool(
 );
 ```
 
+**Editing arguments before approval:**
+
+A custom `ToolApproval` slot can let the user correct proposed arguments in a form and submit them with approval. `onApproveWithArgs` takes edited arguments keyed by `toolCallId`; calls without an entry keep their proposed arguments. The slot also receives the request's `message` and `metadata` (set by MCP `confirmation_required` responses and runtime approvals).
+
+```tsx
+import type { ChatToolApprovalSlotProps } from '@meetsmore-oss/use-ai-client';
+
+function EditableApproval({ approvals, onApprove, onApproveWithArgs, onReject }: ChatToolApprovalSlotProps) {
+  const pending = approvals[0];
+  const [draft, setDraft] = useState<Record<string, unknown>>();
+  const [error, setError] = useState('');
+  const canEdit = pending.acceptsModifiedArgs && onApproveWithArgs;
+  const approve = async () => {
+    if (!canEdit || !draft) {
+      onApprove();
+      return;
+    }
+    try {
+      await canEdit({ [pending.toolCallId]: draft });
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    }
+  };
+  return (
+    <div>
+      <p>{pending.message}</p>
+      {/* Render editable fields when canEdit is set. Initialize them from
+          draft ?? pending.toolCallArgs and call setDraft when a field changes. */}
+      <button onClick={approve}>Approve</button>
+      <button onClick={() => onReject()}>Deny</button>
+      {error && <p role="alert">{error}</p>}
+    </div>
+  );
+}
+
+<UseAIProvider serverUrl="ws://localhost:8081" chatComponents={{ ToolApproval: EditableApproval }}>
+```
+
+- Only approvals with `acceptsModifiedArgs: true` take edits. The server sets it on `destructiveHint` approvals and MCP `confirmation_required` approvals. `onApproveWithArgs` returns `Promise<void>`; catch its rejection to report a refused edit. It rejects with an error, and sends nothing, when any edited call lacks it.
+- Server tools: `defineServerTool` parses edited arguments with the tool's Zod schema before execution, including async refinements and transforms. The tool receives the parsed value. Hand-written server tools without a Zod schema validate edits against their JSON Schema parameters.
+- MCP tools: the edited arguments are validated against the complete input schema the MCP server advertised (`$defs`, `$ref` and `additionalProperties` included), as JSON Schema 2020-12. A draft-07 tuple (`items: [...]`) does not compile under 2020-12, so edits to such a tool are denied.
+- Invalid edits do not run the tool; the AI receives an error result that names each failing field.
+- MCP `confirmation_required` tools: edited arguments go through phase 1 again. A new `confirmation_required` asks the user again, with the `message`, `metadata` and `additional_columns` phase 1 returns for the edited arguments; any other phase-1 result is returned as the tool result. Phase 2 only runs arguments phase 1 has seen.
+- Client tools: the browser runs the tool with the edited arguments, and the tool's Zod schema validates them. Invalid ones return the validation error to the AI.
+- Client tools run only with the arguments the user approved. Without edits, the arguments shown in the approval request must equal the arguments of the tool call. If they differ, or the tool names differ, the tool does not run and the AI receives an error result.
+- Omitting the edited arguments (`onApprove`, or no entry for a call) behaves exactly as a plain approval.
+- Runtime approvals requested with `ctx.requestApproval` do not accept edits: `acceptsModifiedArgs` is unset, and an edited approval that reaches the server is denied rather than run with the original arguments.
+- The AI's history keeps the arguments it proposed, followed by the result of the edited call, so return what was actually done in the tool result.
+- Upgrade the server before the client. An older server never sets `acceptsModifiedArgs`, so the client refuses every edit instead of having the server drop it.
+- Over the wire this is an optional `modifiedArgs` field on the `tool_approval_response` message, honored only when `approved` is `true`. `UseAIClient.sendToolApprovalResponse(toolCallId, approved, reason, modifiedArgs)` sends it outside the chat slots.
+
 ### Chat History
 
 By default, there is locally stored chat history for up to 20 chats.
@@ -1326,7 +1377,7 @@ const server = new UseAIServer({
 
 **Argument validation:**
 
-Before `execute` runs, the AI's arguments are parsed with the tool's Zod schema. `execute` receives the parsed value: keys the schema does not declare are dropped, and defaults and transforms are applied. If parsing fails, `execute` does not run and the AI gets `{ error: true, message: 'Invalid arguments for tool <name>: ...' }`. A tool without parameters gets an empty object schema. A `ServerToolConfig` written by hand, without `defineServerTool()`, has no schema and is not checked.
+Before `execute` runs, proposed or user-edited arguments are parsed with the tool's Zod schema. `execute` receives the parsed value, with any defaults and transforms applied. If parsing fails, the AI gets an error result and `execute` does not run. A tool without parameters gets an empty object schema. For a hand-written `ServerToolConfig` without a Zod schema, the approval flow checks edits against `parameters`.
 
 **Execution Context:**
 

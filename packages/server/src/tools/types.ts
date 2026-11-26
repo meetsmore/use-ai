@@ -52,7 +52,7 @@ export interface ServerToolConfig {
   };
   /** The function to execute when the AI calls this tool */
   execute: ServerToolExecuteFn;
-  /** The Zod input schema (set by defineServerTool); the arguments are checked against it before execute runs */
+  /** The Zod input schema (set by defineServerTool) for proposed and user-edited arguments. */
   schema?: ZodType;
   /** MCP-aligned annotations for tool behavior hints */
   annotations?: ToolAnnotations;

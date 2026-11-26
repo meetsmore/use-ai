@@ -917,6 +917,7 @@ export function UseAIProvider({
       pending: {
         tools: toolSystem.pendingApprovals,
         approveAll: toolSystem.approveAll,
+        approveWithArgs: toolSystem.approveWithArgs,
         rejectAll: toolSystem.rejectAll,
       },
     },
@@ -971,6 +972,7 @@ export function UseAIProvider({
     onFeedback: feedback.submitFeedback,
     pendingApprovals: toolSystem.pendingApprovals,
     onApproveToolCall: toolSystem.pendingApprovals.length > 0 ? toolSystem.approveAll : undefined,
+    onApproveToolCallWithArgs: toolSystem.pendingApprovals.length > 0 ? toolSystem.approveWithArgs : undefined,
     onRejectToolCall: toolSystem.pendingApprovals.length > 0 ? toolSystem.rejectAll : undefined,
     submitMode,
     components: chatComponents,

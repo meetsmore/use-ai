@@ -6,8 +6,9 @@ import {
 } from './mcpConfirmation';
 import type { UseAIInternalResponse } from './useAIInternalResponse';
 import type { ClientSession, EventEmitter } from '../agents/types';
-import type { RemoteMcpToolsProvider } from './RemoteMcpToolsProvider';
+import type { RemoteMcpToolsProvider, RemoteToolDefinition } from './RemoteMcpToolsProvider';
 import { TOOL_APPROVAL_REQUEST } from '../types';
+import type { ToolDefinition } from '../types';
 
 function createTestSession(overrides: Partial<ClientSession> = {}): ClientSession {
   return {
@@ -102,6 +103,17 @@ describe('isMcpConfirmationResponse', () => {
 
 describe('handleMcpConfirmation', () => {
   const originalArgs = { to: 'Bob', amount: 5000 };
+  const inputSchema: ToolDefinition['parameters'] = {
+    type: 'object',
+    properties: { to: { type: 'string' }, amount: { type: 'number' } },
+    required: ['to', 'amount'],
+  };
+  const remoteTool = (provider: RemoteMcpToolsProvider): RemoteToolDefinition => ({
+    name: 'ns_transfer',
+    description: 'Transfer money',
+    parameters: inputSchema,
+    _remote: { provider, originalName: 'transfer', inputSchema },
+  });
   const confirmation: McpConfirmationResponse = {
     _use_ai_internal: true,
     _use_ai_type: 'confirmation_required',
@@ -118,8 +130,8 @@ describe('handleMcpConfirmation', () => {
     const provider = createMockProvider();
 
     const promise = handleMcpConfirmation(
-      confirmation, 'tool-call-1', 'ns_transfer', 'transfer',
-      originalArgs, provider, session, events
+      confirmation, 'tool-call-1', remoteTool(provider),
+      originalArgs, session, events
     );
 
     expect(events.emittedEvents).toHaveLength(1);
@@ -130,6 +142,7 @@ describe('handleMcpConfirmation', () => {
     expect(emitted.message).toBe('Transfer $5000 to Bob. Are you sure?');
     expect(emitted.metadata).toEqual({ amount: 5000, to: 'Bob' });
     expect(emitted.toolCallArgs).toEqual({ to: 'Bob', amount: 5000 });
+    expect(emitted.acceptsModifiedArgs).toBe(true);
 
     session.pendingToolApprovals.get('tool-call-1')!({ approved: true });
     await promise;
@@ -141,8 +154,8 @@ describe('handleMcpConfirmation', () => {
     const provider = createMockProvider({ success: true, message: 'Transferred' });
 
     const promise = handleMcpConfirmation(
-      confirmation, 'tool-call-1', 'ns_transfer', 'transfer',
-      originalArgs, provider, session, events
+      confirmation, 'tool-call-1', remoteTool(provider),
+      originalArgs, session, events
     );
 
     session.pendingToolApprovals.get('tool-call-1')!({ approved: true });
@@ -168,8 +181,8 @@ describe('handleMcpConfirmation', () => {
     };
 
     const promise = handleMcpConfirmation(
-      noColumnsConfirmation, 'tool-call-1', 'ns_transfer', 'transfer',
-      originalArgs, provider, session, events
+      noColumnsConfirmation, 'tool-call-1', remoteTool(provider),
+      originalArgs, session, events
     );
 
     session.pendingToolApprovals.get('tool-call-1')!({ approved: true });
@@ -184,8 +197,8 @@ describe('handleMcpConfirmation', () => {
     const provider = createMockProvider();
 
     const promise = handleMcpConfirmation(
-      confirmation, 'tool-call-1', 'ns_transfer', 'transfer',
-      originalArgs, provider, session, events
+      confirmation, 'tool-call-1', remoteTool(provider),
+      originalArgs, session, events
     );
 
     session.pendingToolApprovals.get('tool-call-1')!({ approved: false, reason: 'Too expensive' });
@@ -204,8 +217,8 @@ describe('handleMcpConfirmation', () => {
     const provider = createMockProvider();
 
     const promise = handleMcpConfirmation(
-      confirmation, 'tool-call-1', 'ns_transfer', 'transfer',
-      originalArgs, provider, session, events
+      confirmation, 'tool-call-1', remoteTool(provider),
+      originalArgs, session, events
     );
 
     session.pendingToolApprovals.get('tool-call-1')!({ approved: false });
@@ -225,8 +238,8 @@ describe('handleMcpConfirmation', () => {
     } as unknown as RemoteMcpToolsProvider;
 
     const promise = handleMcpConfirmation(
-      confirmation, 'tool-call-1', 'ns_transfer', 'transfer',
-      originalArgs, provider, session, events
+      confirmation, 'tool-call-1', remoteTool(provider),
+      originalArgs, session, events
     );
 
     session.pendingToolApprovals.get('tool-call-1')!({ approved: true });
@@ -251,13 +264,125 @@ describe('handleMcpConfirmation', () => {
     } as unknown as RemoteMcpToolsProvider;
 
     const promise = handleMcpConfirmation(
-      confirmation, 'tool-call-1', 'ns_transfer', 'transfer',
-      originalArgs, provider, session, events, mcpHeaders
+      confirmation, 'tool-call-1', remoteTool(provider),
+      originalArgs, session, events, mcpHeaders
     );
 
     session.pendingToolApprovals.get('tool-call-1')!({ approved: true });
     await promise;
 
     expect(capturedHeaders).toBe(mcpHeaders);
+  });
+  function createSequencedProvider(results: unknown[]) {
+    const executedCalls: { toolName: string; args: unknown }[] = [];
+    const provider = {
+      executeTool: async (toolName: string, args: unknown) => {
+        executedCalls.push({ toolName, args });
+        return results[executedCalls.length - 1];
+      },
+    } as unknown as RemoteMcpToolsProvider;
+    return { provider, executedCalls };
+  }
+
+  const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+  test('re-runs phase 1 with edited args and asks again before phase 2 runs them', async () => {
+    const session = createTestSession();
+    const events = createMockEmitter();
+    const reconfirmation: McpConfirmationResponse = {
+      _use_ai_internal: true,
+      _use_ai_type: 'confirmation_required',
+      _use_ai_metadata: {
+        message: 'Transfer $300 to Carol. Are you sure?',
+        metadata: { amount: 300, to: 'Carol' },
+        additional_columns: { token: 'token_for_carol' },
+      },
+    };
+    const { provider, executedCalls } = createSequencedProvider([reconfirmation, { success: true }]);
+
+    const promise = handleMcpConfirmation(
+      confirmation, 'tool-call-1', remoteTool(provider),
+      originalArgs, session, events
+    );
+
+    session.pendingToolApprovals.get('tool-call-1')!({
+      approved: true,
+      modifiedArgs: { to: 'Carol', amount: 300 },
+    });
+    await tick();
+
+    expect(executedCalls).toEqual([{ toolName: 'transfer', args: { to: 'Carol', amount: 300 } }]);
+    expect(events.emittedEvents).toHaveLength(2);
+    const second = events.emittedEvents[1] as Record<string, unknown>;
+    expect(second.message).toBe('Transfer $300 to Carol. Are you sure?');
+    expect(second.toolCallArgs).toEqual({ to: 'Carol', amount: 300 });
+
+    session.pendingToolApprovals.get('tool-call-1')!({ approved: true });
+    const result = await promise;
+
+    expect(executedCalls[1]).toEqual({
+      toolName: 'transfer',
+      args: { to: 'Carol', amount: 300, token: 'token_for_carol' },
+    });
+    expect(result).toEqual({ success: true });
+  });
+
+  test('returns the re-run phase-1 result when the edited args need no confirmation', async () => {
+    const session = createTestSession();
+    const events = createMockEmitter();
+    const { provider, executedCalls } = createSequencedProvider([{ success: true, message: 'Done' }]);
+
+    const promise = handleMcpConfirmation(
+      confirmation, 'tool-call-1', remoteTool(provider),
+      originalArgs, session, events
+    );
+
+    session.pendingToolApprovals.get('tool-call-1')!({
+      approved: true,
+      modifiedArgs: { to: 'Carol', amount: 1 },
+    });
+
+    expect(await promise).toEqual({ success: true, message: 'Done' });
+    expect(executedCalls).toEqual([{ toolName: 'transfer', args: { to: 'Carol', amount: 1 } }]);
+  });
+
+  test('a re-confirmation that is rejected runs nothing further', async () => {
+    const session = createTestSession();
+    const events = createMockEmitter();
+    const { provider, executedCalls } = createSequencedProvider([confirmation]);
+
+    const promise = handleMcpConfirmation(
+      confirmation, 'tool-call-1', remoteTool(provider),
+      originalArgs, session, events
+    );
+
+    session.pendingToolApprovals.get('tool-call-1')!({ approved: true, modifiedArgs: { to: 'Carol', amount: 2 } });
+    await tick();
+    session.pendingToolApprovals.get('tool-call-1')!({ approved: false, reason: 'Changed my mind' });
+
+    expect(await promise).toEqual({ error: true, message: 'Tool execution denied by user: Changed my mind' });
+    expect(executedCalls).toHaveLength(1);
+  });
+
+  test('does not call phase-2 when modifiedArgs fail the input schema', async () => {
+    const session = createTestSession();
+    const events = createMockEmitter();
+    const provider = createMockProvider({ success: true });
+
+    const promise = handleMcpConfirmation(
+      confirmation, 'tool-call-1', remoteTool(provider),
+      originalArgs, session, events
+    );
+
+    session.pendingToolApprovals.get('tool-call-1')!({
+      approved: true,
+      modifiedArgs: { to: 'Carol', amount: 'a lot' },
+    });
+    const result = await promise as { error: boolean; message: string };
+
+    expect(provider.executedCalls).toHaveLength(0);
+    expect(result.error).toBe(true);
+    expect(result.message).toContain('Edited arguments are invalid');
+    expect(result.message).toContain('args/amount must be number');
   });
 });
