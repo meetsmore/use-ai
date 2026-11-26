@@ -541,6 +541,11 @@ When the AI attempts to call a tool marked with `destructiveHint: true`:
 3. The user can click "Allow" to proceed or "Deny" to reject the action
 4. If rejected, the AI receives a message that the user denied the action
 
+An approval can only be answered from the chat whose run asked for it:
+
+- Switching to another chat (or deleting the run's chat) rejects the pending approvals with the reason `The user switched to another chat`, also when the request arrives after the switch. The run then finishes in its own chat. Runtime approvals (`ctx.requestApproval`) resolve to `{ approved: false }`.
+- When the run ends without an answer (stopped, failed, disconnected, or the provider unmounted), the pending approvals are dropped. Approving afterwards runs nothing.
+
 **Batch Approvals:**
 
 When the AI proposes multiple destructive tool calls at once, they are batched together in a single approval dialog:

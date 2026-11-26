@@ -712,6 +712,26 @@ export function UseAIProvider({
     }
   }, [toolSystem.hasTools, toolSystem.aggregatedTools, connected]);
 
+  // ── Approvals Outside the Run's Chat ────────────────────────────────────
+
+  // An approval belongs to the chat its run was sent from. Switching to
+  // another chat (or deleting the run's chat) does not end the run: the server
+  // keeps waiting for the answer, so the approval would show over a different
+  // chat and, if approved, run a tool for a conversation the user no longer
+  // sees. Reject it instead, so the run finishes and the user can send again.
+  // Also covers an approval that arrives after the user switched away.
+  // Not endRun(): it answers nothing, so the server would wait forever and
+  // `loading` would never clear.
+  const runChatId = serverEvents.streamingChatIdRef.current;
+  const displayedChatId = chatManagement.displayedChatId;
+  const { pendingApprovals, rejectAll } = toolSystem;
+  useEffect(() => {
+    if (pendingApprovals.length === 0) return;
+    if (runChatId === null || runChatId === displayedChatId) return;
+    logger.debug('[Provider] Rejecting approvals of a run in another chat:', runChatId);
+    rejectAll('The user switched to another chat');
+  }, [pendingApprovals, displayedChatId, runChatId, rejectAll]);
+
   // ── Abort ───────────────────────────────────────────────────────────────
 
   const abortRun = useCallback(() => {
