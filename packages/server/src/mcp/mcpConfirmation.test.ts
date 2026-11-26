@@ -274,10 +274,11 @@ describe('handleMcpConfirmation', () => {
     expect(capturedHeaders).toBe(mcpHeaders);
   });
   function createSequencedProvider(results: unknown[]) {
-    const executedCalls: { toolName: string; args: unknown }[] = [];
+    type ParamHeaders = RemoteToolDefinition['_remote']['paramHeaders'];
+    const executedCalls: { toolName: string; args: unknown; paramHeaders?: ParamHeaders }[] = [];
     const provider = {
-      executeTool: async (toolName: string, args: unknown) => {
-        executedCalls.push({ toolName, args });
+      executeTool: async (toolName: string, args: unknown, _headers: unknown, paramHeaders?: ParamHeaders) => {
+        executedCalls.push({ toolName, args, ...(paramHeaders && { paramHeaders }) });
         return results[executedCalls.length - 1];
       },
     } as unknown as RemoteMcpToolsProvider;
@@ -299,9 +300,11 @@ describe('handleMcpConfirmation', () => {
       },
     };
     const { provider, executedCalls } = createSequencedProvider([reconfirmation, { success: true }]);
+    const tool = remoteTool(provider);
+    tool._remote.paramHeaders = [{ header: 'Recipient', path: ['to'], type: 'string' }];
 
     const promise = handleMcpConfirmation(
-      confirmation, 'tool-call-1', remoteTool(provider),
+      confirmation, 'tool-call-1', tool,
       originalArgs, session, events
     );
 
@@ -311,7 +314,11 @@ describe('handleMcpConfirmation', () => {
     });
     await tick();
 
-    expect(executedCalls).toEqual([{ toolName: 'transfer', args: { to: 'Carol', amount: 300 } }]);
+    expect(executedCalls).toEqual([{
+      toolName: 'transfer',
+      args: { to: 'Carol', amount: 300 },
+      paramHeaders: tool._remote.paramHeaders,
+    }]);
     expect(events.emittedEvents).toHaveLength(2);
     const second = events.emittedEvents[1] as Record<string, unknown>;
     expect(second.message).toBe('Transfer $300 to Carol. Are you sure?');
@@ -323,6 +330,7 @@ describe('handleMcpConfirmation', () => {
     expect(executedCalls[1]).toEqual({
       toolName: 'transfer',
       args: { to: 'Carol', amount: 300, token: 'token_for_carol' },
+      paramHeaders: tool._remote.paramHeaders,
     });
     expect(result).toEqual({ success: true });
   });

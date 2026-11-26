@@ -1226,7 +1226,8 @@ const server = new UseAIServer({
     url: 'http://my-app.com/mcp',
     namespace: 'my-app',
     timeout: 30_000,
-    toolsCacheTtl: 60_000  // cache tool definitions for 60s
+    toolsCacheTtl: 60_000, // cache tool definitions for 60s
+    protocolVersion: '2026-07-28', // optional: send MCP 2026-07-28 request headers and _meta
   }],
 });
 ```
@@ -1253,6 +1254,7 @@ A non-browser client can send any `Origin` header. The origin check stops other 
 
 `use-ai` supports providing additional tools using external MCPs, defined by `mcpEndpoints`.
 These MCP endpoints should follow the MCP protocol to return a set of tools when called.
+They are called over [Streamable HTTP](https://modelcontextprotocol.io/specification/2026-07-28/basic/transports/streamable-http): each response may be `application/json` or a `text/event-stream`. SSE streams are not resumed: if the server closes one before the response, the call fails.
 
 The server will invoke these on start, with a refresh interval to reload them periodically.
 

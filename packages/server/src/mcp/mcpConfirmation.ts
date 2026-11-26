@@ -44,7 +44,8 @@ export async function handleMcpConfirmation(
   mcpHeaders?: McpHeadersMap
 ): Promise<unknown> {
   const { message, metadata, additional_columns } = confirmation._use_ai_metadata;
-  const { name: toolCallName, _remote: { provider, originalName: originalToolName } } = tool;
+  const { provider, originalName: originalToolName, paramHeaders } = tool._remote;
+  const toolCallName = tool.name;
 
   logger.info('[MCP] Tool returned confirmation_required', {
     toolCallId,
@@ -81,7 +82,7 @@ export async function handleMcpConfirmation(
 
   const callTool = async (args: Record<string, unknown>, phase: 'phase 1' | 'phase 2') => {
     try {
-      return await provider.executeTool(originalToolName, args, mcpHeaders);
+      return await provider.executeTool(originalToolName, args, mcpHeaders, paramHeaders);
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       logger.error(`[MCP] ${phase} execution failed`, { toolCallId, originalToolName, error: errorMsg });
