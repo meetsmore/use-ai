@@ -51,6 +51,7 @@ bun run kill                   # Kill processes on ports 3000, 3002, 8081
 - `ANTHROPIC_API_KEY` (required)
 - `ANTHROPIC_WORKSPACE_ID` (required for an identity-linked key): sent as the `anthropic-workspace-id` header
 - `LOG_FORMAT` (optional): `pretty` (default) or `json`
+- `LOG_LLM_CONTENT` (optional): `true` to also log user prompts, AI responses and tool results (off by default)
 - `RATE_LIMIT_MAX_REQUESTS` (optional): Max requests per window (0 = unlimited)
 - `RATE_LIMIT_WINDOW_MS` (optional): Window in ms (default: 60000)
 - `RATE_LIMIT_MAX_LLM_CALLS` (optional): Max LLM calls per window (0 = unlimited). Each agent step is one LLM call, so one run can use up to `maxSteps + 1`. If the budget runs out mid-run, the run stops with `RUN_ERROR` (`RATE_LIMITED`). Same window and key as `RATE_LIMIT_MAX_REQUESTS`.
