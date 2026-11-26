@@ -28,7 +28,7 @@ import { isRemoteTool, isServerTool } from './utils/toolFilters';
 import { abortRun, RunAbortedByUser, RunAbortedByClientDisconnect } from './utils/abortReason';
 import { RemoteMcpToolsProvider, type RemoteToolDefinition } from './mcp';
 import type { ServerToolDefinition } from './tools/types';
-import { findMatch } from './utils/patternMatcher';
+import { findMcpHeadersForUrl } from './mcp/mcpHeaderPatterns';
 import {
   createRuntimeAdapter,
   createClientIpTracker,
@@ -1128,7 +1128,7 @@ export class UseAIServer {
       return {};
     }
 
-    const matchingConfig = findMatch(endpointUrl, mcpHeaders);
+    const matchingConfig = findMcpHeadersForUrl(endpointUrl, mcpHeaders);
     return matchingConfig?.headers || {};
   }
 
