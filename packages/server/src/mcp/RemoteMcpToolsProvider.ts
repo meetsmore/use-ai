@@ -311,12 +311,14 @@ export class RemoteMcpToolsProvider {
   }
 
   /**
-   * Formats headers for logging with every value redacted.
-   * Values carry user JWTs and server keys, so they are never logged, not even their length.
+   * Formats headers for logging.
+   * By default, redacts all values without revealing their length, since they carry user
+   * JWTs and server keys. Set DEBUG=1 to print the values (local development only).
    */
   private formatHeaders(headers: Record<string, string>): string {
-    return Object.keys(headers)
-      .map((key) => `${key}: [REDACTED]`)
+    const isDebug = process.env.DEBUG === '1';
+    return Object.entries(headers)
+      .map(([key, value]) => `${key}: ${isDebug ? value : '[REDACTED]'}`)
       .join(', ');
   }
 }
