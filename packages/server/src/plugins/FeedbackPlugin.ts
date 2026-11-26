@@ -3,7 +3,7 @@ import type { UseAIServerPlugin, MessageHandler } from './types';
 import type { ClientSession } from '../agents/types';
 import type { UseAIClientMessage, FeedbackMessage } from '@meetsmore-oss/use-ai-core';
 import { logger } from '../logger';
-import { langfuse } from '../instrumentation';
+import { langfuse, type LangfuseApi } from '../instrumentation';
 
 /**
  * Plugin for user feedback on AI messages.
@@ -34,7 +34,12 @@ import { langfuse } from '../instrumentation';
 export class FeedbackPlugin implements UseAIServerPlugin {
   private langfuseClient: LangfuseClient | null = null;
 
-  constructor(client: LangfuseClient | undefined = langfuse.client) {
+  /**
+   * @param client - The Langfuse client. If it is not given, the plugin uses the client of `langfuseApi`.
+   * @param langfuseApi - The Langfuse singleton. Tests set it to avoid a process-global module mock.
+   */
+  constructor(client?: LangfuseClient, langfuseApi: Pick<LangfuseApi, 'client'> = langfuse) {
+    client ??= langfuseApi.client;
     if (!client) {
       logger.debug('[FeedbackPlugin] Langfuse not enabled - feedback disabled');
       return
