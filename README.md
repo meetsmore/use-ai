@@ -1132,6 +1132,7 @@ ANTHROPIC_API_KEY=sk-ant-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 # LOG_SILENT=true                                     # Disable all logging
 # DEBUG=1                                             # Enable debug logging
 # MAX_HTTP_BUFFER_SIZE=10485760                       # Max payload size in bytes
+# ALLOWED_ORIGINS=https://app.example.com             # Comma-separated. Refuse connections from other origins
 
 # Rate Limiting (optional)
 # RATE_LIMIT_MAX_REQUESTS=0
@@ -1163,6 +1164,7 @@ const server = new UseAIServer({
   },
   defaultAgent: 'claude',
   transport: 'socketio',  // or 'websocket', see 'Transports'
+  allowedOrigins: ['https://app.example.com'], // optional, see 'Origin check'
   rateLimitMaxRequests: 1_000,
   rateLimitWindowMs: 60_000,
   plugins: [              // see 'Plugins'
@@ -1176,6 +1178,24 @@ const server = new UseAIServer({
   }],
 });
 ```
+
+#### Origin check
+
+By default, the server does not check the `Origin` header. CORS does not apply to WebSocket upgrades, so any site can open a connection from its users' browsers.
+
+To refuse connections from other sites, set `allowedOrigins` on `UseAIServer`, or `ALLOWED_ORIGINS` (comma-separated) on the Docker image. The check applies to both transports:
+
+- With `transport: 'socketio'`, the server refuses the handshake (polling or WebSocket) with HTTP 403.
+- With `transport: 'websocket'`, the server refuses the upgrade at `/` with HTTP 403.
+
+Each entry must match the `Origin` header exactly: scheme, host and port, with no trailing slash, for example `https://app.example.com`. Browsers always send the `Origin` header on a WebSocket upgrade and on a cross-origin request. But a browser does not send it on a same-origin GET. An example is the first Socket.IO polling handshake when the app and the server share an origin behind a reverse proxy. For a request that has no `Origin` header, the server reads `Sec-Fetch-Site`:
+
+- If `Sec-Fetch-Site` is `same-origin`, the server accepts the request.
+- In all other cases, the server refuses the request. This includes a missing header, `same-site`, `cross-site` and `none`.
+
+A page cannot set `Sec-Fetch-Site`, so another site cannot make the browser send `same-origin`. The browser compares the page with the server's own origin, not with `allowedOrigins`. As a result, any page on the server's own origin can connect, even if `allowedOrigins` does not name that origin. Do not serve untrusted content on the same origin as the server.
+
+A non-browser client can send any `Origin` header. The origin check stops other sites in a browser, but it does not replace authentication. Use an auth plugin as well.
 
 ### External MCPs
 
