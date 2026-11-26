@@ -630,8 +630,9 @@ export function UseAIProvider({
 
   useEffect(() => {
     logger.debug('[UseAIProvider] Initializing client for', resolvedServerUrl);
-    // `transport` is deliberately not a dependency: an inline object must not
-    // re-create the client on every render.
+    // The effect depends on the resolved URL, not on the `transport` object.
+    // An inline transport object is new on each render, but its URL is the same.
+    // So the client is created again only when the URL changes.
     const client = new UseAIClient(transport ?? serverUrl!);
 
     const unsubscribeConnection = client.onConnectionStateChange((isConnected) => {
@@ -668,7 +669,7 @@ export function UseAIProvider({
       // waiting for the user) would otherwise wait forever.
       toolSystem.endRun();
     };
-  }, [serverUrl]);
+  }, [resolvedServerUrl]);
 
   // The file transformation cache is module-level and outlives the provider.
   // Clear it on unmount so results from one session (for example, before a
@@ -955,6 +956,7 @@ export function UseAIProvider({
     onLoadChat: chatManagement.loadChat,
     onDeleteChat: chatManagement.deleteChat,
     onListChats: chatManagement.listChats,
+    onGetChat: chatManagement.getCurrentChat,
     suggestions: promptState.aggregatedSuggestions,
     availableAgents,
     defaultAgent,
