@@ -1,3 +1,4 @@
+import type { ZodIssue } from 'zod';
 import type { ClientSession, EventEmitter } from '../agents/types';
 import type { ToolApprovalRequestEvent } from '../types';
 import { TOOL_APPROVAL_REQUEST } from '../types';
@@ -9,6 +10,13 @@ import { logger } from '../logger';
 type ToolArguments = Record<string, unknown>;
 /** Generic tool result type */
 type ToolResult = unknown;
+
+/** Formats Zod issues as `args/path message`, for the error result the AI reads. */
+function formatZodIssues(issues: ZodIssue[]): string {
+  return issues
+    .map((issue) => `${['args', ...issue.path].join('/')} ${issue.message}`)
+    .join(', ');
+}
 
 /**
  * Creates an execute function for server-side tools.
@@ -25,7 +33,28 @@ export function createServerToolExecutor(
   session: ClientSession,
   events: EventEmitter
 ): (args: ToolArguments, options: { toolCallId: string }) => Promise<ToolResult> {
-  return async (args: ToolArguments, { toolCallId }): Promise<ToolResult> => {
+  return async (rawArgs: ToolArguments, { toolCallId }): Promise<ToolResult> => {
+    // The AI SDK passes tool input through without checking it against the schema,
+    // so the tool's own Zod schema is the only check before execute runs.
+    let args = rawArgs;
+    const schema = serverTool._server.schema;
+    if (schema) {
+      const parsed = await schema.safeParseAsync(rawArgs);
+      if (!parsed.success) {
+        // Issue messages can quote the received value, so only paths and codes are logged.
+        logger.warn('[Server Tool] Invalid arguments, not executing', {
+          toolName: serverTool.name,
+          toolCallId,
+          issues: parsed.error.issues.map((issue) => ({ path: issue.path.join('.'), code: issue.code })),
+        });
+        return {
+          error: true,
+          message: `Invalid arguments for tool ${serverTool.name}: ${formatZodIssues(parsed.error.issues)}`,
+        };
+      }
+      args = parsed.data as ToolArguments;
+    }
+
     logger.info('[Server Tool] Executing', {
       toolName: serverTool.name,
       toolCallId,

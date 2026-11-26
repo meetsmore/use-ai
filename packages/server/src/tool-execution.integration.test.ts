@@ -18,6 +18,8 @@ import {
   createToolValidatorMockModel,
 } from '../test/integration-test-utils';
 import { AISDKAgent } from './agents/AISDKAgent';
+import { defineServerTool } from './tools';
+import { z } from 'zod';
 
 // Track all servers and sockets for cleanup
 const cleanup = new TestCleanupManager();
@@ -369,5 +371,56 @@ describe('Tool Execution Coordination', () => {
     await waitForEventType(socket, EventType.RUN_FINISHED);
 
     socket.disconnect();
+  });
+});
+
+describe('Server tool argument validation', () => {
+  test('a server tool runs only with arguments its Zod schema accepts', async () => {
+    const port = 9180;
+    const received: unknown[] = [];
+    const model = createSequentialMockModel([
+      {
+        toolCalls: [
+          // An operator object where the schema expects a string
+          { toolCallId: 'bad-call', toolName: 'find_user', input: { id: { $ne: null } } },
+          // A valid id plus a key the schema does not declare
+          { toolCallId: 'good-call', toolName: 'find_user', input: { id: 'user-1', extra: 'dropped' } },
+        ],
+      },
+      { text: 'Done' },
+    ]);
+    const server = new UseAIServer({
+      port,
+      agents: { test: new AISDKAgent({ hooks: { loadConfig: () => ({ model }) } }) },
+      defaultAgent: 'test',
+      tools: {
+        find_user: defineServerTool(
+          'Find a user by id',
+          z.object({ id: z.string() }),
+          (args) => {
+            received.push(args);
+            return { found: true };
+          }
+        ),
+      },
+    });
+    cleanup.trackServer(server);
+
+    const socket = await cleanup.createTestClient(port);
+    sendRunAgent(socket, { prompt: 'Find the user', tools: [] });
+    const events = await collectEventsUntil(socket, EventType.RUN_FINISHED);
+
+    // The tool ran once, for the valid call, without the undeclared key
+    expect(received).toEqual([{ id: 'user-1' }]);
+
+    const results = events.filter((e) => e.type === EventType.TOOL_CALL_RESULT) as Array<{ toolCallId: string; content: string }>;
+    const badResult = JSON.parse(results.find((r) => r.toolCallId === 'bad-call')!.content);
+    expect(badResult.error).toBe(true);
+    expect(badResult.message).toContain('Invalid arguments for tool find_user');
+    expect(badResult.message).toContain('args/id');
+    expect(JSON.parse(results.find((r) => r.toolCallId === 'good-call')!.content)).toEqual({ found: true });
+
+    socket.disconnect();
+    server.close();
   });
 });

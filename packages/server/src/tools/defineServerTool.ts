@@ -77,15 +77,18 @@ export function defineServerTool<TSchema extends z.ZodType>(
   const isNoParamForm = typeof schemaOrExecute === 'function';
 
   let parameters: ServerToolConfig['parameters'];
+  let schema: z.ZodType | undefined;
   let execute: ServerToolExecuteFn;
   let actualOptions: ServerToolOptions;
 
   if (isNoParamForm) {
     parameters = { type: 'object', properties: {} };
+    // Empty object schema, so arguments the AI adds are dropped before execute runs
+    schema = z.object({});
     execute = schemaOrExecute as ServerToolExecuteFn;
     actualOptions = (executeOrOptions as ServerToolOptions) || {};
   } else {
-    const schema = schemaOrExecute as TSchema;
+    schema = schemaOrExecute as TSchema;
     const jsonSchema = zodToJsonSchema(schema, { target: 'openApi3' }) as {
       type?: string;
       properties?: Record<string, unknown>;
@@ -107,6 +110,10 @@ export function defineServerTool<TSchema extends z.ZodType>(
     parameters,
     execute,
   };
+
+  if (schema) {
+    config.schema = schema;
+  }
 
   if (actualOptions.annotations) {
     config.annotations = actualOptions.annotations;

@@ -1324,6 +1324,10 @@ const server = new UseAIServer({
 });
 ```
 
+**Argument validation:**
+
+Before `execute` runs, the AI's arguments are parsed with the tool's Zod schema. `execute` receives the parsed value: keys the schema does not declare are dropped, and defaults and transforms are applied. If parsing fails, `execute` does not run and the AI gets `{ error: true, message: 'Invalid arguments for tool <name>: ...' }`. A tool without parameters gets an empty object schema. A `ServerToolConfig` written by hand, without `defineServerTool()`, has no schema and is not checked.
+
 **Execution Context:**
 
 Server tool execute functions receive a `ServerToolContext` as the second argument, providing access to the current session, app state, run ID, and tool call ID:
