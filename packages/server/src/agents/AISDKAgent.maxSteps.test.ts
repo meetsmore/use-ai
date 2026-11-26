@@ -1,11 +1,11 @@
 import { describe, expect, test } from 'bun:test';
 import { MockLanguageModelV3 } from 'ai/test';
 import { simulateReadableStream } from 'ai';
-import { v4 as uuidv4 } from 'uuid';
 import { AISDKAgent } from './AISDKAgent';
 import type { AgentInput, EventEmitter, AGUIEventExtended } from './types';
 import type { ServerToolDefinition } from '../tools/types';
 import { EventType, ErrorCode } from '@meetsmore-oss/use-ai-core';
+import { createTestInput } from '../../test/agent-input';
 
 function createToolLoopMockModel(toolName: string, calls: { count: number }) {
   return new MockLanguageModelV3({
@@ -135,35 +135,8 @@ function createToolThenTextMockModel(
   });
 }
 
-function createTestInput(tools: ServerToolDefinition[]): AgentInput {
-  const threadId = uuidv4();
-  const runId = uuidv4();
-
-  return {
-    session: {
-      socket: {} as never,
-      clientId: 'client-1',
-      threadId: 'thread-1',
-      tools: [],
-      state: null,
-      pendingToolCalls: new Map(),
-      pendingToolApprovals: new Map(),
-      ipAddress: '127.0.0.1',
-    },
-    runId,
-    messages: [{ role: 'user', content: 'loop' }],
-    tools,
-    state: null,
-    originalInput: {
-      threadId,
-      runId,
-      messages: [{ id: uuidv4(), role: 'user', content: 'loop' }],
-      tools,
-      state: null,
-      context: [],
-      forwardedProps: {},
-    },
-  };
+function createLoopInput(tools: ServerToolDefinition[]): AgentInput {
+  return createTestInput({ tools, messages: [{ role: 'user', content: 'loop' }] });
 }
 
 describe('AISDKAgent maxSteps', () => {
@@ -186,7 +159,7 @@ describe('AISDKAgent maxSteps', () => {
     const emittedEvents: AGUIEventExtended[] = [];
     const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
 
-    const result = await agent.run(createTestInput([loopTool]), eventEmitter);
+    const result = await agent.run(createLoopInput([loopTool]), eventEmitter);
 
     expect(result.success).toBe(true);
     // 10 main iterations + 1 graceful summary call = 11 total
@@ -204,7 +177,7 @@ describe('AISDKAgent maxSteps', () => {
     const emittedEvents: AGUIEventExtended[] = [];
     const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
 
-    const result = await agent.run(createTestInput([loopTool]), eventEmitter);
+    const result = await agent.run(createLoopInput([loopTool]), eventEmitter);
 
     expect(result.success).toBe(true);
     // 2 main iterations + 1 graceful summary call = 3 total
@@ -219,7 +192,7 @@ describe('AISDKAgent maxSteps', () => {
     const emittedEvents: AGUIEventExtended[] = [];
     const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
 
-    const result = await agent.run(createTestInput([loopTool]), eventEmitter);
+    const result = await agent.run(createLoopInput([loopTool]), eventEmitter);
 
     expect(result.success).toBe(true);
     // 2 main iterations + 1 graceful summary call = 3 total
@@ -275,7 +248,7 @@ describe('AISDKAgent maxSteps', () => {
     const emittedEvents: AGUIEventExtended[] = [];
     const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
 
-    const result = await agent.run(createTestInput([loopTool]), eventEmitter);
+    const result = await agent.run(createLoopInput([loopTool]), eventEmitter);
 
     expect(result.success).toBe(true);
     // Only 1 call — no graceful summary needed when last step had no tool calls
@@ -310,7 +283,7 @@ describe('AISDKAgent maxSteps', () => {
       const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
 
-      const result = await agent.run({ ...createTestInput([loopTool]), llmCallLimit: limit }, eventEmitter);
+      const result = await agent.run({ ...createLoopInput([loopTool]), llmCallLimit: limit }, eventEmitter);
 
       expect(result.success).toBe(true);
       // 2 main iterations + 1 graceful summary call = 3 LLM calls
@@ -327,7 +300,7 @@ describe('AISDKAgent maxSteps', () => {
       const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
 
-      const result = await agent.run({ ...createTestInput([loopTool]), llmCallLimit: limit }, eventEmitter);
+      const result = await agent.run({ ...createLoopInput([loopTool]), llmCallLimit: limit }, eventEmitter);
 
       expect(result.success).toBe(false);
       // Only the 2 allowed calls reach the model; the default maxSteps (10) is not reached
@@ -348,7 +321,7 @@ describe('AISDKAgent maxSteps', () => {
       const emittedEvents: AGUIEventExtended[] = [];
       const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
 
-      const result = await agent.run({ ...createTestInput([loopTool]), llmCallLimit: limit }, eventEmitter);
+      const result = await agent.run({ ...createLoopInput([loopTool]), llmCallLimit: limit }, eventEmitter);
 
       expect(result.success).toBe(false);
       expect(calls.count).toBe(0);

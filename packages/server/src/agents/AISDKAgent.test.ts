@@ -19,6 +19,7 @@ import {
   not,
 } from '../utils/toolFilters';
 import { pushTraceIdForRun, popTraceIdForRun } from '../instrumentation';
+import { createTestInput } from '../../test/agent-input';
 
 // Copy of the real 'ai' exports. mock.module() patches the live namespace in place,
 // so a copy made after a mock would keep the stub.
@@ -105,42 +106,6 @@ function createMultiDeltaStreamingMockModel(deltas: string[]) {
       },
     }),
   });
-}
-
-/**
- * Helper to create a standard test input
- */
-function createTestInput(overrides: Partial<AgentInput> = {}): AgentInput {
-  const threadId = uuidv4();
-  const runId = uuidv4();
-  return {
-    session: {
-      socket: {} as never,
-      clientId: 'client-1',
-      threadId: 'thread-1',
-      tools: [],
-      state: null,
-      pendingToolCalls: new Map(),
-      pendingToolApprovals: new Map(),
-      ipAddress: '127.0.0.1',
-    },
-    runId,
-    messages: [
-      { role: 'user', content: 'Hello' },
-    ],
-    tools: [],
-    state: null,
-    originalInput: {
-      threadId,
-      runId,
-      messages: [{ id: uuidv4(), role: 'user', content: 'Hello' }],
-      tools: [],
-      state: null,
-      context: [],
-      forwardedProps: {},
-    },
-    ...overrides,
-  };
 }
 
 describe('AISDKAgent', () => {
