@@ -4,8 +4,8 @@ import { useServerEvents } from './useServerEvents';
 import { defaultStrings } from '../theme/strings';
 import { EventType } from '../types';
 import type { AGUIEvent, ToolDefinition } from '../types';
-import type { UseToolSystemReturn } from './useToolSystem';
 import type { UseAIClient } from '../client';
+import { makeToolSystem } from '../../test/toolSystemMock';
 
 /**
  * A call reaches the client after TOOL_CALL_END. The client runs it only when
@@ -13,14 +13,7 @@ import type { UseAIClient } from '../client';
  * registry does not have.
  */
 function setup(runTools: ToolDefinition[]) {
-  const toolSystem = {
-    aggregatedToolsRef: { current: {} },
-    executeToolCall: mock(async () => undefined),
-    storePendingToolCall: mock(),
-    handleApprovalRequest: mock(),
-    pendingApprovals: [],
-    endRun: mock(),
-  } as unknown as UseToolSystemReturn;
+  const toolSystem = makeToolSystem();
   const currentToolCalls = new Map<string, { name: string; args: string }>();
   const client = {
     runMessages: [],

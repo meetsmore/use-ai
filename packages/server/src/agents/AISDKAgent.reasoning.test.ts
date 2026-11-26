@@ -1,42 +1,12 @@
 import { describe, expect, test } from 'bun:test';
 import { AISDKAgent } from './AISDKAgent';
-import type { AgentInput, EventEmitter, AGUIEventExtended } from './types';
+import type { EventEmitter, AGUIEventExtended } from './types';
 import { EventType } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 import { MockLanguageModelV3 } from 'ai/test';
 import { simulateReadableStream } from 'ai';
 import type { JSONValue } from 'ai';
-
-function createTestInput(overrides: Partial<AgentInput> = {}): AgentInput {
-  const threadId = uuidv4();
-  const runId = uuidv4();
-  return {
-    session: {
-      socket: {} as never,
-      clientId: 'client-1',
-      threadId: 'thread-1',
-      tools: [],
-      state: null,
-      pendingToolCalls: new Map(),
-      pendingToolApprovals: new Map(),
-      ipAddress: '127.0.0.1',
-    },
-    runId,
-    messages: [{ role: 'user', content: 'Hello' }],
-    tools: [],
-    state: null,
-    originalInput: {
-      threadId,
-      runId,
-      messages: [{ id: uuidv4(), role: 'user', content: 'Hello' }],
-      tools: [],
-      state: null,
-      context: [],
-      forwardedProps: {},
-    },
-    ...overrides,
-  };
-}
+import { createTestInput } from '../../test/agent-input';
 
 describe('AISDKAgent reasoning events', () => {
   test('emits REASONING_* events in correct order before text events', async () => {

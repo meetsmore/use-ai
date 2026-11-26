@@ -48,12 +48,6 @@ test.describe('Model Selection', () => {
     return await agentSelector.textContent();
   }
 
-  test.describe('Agent selector visibility', () => {
-    test.skip('should not show agent selector if only one agent is configured.', async ({ page }) => {
-      // TODO: This is annoying to test, because the server is configured to use multiple agents.
-    });
-  });
-
   test.describe('Multiple agents configuration', () => {
     test('should show agent selector when multiple agents are configured', async ({ page }) => {
       // Open AI chat

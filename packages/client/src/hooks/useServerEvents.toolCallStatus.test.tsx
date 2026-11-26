@@ -9,16 +9,7 @@ import { UseAIClient } from '../client';
 import { extractTurnMessages } from '../utils/messageConversion';
 import { getTurnParts } from '../utils/toolCalls';
 import type { PersistedMessage } from '../providers/chatRepository/types';
-
-function makeToolSystem(pendingApprovals: PendingToolApproval[] = []): UseToolSystemReturn {
-  return {
-    aggregatedToolsRef: { current: {} },
-    executeToolCall: mock(async () => undefined),
-    storePendingToolCall: mock(),
-    handleApprovalRequest: mock(),
-    pendingApprovals,
-  } as unknown as UseToolSystemReturn;
-}
+import { makeToolSystem } from '../../test/toolSystemMock';
 
 /**
  * Wires a real client to the hook the way UseAIProvider does: the client
@@ -26,7 +17,7 @@ function makeToolSystem(pendingApprovals: PendingToolApproval[] = []): UseToolSy
  * results through `onToolResult`.
  */
 function setup(pendingApprovals: PendingToolApproval[] = []) {
-  const toolSystem = makeToolSystem(pendingApprovals);
+  const toolSystem = makeToolSystem({ pendingApprovals });
   const hook = renderHook(
     ({ approvals }: { approvals: PendingToolApproval[] }) =>
       useServerEvents({ toolSystem: { ...toolSystem, pendingApprovals: approvals }, saveAIResponse: mock(async () => {}), strings: defaultStrings }),

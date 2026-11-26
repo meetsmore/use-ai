@@ -16,6 +16,7 @@ import {
   simulateReadableStream,
   TestCleanupManager,
 } from '../test/integration-test-utils';
+import { getFreePort } from '../test/ports';
 
 // Track all servers and sockets for cleanup
 const cleanup = new TestCleanupManager();
@@ -26,9 +27,10 @@ afterAll(() => {
 
 describe('Rate Limiting', () => {
   let server: UseAIServer;
-  const testPort = 9005;
+  let testPort: number;
 
-  beforeAll(() => {
+  beforeAll(async () => {
+    testPort = await getFreePort();
     server = new UseAIServer(createServerConfig(testPort, 'test-agent', {
       rateLimitMaxRequests: 2,
       rateLimitWindowMs: 1000,
@@ -71,7 +73,7 @@ describe('Rate Limiting', () => {
   });
 
   test('Rate limiting can be disabled by setting max to 0', async () => {
-    const unlimitedPort = 9006;
+    const unlimitedPort = await getFreePort();
     const unlimitedServer = new UseAIServer(createServerConfig(unlimitedPort, 'test-agent', {
       rateLimitMaxRequests: 0,
       rateLimitWindowMs: 1000,
@@ -97,7 +99,7 @@ describe('Rate Limiting', () => {
     // To truly test independent limits per client, we would need to mock different IP addresses.
 
     // Create a separate server for this test to avoid rate limit spillover from previous tests
-    const independentPort = 9301;
+    const independentPort = await getFreePort();
     const independentServer = new UseAIServer(createServerConfig(independentPort, 'test-agent', {
       rateLimitMaxRequests: 2,
       rateLimitWindowMs: 1000,
@@ -128,7 +130,7 @@ describe('Rate Limiting', () => {
 
   test('Rate limits reset after time window expires', async () => {
     // Create a separate server for this test to avoid rate limit spillover from previous tests
-    const resetPort = 9302;
+    const resetPort = await getFreePort();
     const resetServer = new UseAIServer(createServerConfig(resetPort, 'test-agent', {
       rateLimitMaxRequests: 2,
       rateLimitWindowMs: 1000,
@@ -163,7 +165,7 @@ describe('Rate Limiting', () => {
 
   test('Returns helpful error with retry-after when rate limited', async () => {
     // Create a separate server for this test to avoid rate limit spillover from previous tests
-    const errorPort = 9303;
+    const errorPort = await getFreePort();
     const errorServer = new UseAIServer(createServerConfig(errorPort, 'test-agent', {
       rateLimitMaxRequests: 2,
       rateLimitWindowMs: 1000,
@@ -193,7 +195,7 @@ describe('Rate Limiting', () => {
 
   test('Rate limiting works correctly with WebSocket transport', async () => {
     // Create a separate server for this test
-    const wsPort = 9306;
+    const wsPort = await getFreePort();
     const wsServer = new UseAIServer(createServerConfig(wsPort, 'test-agent', {
       rateLimitMaxRequests: 2,
       rateLimitWindowMs: 1000,
@@ -226,7 +228,7 @@ describe('Rate Limiting', () => {
 
   test('Rate limiting works correctly with HTTP long-polling transport', async () => {
     // Create a separate server for this test
-    const pollingPort = 9304;
+    const pollingPort = await getFreePort();
     const pollingServer = new UseAIServer(createServerConfig(pollingPort, 'test-agent', {
       rateLimitMaxRequests: 2,
       rateLimitWindowMs: 1000,
@@ -259,7 +261,7 @@ describe('Rate Limiting', () => {
 
   test('Polling and WebSocket clients from same IP share rate limit', async () => {
     // Create a separate server for this test
-    const mixedPort = 9305;
+    const mixedPort = await getFreePort();
     const mixedServer = new UseAIServer(createServerConfig(mixedPort, 'test-agent', {
       rateLimitMaxRequests: 2,
       rateLimitWindowMs: 1000,
@@ -338,7 +340,7 @@ describe('LLM call rate limiting', () => {
   }
 
   test('rateLimitMaxLlmCalls stops a run with RATE_LIMITED when the budget runs out mid-run', async () => {
-    const port = 9317;
+    const port = await getFreePort();
     const calls = { count: 0 };
     const server = createLoopServer(port, calls, {
       rateLimitMaxRequests: 10,
@@ -365,7 +367,7 @@ describe('LLM call rate limiting', () => {
   });
 
   test('LLM calls are not limited when rateLimitMaxLlmCalls is not set', async () => {
-    const port = 9318;
+    const port = await getFreePort();
     const calls = { count: 0 };
     const server = createLoopServer(port, calls, {
       rateLimitMaxRequests: 10,

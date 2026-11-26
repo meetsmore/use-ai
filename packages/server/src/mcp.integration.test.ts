@@ -17,7 +17,6 @@ function createTestAgent(name: string = 'test-agent'): AISDKAgent {
 
 describe('MCP Integration', () => {
   test('Remote MCP servers can be configured with endpoints', () => {
-    const mcpPort = 9007;
     const mcpConfig: McpEndpointConfig[] = [
       {
         url: 'http://localhost:3002/mcp',
@@ -29,7 +28,7 @@ describe('MCP Integration', () => {
 
     // Server accepts MCP configuration
     const mcpServer = new UseAIServer({
-      port: mcpPort,
+      port: 0,
       agents: { test: createTestAgent() },
       defaultAgent: 'test',
       mcpEndpoints: mcpConfig,
@@ -79,9 +78,8 @@ describe('MCP Integration', () => {
   });
 
   test('MCP endpoints are cleaned up on server shutdown', () => {
-    const mcpPort = 9008;
     const mcpServer = new UseAIServer({
-      port: mcpPort,
+      port: 0,
       agents: { test: createTestAgent() },
       defaultAgent: 'test',
       mcpEndpoints: [

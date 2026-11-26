@@ -1,11 +1,11 @@
 import { describe, expect, test, mock } from 'bun:test';
 import { AISDKAgent } from './AISDKAgent';
-import type { AgentInput, EventEmitter, AGUIEventExtended } from './types';
+import type { EventEmitter, AGUIEventExtended } from './types';
 import { EventType } from '../types';
 import type { ToolDefinition } from '../types';
-import { v4 as uuidv4 } from 'uuid';
 import { MockLanguageModelV3 } from 'ai/test';
 import { simulateReadableStream } from 'ai';
+import { createTestInput } from '../../test/agent-input';
 
 /**
  * Server-side tests: AISDKAgent emits TEXT_MESSAGE_START/END per step.
@@ -14,37 +14,6 @@ import { simulateReadableStream } from 'ai';
  * so a multi-step run emitted only one TEXT_MESSAGE_START/END pair for the
  * entire run. Fix: moved to StepContext, so each step gets its own pair.
  */
-
-function createTestInput(overrides: Partial<AgentInput> = {}): AgentInput {
-  const threadId = uuidv4();
-  const runId = uuidv4();
-  return {
-    session: {
-      socket: {} as never,
-      clientId: 'client-1',
-      threadId: 'thread-1',
-      tools: [],
-      state: null,
-      pendingToolCalls: new Map(),
-      pendingToolApprovals: new Map(),
-      ipAddress: '127.0.0.1',
-    },
-    runId,
-    messages: [{ role: 'user', content: 'Hello' }],
-    tools: [],
-    state: null,
-    originalInput: {
-      threadId,
-      runId,
-      messages: [{ id: uuidv4(), role: 'user', content: 'Hello' }],
-      tools: [],
-      state: null,
-      context: [],
-      forwardedProps: {},
-    },
-    ...overrides,
-  };
-}
 
 function createTwoStepMock() {
   const aiModule = require('ai');

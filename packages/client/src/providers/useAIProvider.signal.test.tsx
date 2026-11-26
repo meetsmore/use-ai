@@ -1,29 +1,11 @@
 import React from 'react';
-import { describe, test, expect, mock, spyOn } from 'bun:test';
+import { describe, test, expect, spyOn } from 'bun:test';
 import { render, act } from '@testing-library/react';
-import type { Socket } from 'socket.io-client';
+import { installSocketIOMock } from '../../test/socketIOMock';
 import type { ToolExecutionContext } from '../defineTool';
 
-// Handlers the transport registers on the socket, so the test can play the server.
-const socketHandlers = new Map<string, (payload: unknown) => void>();
-
-function createMockSocket() {
-  const socket: Partial<Socket> & { connected: boolean } = {
-    on: mock((name: string, handler: (payload: unknown) => void) => {
-      socketHandlers.set(name, handler);
-      return socket as Socket;
-    }) as unknown as Socket['on'],
-    emit: mock(() => socket as Socket),
-    connected: false,
-    disconnect: mock(() => socket as Socket),
-    io: { engine: { transport: { name: 'websocket' }, on: mock() } } as unknown as Socket['io'],
-  };
-  return socket as Socket;
-}
-
-mock.module('socket.io-client', () => ({
-  io: () => createMockSocket(),
-}));
+// The test plays the server through the handlers the transport registers on the socket.
+const socketIO = installSocketIOMock();
 
 const { UseAIProvider } = await import('./useAIProvider');
 const { useAI } = await import('../useAI');
@@ -49,7 +31,7 @@ describe('UseAIProvider — ctx.signal', () => {
       </UseAIProvider>
     );
 
-    const emit = (event: Record<string, unknown>) => socketHandlers.get('event')!({ timestamp: 0, ...event });
+    const emit = (event: Record<string, unknown>) => socketIO.fire('event', { timestamp: 0, ...event });
     await act(async () => {
       emit({ type: 'RUN_STARTED', threadId: 't', runId: 'run-1' });
       emit({ type: 'TOOL_CALL_START', toolCallId: 'tc1', toolCallName: 'ask' });

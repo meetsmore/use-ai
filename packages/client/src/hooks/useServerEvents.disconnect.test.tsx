@@ -3,29 +3,7 @@ import { renderHook, act } from '@testing-library/react';
 import { useServerEvents } from './useServerEvents';
 import { defaultStrings } from '../theme/strings';
 import { ErrorCode } from '../types';
-import type { UseToolSystemReturn } from './useToolSystem';
-
-function makeToolSystem(): UseToolSystemReturn {
-  return {
-    registerTools: mock(),
-    unregisterTools: mock(),
-    isInvisible: mock(() => false),
-    aggregatedTools: {},
-    hasTools: false,
-    aggregatedToolsRef: { current: {} },
-    signalReady: mock(),
-    toolRegistryVersion: 0,
-    registerWaiter: mock(),
-    unregisterWaiter: mock(),
-    pendingApprovals: [],
-    handleApprovalRequest: mock(),
-    executeToolCall: mock(async () => undefined),
-    storePendingToolCall: mock(),
-    approveAll: mock(async () => undefined),
-    rejectAll: mock(),
-    endRun: mock(),
-  } as unknown as UseToolSystemReturn;
-}
+import { makeToolSystem } from '../../test/toolSystemMock';
 
 describe('useServerEvents.handleDisconnect', () => {
   it('is a no-op when no run is in flight', () => {

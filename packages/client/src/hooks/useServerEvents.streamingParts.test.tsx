@@ -3,19 +3,8 @@ import { renderHook, act } from '@testing-library/react';
 import { useServerEvents } from './useServerEvents';
 import { defaultStrings } from '../theme/strings';
 import { EventType } from '../types';
-import type { UseToolSystemReturn } from './useToolSystem';
 import type { UseAIClient } from '../client';
-
-function makeToolSystem(): UseToolSystemReturn {
-  return {
-    aggregatedToolsRef: { current: {} },
-    endRun: mock(),
-    executeToolCall: mock(async () => undefined),
-    storePendingToolCall: mock(),
-    handleApprovalRequest: mock(),
-    pendingApprovals: [],
-  } as unknown as UseToolSystemReturn;
-}
+import { makeToolSystem } from '../../test/toolSystemMock';
 
 function makeClient() {
   return {

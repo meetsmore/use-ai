@@ -17,6 +17,7 @@ import {
 } from '../test/integration-test-utils';
 import { UseAIServer } from './server';
 import { AISDKAgent } from './agents/AISDKAgent';
+import { getFreePort } from '../test/ports';
 
 // Global cleanup manager
 const cleanup = new TestCleanupManager();
@@ -28,15 +29,9 @@ afterAll(() => {
 // Test both runtime adapters
 const RUNTIMES: ('bun' | 'node')[] = ['bun', 'node'];
 
-// Port offset for each runtime to avoid conflicts
-// bun: +2000, node: +1000 (ranges don't overlap)
-const getPort = (basePort: number, runtime: 'bun' | 'node') =>
-  basePort + (runtime === 'node' ? 1000 : 2000);
-
 describe.each(RUNTIMES)('Connection Management [%s runtime]', (runtime) => {
-  const testPort = getPort(8081, runtime);
-
   test('client can connect to the server', async () => {
+    const testPort = await getFreePort();
     const mockModel = createSequentialMockModel([{ text: 'Hello' }]);
     const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
     const server = new UseAIServer({
@@ -53,18 +48,19 @@ describe.each(RUNTIMES)('Connection Management [%s runtime]', (runtime) => {
   });
 
   test('server supports multiple clients', async () => {
+    const testPort = await getFreePort();
     const mockModel = createSequentialMockModel([{ text: 'Hello' }]);
     const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
     const server = new UseAIServer({
-      port: testPort + 1,
+      port: testPort,
       agents: { test: agent },
       defaultAgent: 'test',
       runtime,
     });
     cleanup.trackServer(server);
 
-    const ws1 = await cleanup.createTestClient(testPort + 1);
-    const ws2 = await cleanup.createTestClient(testPort + 1);
+    const ws1 = await cleanup.createTestClient(testPort);
+    const ws2 = await cleanup.createTestClient(testPort);
 
     expect(ws1.connected).toBe(true);
     expect(ws2.connected).toBe(true);
@@ -76,7 +72,7 @@ describe.each(RUNTIMES)('Connection Management [%s runtime]', (runtime) => {
 
 describe.each(RUNTIMES)('Tool Use [%s runtime]', (runtime) => {
   test('tools can be registered and invoked by the AI', async () => {
-    const toolPort = getPort(8182, runtime);
+    const toolPort = await getFreePort();
     const toolMockModel = createSequentialMockModel([
       {
         toolCalls: [{ toolCallId: 'toolu_123', toolName: 'add_todo', input: { text: 'Buy milk' } }],
@@ -140,7 +136,7 @@ describe.each(RUNTIMES)('Tool Use [%s runtime]', (runtime) => {
   });
 
   test('the AI can invoke a tool on the client and receive a response', async () => {
-    const tool2Port = getPort(8183, runtime);
+    const tool2Port = await getFreePort();
     const tool2MockModel = createSequentialMockModel([
       {
         toolCalls: [{ toolCallId: 'toolu_456', toolName: 'get_data', input: { id: '123' } }],
@@ -206,7 +202,7 @@ describe.each(RUNTIMES)('Tool Use [%s runtime]', (runtime) => {
   });
 
   test('server emits proper AG-UI event sequence', async () => {
-    const seqPort = getPort(8184, runtime);
+    const seqPort = await getFreePort();
     const seqMockModel = createSequentialMockModel([{ text: 'Hello world' }]);
 
     const seqAgent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: seqMockModel }) } });
@@ -250,7 +246,7 @@ describe.each(RUNTIMES)('Tool Use [%s runtime]', (runtime) => {
 
 describe.each(RUNTIMES)('Multiple Tool Use [%s runtime]', (runtime) => {
   test('AI can invoke multiple tools in sequence', async () => {
-    const multiPort = getPort(8185, runtime);
+    const multiPort = await getFreePort();
     const multiMockModel = createSequentialMockModel([
       {
         toolCalls: [
@@ -340,7 +336,7 @@ describe.each(RUNTIMES)('Multiple Tool Use [%s runtime]', (runtime) => {
 
 describe.each(RUNTIMES)('Error Handling [%s runtime]', (runtime) => {
   test('server emits error event when AI call fails', async () => {
-    const errorPort = getPort(8186, runtime);
+    const errorPort = await getFreePort();
     const errorMockModel = createErrorMockModel('API Error');
 
     const errorAgent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: errorMockModel }) } });
@@ -370,7 +366,7 @@ describe.each(RUNTIMES)('Error Handling [%s runtime]', (runtime) => {
 
 describe.each(RUNTIMES)('State Management [%s runtime]', (runtime) => {
   test('server includes state in STATE_SNAPSHOT event', async () => {
-    const statePort = getPort(8187, runtime);
+    const statePort = await getFreePort();
     const stateMockModel = createSequentialMockModel([{ text: 'OK' }]);
 
     const stateAgent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: stateMockModel }) } });
@@ -404,7 +400,7 @@ describe.each(RUNTIMES)('State Management [%s runtime]', (runtime) => {
 
 describe.each(RUNTIMES)('Rate Limiting [%s runtime]', (runtime) => {
   test('server allows requests within rate limit', async () => {
-    const ratePort = getPort(8188, runtime);
+    const ratePort = await getFreePort();
     const rateMockModel = createSequentialMockModel([
       { text: 'OK' },
       { text: 'OK' },
@@ -445,7 +441,7 @@ describe.each(RUNTIMES)('Rate Limiting [%s runtime]', (runtime) => {
   });
 
   test('server blocks requests exceeding rate limit', async () => {
-    const blockPort = getPort(8189, runtime);
+    const blockPort = await getFreePort();
     const blockMockModel = createSequentialMockModel([
       { text: 'OK' },
       { text: 'OK' },
@@ -482,7 +478,7 @@ describe.each(RUNTIMES)('Rate Limiting [%s runtime]', (runtime) => {
   });
 
   test('rate limit resets after time window expires', async () => {
-    const resetPort = getPort(8190, runtime);
+    const resetPort = await getFreePort();
     const resetMockModel = createSequentialMockModel([
       { text: 'OK' },
       { text: 'OK' },
@@ -526,7 +522,7 @@ describe.each(RUNTIMES)('Rate Limiting [%s runtime]', (runtime) => {
   });
 
   test('clients from same IP share rate limit', async () => {
-    const indepPort = getPort(8191, runtime);
+    const indepPort = await getFreePort();
     const indepMockModel = createSequentialMockModel([
       { text: 'OK' },
       { text: 'OK' },
@@ -572,7 +568,7 @@ describe('handleToolResult - MCP tool preservation', () => {
     const mockModel = createSequentialMockModel([{ text: 'OK' }]);
     const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
     const server = new UseAIServer({
-      port: 19001,
+      port: 0,
       agents: { test: agent },
       defaultAgent: 'test',
     });
@@ -651,7 +647,7 @@ describe('handleToolResult - MCP tool preservation', () => {
     const mockModel = createSequentialMockModel([{ text: 'OK' }]);
     const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
     const server = new UseAIServer({
-      port: 19002,
+      port: 0,
       agents: { test: agent },
       defaultAgent: 'test',
     });
@@ -703,10 +699,10 @@ describe('handleToolResult - MCP tool preservation', () => {
 });
 
 describe('handleToolApprovalResponse - modifiedArgs', () => {
-  function setup(port: number) {
+  function setup() {
     const mockModel = createSequentialMockModel([{ text: 'OK' }]);
     const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
-    const server = new UseAIServer({ port, agents: { test: agent }, defaultAgent: 'test' });
+    const server = new UseAIServer({ port: 0, agents: { test: agent }, defaultAgent: 'test' });
     cleanup.trackServer(server);
     const results: unknown[] = [];
     const session = {
@@ -724,28 +720,28 @@ describe('handleToolApprovalResponse - modifiedArgs', () => {
   }
 
   test('forwards modifiedArgs of an approval to the waiting tool', () => {
-    const { results, respond } = setup(19011);
+    const { results, respond } = setup();
     respond({ approved: true, modifiedArgs: { title: 'Edited' } });
     expect(results).toEqual([{ approved: true, reason: undefined, modifiedArgs: { title: 'Edited' } }]);
   });
 
   test('resolves without modifiedArgs when the approval carries none', () => {
-    const { results, respond } = setup(19012);
+    const { results, respond } = setup();
     respond({ approved: true });
     expect(results).toEqual([{ approved: true, reason: undefined }]);
     expect(results[0]).not.toHaveProperty('modifiedArgs');
   });
 
   test('denies an approval whose modifiedArgs is not an object', () => {
-    for (const [index, modifiedArgs] of [null, ['a'], 'text', 3].entries()) {
-      const { results, respond } = setup(19014 + index);
+    for (const modifiedArgs of [null, ['a'], 'text', 3]) {
+      const { results, respond } = setup();
       respond({ approved: true, modifiedArgs });
       expect(results).toEqual([{ approved: false, reason: 'modifiedArgs must be a JSON object' }]);
     }
   });
 
   test('drops modifiedArgs of a rejection', () => {
-    const { results, respond } = setup(19013);
+    const { results, respond } = setup();
     respond({ approved: false, reason: 'No', modifiedArgs: { title: 'Edited' } });
     expect(results[0]).not.toHaveProperty('modifiedArgs');
   });

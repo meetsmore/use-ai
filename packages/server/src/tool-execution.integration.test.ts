@@ -20,6 +20,7 @@ import {
 import { AISDKAgent } from './agents/AISDKAgent';
 import { defineServerTool } from './tools';
 import { z } from 'zod';
+import { getFreePort } from '../test/ports';
 
 // Track all servers and sockets for cleanup
 const cleanup = new TestCleanupManager();
@@ -30,9 +31,10 @@ afterAll(() => {
 
 describe('Tool Execution Coordination', () => {
   let server: UseAIServer;
-  const testPort = 9004;
+  let testPort: number;
 
-  beforeAll(() => {
+  beforeAll(async () => {
+    testPort = await getFreePort();
     server = new UseAIServer(createServerConfig(testPort));
     cleanup.trackServer(server);
   });
@@ -43,7 +45,7 @@ describe('Tool Execution Coordination', () => {
 
   test('Tools execute on client side', async () => {
     // Create a custom server with tool call response
-    const toolPort = 9104;
+    const toolPort = await getFreePort();
     const toolMockModel = createSequentialMockModel([
       {
         toolCalls: [{ toolCallId: 'tool1', toolName: 'client_tool', input: { value: 'test' } }],
@@ -110,7 +112,7 @@ describe('Tool Execution Coordination', () => {
 
   test('Server coordinates tool calls between AI and client', async () => {
     // Create a custom server with dynamic mock responses
-    const coordPort = 9105;
+    const coordPort = await getFreePort();
     const coordMockModel = createSequentialMockModel([
       {
         toolCalls: [{ toolCallId: 'tool1', toolName: 'test_tool', input: { value: 'test' } }],
@@ -176,7 +178,7 @@ describe('Tool Execution Coordination', () => {
 
   test('Server waits for tool results before continuing', async () => {
     // Create a custom server for waiting test
-    const waitPort = 9106;
+    const waitPort = await getFreePort();
     const waitMockModel = createSequentialMockModel([
       {
         toolCalls: [{ toolCallId: 'tool1', toolName: 'wait_tool', input: {} }],
@@ -238,7 +240,7 @@ describe('Tool Execution Coordination', () => {
 
   test('Server handles multiple sequential tool calls', async () => {
     // Create a custom server for multiple tool calls
-    const multiPort = 9107;
+    const multiPort = await getFreePort();
     const multiMockModel = createSequentialMockModel([
       {
         toolCalls: [
@@ -302,14 +304,13 @@ describe('Tool Execution Coordination', () => {
     multiServer.close();
   });
 
-  test.skip('Tool definitions are converted to AI SDK format', async () => {
-    // TODO: This test has timing issues with the mock model validator
-    // The validator function may be interfering with the mock's response
-    // Skipping for now - tool conversion is implicitly tested by all other tool tests
-    // Create a custom server that verifies tool conversion
-    const convPort = 9108;
+  test('Tool definitions are converted to AI SDK format', async () => {
+    // Record the tools that the model gets. Check them after the run.
+    // An expect() in the model callback would end the run with RUN_ERROR, not with a clear failure.
+    const convPort = await getFreePort();
+    let modelTools: unknown;
     const convMockModel = createToolValidatorMockModel((tools) => {
-      expect(Object.keys(tools as object).length).toBeGreaterThan(0);
+      modelTools = tools;
     });
 
     const convAgent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: convMockModel }) } });
@@ -346,6 +347,17 @@ describe('Tool Execution Coordination', () => {
 
     await responsePromise;
 
+    expect(modelTools).toContainEqual({
+      type: 'function',
+      name: 'test_tool',
+      description: 'Test tool',
+      inputSchema: {
+        type: 'object',
+        properties: { value: { type: 'string' } },
+        required: ['value'],
+      },
+    });
+
     socket.disconnect();
     convServer.close();
   });
@@ -376,7 +388,7 @@ describe('Tool Execution Coordination', () => {
 
 describe('Server tool argument validation', () => {
   test('a server tool runs only with arguments its Zod schema accepts', async () => {
-    const port = 9180;
+    const port = await getFreePort();
     const received: unknown[] = [];
     const model = createSequentialMockModel([
       {

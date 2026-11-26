@@ -9,6 +9,7 @@ import {
 } from '../test/integration-test-utils';
 import { waitFor } from '../test/test-utils';
 import { AISDKAgent } from './agents/AISDKAgent';
+import { getFreePort } from '../test/ports';
 
 /**
  * Drives the bundled WebSocketTransport against a real server (transport: 'websocket')
@@ -39,10 +40,11 @@ function connectClient(port: number): Promise<{ client: UseAIClient; events: AGU
 
 describe.each(RUNTIMES)('WebSocketTransport against a real server: %s runtime', (runtime) => {
   const cleanup = new TestCleanupManager();
-  const port = runtime === 'bun' ? 9530 : 9540;
+  let port: number;
   let server: UseAIServer;
 
-  beforeAll(() => {
+  beforeAll(async () => {
+    port = await getFreePort();
     // Step 1 asks for the tool; step 2 answers with text once the result arrives.
     const model = createSequentialMockModel([
       { toolCalls: [{ toolCallId: 'tc-1', toolName: 'addTodo', input: { text: 'buy groceries' } }] },
@@ -164,7 +166,7 @@ describe('transport defaults to socketio', () => {
   });
 
   test('a default server serves Socket.IO and refuses a plain WebSocket', async () => {
-    const port = 9560;
+    const port = await getFreePort();
     const model = createSequentialMockModel([{ text: 'hi' }]);
     cleanup.trackServer(
       new UseAIServer({

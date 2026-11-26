@@ -24,6 +24,7 @@ import {
   createSequentialMockModel,
   createMockModel,
 } from '../test/integration-test-utils';
+import { getFreePort } from '../test/ports';
 
 // Track all servers and sockets for cleanup
 const cleanup = new TestCleanupManager();
@@ -34,9 +35,10 @@ afterAll(() => {
 
 describe('Error Handling', () => {
   let server: UseAIServer;
-  const testPort = 9313;
+  let testPort: number;
 
-  beforeAll(() => {
+  beforeAll(async () => {
+    testPort = await getFreePort();
     server = new UseAIServer(createServerConfig(testPort));
     cleanup.trackServer(server);
   });
@@ -47,7 +49,7 @@ describe('Error Handling', () => {
 
   test('Server emits RUN_ERROR events when agent execution fails', async () => {
     // Create a custom server with failing mock
-    const errorPort = 9300;
+    const errorPort = await getFreePort();
     const errorMockModel = createErrorMockModel('Agent execution failed');
 
     const errorAgent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: errorMockModel }) } });
@@ -75,7 +77,7 @@ describe('Error Handling', () => {
 
   test('Server catches and handles AI SDK model errors', async () => {
     // Create a custom server with API error
-    const apiErrorPort = 9301;
+    const apiErrorPort = await getFreePort();
     const apiErrorMockModel = createErrorMockModel('Model error');
 
     const apiErrorAgent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: apiErrorMockModel }) } });
@@ -145,7 +147,7 @@ describe('Error Handling', () => {
 
   test('user stops generation while a tool call is pending → RUN_ERROR(ABORTED) with no STEP_FINISHED for the aborted step', async () => {
     // Create a custom server with slow tool execution
-    const abortPort = 9302;
+    const abortPort = await getFreePort();
     const abortMockModel = createSequentialMockModel([
       {
         toolCalls: [{ toolCallId: 'tool1', toolName: 'slow_tool', input: {} }],
@@ -231,7 +233,7 @@ describe('Error Handling', () => {
     // Exercises the OTHER abort path: the post-stream signal check in
     // executeStepLoop. No tool call is pending, so the abort is detected after
     // the text stream ends rather than via a rejected tool wait.
-    const abortPort = 9304;
+    const abortPort = await getFreePort();
 
     // Streams a partial text answer, then holds the stream open until the run
     // is aborted, mirroring a user pressing stop mid-reply.
@@ -311,7 +313,7 @@ describe('Error Handling', () => {
     // disconnects while a tool call is pending. Without the AbortController fix,
     // the pending tool call Promise would never resolve, causing agent.run() to
     // hang indefinitely.
-    const disconnectPort = 9303;
+    const disconnectPort = await getFreePort();
     const disconnectMockModel = createSequentialMockModel([
       {
         toolCalls: [{ toolCallId: 'tool-dc-1', toolName: 'pending_tool', input: {} }],
@@ -382,7 +384,7 @@ describe('Error Handling', () => {
     // Poll until agent.run() completes. Without the AbortController fix,
     // agent.run() would hang forever at the pending tool call Promise,
     // and this polling loop would timeout.
-    const timeoutMs = 3000;
+    const timeoutMs = await getFreePort();
     const pollIntervalMs = 50;
     const deadline = Date.now() + timeoutMs;
     while (!runCompleted && Date.now() < deadline) {
@@ -456,7 +458,7 @@ describe('Abort cause labelling', () => {
   }
 
   test('handleAbortRun tags the signal as RunAbortedByUser', async () => {
-    const { server, socket, session, runId } = await startPendingToolRun(9330);
+    const { server, socket, session, runId } = await startPendingToolRun(await getFreePort());
 
     socket.emit('message', { type: 'abort_run', data: { runId } });
     await waitForAborted(session);
@@ -469,7 +471,7 @@ describe('Abort cause labelling', () => {
   });
 
   test('client disconnect tags the signal as RunAbortedByClientDisconnect', async () => {
-    const { server, socket, session } = await startPendingToolRun(9331);
+    const { server, socket, session } = await startPendingToolRun(await getFreePort());
 
     socket.disconnect();
     await waitForAborted(session);
@@ -529,7 +531,7 @@ describe('Error recording and abort handling', () => {
   }
 
   test('Pre-streamText error records pre_stream_error trace', async () => {
-    const port = 9320;
+    const port = await getFreePort();
     const lf = enableMockLangfuse();
     try {
       // Use a mock model with provider='anthropic' so applyCacheBreakpoints is active,
@@ -576,7 +578,7 @@ describe('Error recording and abort handling', () => {
     // This test validates that agent.run() completes (not hangs) when abort_run
     // is sent while a tool call is pending. Without the AbortController fix,
     // the pending tool call Promise would never resolve.
-    const port = 9321;
+    const port = await getFreePort();
     const lf = enableMockLangfuse();
     try {
       const model = createSequentialMockModel([
@@ -639,7 +641,7 @@ describe('Error recording and abort handling', () => {
       // Poll until agent.run() completes. Without the AbortController fix,
       // agent.run() would hang forever at the pending tool call Promise,
       // and this polling loop would timeout.
-      const timeoutMs = 3000;
+      const timeoutMs = await getFreePort();
       const pollIntervalMs = 50;
       const deadline = Date.now() + timeoutMs;
       while (!runCompleted && Date.now() < deadline) {
@@ -664,7 +666,7 @@ describe('Error recording and abort handling', () => {
     // This test validates that agent.run() completes (not hangs) when abort_run
     // is sent while a tool approval is pending. Without the AbortController fix,
     // the pending approval Promise would never resolve.
-    const port = 9322;
+    const port = await getFreePort();
     const lf = enableMockLangfuse();
     try {
       const model = createSequentialMockModel([
@@ -733,7 +735,7 @@ describe('Error recording and abort handling', () => {
       // Poll until agent.run() completes. Without the AbortController fix,
       // agent.run() would hang forever at the pending approval Promise,
       // and this polling loop would timeout.
-      const timeoutMs = 3000;
+      const timeoutMs = await getFreePort();
       const pollIntervalMs = 50;
       const deadline = Date.now() + timeoutMs;
       while (!runCompleted && Date.now() < deadline) {
@@ -755,7 +757,7 @@ describe('Error recording and abort handling', () => {
   });
 
   test('Agent not found records agent_not_found trace with telemetryMetadata', async () => {
-    const port = 9323;
+    const port = await getFreePort();
     const lf = enableMockLangfuse();
     try {
       const server = new UseAIServer(createServerConfig(port));
@@ -807,7 +809,7 @@ describe('Error recording and abort handling', () => {
   });
 
   test('Rate limit exceeded records rate_limit_exceeded trace with telemetryMetadata', async () => {
-    const port = 9324;
+    const port = await getFreePort();
     const lf = enableMockLangfuse();
     try {
       const server = new UseAIServer(
@@ -858,7 +860,7 @@ describe('Error recording and abort handling', () => {
   });
 
   test('Unhandled agent error records unhandled_error trace with telemetryMetadata', async () => {
-    const port = 9325;
+    const port = await getFreePort();
     const lf = enableMockLangfuse();
     try {
       // Custom agent that throws from run() — error propagates to server.ts outer catch

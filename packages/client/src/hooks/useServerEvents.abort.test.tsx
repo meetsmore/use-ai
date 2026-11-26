@@ -3,30 +3,8 @@ import { renderHook, act } from '@testing-library/react';
 import { useServerEvents } from './useServerEvents';
 import { defaultStrings } from '../theme/strings';
 import { ErrorCode, EventType } from '../types';
-import type { UseToolSystemReturn } from './useToolSystem';
 import type { UseAIClient } from '../client';
-
-function makeToolSystem(): UseToolSystemReturn {
-  return {
-    registerTools: mock(),
-    unregisterTools: mock(),
-    isInvisible: mock(() => false),
-    aggregatedTools: {},
-    hasTools: false,
-    aggregatedToolsRef: { current: {} },
-    signalReady: mock(),
-    toolRegistryVersion: 0,
-    registerWaiter: mock(),
-    unregisterWaiter: mock(),
-    pendingApprovals: [],
-    handleApprovalRequest: mock(),
-    executeToolCall: mock(async () => undefined),
-    storePendingToolCall: mock(),
-    approveAll: mock(async () => undefined),
-    rejectAll: mock(),
-    endRun: mock(),
-  } as unknown as UseToolSystemReturn;
-}
+import { makeToolSystem } from '../../test/toolSystemMock';
 
 /**
  * Minimal stub of UseAIClient — only the surface `useServerEvents` touches

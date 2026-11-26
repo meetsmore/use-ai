@@ -1,35 +1,30 @@
 /**
- * Unit tests for FeedbackPlugin with Langfuse singleton enabled.
+ * Unit tests for FeedbackPlugin.
+ *
+ * The tests inject the Langfuse singleton through the constructor.
+ * They do not use mock.module(), because Bun applies it to the whole process.
  */
 
 import { describe, expect, test, beforeEach, mock } from 'bun:test';
 import type { ClientSession } from '../agents/types';
-import type { LangfuseClient } from '@langfuse/client';
+import type { LangfuseApi } from '../instrumentation';
+import { createMockLangfuseClient } from '../../test/langfuse-mock';
+import { FeedbackPlugin } from './FeedbackPlugin';
 
-// Mock Langfuse client factory
 const mockScore = mock(() => {});
 const mockFlush = mock(() => Promise.resolve());
 
-function createMockLangfuseClient(): LangfuseClient {
-  return {
-    score: { create: mockScore },
-    flush: mockFlush,
-  } as unknown as LangfuseClient;
-}
+// The Langfuse singleton when Langfuse is enabled
+const enabledLangfuse: LangfuseApi = {
+  enabled: true,
+  client: createMockLangfuseClient({ score: mockScore, flush: mockFlush }),
+};
 
-// Mock the instrumentation module with an enabled singleton
-const mockSingletonClient = createMockLangfuseClient();
-mock.module('../instrumentation', () => ({
-  langfuse: {
-    enabled: true,
-    client: mockSingletonClient,
-  },
-  pushTraceIdForRun: () => {},
-  popTraceIdForRun: () => undefined,
-}));
-
-// Import after mocking
-import { FeedbackPlugin } from './FeedbackPlugin';
+// The Langfuse singleton when Langfuse is disabled
+const disabledLangfuse: LangfuseApi = {
+  enabled: false,
+  client: undefined,
+};
 
 describe('FeedbackPlugin (singleton enabled)', () => {
   beforeEach(() => {
@@ -39,20 +34,20 @@ describe('FeedbackPlugin (singleton enabled)', () => {
 
   describe('initialization', () => {
     test('uses singleton client by default', () => {
-      const plugin = new FeedbackPlugin();
+      const plugin = new FeedbackPlugin(undefined, enabledLangfuse);
       expect(plugin.isEnabled()).toBe(true);
     });
 
     test('explicit client overrides singleton', () => {
-      const explicitClient = createMockLangfuseClient();
-      const plugin = new FeedbackPlugin(explicitClient);
+      const explicitClient = createMockLangfuseClient({ score: mockScore, flush: mockFlush });
+      const plugin = new FeedbackPlugin(explicitClient, enabledLangfuse);
       expect(plugin.isEnabled()).toBe(true);
     });
   });
 
   describe('registerHandlers', () => {
     test('registers message_feedback handler', () => {
-      const plugin = new FeedbackPlugin();
+      const plugin = new FeedbackPlugin(undefined, enabledLangfuse);
       const registerMessageHandler = mock(() => {});
 
       plugin.registerHandlers({ registerMessageHandler });
@@ -66,7 +61,7 @@ describe('FeedbackPlugin (singleton enabled)', () => {
 
   describe('onClientConnect', () => {
     test('emits langfuseEnabled=true when using singleton', () => {
-      const plugin = new FeedbackPlugin();
+      const plugin = new FeedbackPlugin(undefined, enabledLangfuse);
       const mockEmit = mock(() => {});
       const session = {
         socket: { emit: mockEmit },
@@ -82,7 +77,7 @@ describe('FeedbackPlugin (singleton enabled)', () => {
 
   describe('handleFeedback', () => {
     test('submits score to Langfuse for thumbs up', async () => {
-      const plugin = new FeedbackPlugin();
+      const plugin = new FeedbackPlugin(undefined, enabledLangfuse);
       let feedbackHandler: Function;
 
       plugin.registerHandlers({
@@ -114,7 +109,7 @@ describe('FeedbackPlugin (singleton enabled)', () => {
     });
 
     test('submits score to Langfuse for thumbs down', async () => {
-      const plugin = new FeedbackPlugin();
+      const plugin = new FeedbackPlugin(undefined, enabledLangfuse);
       let feedbackHandler: Function;
 
       plugin.registerHandlers({
@@ -146,7 +141,7 @@ describe('FeedbackPlugin (singleton enabled)', () => {
     });
 
     test('does not submit score when feedback is null (removed)', async () => {
-      const plugin = new FeedbackPlugin();
+      const plugin = new FeedbackPlugin(undefined, enabledLangfuse);
       let feedbackHandler: Function;
 
       plugin.registerHandlers({
@@ -173,7 +168,7 @@ describe('FeedbackPlugin (singleton enabled)', () => {
     });
 
     test('uses idempotent score ID based on messageId', async () => {
-      const plugin = new FeedbackPlugin();
+      const plugin = new FeedbackPlugin(undefined, enabledLangfuse);
       let feedbackHandler: Function;
 
       plugin.registerHandlers({
@@ -208,10 +203,84 @@ describe('FeedbackPlugin (singleton enabled)', () => {
 
   describe('close', () => {
     test('flushes Langfuse events', async () => {
-      const plugin = new FeedbackPlugin();
+      const plugin = new FeedbackPlugin(undefined, enabledLangfuse);
       await plugin.close();
 
       expect(mockFlush).toHaveBeenCalled();
+    });
+  });
+});
+
+describe('FeedbackPlugin (singleton disabled)', () => {
+  beforeEach(() => {
+    mockScore.mockClear();
+    mockFlush.mockClear();
+  });
+
+  describe('initialization', () => {
+    test('is disabled when singleton has no client', () => {
+      const plugin = new FeedbackPlugin(undefined, disabledLangfuse);
+      expect(plugin.isEnabled()).toBe(false);
+    });
+
+    test('explicit client enables plugin even when singleton is disabled', () => {
+      const explicitClient = createMockLangfuseClient({ score: mockScore, flush: mockFlush });
+      const plugin = new FeedbackPlugin(explicitClient, disabledLangfuse);
+      expect(plugin.isEnabled()).toBe(true);
+    });
+  });
+
+  describe('onClientConnect', () => {
+    test('emits langfuseEnabled=false when disabled', () => {
+      const plugin = new FeedbackPlugin(undefined, disabledLangfuse);
+      const mockEmit = mock(() => {});
+      const session = {
+        socket: { emit: mockEmit },
+      } as unknown as ClientSession;
+
+      plugin.onClientConnect(session);
+
+      expect(mockEmit).toHaveBeenCalledWith('config', {
+        langfuseEnabled: false,
+      });
+    });
+  });
+
+  describe('handleFeedback', () => {
+    test('does not submit score when plugin is disabled', async () => {
+      const plugin = new FeedbackPlugin(undefined, disabledLangfuse);
+      let feedbackHandler: Function;
+
+      plugin.registerHandlers({
+        registerMessageHandler: (type: string, handler: Function) => {
+          if (type === 'message_feedback') {
+            feedbackHandler = handler;
+          }
+        },
+      });
+
+      const session = {} as ClientSession;
+      const message = {
+        type: 'message_feedback',
+        data: {
+          messageId: 'msg-000',
+          traceId: 'trace-000',
+          feedback: 'upvote',
+        },
+      };
+
+      await feedbackHandler!(session, message);
+
+      expect(mockScore).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('close', () => {
+    test('does nothing when disabled', async () => {
+      const plugin = new FeedbackPlugin(undefined, disabledLangfuse);
+      await plugin.close();
+
+      expect(mockFlush).not.toHaveBeenCalled();
     });
   });
 });

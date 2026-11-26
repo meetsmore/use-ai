@@ -13,6 +13,7 @@ import {
   collectEventsUntil,
   extractTextFromEvents,
 } from '../test/test-utils';
+import { getFreePort } from '../test/ports';
 
 // Track all servers and sockets for cleanup
 const cleanup = new TestCleanupManager();
@@ -23,7 +24,6 @@ afterAll(() => {
 
 describe('Plugin Architecture', () => {
   let server: UseAIServer;
-  const testPort = 9009;
 
   test('Server supports plugins that extend functionality', () => {
     class TestPlugin implements UseAIServerPlugin {
@@ -38,7 +38,7 @@ describe('Plugin Architecture', () => {
 
     const plugin = new TestPlugin();
     server = new UseAIServer({
-      port: testPort,
+      port: 0,
       agents: { test: createTestAgent() },
       defaultAgent: 'test',
       plugins: [plugin],
@@ -49,7 +49,7 @@ describe('Plugin Architecture', () => {
   });
 
   test('Plugins can register custom message handlers', async () => {
-    const customPort = 9010;
+    const customPort = await getFreePort();
     let customMessageReceived = false;
 
     class CustomMessagePlugin implements UseAIServerPlugin {
@@ -87,7 +87,7 @@ describe('Plugin Architecture', () => {
   });
 
   test('Plugins receive lifecycle hooks on connect/disconnect', async () => {
-    const lifecyclePort = 9011;
+    const lifecyclePort = await getFreePort();
     let connectCalled = false;
     let disconnectCalled = false;
 
@@ -129,7 +129,7 @@ describe('Plugin Architecture', () => {
   });
 
   test('Plugins have access to client session', async () => {
-    const sessionPort = 9012;
+    const sessionPort = await getFreePort();
     let receivedSession: ClientSession | null = null;
 
     class SessionPlugin implements UseAIServerPlugin {
@@ -169,7 +169,7 @@ describe('Plugin Architecture', () => {
   test('clientId is unique across server instances (pods and restarts)', async () => {
     // Two server instances stand for two pods, or one pod before and after a restart.
     // A per-process counter gives "client-1" on both, which merges tenants in Langfuse and Dify.
-    const ports = [9018, 9019];
+    const ports = [await getFreePort(), await getFreePort()];
     const clientIds: string[] = [];
 
     class CapturePlugin implements UseAIServerPlugin {
@@ -207,7 +207,7 @@ describe('Plugin Architecture', () => {
   });
 
   test('beforeRunAgent hook is called before agent execution', async () => {
-    const hookPort = 9013;
+    const hookPort = await getFreePort();
     let hookCalledWith: AgentInput | null = null;
 
     class BeforeRunPlugin implements UseAIServerPlugin {
@@ -248,7 +248,7 @@ describe('Plugin Architecture', () => {
   });
 
   test('beforeRunAgent hook can abort a run', async () => {
-    const blockPort = 9014;
+    const blockPort = await getFreePort();
 
     class BlockingPlugin implements UseAIServerPlugin {
       getName(): string {
@@ -282,7 +282,7 @@ describe('Plugin Architecture', () => {
   });
 
   test('beforeRunAgent hook stops at first abort', async () => {
-    const orderPort = 9015;
+    const orderPort = await getFreePort();
     const callOrder: string[] = [];
 
     class FirstPlugin implements UseAIServerPlugin {
@@ -327,7 +327,7 @@ describe('Plugin Architecture', () => {
   });
 
   test('agent runs normally when beforeRunAgent hook passes', async () => {
-    const passPort = 9016;
+    const passPort = await getFreePort();
     let hookCalled = false;
 
     class PassingPlugin implements UseAIServerPlugin {
@@ -364,7 +364,7 @@ describe('Plugin Architecture', () => {
   });
 
   test('beforeRunAuthorized runs before beforeRunAgent, which still gets the built input', async () => {
-    const port = 9032;
+    const port = await getFreePort();
     const calls: string[] = [];
     let agentInput: AgentInput | null = null;
 
@@ -421,7 +421,7 @@ describe('Plugin Architecture', () => {
     });
 
     test('aborted run triggers no MCP tools/list and no attachment resolution', async () => {
-      const port = 9027;
+      const port = await getFreePort();
       mcpRequests.length = 0;
       let resolveCalls = 0;
 
@@ -465,7 +465,7 @@ describe('Plugin Architecture', () => {
     });
 
     test('hook can replace MCP headers before tools/list', async () => {
-      const port = 9028;
+      const port = await getFreePort();
       mcpRequests.length = 0;
 
       class HeaderSwapPlugin implements UseAIServerPlugin {
@@ -556,8 +556,9 @@ describe('Plugin Architecture', () => {
     }
 
     test('client disconnect during the hook stops the run', async () => {
-      const setup = createSlowAuthSetup(9029);
-      const socket = await cleanup.createTestClient(9029);
+      const port = await getFreePort();
+      const setup = createSlowAuthSetup(port);
+      const socket = await cleanup.createTestClient(port);
 
       sendRunAgent(socket, { prompt: 'Hello' });
       await setup.hookStarted;
@@ -574,8 +575,9 @@ describe('Plugin Architecture', () => {
     });
 
     test('abort_run during the hook stops the run', async () => {
-      const setup = createSlowAuthSetup(9030);
-      const socket = await cleanup.createTestClient(9030);
+      const port = await getFreePort();
+      const setup = createSlowAuthSetup(port);
+      const socket = await cleanup.createTestClient(port);
 
       const eventsPromise = collectEventsUntil(socket, EventType.RUN_ERROR);
       sendRunAgent(socket, { prompt: 'Hello' });
@@ -599,8 +601,9 @@ describe('Plugin Architecture', () => {
     });
 
     test('abort_run for a run still in its hook is not lost when a newer run starts', async () => {
-      const setup = createSlowAuthSetup(9031);
-      const socket = await cleanup.createTestClient(9031);
+      const port = await getFreePort();
+      const setup = createSlowAuthSetup(port);
+      const socket = await cleanup.createTestClient(port);
 
       sendRunAgent(socket, { prompt: 'First' });
       const firstRunId = await setup.hookStarted;

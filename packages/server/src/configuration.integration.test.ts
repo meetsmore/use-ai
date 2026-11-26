@@ -14,9 +14,8 @@ afterAll(() => {
 
 describe('Configuration', () => {
   test('Server port can be configured via PORT env variable', () => {
-    const customPort = 9014;
     const portServer = new UseAIServer({
-      port: customPort,
+      port: 0,
       agents: { test: createTestAgent() },
       defaultAgent: 'test',
     });
@@ -27,13 +26,12 @@ describe('Configuration', () => {
   });
 
   test('Server can be initialized with multiple agents', () => {
-    const multiAgentPort = 9015;
     const claudeAgent = createTestAgent('claude');
     const gptAgent = createTestAgent('gpt');
     const geminiAgent = createTestAgent('gemini');
 
     const multiAgentServer = new UseAIServer({
-      port: multiAgentPort,
+      port: 0,
       agents: {
         claude: claudeAgent,
         gpt: gptAgent,
@@ -57,7 +55,7 @@ describe('Configuration', () => {
     // Server should throw error if no agents provided
     expect(() => {
       new UseAIServer({
-        port: 9016,
+        port: 0,
         agents: {},
         defaultAgent: 'nonexistent',
       } as any);
@@ -65,11 +63,9 @@ describe('Configuration', () => {
   });
 
   test('MCP endpoint configuration via environment variables', () => {
-    const mcpConfigPort = 9017;
-
     // MCP endpoints can be configured
     const mcpServer = new UseAIServer({
-      port: mcpConfigPort,
+      port: 0,
       agents: { test: createTestAgent() },
       defaultAgent: 'test',
       mcpEndpoints: [
