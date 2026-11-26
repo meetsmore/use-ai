@@ -578,19 +578,23 @@ const deleteTodo = defineTool(
 
 **Editing arguments before approval:**
 
-A custom `ToolApproval` slot can let the user correct the proposed arguments (for example in a form) and approve in one step. `onApproveWithArgs` takes edited arguments keyed by `toolCallId`; those calls run with the edited arguments instead of the AI's, and calls without an entry run unchanged. The slot also receives the request's `message` and `metadata` (set by MCP `confirmation_required` responses and runtime approvals).
+A custom `ToolApproval` slot can let the user correct proposed arguments in a form and submit them with approval. `onApproveWithArgs` takes edited arguments keyed by `toolCallId`; calls without an entry keep their proposed arguments. The slot also receives the request's `message` and `metadata` (set by MCP `confirmation_required` responses and runtime approvals).
 
 ```tsx
 import type { ChatToolApprovalSlotProps } from '@meetsmore-oss/use-ai-client';
 
 function EditableApproval({ approvals, onApprove, onApproveWithArgs, onReject }: ChatToolApprovalSlotProps) {
   const pending = approvals[0];
-  const [args, setArgs] = useState(pending.toolCallArgs);
+  const [draft, setDraft] = useState<Record<string, unknown>>();
   const [error, setError] = useState('');
-  const approveEdited = async () => {
-    if (!onApproveWithArgs) return;
+  const canEdit = pending.acceptsModifiedArgs && onApproveWithArgs;
+  const approve = async () => {
+    if (!canEdit || !draft) {
+      onApprove();
+      return;
+    }
     try {
-      await onApproveWithArgs({ [pending.toolCallId]: args });
+      await canEdit({ [pending.toolCallId]: draft });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
     }
@@ -598,8 +602,9 @@ function EditableApproval({ approvals, onApprove, onApproveWithArgs, onReject }:
   return (
     <div>
       <p>{pending.message}</p>
-      {/* form fields that update args, e.g. from pending.metadata */}
-      <button onClick={approveEdited}>Approve</button>
+      {/* Render editable fields when canEdit is set. Initialize them from
+          draft ?? pending.toolCallArgs and call setDraft when a field changes. */}
+      <button onClick={approve}>Approve</button>
       <button onClick={() => onReject()}>Deny</button>
       {error && <p role="alert">{error}</p>}
     </div>

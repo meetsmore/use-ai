@@ -435,7 +435,7 @@ export function useToolSystem({
    * but the call itself comes from TOOL_CALL_END. The tool runs only when both name the
    * same tool, and with exactly the arguments the user approved: the edited arguments,
    * or else the shown arguments, which must equal the call arguments. Otherwise the
-   * tool does not run and the server gets an error result (security finding I6).
+   * tool does not run and the server gets an error result.
    */
   const executePendingToolAfterApproval = useCallback(async (
     approval: PendingToolApproval,

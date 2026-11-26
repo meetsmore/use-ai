@@ -116,6 +116,45 @@ describe('useToolSystem approval with edited arguments', () => {
     expect(result.current.pendingApprovals[1].acceptsModifiedArgs).toBeUndefined();
   });
 
+  it('can approve a new MCP preview for the same tool call after submitting edits', async () => {
+    const { result, client, executed } = setup();
+    const toolCallId = 'remote-1';
+    const request = {
+      type: TOOL_APPROVAL_REQUEST,
+      toolCallId,
+      toolCallName: 'publishReport',
+      timestamp: 0,
+      acceptsModifiedArgs: true,
+    } as const;
+    act(() => result.current.handleApprovalRequest({
+      ...request,
+      toolCallArgs: { title: 'Original' },
+      metadata: { preview: 'Original report' },
+    }));
+
+    await act(() => result.current.approveWithArgs({ [toolCallId]: { title: 'Edited' } }));
+    expect(result.current.pendingApprovals).toEqual([]);
+
+    act(() => result.current.handleApprovalRequest({
+      ...request,
+      toolCallArgs: { title: 'Edited' },
+      metadata: { preview: 'Edited report' },
+    }));
+    expect(result.current.pendingApprovals).toEqual([expect.objectContaining({
+      toolCallId,
+      toolCallArgs: { title: 'Edited' },
+      metadata: { preview: 'Edited report' },
+    })]);
+
+    await act(() => result.current.approveAll());
+    expect(client.sendToolApprovalResponse.mock.calls).toEqual([
+      [toolCallId, true, undefined, { title: 'Edited' }],
+      [toolCallId, true, undefined, undefined],
+    ]);
+    expect(result.current.pendingApprovals).toEqual([]);
+    expect(executed).toEqual([]);
+  });
+
   it('approveWithArgs refuses edits for an approval that does not accept them and approves nothing', async () => {
     const { result, client, executed, requestApproval } = setup();
     requestApproval('tc-1', 'Original', 'no-edits');
@@ -132,7 +171,7 @@ describe('useToolSystem approval with edited arguments', () => {
   });
 });
 
-describe('useToolSystem approval matches what executes (security finding I6)', () => {
+describe('useToolSystem approval matches what executes', () => {
   function requestApprovalShowing(
     result: ReturnType<typeof setup>['result'],
     toolCallId: string,
