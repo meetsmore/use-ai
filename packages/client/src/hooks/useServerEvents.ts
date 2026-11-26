@@ -132,8 +132,8 @@ export interface UseServerEventsReturn {
   handleToolResult: (toolCallId: string, content: string) => void;
   /**
    * Handles a server event. Called from the provider's client subscription.
-   * Takes the client instance so it can access client-internal state
-   * (currentToolCalls, currentMessageContent).
+   * Takes the client instance so it can read the run's state
+   * (tool call data, currentMessageContent).
    */
   handleServerEvent: (client: UseAIClient, event: AGUIEvent) => Promise<void>;
   /**
@@ -382,14 +382,13 @@ export function useServerEvents({
       setExecutingTool(prev => prev?.toolCallId === toolCallId ? null : prev);
       updateToolCallPart(toolCallId, part => ({ ...part, status: 'running' }));
 
-      const toolCallData = (client as unknown as { currentToolCalls: Map<string, { name: string; args: string }> }).currentToolCalls.get(toolCallId);
+      const toolCallData = client.getToolCallData(toolCallId);
       if (!toolCallData) {
         console.error(`[ServerEvents] Tool call ${toolCallId} not found`);
         return;
       }
 
       const name = toolCallData.name;
-      const input = JSON.parse(toolCallData.args);
 
       const tool = ts.aggregatedToolsRef.current[name];
       const runTool = client.getRunTool(name);
@@ -397,6 +396,18 @@ export function useServerEvents({
       // them and sends their result as TOOL_CALL_RESULT, so leave them to it.
       if (!tool && !runTool) {
         logger.debug(`[ServerEvents] Tool "${name}" is not a client tool, the server runs it`);
+        return;
+      }
+
+      // The server waits for a result of each client tool call. If the args
+      // are not valid JSON, send an error result, so that the run continues.
+      let input: unknown;
+      try {
+        input = JSON.parse(toolCallData.args);
+      } catch (err) {
+        const reason = err instanceof Error ? err.message : String(err);
+        console.error(`[ServerEvents] Invalid args for tool call ${toolCallId}:`, reason);
+        client.sendToolResponse(toolCallId, { error: `Invalid tool arguments: ${reason}` });
         return;
       }
 

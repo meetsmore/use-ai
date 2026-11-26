@@ -25,7 +25,7 @@ function setup(runTools: ToolDefinition[]) {
   const client = {
     runMessages: [],
     currentRunId: 'run-1',
-    currentToolCalls,
+    getToolCallData: (toolCallId: string) => currentToolCalls.get(toolCallId),
     getRunTool: (name: string) => runTools.find(tool => tool.name === name),
   } as unknown as UseAIClient;
   const hook = renderHook(() =>

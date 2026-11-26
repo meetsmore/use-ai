@@ -24,7 +24,7 @@ function makeClient(currentMessageContent: string) {
     currentReasoningBlocks: [],
     currentRunId: 'run-1',
     finalizeRun: mock(() => {}),
-    currentToolCalls: new Map(),
+    getToolCallData: () => undefined,
   } as unknown as UseAIClient;
 }
 

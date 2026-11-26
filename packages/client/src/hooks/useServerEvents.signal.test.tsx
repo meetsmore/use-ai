@@ -23,7 +23,7 @@ function setup() {
     currentReasoningBlocks: [],
     currentRunId: 'run-1',
     finalizeRun: mock(() => { order.push('finalize'); }),
-    currentToolCalls: new Map(),
+    getToolCallData: () => undefined,
   } as unknown as UseAIClient;
   const hook = renderHook(() =>
     useServerEvents({ toolSystem, saveAIResponse: mock(async () => {}), strings: defaultStrings }),
