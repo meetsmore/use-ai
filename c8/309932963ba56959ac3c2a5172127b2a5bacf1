@@ -1,0 +1,19 @@
+packages/server/src/tools/serverToolExecutor.ts
+  s_f2fe6d12681464::t_71ccfd1f6f16ca 14-18,22,53
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "c8309932963ba56959ac3c2a5172127b2a5bacf1",
+  "prompts": {},
+  "sessions": {
+    "s_f2fe6d12681464": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d11f92f3-aa1a-43f4-8dd4-599d86742593",
+        "model": "unknown"
+      },
+      "human_author": "yuma.ito <yuma.ito@meetsmore.com>"
+    }
+  }
+}
