@@ -1240,6 +1240,7 @@ The client's patterns decide which configured MCP endpoint gets which headers. T
 - The host is a literal host (`api.example.com`, `localhost`, `127.0.0.1`, `[::1]`), or `*.` followed by a domain (`*.example.com`).
 - `*.example.com` matches subdomains at any depth (`a.example.com`, `a.b.example.com`). It does not match `example.com`.
 - The domain after `*.` must not be a public suffix, such as `*.jp`, `*.co.jp` or `*.com`.
+- The subdomains of the domain after `*.` must not be public suffixes. For example, the Public Suffix List rule `*.kawasaki.jp` makes each `foo.kawasaki.jp` a public suffix, so `*.kawasaki.jp` is not allowed.
 - The port is a literal number. If there is no port, the pattern matches only the default port of the scheme.
 - No other globs are allowed in the host or the port. For example, `*`, `api*.example.com` and `a.*.example.com` are not allowed.
 

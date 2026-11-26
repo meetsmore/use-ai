@@ -10,6 +10,7 @@
  * - `scheme` and `path` may contain picomatch globs. A missing path means `/`.
  * - `host` is a literal host (`api.example.com`, `localhost`, `127.0.0.1`, `[::1]`),
  *   or `*.` followed by a literal domain that is not a public suffix (`*.example.com`).
+ *   The subdomains of that domain must not be public suffixes either (not `*.kawasaki.jp`).
  *   `*.example.com` matches subdomains at any depth, but not `example.com` itself.
  * - `port` is a literal number. A missing port means the default port of the scheme.
  *
@@ -105,6 +106,16 @@ function parsePattern(pattern: string): ParseResult {
     }
     if (info.publicSuffix === host) {
       return { ok: false, reason: '*. must not be followed by a public suffix' };
+    }
+    // A PSL wildcard rule such as `*.kawasaki.jp` makes each child of `kawasaki.jp` a
+    // public suffix, but not `kawasaki.jp` itself. Then `*.kawasaki.jp` matches hosts of
+    // different registrants. Any label works as the probe, because the rule matches any label.
+    const probe = `x.${host}`;
+    if (parseDomain(probe, { allowPrivateDomains: true }).publicSuffix === probe) {
+      return {
+        ok: false,
+        reason: '*. must not be followed by a domain whose subdomains are public suffixes',
+      };
     }
   }
 

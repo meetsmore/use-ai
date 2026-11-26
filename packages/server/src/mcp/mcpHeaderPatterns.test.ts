@@ -18,6 +18,8 @@ describe('validateMcpHeaderPattern', () => {
       ['scheme glob', '*://api.proone.jp/api/mcp'],
       ['scheme brace glob', '{http,https}://api.proone.jp/api/mcp'],
       ['path glob', 'https://api.proone.jp/**'],
+      ['*. before a PSL exception domain (city.kawasaki.jp)', 'https://*.city.kawasaki.jp/api/mcp'],
+      ['*. before a domain under a PSL wildcard suffix', 'https://*.foo.bar.kawasaki.jp/api/mcp'],
     ])('%s: %s', (_name, pattern) => {
       expect(validateMcpHeaderPattern(pattern)).toBeNull();
     });
@@ -32,6 +34,8 @@ describe('validateMcpHeaderPattern', () => {
       ['*. before a public suffix (co.jp)', 'https://*.co.jp/api/mcp'],
       ['*. before a public suffix (com)', 'https://*.com/api/mcp'],
       ['*. before a private public suffix (github.io)', 'https://*.github.io/api/mcp'],
+      ['*. before a PSL wildcard parent (kawasaki.jp)', 'https://*.kawasaki.jp/api/mcp'],
+      ['*. before a PSL wildcard parent (sch.uk)', 'https://*.sch.uk/api/mcp'],
       ['*. before a single label', 'https://*.localhost/api/mcp'],
       ['*. before an IP address', 'https://*.0.0.1/api/mcp'],
       ['wildcard in the middle of a label', 'https://api*.proone.jp/api/mcp'],
