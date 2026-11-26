@@ -304,14 +304,13 @@ describe('Tool Execution Coordination', () => {
     multiServer.close();
   });
 
-  test.skip('Tool definitions are converted to AI SDK format', async () => {
-    // TODO: This test has timing issues with the mock model validator
-    // The validator function may be interfering with the mock's response
-    // Skipping for now - tool conversion is implicitly tested by all other tool tests
-    // Create a custom server that verifies tool conversion
+  test('Tool definitions are converted to AI SDK format', async () => {
+    // Record the tools that the model gets. Check them after the run.
+    // An expect() in the model callback would end the run with RUN_ERROR, not with a clear failure.
     const convPort = await getFreePort();
+    let modelTools: unknown;
     const convMockModel = createToolValidatorMockModel((tools) => {
-      expect(Object.keys(tools as object).length).toBeGreaterThan(0);
+      modelTools = tools;
     });
 
     const convAgent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: convMockModel }) } });
@@ -347,6 +346,17 @@ describe('Tool Execution Coordination', () => {
     });
 
     await responsePromise;
+
+    expect(modelTools).toContainEqual({
+      type: 'function',
+      name: 'test_tool',
+      description: 'Test tool',
+      inputSchema: {
+        type: 'object',
+        properties: { value: { type: 'string' } },
+        required: ['value'],
+      },
+    });
 
     socket.disconnect();
     convServer.close();
