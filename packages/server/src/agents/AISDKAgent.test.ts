@@ -1,4 +1,4 @@
-import { describe, expect, test, mock, spyOn } from 'bun:test';
+import { describe, expect, test, mock, spyOn, afterEach } from 'bun:test';
 import { AISDKAgent } from './AISDKAgent';
 import { logger } from '../logger';
 import * as telemetry from '../telemetry';
@@ -9,6 +9,7 @@ import type { RemoteToolDefinition } from '../mcp';
 import type { ServerToolDefinition } from '../tools/types';
 import { v4 as uuidv4 } from 'uuid';
 import { MockLanguageModelV3 } from 'ai/test';
+import * as aiNamespace from 'ai';
 import { simulateReadableStream } from 'ai';
 import {
   isRemoteTool,
@@ -18,6 +19,28 @@ import {
   not,
 } from '../utils/toolFilters';
 import { pushTraceIdForRun, popTraceIdForRun } from '../instrumentation';
+
+// Copy of the real 'ai' exports. mock.module() patches the live namespace in place,
+// so a copy made after a mock would keep the stub.
+const realAi = { ...aiNamespace };
+let aiIsMocked = false;
+
+/**
+ * Replaces exports of 'ai' for one test.
+ * Bun applies mock.module() to the whole process. The afterEach hook below restores 'ai',
+ * also when the test fails. Thus the mock cannot leak into later test files.
+ */
+function mockAi(overrides: Record<string, unknown>): void {
+  aiIsMocked = true;
+  mock.module('ai', () => ({ ...realAi, ...overrides }));
+}
+
+afterEach(() => {
+  if (aiIsMocked) {
+    aiIsMocked = false;
+    mock.module('ai', () => realAi);
+  }
+});
 
 /**
  * Helper to create a streaming mock model that emits text
@@ -575,11 +598,7 @@ describe('AISDKAgent', () => {
       // This is the typical behavior with stopWhen
 
       // Mock streamText to control response.messages
-      const aiModule = await import('ai');
-      const originalStreamText = aiModule.streamText;
-
-      mock.module('ai', () => ({
-        ...aiModule,
+      mockAi({
         streamText: (options: unknown) => {
           // Create a mock stream result
           const mockResult = {
@@ -631,7 +650,7 @@ describe('AISDKAgent', () => {
           };
           return mockResult;
         },
-      }));
+      });
 
       const mockModel = createStreamingTextMockModel('Final response after tool execution');
       const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
@@ -668,12 +687,6 @@ describe('AISDKAgent', () => {
       const assistantMsg = result.conversationHistory[1] as { content: unknown };
       expect(assistantMsg.content).toBeDefined();
       expect(Array.isArray(assistantMsg.content)).toBe(true);
-
-      // Restore original
-      mock.module('ai', () => ({
-        ...aiModule,
-        streamText: originalStreamText,
-      }));
     });
 
     test('with single step: response includes input messages', async () => {
@@ -681,11 +694,7 @@ describe('AISDKAgent', () => {
       // This may happen with single step or certain AI SDK versions
 
       // Mock streamText to return response that includes the input message
-      const aiModule = await import('ai');
-      const originalStreamText = aiModule.streamText;
-
-      mock.module('ai', () => ({
-        ...aiModule,
+      mockAi({
         streamText: (options: unknown) => {
           const mockResult = {
             fullStream: (async function* () {
@@ -740,7 +749,7 @@ describe('AISDKAgent', () => {
           };
           return mockResult;
         },
-      }));
+      });
 
       const mockModel = createStreamingTextMockModel('Final response after tool execution');
       const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
@@ -776,23 +785,13 @@ describe('AISDKAgent', () => {
       expect((result.conversationHistory[2] as { role: string }).role).toBe('assistant');
       expect((result.conversationHistory[3] as { role: string }).role).toBe('tool');
       expect((result.conversationHistory[4] as { role: string }).role).toBe('assistant');
-
-      // Restore original
-      mock.module('ai', () => ({
-        ...aiModule,
-        streamText: originalStreamText,
-      }));
     });
 
     test('preserves existing history across multiple turns', async () => {
       // This test verifies that conversation history accumulates correctly across multiple turns
 
       // Mock streamText to return a simple response with one assistant message
-      const aiModule = await import('ai');
-      const originalStreamText = aiModule.streamText;
-
-      mock.module('ai', () => ({
-        ...aiModule,
+      mockAi({
         streamText: (options: unknown) => {
           const mockResult = {
             fullStream: (async function* () {
@@ -820,7 +819,7 @@ describe('AISDKAgent', () => {
           };
           return mockResult;
         },
-      }));
+      });
 
       const mockModel = createStreamingTextMockModel('Response');
       const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
@@ -860,12 +859,6 @@ describe('AISDKAgent', () => {
       expect((result.conversationHistory[1] as { content: string }).content).toBe('First response');
       expect((result.conversationHistory[2] as { content: string }).content).toBe('Second message');
       expect((result.conversationHistory[3] as { content: string }).content).toBe('Response');
-
-      // Restore original
-      mock.module('ai', () => ({
-        ...aiModule,
-        streamText: originalStreamText,
-      }));
     });
 
     test('multi-step execution preserves all step messages in history', async () => {
@@ -873,12 +866,9 @@ describe('AISDKAgent', () => {
       // messages from ALL steps are preserved in conversation history, not just the last step.
       // Regression test for: response.messages only containing the last step's messages.
 
-      const aiModule = await import('ai');
-      const originalStreamText = aiModule.streamText;
       let callCount = 0;
 
-      mock.module('ai', () => ({
-        ...aiModule,
+      mockAi({
         streamText: (options: unknown) => {
           callCount++;
 
@@ -955,7 +945,7 @@ describe('AISDKAgent', () => {
             };
           }
         },
-      }));
+      });
 
       const mockModel = createStreamingTextMockModel('unused');
       const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
@@ -997,12 +987,6 @@ describe('AISDKAgent', () => {
 
       // Verify streamText was called twice (two steps)
       expect(callCount).toBe(2);
-
-      // Restore original
-      mock.module('ai', () => ({
-        ...aiModule,
-        streamText: originalStreamText,
-      }));
     });
   });
 
@@ -1664,13 +1648,9 @@ describe('AISDKAgent', () => {
 
     test('no cacheBreakpoint: messages are not modified', async () => {
       const capturedMessages = { messages: [] as unknown[] };
-      const aiModule = await import('ai');
-      const originalStreamText = aiModule.streamText;
-
-      mock.module('ai', () => ({
-        ...aiModule,
+      mockAi({
         streamText: createMockStreamResult(capturedMessages),
-      }));
+      });
 
       const mockModel = createAnthropicMockModel();
       const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
@@ -1689,22 +1669,13 @@ describe('AISDKAgent', () => {
         (msg: unknown) => (msg as { providerOptions?: unknown }).providerOptions
       );
       expect(hasProviderOptions).toBe(false);
-
-      mock.module('ai', () => ({
-        ...aiModule,
-        streamText: originalStreamText,
-      }));
     });
 
     test('cacheBreakpoint with system OR isLast: common caching pattern', async () => {
       const capturedMessages = { messages: [] as unknown[] };
-      const aiModule = await import('ai');
-      const originalStreamText = aiModule.streamText;
-
-      mock.module('ai', () => ({
-        ...aiModule,
+      mockAi({
         streamText: createMockStreamResult(capturedMessages),
-      }));
+      });
 
       const mockModel = createAnthropicMockModel();
       const agent = new AISDKAgent({ cacheBreakpoint: (msg) => msg.role === 'system' || msg.isLast, hooks: { loadConfig: () => ({ model: mockModel }) } });
@@ -1740,11 +1711,6 @@ describe('AISDKAgent', () => {
       // Verify last message has cache control
       const lastMsg = capturedMessages.messages[3] as { role: string; providerOptions?: { anthropic?: { cacheControl?: { type: string } } } };
       expect(lastMsg.providerOptions?.anthropic?.cacheControl?.type).toBe('ephemeral');
-
-      mock.module('ai', () => ({
-        ...aiModule,
-        streamText: originalStreamText,
-      }));
     });
 
     test('cacheBreakpoint receives correct context', async () => {
@@ -1815,13 +1781,9 @@ describe('AISDKAgent', () => {
 
     test('cacheBreakpoint not applied for non-Anthropic models', async () => {
       const capturedMessages = { messages: [] as unknown[] };
-      const aiModule = await import('ai');
-      const originalStreamText = aiModule.streamText;
-
-      mock.module('ai', () => ({
-        ...aiModule,
+      mockAi({
         streamText: createMockStreamResult(capturedMessages),
-      }));
+      });
 
       const mockModel = createNonAnthropicMockModel();
       const agent = new AISDKAgent({
@@ -1844,22 +1806,13 @@ describe('AISDKAgent', () => {
         (msg: unknown) => (msg as { providerOptions?: unknown }).providerOptions
       );
       expect(hasProviderOptions).toBe(false);
-
-      mock.module('ai', () => ({
-        ...aiModule,
-        streamText: originalStreamText,
-      }));
     });
 
     test('cacheBreakpoint with TTL string: adds cache control with explicit TTL', async () => {
       const capturedMessages = { messages: [] as unknown[] };
-      const aiModule = await import('ai');
-      const originalStreamText = aiModule.streamText;
-
-      mock.module('ai', () => ({
-        ...aiModule,
+      mockAi({
         streamText: createMockStreamResult(capturedMessages),
-      }));
+      });
 
       const mockModel = createAnthropicMockModel();
       const agent = new AISDKAgent({ // Return '1h' TTL for system prompt
@@ -1882,22 +1835,13 @@ describe('AISDKAgent', () => {
       expect(systemMsg.role).toBe('system');
       expect(systemMsg.providerOptions?.anthropic?.cacheControl?.type).toBe('ephemeral');
       expect(systemMsg.providerOptions?.anthropic?.cacheControl?.ttl).toBe('1h');
-
-      mock.module('ai', () => ({
-        ...aiModule,
-        streamText: originalStreamText,
-      }));
     });
 
     test('cacheBreakpoint with true: adds cache control without TTL', async () => {
       const capturedMessages = { messages: [] as unknown[] };
-      const aiModule = await import('ai');
-      const originalStreamText = aiModule.streamText;
-
-      mock.module('ai', () => ({
-        ...aiModule,
+      mockAi({
         streamText: createMockStreamResult(capturedMessages),
-      }));
+      });
 
       const mockModel = createAnthropicMockModel();
       const agent = new AISDKAgent({ // Return true (not TTL string) - should not include ttl field
@@ -1921,11 +1865,6 @@ describe('AISDKAgent', () => {
       expect(systemMsg.providerOptions?.anthropic?.cacheControl?.type).toBe('ephemeral');
       // ttl field should not be present when returning true
       expect(systemMsg.providerOptions?.anthropic?.cacheControl?.ttl).toBeUndefined();
-
-      mock.module('ai', () => ({
-        ...aiModule,
-        streamText: originalStreamText,
-      }));
     });
   });
 
@@ -4003,9 +3942,6 @@ describe('AISDKAgent', () => {
 
     test('cache breakpoints follow the loaded model in both directions', async () => {
       const capturedMessages = { messages: [] as unknown[] };
-      const aiModule = await import('ai');
-      const originalStreamText = aiModule.streamText;
-
       /** Same capture pattern as the "Prompt caching" describe above */
       const mockStreamText = (options: { messages: unknown[] }) => {
         capturedMessages.messages = options.messages;
@@ -4030,10 +3966,9 @@ describe('AISDKAgent', () => {
         };
       };
 
-      mock.module('ai', () => ({
-        ...aiModule,
+      mockAi({
         streamText: mockStreamText,
-      }));
+      });
 
       const runWithModel = async (model: MockLanguageModelV3) => {
         const agent = new AISDKAgent({
@@ -4060,11 +3995,6 @@ describe('AISDKAgent', () => {
         (msg: unknown) => (msg as { providerOptions?: unknown }).providerOptions
       );
       expect(hasProviderOptions).toBe(false);
-
-      mock.module('ai', () => ({
-        ...aiModule,
-        streamText: originalStreamText,
-      }));
     });
   });
 });
