@@ -1,0 +1,22 @@
+packages/client/src/providers/useAIProvider.tsx
+  s_dcd20c27a7b625::t_86c933d0a01888 1
+  s_dcd20c27a7b625::t_a8d299e65d41f2 725-727,730,732-735,738
+packages/client/src/providers/useAIProvider.approvalScope.test.tsx
+  s_dcd20c27a7b625::t_6b618df18a9dba 165-205
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "26b2d8977f4a4b89cad8a52a9747de1a01b9d961",
+  "prompts": {},
+  "sessions": {
+    "s_dcd20c27a7b625": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "69fdba5c-e57c-46e6-a3d8-e0d8b173c58b",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "yuma.ito <yuma.ito@meetsmore.com>"
+    }
+  }
+}
