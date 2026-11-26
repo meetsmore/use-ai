@@ -129,6 +129,31 @@ describe('Error Handling', () => {
     socket.disconnect();
   });
 
+  test.each(['constructor', '__proto__', 'toString', 'hasOwnProperty'])(
+    'Server rejects the inherited Object property "%s" as an agent name',
+    async (agentName) => {
+      const socket = await cleanup.createTestClient(testPort);
+
+      socket.emit('message', {
+        type: 'run_agent',
+        data: {
+          threadId: uuidv4(),
+          runId: uuidv4(),
+          messages: [{ id: uuidv4(), role: 'user', content: 'test' }],
+          tools: [],
+          state: null,
+          context: [],
+          forwardedProps: { agent: agentName },
+        },
+      });
+
+      const errorEvent = await waitForEventType(socket, EventType.RUN_ERROR);
+      expect((errorEvent as RunErrorEvent).message).toContain(`Agent "${agentName}" not found`);
+
+      socket.disconnect();
+    },
+  );
+
   test('Server survives malformed messages and keeps serving the connection', async () => {
     const socket = await cleanup.createTestClient(testPort);
 
@@ -463,6 +488,26 @@ describe('Abort cause labelling', () => {
 
     expect(session.abortController.signal.reason).toBeInstanceOf(RunAbortedByUser);
     expect(session.abortController.signal.reason.name).toBe('RunAbortedByUser');
+
+    socket.disconnect();
+    server.close();
+  });
+
+  test('handleAbortRun ignores an abort for a run that is not the current run', async () => {
+    const { server, socket, session, runId } = await startPendingToolRun(9340);
+
+    // A late abort for an earlier run must not abort the current run.
+    socket.emit('message', { type: 'abort_run', data: { runId: uuidv4() } });
+    // Give the server time to process the stale abort.
+    await new Promise((r) => setTimeout(r, 200));
+    expect(session.abortController.signal.aborted).toBe(false);
+    expect(session.currentRunId).toBe(runId);
+    expect(session.pendingToolCalls.size).toBe(1);
+
+    socket.emit('message', { type: 'abort_run', data: { runId } });
+    await waitForAborted(session);
+    expect(session.abortController.signal.aborted).toBe(true);
+    expect(session.currentRunId).toBeUndefined();
 
     socket.disconnect();
     server.close();

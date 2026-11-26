@@ -469,7 +469,8 @@ export class UseAIServer {
     // Select agent: use requested agent if valid, otherwise fall back to default
     let selectedAgent = this.agent;
     if (requestedAgent) {
-      const agent = this.agents[requestedAgent];
+      // Use an own-property check. A plain lookup returns inherited members such as `constructor`.
+      const agent = Object.hasOwn(this.agents, requestedAgent) ? this.agents[requestedAgent] : undefined;
       if (agent) {
         selectedAgent = agent;
         logger.debug('Using requested agent', { agent: requestedAgent });
@@ -1021,6 +1022,16 @@ export class UseAIServer {
 
   private handleAbortRun(session: ClientSession, message: AbortRunMessage) {
     const { runId } = message.data;
+    // A late abort for an earlier run must not abort the current run.
+    // An abort without a runId keeps the old behaviour and aborts the current run.
+    if (runId !== undefined && runId !== session.currentRunId) {
+      logger.info('Ignored abort for a run that is not current', {
+        clientId: session.clientId,
+        runId,
+        currentRunId: session.currentRunId,
+      });
+      return;
+    }
     // Abort pending tool calls/approvals via AbortController (rejects their promises)
     abortRun(session.abortController, new RunAbortedByUser());
     // Clear pending tool calls and approvals for this run
