@@ -2734,6 +2734,28 @@ describe('AISDKAgent', () => {
     });
   });
 
+  describe('step log', () => {
+    test('client telemetryMetadata stays inside metadata and cannot replace the log level or message', async () => {
+      const debugSpy = spyOn(logger, 'debug');
+      try {
+        const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: createStreamingTextMockModel('Hi') }) } });
+        const base = createTestInput();
+        const input = createTestInput({
+          originalInput: { ...base.originalInput, forwardedProps: { telemetryMetadata: { level: 'error', message: 'spoofed', userId: 'user-1' } } },
+        });
+        await agent.run(input, { emit: () => {} });
+
+        const call = debugSpy.mock.calls.find(([message]) => message === 'Starting step iteration');
+        expect(call).toBeDefined();
+        const data = call![1] as Record<string, unknown>;
+        expect(Object.keys(data).sort()).toEqual(['metadata', 'stepIteration']);
+        expect(data.metadata).toMatchObject({ level: 'error', message: 'spoofed', userId: 'user-1', runId: input.runId });
+      } finally {
+        debugSpy.mockRestore();
+      }
+    });
+  });
+
   describe('run span session id', () => {
     async function runSpanSessionId(forwardedProps: Record<string, unknown>): Promise<string | undefined> {
       const startSpy = spyOn(telemetry, 'startRunSpan');
@@ -3925,8 +3947,13 @@ describe('AISDKAgent', () => {
 
       const eventEmitter: EventEmitter = { emit: () => {} };
       const warnSpy = spyOn(logger, 'warn');
+      const debugSpy = spyOn(logger, 'debug');
       try {
-        const result = await agent.run(createTestInput(), eventEmitter);
+        const base = createTestInput();
+        const result = await agent.run(
+          createTestInput({ originalInput: { ...base.originalInput, forwardedProps: { telemetryMetadata: { truncationFallback: true } } } }),
+          eventEmitter,
+        );
 
         expect(result.success).toBe(true);
         expect(callCount).toBe(2);
@@ -3940,8 +3967,15 @@ describe('AISDKAgent', () => {
         );
         expect(truncationWarn).toBeDefined();
         expect((truncationWarn![1] as { maxOutputTokens: number }).maxOutputTokens).toBe(100);
+
+        // Step metadata: only the fallback step carries truncationFallback (a client value does not stay on step 0)
+        const stepMetadata = debugSpy.mock.calls
+          .filter(([message]) => message === 'Starting step iteration')
+          .map(([, data]) => (data as { metadata: Record<string, unknown> }).metadata);
+        expect(stepMetadata.map(m => [m.truncationFallback, m.toolCount])).toEqual([[undefined, 0], [true, 0]]);
       } finally {
         warnSpy.mockRestore();
+        debugSpy.mockRestore();
       }
     });
 

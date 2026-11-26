@@ -437,6 +437,13 @@ function extractReasoningSignature(
   return null;
 }
 
+type RunTelemetryMetadata = Record<string, unknown> & {
+  sessionId: string;
+  threadId?: string;
+  runId: string;
+  ipAddress?: string;
+};
+
 /**
  * Agent implementation for AI SDK models (Anthropic, OpenAI, Google, etc.).
  *
@@ -659,19 +666,41 @@ export class AISDKAgent implements Agent {
     });
   }
 
+  /** The client's `forwardedProps.telemetryMetadata`, or an empty object. */
+  private clientTelemetryMetadata(ctx: RunContext): Record<string, unknown> {
+    return (ctx.originalInput.forwardedProps as UseAIForwardedProps | undefined)?.telemetryMetadata ?? {};
+  }
+
+  /**
+   * Langfuse session of the run span and its steps: the client's `telemetryMetadata.sessionId`
+   * when it is a non-empty string (documented option), else the socket client id.
+   */
+  private runSessionId(ctx: RunContext): string {
+    const sessionId = this.clientTelemetryMetadata(ctx).sessionId;
+    return typeof sessionId === 'string' && sessionId !== '' ? sessionId : ctx.session.clientId;
+  }
+
+  /** Telemetry metadata shared by the run span and every step. The server keys come last and always win. */
+  private runTelemetryMetadata(ctx: RunContext): RunTelemetryMetadata {
+    return {
+      ...this.clientTelemetryMetadata(ctx),
+      sessionId: this.runSessionId(ctx),
+      threadId: ctx.session.threadId,
+      runId: ctx.runId,
+      ipAddress: ctx.session.ipAddress,
+    };
+  }
+
   /**
    * Creates a telemetry span and sets input from the last user message.
    */
   private startTelemetrySpan(ctx: RunContext): ReturnType<typeof startRunSpan> {
-    const telemetryMetadata = (ctx.originalInput.forwardedProps as UseAIForwardedProps | undefined)?.telemetryMetadata;
-    const sessionId = typeof telemetryMetadata?.sessionId === 'string' && telemetryMetadata.sessionId !== ''
-      ? telemetryMetadata.sessionId
-      : ctx.session.clientId;
+    const { runId, sessionId, ...metadata } = this.runTelemetryMetadata(ctx);
     const attributes: Record<string, AttributeValue> = {};
-    for (const [key, value] of Object.entries(telemetryMetadata ?? {})) {
-      if (value != null && key !== 'runId' && key !== 'sessionId') attributes[`ai.telemetry.metadata.${key}`] = value as AttributeValue;
+    for (const [key, value] of Object.entries(metadata)) {
+      if (value != null) attributes[`ai.telemetry.metadata.${key}`] = value as AttributeValue;
     }
-    const span = startRunSpan({ runId: ctx.runId, sessionId, attributes });
+    const span = startRunSpan({ runId, sessionId, attributes });
 
     const lastUserMessage = [...ctx.messages].reverse().find(m => m.role === 'user');
     if (lastUserMessage) {
@@ -755,20 +784,20 @@ export class AISDKAgent implements Agent {
           ? (this.sanitizeToolsForAPI(this.filterTools(stepCtx.currentTools), ctx.session, events, ctx.mcpHeaders) as any)
           : undefined,
         metadata: {
-          sessionId: ctx.session.clientId,
-          threadId: ctx.session.threadId,
-          runId: ctx.runId,
-          ipAddress: ctx.session.ipAddress,
+          ...this.runTelemetryMetadata(ctx),
           toolCount: stepCtx.currentTools.length,
           stepIteration,
-          ...((ctx.originalInput.forwardedProps as UseAIForwardedProps | undefined)?.telemetryMetadata || {}),
+          // Set on every step (undefined on normal steps), after the client metadata, so a client value never stays.
+          gracefulSummary: isGracefulSummaryStep || undefined,
+          truncationFallback: isTruncationFallbackStep || undefined,
         } as Record<string, AttributeValue>,
       };
 
       this.applyGracefulSummaryOverrides(isGracefulSummaryStep, stepConfig);
       this.applyTruncationFallbackOverrides(isTruncationFallbackStep, stepConfig);
 
-      logger.debug('Starting step iteration', { stepIteration, ...stepConfig.metadata });
+      // Nest the metadata: it holds client telemetryMetadata keys, which must not collide with the log's own fields (level, message, …).
+      logger.debug('Starting step iteration', { stepIteration, metadata: stepConfig.metadata });
 
       // Apply cache breakpoints for Anthropic prompt caching
       const messagesWithCache = applyCacheBreakpoints(
@@ -1512,7 +1541,6 @@ export class AISDKAgent implements Agent {
 
     // Record pre-streamText errors to Langfuse (post-streamText errors are captured by AI SDK OTEL)
     if (!ctx.streamTextStarted) {
-      const telemetryMetadata = (ctx.originalInput.forwardedProps as UseAIForwardedProps | undefined)?.telemetryMetadata;
       span.recordError({
         runId: ctx.runId,
         errorCategory: 'pre_stream_error',
@@ -1520,7 +1548,7 @@ export class AISDKAgent implements Agent {
         sessionId: ctx.session.clientId,
         threadId: ctx.session.threadId,
         ipAddress: ctx.session.ipAddress,
-        metadata: { errorCode, toolCount: ctx.tools.length, messageCount: ctx.messages.length, ...telemetryMetadata },
+        metadata: { ...this.clientTelemetryMetadata(ctx), errorCode, toolCount: ctx.tools.length, messageCount: ctx.messages.length },
       });
     }
 
@@ -1588,7 +1616,7 @@ export class AISDKAgent implements Agent {
     if (!isGracefulSummaryStep) return;
     stepConfig.messages.push({ role: 'user', content: 'max steps reached, summarize progress' });
     stepConfig.tools = undefined;
-    Object.assign(stepConfig.metadata, { toolCount: 0, gracefulSummary: true });
+    stepConfig.metadata.toolCount = 0;
   }
 
   /** Disables tools for the truncation-acknowledgment fallback iteration. */
@@ -1598,7 +1626,7 @@ export class AISDKAgent implements Agent {
   ): void {
     if (!isTruncationFallbackStep) return;
     stepConfig.tools = undefined;
-    Object.assign(stepConfig.metadata, { toolCount: 0, truncationFallback: true });
+    stepConfig.metadata.toolCount = 0;
   }
 
   /**
