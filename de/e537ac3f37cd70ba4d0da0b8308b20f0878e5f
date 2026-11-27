@@ -1,0 +1,37 @@
+apps/use-ai-server-app/package.json
+  s_fe9eb1c5fca62f::t_5299a6e23ca41c 22-24
+bun.lock
+  s_dcf8cbe895db7c::t_dfa02c9c54043e 59-61,114-115,120,163,165,167,169,171,541,553,1443-1444,1471-1472
+packages/server/package.json
+  s_fe9eb1c5fca62f::t_4a3a0aaa309cde 33-34,39
+packages/server/src/agents/AISDKAgent.test.ts
+  s_fe9eb1c5fca62f::t_49b178c3b73dcd 2865,2964,3029,3246,3410,3527,3633,3823,3925
+packages/server/src/agents/AISDKAgent.ts
+  s_fe9eb1c5fca62f::t_0fbe9c14fd2f17 795,1616,1627
+packages/server/test/integration-test-utils.ts
+  s_fe9eb1c5fca62f::t_4b9e42963197fe 15-20,31-32,52-53,300-301
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "dee537ac3f37cd70ba4d0da0b8308b20f0878e5f",
+  "prompts": {},
+  "sessions": {
+    "s_dcf8cbe895db7c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "97ef8f3c-0f1f-4ede-b64c-31038c01a488",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "yuma.ito <yuma.ito@meetsmore.com>"
+    },
+    "s_fe9eb1c5fca62f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "81e02223-97d4-47cf-9265-22bc52f8cedb",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "yuma.ito <yuma.ito@meetsmore.com>"
+    }
+  }
+}
