@@ -1,0 +1,29 @@
+packages/server/src/agents/index.ts
+  s_92af7bc6281499::t_c40bf2dfceefac 6
+CLAUDE.md
+  s_92af7bc6281499::t_002e1411c75673 194,282
+packages/server/src/agents/AISDKAgent.ts
+  s_92af7bc6281499::t_c40bf2dfceefac 539
+packages/server/src/index.ts
+  s_92af7bc6281499::t_c40bf2dfceefac 10
+packages/server/src/instrumentation.ts
+  s_92af7bc6281499::t_c40bf2dfceefac 59
+README.md
+  s_92af7bc6281499::t_002e1411c75673 1343,1345-1348,1350
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "5ecda0daf7e14fcac990ef47f11cb35b7ca13242",
+  "prompts": {},
+  "sessions": {
+    "s_92af7bc6281499": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5d759e49-fd6d-4f60-ab6f-2d488244b5b1",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "yuma.ito <yuma.ito@meetsmore.com>"
+    }
+  }
+}
