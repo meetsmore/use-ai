@@ -36,13 +36,18 @@ afterEach(() => {
 
 type PromptPart = { type: string; mediaType?: string };
 
-async function createServer(port: number, resolveAttachments?: ResolveAttachments) {
+async function createServer(
+  port: number,
+  resolveAttachments?: ResolveAttachments,
+  supportedUrls?: Record<string, RegExp[]>,
+) {
   const { MockLanguageModelV3 } = await import('ai/test');
   const { simulateReadableStream } = await import('ai');
 
   const captured: { prompt: Array<{ role: string; content: unknown }> } = { prompt: [] };
-  // No supportedUrls, so the AI SDK downloads every URL part itself (like @ai-sdk/anthropic does for most types).
+  // No supportedUrls by default, so the AI SDK downloads every URL part itself (like @ai-sdk/anthropic does for most types).
   const model = new MockLanguageModelV3({
+    ...(supportedUrls ? { supportedUrls } : {}),
     doStream: async (params: { prompt: unknown }) => {
       captured.prompt = params.prompt as typeof captured.prompt;
       return {
@@ -123,19 +128,23 @@ describe('client-supplied attachment urls', () => {
     socket.disconnect();
   });
 
-  test('urls returned by resolveAttachments are still fetched', async () => {
+  // The AI SDK refuses to download from loopback and private addresses, so the model here takes the url
+  // as is. What this checks is that urls from the trusted resolver are not dropped like client urls.
+  test('urls returned by resolveAttachments still reach the model', async () => {
     const base = startTarget();
+    const signedUrl = `${base}/signed`;
     const resolveAttachments: ResolveAttachments = async (parts: unknown[]) =>
-      parts.map(() => ({ type: 'file_url', url: `${base}/signed`, mimeType: 'text/plain', name: 'r.txt' }));
-    const { socket, captured } = await createServer(18913, resolveAttachments);
+      parts.map(() => ({ type: 'file_url', url: signedUrl, mimeType: 'text/plain', name: 'r.txt' }));
+    const { socket, captured } = await createServer(18913, resolveAttachments, { 'text/plain': [/^http:/] });
 
     const finished = await runUntilDone(socket, [
       { type: 'file_ref', ref: 'REF-1', mimeType: 'text/plain', name: 'r.txt' },
     ]);
 
     expect(finished).toBe(true);
-    expect(hits).toEqual(['/signed']);
-    expect(filePartsSentToModel(captured)).toHaveLength(1);
+    const fileParts = filePartsSentToModel(captured) as Array<PromptPart & { data?: unknown }>;
+    expect(fileParts).toHaveLength(1);
+    expect(String(fileParts[0].data)).toBe(signedUrl);
     socket.disconnect();
   });
 });
