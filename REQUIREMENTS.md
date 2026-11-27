@@ -159,7 +159,7 @@ This document lists user-facing capabilities in requirements format with test co
 ✅ Log format can be configured via LOG_FORMAT environment variable
 ✅ The logger supports info, warn, error, and debug levels
 ✅ The logger includes timestamps in all log entries
-✅ The logger redacts sensitive header values in MCP logs (unless DEBUG=1)
+✅ The logger redacts all header values in MCP logs without revealing their length (unless DEBUG=1)
 ✅ Langfuse observability can be enabled for LLM tracking and analytics
 ✅ Langfuse integration tracks conversation sessions, tool calls, and token usage
 ✅ Langfuse telemetry includes session metadata (sessionId, threadId, runId, ipAddress, toolCount)

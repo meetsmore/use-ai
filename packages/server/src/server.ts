@@ -192,6 +192,7 @@ export class UseAIServer {
         annotations: toolConfig.annotations,
         _server: {
           execute: toolConfig.execute,
+          schema: toolConfig.schema,
         },
       }));
       logger.info('[Server Tools] Registered server tools', {
@@ -464,7 +465,7 @@ export class UseAIServer {
           sessionId: session.clientId,
           threadId,
           ipAddress: session.ipAddress,
-          metadata: { requestedAgent, availableAgents, ...forwardedProps?.telemetryMetadata },
+          metadata: { ...forwardedProps?.telemetryMetadata, requestedAgent, availableAgents },
         });
         this.sendEvent(session.socket, {
           type: EventType.RUN_ERROR,
@@ -515,7 +516,6 @@ export class UseAIServer {
         type: EventType.RUN_STARTED,
         threadId,
         runId,
-        input: message.data,
         timestamp: Date.now(),
       });
       this.sendEvent(session.socket, {
@@ -946,11 +946,18 @@ export class UseAIServer {
   }
 
   private handleToolApprovalResponse(session: ClientSession, message: ToolApprovalResponseMessage) {
-    const { toolCallId, approved, reason } = message.data;
+    const { toolCallId, approved, reason, modifiedArgs } = message.data;
     const resolver = session.pendingToolApprovals.get(toolCallId);
 
     if (resolver) {
-      resolver({ approved, reason });
+      if (approved && modifiedArgs !== undefined) {
+        const isObject = typeof modifiedArgs === 'object' && modifiedArgs !== null && !Array.isArray(modifiedArgs);
+        resolver(isObject
+          ? { approved, reason, modifiedArgs }
+          : { approved: false, reason: 'modifiedArgs must be a JSON object' });
+      } else {
+        resolver({ approved, reason });
+      }
       session.pendingToolApprovals.delete(toolCallId);
       logger.info('Tool approval response received', {
         clientId: session.clientId,

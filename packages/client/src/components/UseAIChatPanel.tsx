@@ -13,6 +13,7 @@ import { useFileUpload } from '../hooks/useFileUpload';
 import { useStrings, useTheme } from '../theme';
 import type { UseAIStrings, UseAITheme } from '../theme';
 import type { ChatStreamingPart, ExecutingToolDisplay } from '../hooks/useServerEvents';
+import type { ModifiedToolArgs } from '../hooks/useToolSystem';
 import {
   Slot,
   DefaultHeader,
@@ -125,6 +126,8 @@ export interface UseAIChatPanelProps {
   pendingApprovals?: ChatToolApproval[];
   /** Callback to approve all pending tool calls */
   onApproveToolCall?: () => void;
+  /** Callback to approve all pending tool calls, running the keyed ones with edited arguments */
+  onApproveToolCallWithArgs?: (modifiedArgs: ModifiedToolArgs) => Promise<void>;
   /** Callback to reject all pending tool calls */
   onRejectToolCall?: (reason?: string) => void;
   /**
@@ -182,6 +185,7 @@ export function UseAIChatPanel({
   onFeedback,
   pendingApprovals = [],
   onApproveToolCall,
+  onApproveToolCallWithArgs,
   onRejectToolCall,
   submitMode = 'enter',
   components,
@@ -452,6 +456,7 @@ export function UseAIChatPanel({
           props={{
             approvals: pendingApprovals,
             onApprove: onApproveToolCall,
+            onApproveWithArgs: onApproveToolCallWithArgs,
             onReject: onRejectToolCall,
           }}
         />

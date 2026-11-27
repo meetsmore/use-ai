@@ -423,6 +423,7 @@ describe('handleToolResult - MCP tool preservation', () => {
       _remote: {
         provider: { executeTool: mock(() => Promise.resolve({ success: true })) } as unknown as RemoteToolDefinition['_remote']['provider'],
         originalName: 'search',
+        inputSchema: { type: 'object', properties: {}, required: [] },
       },
     };
 
@@ -501,6 +502,7 @@ describe('handleToolResult - MCP tool preservation', () => {
       _remote: {
         provider: { executeTool: mock(() => Promise.resolve({ success: true })) } as unknown as RemoteToolDefinition['_remote']['provider'],
         originalName: 'search',
+        inputSchema: { type: 'object', properties: {}, required: [] },
       },
     };
 
@@ -535,5 +537,54 @@ describe('handleToolResult - MCP tool preservation', () => {
     // Tools should be unchanged
     expect(session.tools.length).toBe(2);
     expect(session.tools.map(t => t.name).sort()).toEqual(['mcp_search', 'navigate']);
+  });
+});
+
+describe('handleToolApprovalResponse - modifiedArgs', () => {
+  function setup(port: number) {
+    const mockModel = createSequentialMockModel([{ text: 'OK' }]);
+    const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
+    const server = new UseAIServer({ port, agents: { test: agent }, defaultAgent: 'test' });
+    cleanup.trackServer(server);
+    const results: unknown[] = [];
+    const session = {
+      clientId: 'test-client',
+      pendingToolApprovals: new Map<string, (result: unknown) => void>([
+        ['tc-1', (result: unknown) => { results.push(result); }],
+      ]),
+    };
+    const serverInternals = server as unknown as {
+      handleToolApprovalResponse(session: unknown, message: unknown): void;
+    };
+    const respond = (data: Record<string, unknown>) =>
+      serverInternals.handleToolApprovalResponse(session, { type: 'tool_approval_response', data: { toolCallId: 'tc-1', ...data } });
+    return { results, respond };
+  }
+
+  test('forwards modifiedArgs of an approval to the waiting tool', () => {
+    const { results, respond } = setup(19011);
+    respond({ approved: true, modifiedArgs: { title: 'Edited' } });
+    expect(results).toEqual([{ approved: true, reason: undefined, modifiedArgs: { title: 'Edited' } }]);
+  });
+
+  test('resolves without modifiedArgs when the approval carries none', () => {
+    const { results, respond } = setup(19012);
+    respond({ approved: true });
+    expect(results).toEqual([{ approved: true, reason: undefined }]);
+    expect(results[0]).not.toHaveProperty('modifiedArgs');
+  });
+
+  test('denies an approval whose modifiedArgs is not an object', () => {
+    for (const [index, modifiedArgs] of [null, ['a'], 'text', 3].entries()) {
+      const { results, respond } = setup(19014 + index);
+      respond({ approved: true, modifiedArgs });
+      expect(results).toEqual([{ approved: false, reason: 'modifiedArgs must be a JSON object' }]);
+    }
+  });
+
+  test('drops modifiedArgs of a rejection', () => {
+    const { results, respond } = setup(19013);
+    respond({ approved: false, reason: 'No', modifiedArgs: { title: 'Edited' } });
+    expect(results[0]).not.toHaveProperty('modifiedArgs');
   });
 });

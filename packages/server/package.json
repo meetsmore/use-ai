@@ -37,6 +37,8 @@
     "@meetsmore-oss/use-ai-core": "workspace:^",
     "@socket.io/bun-engine": "^0.1.0",
     "ai": "6.0.0-beta.116",
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1",
     "picomatch": "^4.0.3",
     "socket.io": "^4.8.1",
     "tldts": "7.0.24",
