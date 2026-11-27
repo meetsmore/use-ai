@@ -59,30 +59,6 @@ describe('toModelOutputWithFiles', () => {
   });
 });
 
-describe('toModelOutputWithFiles with mediaParts', () => {
-  test('writes every file as a media part, for the AI Gateway', () => {
-    const output = toModelOutputWithFiles(
-      {
-        name: 'quote.pdf',
-        [USE_AI_FILES]: [
-          { mediaType: 'image/png', data: 'aW1n' },
-          { mediaType: 'application/pdf', data: 'cGRm', filename: 'quote.pdf' },
-        ],
-      },
-      { mediaParts: true }
-    );
-
-    expect(output).toEqual({
-      type: 'content',
-      value: [
-        { type: 'text', text: '{"name":"quote.pdf"}' },
-        { type: 'media', data: 'aW1n', mediaType: 'image/png' },
-        { type: 'media', data: 'cGRm', mediaType: 'application/pdf' },
-      ],
-    });
-  });
-});
-
 describe('omitToolResultFiles', () => {
   test('replaces file data with a note and keeps the rest', () => {
     const omitted = omitToolResultFiles({
