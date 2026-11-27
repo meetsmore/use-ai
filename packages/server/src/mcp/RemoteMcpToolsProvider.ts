@@ -4,6 +4,7 @@ import { logger } from '../logger';
 import { findMcpHeadersForUrl } from './mcpHeaderPatterns';
 import { McpHttpClient, McpRequestTimeoutError } from './McpHttpClient';
 import { buildMcpParamHeaders, readMcpParamHeaders, type McpParamHeader } from './mcpParamHeaders';
+import { extractFilesFromMcpContent, USE_AI_FILES, type McpContentPart } from './mcpToolResultFiles';
 
 /**
  * Schema format returned by MCP endpoints.
@@ -187,7 +188,7 @@ export class RemoteMcpToolsProvider {
         { headers, extraHeaders },
       ) as {
         error?: { message: string };
-        result?: { content?: { type: string; text: string }[] };
+        result?: { content?: McpContentPart[] };
       };
 
       if (rpcResponse.error) {
@@ -196,22 +197,34 @@ export class RemoteMcpToolsProvider {
 
       // Extract content from MCP response
       const content = rpcResponse.result?.content || [];
+      const files = extractFilesFromMcpContent(content);
 
       // Find text content
       const textContent = content.find((c) => c.type === 'text');
+      let result: unknown = {};
       if (textContent) {
         // Try to parse as JSON
         try {
-          return JSON.parse(textContent.text);
+          result = JSON.parse(textContent.text ?? '');
         } catch {
           // If not JSON, return as result object
-          return { result: textContent.text };
+          result = { result: textContent.text };
         }
       }
 
       logger.debug(`[MCP] Tool "${toolName}" executed successfully`);
 
-      return {};
+      if (files.length === 0) {
+        return result;
+      }
+
+      // Images and PDFs ride along under USE_AI_FILES; AISDKAgent hands them to
+      // the model and keeps them out of the history and logs.
+      const base =
+        typeof result === 'object' && result !== null && !Array.isArray(result)
+          ? (result as Record<string, unknown>)
+          : { result };
+      return { ...base, [USE_AI_FILES]: files };
     } catch (error) {
       if (error instanceof McpRequestTimeoutError) {
         const errorMsg = `Tool execution timeout after ${error.timeout}ms`;

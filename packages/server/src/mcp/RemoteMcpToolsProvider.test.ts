@@ -1,5 +1,6 @@
 import { describe, test, expect, mock, spyOn, beforeEach, afterEach } from 'bun:test';
 import { RemoteMcpToolsProvider } from './RemoteMcpToolsProvider';
+import { USE_AI_FILES } from './mcpToolResultFiles';
 import { logger } from '../logger';
 
 describe('RemoteMcpToolsProvider', () => {
@@ -322,6 +323,43 @@ describe('RemoteMcpToolsProvider', () => {
 
       const [, options] = mockFetch.mock.calls[0];
       expect(options.headers.Authorization).toBeUndefined();
+    });
+
+    test('attaches image and PDF parts of the result as files', async () => {
+      mockFetch.mockImplementation(() =>
+        Promise.resolve(
+          Response.json({
+            result: {
+              content: [
+                { type: 'text', text: '{"name":"quote.pdf"}' },
+                { type: 'image', data: 'aW1n', mimeType: 'image/png' },
+                {
+                  type: 'resource',
+                  resource: { uri: 'file:///files/quote.pdf', mimeType: 'application/pdf', blob: 'cGRm' },
+                },
+              ],
+            },
+          })
+        )
+      );
+      const provider = new RemoteMcpToolsProvider({ url: 'http://mcp.test/rpc' });
+
+      const result = await provider.executeTool('test-tool', {});
+
+      expect(JSON.stringify(result)).toBe('{"name":"quote.pdf"}');
+      expect(result[USE_AI_FILES]).toEqual([
+          { mediaType: 'image/png', data: 'aW1n' },
+          { mediaType: 'application/pdf', data: 'cGRm', filename: 'quote.pdf' },
+      ]);
+    });
+
+    test('returns the text result unchanged when there are no files', async () => {
+      mockFetch.mockImplementation(() =>
+        Promise.resolve(Response.json({ result: { content: [{ type: 'text', text: '{"ok":true}' }] } }))
+      );
+      const provider = new RemoteMcpToolsProvider({ url: 'http://mcp.test/rpc' });
+
+      expect(await provider.executeTool('test-tool', {})).toEqual({ ok: true });
     });
   });
 

@@ -6,6 +6,7 @@ import type { AgentInput, EventEmitter, AGUIEventExtended } from './types';
 import { EventType, ErrorCode, TOOL_APPROVAL_REQUEST } from '../types';
 import type { ToolDefinition } from '../types';
 import type { RemoteToolDefinition } from '../mcp';
+import { USE_AI_FILES } from '../mcp/mcpToolResultFiles';
 import type { ServerToolDefinition } from '../tools/types';
 import { v4 as uuidv4 } from 'uuid';
 import { MockLanguageModelV3 } from 'ai/test';
@@ -2171,6 +2172,84 @@ describe('AISDKAgent', () => {
       expect(content).toContain('sunny');
       expect(content).toContain('72');
       expect(content).not.toContain('serverSideTool');
+    });
+
+    test('shows files from an MCP tool result to the model and keeps them out of TOOL_CALL_RESULT', async () => {
+      const toolCallId = 'tool-call-mcp-file';
+      const pdfData = 'JVBERi0xLjQKdGVzdA==';
+      let callCount = 0;
+      let toolMessageContent: unknown;
+
+      const mockModel = new MockLanguageModelV3({
+        doStream: async ({ prompt }) => {
+          callCount++;
+          if (callCount === 1) {
+            return {
+              stream: simulateReadableStream({
+                chunks: [
+                  { type: 'tool-call', toolCallId, toolName: 'mcp_read_file', input: '{"id":"f1"}' },
+                  { type: 'finish', finishReason: 'tool-calls', usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 } },
+                ],
+              }),
+            };
+          }
+          toolMessageContent = prompt.find(m => m.role === 'tool')?.content;
+          return {
+            stream: simulateReadableStream({
+              chunks: [
+                { type: 'text-start', id: 'text-1' },
+                { type: 'text-delta', id: 'text-1', delta: 'Read it.' },
+                { type: 'text-end', id: 'text-1' },
+                { type: 'finish', finishReason: 'stop', usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 } },
+              ],
+            }),
+          };
+        },
+      });
+
+      const agent = new AISDKAgent({ hooks: { loadConfig: () => ({ model: mockModel }) } });
+      const emittedEvents: AGUIEventExtended[] = [];
+      const eventEmitter: EventEmitter = { emit: (event) => emittedEvents.push(event) };
+
+      const mcpTool: RemoteToolDefinition = {
+        name: 'mcp_read_file',
+        description: 'Read a file',
+        parameters: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] },
+        _remote: {
+          provider: {
+            executeTool: mock(() =>
+              Promise.resolve({
+                name: 'quote.pdf',
+                [USE_AI_FILES]: [{ mediaType: 'application/pdf', data: pdfData, filename: 'quote.pdf' }],
+              })
+            ),
+          } as unknown as RemoteToolDefinition['_remote']['provider'],
+          originalName: 'read_file',
+          inputSchema: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] },
+        },
+      };
+
+      const input = createTestInput({ tools: [mcpTool] });
+      input.session.tools = [mcpTool] as ToolDefinition[];
+
+      await agent.run(input, eventEmitter);
+
+      // The model sees the PDF as a file part of the tool result
+      const toolResult = (toolMessageContent as Array<{ type: string; output: unknown }>)[0];
+      expect(toolResult.output).toEqual({
+        type: 'content',
+        value: [
+          { type: 'text', text: '{"name":"quote.pdf"}' },
+          { type: 'file-data', data: pdfData, mediaType: 'application/pdf', filename: 'quote.pdf' },
+        ],
+      });
+
+      // The client gets the result without the file data
+      const toolCallResultEvent = emittedEvents.find(e => e.type === EventType.TOOL_CALL_RESULT);
+      const content = (toolCallResultEvent as { content: string }).content;
+      expect(content).toContain('quote.pdf');
+      expect(content).toContain('Call the tool again');
+      expect(content).not.toContain(pdfData);
     });
 
     test('overlapping runs on one session each call MCP with their own headers', async () => {
