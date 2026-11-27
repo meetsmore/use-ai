@@ -1,0 +1,23 @@
+packages/server/src/server.ts
+  s_fe9eb1c5fca62f::t_fbda3a4827dbe7 43,535,581-583,586,589-590
+packages/server/src/utils/dataUrl.test.ts
+  s_fe9eb1c5fca62f::t_0bd7c602458054 1-17
+packages/server/src/utils/dataUrl.ts
+  s_fe9eb1c5fca62f::t_6ba57c2124fa9d 1-13
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "096a7e09a4c8191ff0a09b4f15a5627323d889be",
+  "prompts": {},
+  "sessions": {
+    "s_fe9eb1c5fca62f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "81e02223-97d4-47cf-9265-22bc52f8cedb",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "yuma.ito <yuma.ito@meetsmore.com>"
+    }
+  }
+}
