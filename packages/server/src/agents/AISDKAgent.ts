@@ -11,6 +11,7 @@ import type { McpHeadersMap } from '@meetsmore-oss/use-ai-core';
 import type { RemoteToolDefinition } from '../mcp';
 import { isUseAIInternalResponse } from '../mcp/useAIInternalResponse';
 import { isMcpConfirmationResponse, handleMcpConfirmation } from '../mcp/mcpConfirmation';
+import { omitToolResultFiles, toModelOutputWithFiles } from '../mcp/mcpToolResultFiles';
 import { EventType, ErrorCode } from '../types';
 import { createClientToolExecutor } from '../utils/toolConverter';
 import { isRemoteTool, isServerTool } from '../utils/toolFilters';
@@ -1366,8 +1367,10 @@ export class AISDKAgent implements Agent {
       }
 
       case 'tool-result': {
-        // Tool execution completed (by execute function)
-        logger.toolResult(chunk.toolName, JSON.stringify(chunk.output));
+        // Tool execution completed (by execute function).
+        // Files from MCP tool results went to the model only; logs and history get a note.
+        const output = omitToolResultFiles(chunk.output);
+        logger.toolResult(chunk.toolName, JSON.stringify(output));
 
         // Emit TOOL_CALL_RESULT so the client can store the actual result
         // in conversation history. Without this, server-side tools (MCP, server tools)
@@ -1376,7 +1379,7 @@ export class AISDKAgent implements Agent {
           type: EventType.TOOL_CALL_RESULT,
           messageId: uuidv4(),
           toolCallId: chunk.toolCallId,
-          content: typeof chunk.output === 'string' ? chunk.output : JSON.stringify(chunk.output),
+          content: typeof output === 'string' ? output : JSON.stringify(output),
           role: 'tool',
           timestamp: Date.now(),
         });
@@ -1755,6 +1758,8 @@ export class AISDKAgent implements Agent {
         description: toolDef.description,
         inputSchema: jsonSchema(inputSchema as JSONSchema7),
         execute,
+        // MCP tools can return images and PDFs; show them to the model as content parts.
+        ...(isRemoteTool(toolDef) ? { toModelOutput: toModelOutputWithFiles } : {}),
       };
     }
 
