@@ -1,0 +1,29 @@
+packages/server/src/agents/AISDKAgent.test.ts
+  s_fe9eb1c5fca62f::t_d7e0c7d6e66da3 9,2223,2251
+packages/server/src/mcp/RemoteMcpToolsProvider.test.ts
+  s_fe9eb1c5fca62f::t_2bd0a5436c1e91 3,349-350,353
+packages/server/src/mcp/RemoteMcpToolsProvider.ts
+  s_fe9eb1c5fca62f::t_e269736013fedc 7,221,227
+packages/server/src/mcp/index.ts
+  s_fe9eb1c5fca62f::t_83f62e729b16f8 9
+packages/server/src/mcp/mcpToolResultFiles.test.ts
+  s_fe9eb1c5fca62f::t_42e09992b050a0 6-7,45,66,71
+packages/server/src/mcp/mcpToolResultFiles.ts
+  s_fe9eb1c5fca62f::t_1c76c513e5b5c2 5-9,15-22,113,117,133,153-154,158-159,164
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d0b426256320ef312ddb9d5f3f7a981f095e1081",
+  "prompts": {},
+  "sessions": {
+    "s_fe9eb1c5fca62f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "81e02223-97d4-47cf-9265-22bc52f8cedb",
+        "model": "unknown"
+      },
+      "human_author": "yuma.ito <yuma.ito@meetsmore.com>"
+    }
+  }
+}
