@@ -12,6 +12,12 @@ import type { UseAIServerConfig } from '../src/types';
 import { UseAIServer } from '../src/server';
 import { createTestClient as createTestClientBase, createPollingTestClient as createPollingTestClientBase } from './test-utils';
 
+/** Usage in the shape of a LanguageModelV3 `finish` stream part. */
+const MOCK_USAGE = {
+  inputTokens: { total: 100, noCache: 100, cacheRead: undefined, cacheWrite: undefined },
+  outputTokens: { total: 50, text: 50, reasoning: undefined },
+};
+
 /**
  * Helper to create streaming chunks for a text response
  */
@@ -22,8 +28,8 @@ function createTextStreamChunks(text: string) {
     { type: 'text-end' as const, id: 'text-1' },
     {
       type: 'finish' as const,
-      finishReason: 'stop' as const,
-      usage: { inputTokens: 100, outputTokens: 50, totalTokens: 150 },
+      finishReason: { unified: 'stop' as const, raw: 'end_turn' },
+      usage: MOCK_USAGE,
     },
   ];
 }
@@ -43,8 +49,8 @@ function createToolCallStreamChunks(
     { type: 'tool-call' as const, toolCallId, toolName, input: toolInput },
     {
       type: 'finish' as const,
-      finishReason: 'tool-calls' as const,
-      usage: { inputTokens: 100, outputTokens: 50, totalTokens: 150 },
+      finishReason: { unified: 'tool-calls' as const, raw: 'tool_use' },
+      usage: MOCK_USAGE,
     },
   ];
 }
@@ -291,8 +297,8 @@ export function createSequentialMockModel(
 
       chunks.push({
         type: 'finish',
-        finishReason: 'tool-calls',
-        usage: { inputTokens: 100, outputTokens: 50, totalTokens: 150 },
+        finishReason: { unified: 'tool-calls', raw: 'tool_use' },
+        usage: MOCK_USAGE,
       });
 
       const content: unknown[] = response.toolCalls.map(t => ({

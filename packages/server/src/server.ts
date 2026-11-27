@@ -39,6 +39,7 @@ import {
 } from './runtime';
 import { SocketIOClientConnection } from './socketIOConnection';
 import { WebSocketClientConnection } from './webSocketConnection';
+import { splitBase64DataUrl } from './utils/dataUrl';
 
 // Re-export session types for external use
 export type { ClientSession, ClientConnection } from './agents/types';
@@ -604,7 +605,7 @@ export class UseAIServer {
 
     // AI SDK content part types (matching AI SDK v6 UserContent)
     type AISDKTextPart = { type: 'text'; text: string };
-    type AISDKImagePart = { type: 'image'; image: string };
+    type AISDKImagePart = { type: 'image'; image: string; mediaType?: string };
     type AISDKFilePart = { type: 'file'; data: string; mediaType: string };
     type AISDKContentPart = AISDKTextPart | AISDKImagePart | AISDKFilePart;
 
@@ -650,14 +651,16 @@ export class UseAIServer {
           if (block.type === 'text' && 'text' in block) {
             parts.push({ type: 'text', text: block.text as string });
           } else if (block.type === 'image_url' && 'url' in block) {
-            // AG-UI uses 'url', AI SDK uses 'image'
-            parts.push({ type: 'image', image: block.url as string });
+            // AG-UI uses 'url', AI SDK uses 'image'. Inline data urls go as base64 (see splitBase64DataUrl).
+            const inline = splitBase64DataUrl(block.url as string);
+            parts.push(inline ? { type: 'image', image: inline.data, mediaType: inline.mediaType } : { type: 'image', image: block.url as string });
           } else if (block.type === 'file_url' && 'url' in block) {
             // AG-UI uses 'url' and 'mimeType', AI SDK uses 'data' and 'mediaType'
+            const inline = splitBase64DataUrl(block.url as string);
             parts.push({
               type: 'file',
-              data: block.url as string,
-              mediaType: (block.mimeType as string) || 'application/octet-stream',
+              data: inline ? inline.data : (block.url as string),
+              mediaType: (block.mimeType as string) || inline?.mediaType || 'application/octet-stream',
             });
           } else if (block.type === 'transformed_file' && 'text' in block) {
             // Transformed file from client-side FileTransformer - convert to text
