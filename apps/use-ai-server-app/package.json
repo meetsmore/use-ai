@@ -19,9 +19,9 @@
     "dev": "bun --watch src/index.ts"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "3.0.0-beta.59",
-    "@ai-sdk/gateway": "2.0.0-beta.61",
-    "@ai-sdk/openai": "3.0.0-beta.66",
+    "@ai-sdk/anthropic": "3.0.68",
+    "@ai-sdk/gateway": "3.0.76",
+    "@ai-sdk/openai": "3.0.52",
     "@meetsmore-oss/use-ai-server": "workspace:*",
     "zod": "3"
   },

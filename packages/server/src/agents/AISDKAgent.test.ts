@@ -2941,7 +2941,7 @@ describe('AISDKAgent', () => {
                   // Stream ends here - no tool-input-end, no tool-call
                   {
                     type: 'finish',
-                    finishReason: 'length' as const,
+                    finishReason: { unified: 'length' as const, raw: 'max_tokens' },
                     usage: { inputTokens: 100, outputTokens: 4096, totalTokens: 4196 },
                   },
                 ],
@@ -3040,7 +3040,7 @@ describe('AISDKAgent', () => {
                 { type: 'tool-input-delta', id: `tool-call-${callCount}`, delta: '{"rows": [' },
                 {
                   type: 'finish',
-                  finishReason: 'length' as const,
+                  finishReason: { unified: 'length' as const, raw: 'max_tokens' },
                   usage: { inputTokens: 100, outputTokens: 4096, totalTokens: 4196 },
                 },
               ],
@@ -3105,7 +3105,7 @@ describe('AISDKAgent', () => {
                   { type: 'tool-input-delta', id: 'tool-call-b', delta: '{"data": "longValueB' },
                   {
                     type: 'finish',
-                    finishReason: 'length' as const,
+                    finishReason: { unified: 'length' as const, raw: 'max_tokens' },
                     usage: { inputTokens: 100, outputTokens: 4096, totalTokens: 4196 },
                   },
                 ],
@@ -3322,7 +3322,7 @@ describe('AISDKAgent', () => {
                   // Stream ends here - no tool-input-end, no tool-call for the second one
                   {
                     type: 'finish',
-                    finishReason: 'length' as const,
+                    finishReason: { unified: 'length' as const, raw: 'max_tokens' },
                     usage: { inputTokens: 100, outputTokens: 100, totalTokens: 200 },
                   },
                 ],
@@ -3486,7 +3486,7 @@ describe('AISDKAgent', () => {
                   // Stream ends mid-text — no text-end, no finish-step
                   {
                     type: 'finish',
-                    finishReason: 'length' as const,
+                    finishReason: { unified: 'length' as const, raw: 'max_tokens' },
                     usage: { inputTokens: 100, outputTokens: 4096, totalTokens: 4196 },
                   },
                 ],
@@ -3603,7 +3603,7 @@ describe('AISDKAgent', () => {
                   // Stream ends mid-reasoning — no reasoning-end
                   {
                     type: 'finish',
-                    finishReason: 'length' as const,
+                    finishReason: { unified: 'length' as const, raw: 'max_tokens' },
                     usage: { inputTokens: 100, outputTokens: 4096, totalTokens: 4196 },
                   },
                 ],
@@ -3709,7 +3709,7 @@ describe('AISDKAgent', () => {
                 { type: 'text-delta', id: `text-${callCount}`, delta: 'long output...' },
                 {
                   type: 'finish',
-                  finishReason: 'length' as const,
+                  finishReason: { unified: 'length' as const, raw: 'max_tokens' },
                   usage: { inputTokens: 100, outputTokens: 256, totalTokens: 356 },
                 },
               ],
@@ -3899,7 +3899,7 @@ describe('AISDKAgent', () => {
                   { type: 'tool-input-delta', id: toolCallId, delta: '{"rows": [{"name": "Al' },
                   {
                     type: 'finish',
-                    finishReason: 'length' as const,
+                    finishReason: { unified: 'length' as const, raw: 'max_tokens' },
                     usage: { inputTokens: 100, outputTokens: 2048, totalTokens: 2148 },
                   },
                 ],
@@ -4001,7 +4001,7 @@ describe('AISDKAgent', () => {
                   { type: 'text-delta', id: 'text-1', delta: 'long output...' },
                   {
                     type: 'finish',
-                    finishReason: 'length' as const,
+                    finishReason: { unified: 'length' as const, raw: 'max_tokens' },
                     usage: { inputTokens: 100, outputTokens: 100, totalTokens: 200 },
                   },
                 ],

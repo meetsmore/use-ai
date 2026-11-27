@@ -800,7 +800,7 @@ export class AISDKAgent implements Agent {
           // Set on every step (undefined on normal steps), after the client metadata, so a client value never stays.
           gracefulSummary: isGracefulSummaryStep || undefined,
           truncationFallback: isTruncationFallbackStep || undefined,
-        } as Record<string, AttributeValue>,
+        } as Record<string, JSONValue>,
       };
 
       this.applyGracefulSummaryOverrides(isGracefulSummaryStep, stepConfig);
@@ -1623,7 +1623,7 @@ export class AISDKAgent implements Agent {
    */
   private applyGracefulSummaryOverrides(
     isGracefulSummaryStep: boolean,
-    stepConfig: { messages: ModelMessage[]; tools: unknown; metadata: Record<string, AttributeValue> }
+    stepConfig: { messages: ModelMessage[]; tools: unknown; metadata: Record<string, JSONValue> }
   ): void {
     if (!isGracefulSummaryStep) return;
     stepConfig.messages.push({ role: 'user', content: 'max steps reached, summarize progress' });
@@ -1634,7 +1634,7 @@ export class AISDKAgent implements Agent {
   /** Disables tools for the truncation-acknowledgment fallback iteration. */
   private applyTruncationFallbackOverrides(
     isTruncationFallbackStep: boolean,
-    stepConfig: { messages: ModelMessage[]; tools: unknown; metadata: Record<string, AttributeValue> }
+    stepConfig: { messages: ModelMessage[]; tools: unknown; metadata: Record<string, JSONValue> }
   ): void {
     if (!isTruncationFallbackStep) return;
     stepConfig.tools = undefined;
