@@ -1139,7 +1139,6 @@ ANTHROPIC_API_KEY=sk-ant-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 # RATE_LIMIT_MAX_REQUESTS=0
 # RATE_LIMIT_WINDOW_MS=60000
 # RATE_LIMIT_MAX_LLM_CALLS=0                          # Max LLM calls (agent steps) per window
-# TRUSTED_PROXY_COUNT=0                               # Proxies in front that append to X-Forwarded-For (1 behind one AWS ALB)
 
 # Langfuse Observability (optional)
 # LANGFUSE_PUBLIC_KEY=pk-lf-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
@@ -1169,7 +1168,6 @@ const server = new UseAIServer({
   allowedOrigins: ['https://app.example.com'], // optional, see 'Origin check'
   rateLimitMaxRequests: 1_000,
   rateLimitWindowMs: 60_000,
-  trustedProxyCount: 1,   // optional, see 'Client address behind a proxy'
   plugins: [              // see 'Plugins'
     new FeedbackPlugin()
   ],
@@ -1199,17 +1197,6 @@ Each entry must match the `Origin` header exactly: scheme, host and port, with n
 A page cannot set `Sec-Fetch-Site`, so another site cannot make the browser send `same-origin`. The browser compares the page with the server's own origin, not with `allowedOrigins`. As a result, any page on the server's own origin can connect, even if `allowedOrigins` does not name that origin. Do not serve untrusted content on the same origin as the server.
 
 A non-browser client can send any `Origin` header. The origin check stops other sites in a browser, but it does not replace authentication. Use an auth plugin as well.
-
-#### Client address behind a proxy
-
-Rate limits (`rateLimitMaxRequests`, `rateLimitMaxLlmCalls`) count per client address. By default the server uses the address of the peer that opened the connection. Behind a load balancer or a reverse proxy, that is the proxy's address, so every user shares one count.
-
-Set `trustedProxyCount` on `UseAIServer`, or `TRUSTED_PROXY_COUNT` on the Docker image, to the number of proxies in front of the server that append the address they saw to the `X-Forwarded-For` header. The server then reads that header from the right and takes the entry at that position as the client address. For example, behind one AWS Application Load Balancer (its default `append` mode), set it to `1`.
-
-- The server reads the header of the first request of a connection: the Socket.IO handshake, or the WebSocket upgrade.
-- If the header has fewer entries than the count, the server uses the leftmost entry. If there is no header, it uses the peer address.
-- A client can write any value at the left of `X-Forwarded-For`. So do not set a count higher than the proxies really in front of the server. If clients can also reach the server, or one of the inner proxies, without passing through the outer ones, they can choose their own address.
-- With `0` (the default), the server ignores the header.
 
 ### External MCPs
 
@@ -1363,8 +1350,14 @@ defineServerTool(
 
 ### Rate Limiting
 
-`UseAIServer` supports rate limiting by IP.
-This allows you to implement `use-ai` without auth, and just rely on rate limiting to prevent abuse of your token spend.
+`UseAIServer` supports rate limiting of runs and LLM calls.
+
+The library does not limit unauthenticated traffic. Do not rely on these limits to stop abuse from clients you cannot identify:
+
+- The limits count per address of the peer that opened the connection. Behind a load balancer or a reverse proxy, that is the proxy's address, so every user shares one count.
+- The server does not read `X-Forwarded-For`, because a client can write any value in it.
+
+To limit unauthenticated traffic, put a rate rule in front of the server, for example an AWS WAF rate-based rule or an ingress rate limit. An edge rule counts across all server instances and stops the traffic before it reaches one. To limit each user, write a plugin that knows the user (see 'Plugins'). If your auth plugin makes an expensive check, such as a call to an identity provider, limit failed attempts in its `beforeRunAuthorized` hook.
 
 You can configure it using environment variables if using `@meetsmore-oss/use-ai-server` directly:
 

@@ -5,11 +5,7 @@ import type { RawWebSocket } from '../types';
  * Adapts a `ws` WebSocket to {@link RawWebSocket}.
  */
 export class NodeRawWebSocket implements RawWebSocket {
-  constructor(
-    private ws: WebSocket,
-    readonly remoteAddress?: string,
-    readonly forwardedFor?: string | string[],
-  ) {}
+  constructor(private ws: WebSocket, readonly remoteAddress?: string) {}
 
   get open(): boolean {
     return this.ws.readyState === this.ws.OPEN;

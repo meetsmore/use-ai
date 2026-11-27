@@ -3,7 +3,6 @@ import type { RawWebSocket } from '../types';
 /** Per-connection data on `ws.data`: set at upgrade, completed on open. */
 export interface BunWebSocketData {
   remoteAddress?: string;
-  forwardedFor?: string;
   connection?: BunRawWebSocket;
 }
 
@@ -23,11 +22,7 @@ export class BunRawWebSocket implements RawWebSocket {
   private messageHandler: ((data: string) => void) | null = null;
   private closeHandler: (() => void) | null = null;
 
-  constructor(
-    private ws: BunWebSocket,
-    readonly remoteAddress?: string,
-    readonly forwardedFor?: string,
-  ) {}
+  constructor(private ws: BunWebSocket, readonly remoteAddress?: string) {}
 
   get open(): boolean {
     return this.ws.readyState === OPEN;

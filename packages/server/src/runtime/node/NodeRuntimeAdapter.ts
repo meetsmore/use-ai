@@ -97,7 +97,7 @@ export class NodeRuntimeAdapter implements RuntimeAdapter {
         return;
       }
       wss.handleUpgrade(req, socket, head, (ws) => {
-        onConnection(new NodeRawWebSocket(ws, req.socket.remoteAddress, req.headers['x-forwarded-for']));
+        onConnection(new NodeRawWebSocket(ws, req.socket.remoteAddress));
       });
     });
     return wss;

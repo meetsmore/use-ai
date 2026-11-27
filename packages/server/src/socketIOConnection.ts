@@ -1,7 +1,7 @@
 import type { Socket } from 'socket.io';
 import type { ClientConnection } from './agents/types';
 import type { UseAIClientMessage } from './types';
-import { resolveClientIp, type ClientIpConnection, type ClientIpTracker } from './runtime';
+import type { ClientIpConnection, ClientIpTracker } from './runtime';
 import { logger } from './logger';
 
 /**
@@ -11,15 +11,12 @@ export class SocketIOClientConnection implements ClientConnection {
   readonly id: string;
   readonly ipAddress: string;
 
-  constructor(private socket: Socket, ipTracker: ClientIpTracker, trustedProxyCount: number) {
+  constructor(private socket: Socket, ipTracker: ClientIpTracker) {
     this.id = socket.id;
     const conn = socket.conn as unknown as ClientIpConnection;
     // Polling connections record their address at engine level, since the transport
     // socket is not available later; WebSocket connections carry it on the handshake.
-    const peerAddress = ipTracker.getClientIp(conn) || socket.handshake.address;
-    // The headers are those of the handshake request, the first of the session.
-    this.ipAddress =
-      resolveClientIp(peerAddress, socket.handshake.headers['x-forwarded-for'], trustedProxyCount) || socket.id;
+    this.ipAddress = ipTracker.getClientIp(conn) || socket.handshake.address || socket.id;
 
     logger.info('Socket.IO connection', { connectionId: this.id, transport: socket.conn.transport.name });
     socket.conn.on('upgrade', (transport) => {

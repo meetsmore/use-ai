@@ -100,13 +100,12 @@ export class UseAIServer {
   private clients: Map<string, ClientSession> = new Map();
   // Sent to every client on connect; constant after construction.
   private agentsPayload: { agents: Array<{ id: string; name: string; annotation?: string }>; defaultAgent: string };
-  private config: Required<Omit<UseAIServerConfig, 'defaultAgent' | 'agents' | 'plugins' | 'tools' | 'mcpEndpoints' | 'maxHttpBufferSize' | 'cors' | 'idleTimeout' | 'runtime' | 'spanProcessors' | 'resolveAttachments' | 'transport' | 'allowedOrigins' | 'trustedProxyCount'>> & {
+  private config: Required<Omit<UseAIServerConfig, 'defaultAgent' | 'agents' | 'plugins' | 'tools' | 'mcpEndpoints' | 'maxHttpBufferSize' | 'cors' | 'idleTimeout' | 'runtime' | 'spanProcessors' | 'resolveAttachments' | 'transport' | 'allowedOrigins'>> & {
     maxHttpBufferSize: number;
     cors?: CorsOptions;
     idleTimeout: number;
     transport: 'socketio' | 'websocket';
     allowedOrigins?: readonly string[];
-    trustedProxyCount: number;
   };
   private rateLimiter: RateLimiter;
   // Counts LLM calls (one for each agent step), not runs. Off when rateLimitMaxLlmCalls is 0.
@@ -142,11 +141,7 @@ export class UseAIServer {
       idleTimeout: config.idleTimeout ?? 30,
       transport: config.transport ?? 'socketio',
       allowedOrigins: config.allowedOrigins ? [...config.allowedOrigins] : undefined,
-      trustedProxyCount: config.trustedProxyCount ?? 0,
     };
-    if (!Number.isInteger(this.config.trustedProxyCount) || this.config.trustedProxyCount < 0) {
-      throw new Error(`trustedProxyCount must be a non-negative integer, got ${config.trustedProxyCount}`);
-    }
 
     // Set agents registry
     this.agents = config.agents;
@@ -229,17 +224,13 @@ export class UseAIServer {
         maxHttpBufferSize: this.config.maxHttpBufferSize,
       });
       this.io.on('connection', (socket) => {
-        this.acceptConnection(
-          new SocketIOClientConnection(socket, this.clientIpTracker, this.config.trustedProxyCount),
-        );
+        this.acceptConnection(new SocketIOClientConnection(socket, this.clientIpTracker));
       });
       listener = { transport: 'socketio', io: this.io };
     } else {
       listener = {
         transport: 'websocket',
-        onConnection: (socket) => this.acceptConnection(
-          new WebSocketClientConnection(`ws-${uuidv4()}`, socket, this.config.trustedProxyCount),
-        ),
+        onConnection: (socket) => this.acceptConnection(new WebSocketClientConnection(`ws-${uuidv4()}`, socket)),
       };
     }
 

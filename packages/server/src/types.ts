@@ -160,19 +160,6 @@ export interface UseAIServerConfig<TAgents extends Record<string, import('./agen
    */
   allowedOrigins?: string[];
   /**
-   * The number of proxies in front of the server that append the client address to the
-   * `X-Forwarded-For` header, such as a load balancer. The server takes the client address
-   * from that header, counting from the right, and uses it for rate limiting and logs.
-   *
-   * Set it to the real number of such proxies: 1 behind one AWS ALB (its default `append` mode).
-   * A larger number lets a client pick the address it is counted under, by writing its own
-   * `X-Forwarded-For` header. With 0, the header is ignored and the address of the peer that
-   * opened the connection is used, which is the proxy's address when there is one.
-   *
-   * Default: 0.
-   */
-  trustedProxyCount?: number;
-  /**
    * Idle timeout in seconds for the HTTP server.
    * Only used by the Bun runtime (ignored by Node.js).
    * Must be greater than the pingInterval option (25 seconds by default).

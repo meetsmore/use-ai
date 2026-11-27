@@ -2,27 +2,19 @@ import { describe, expect, test, beforeAll, afterAll } from 'bun:test';
 import WebSocket from 'ws';
 import { io, type Socket } from 'socket.io-client';
 import { UseAIServer } from './server';
-import { EventType } from './types';
 import type { ClientSession } from './agents/types';
-import { waitForConnection, waitForEventType, sendRunAgent } from '../test/test-utils';
+import { waitForConnection } from '../test/test-utils';
 import { createServerConfig, TestCleanupManager } from '../test/integration-test-utils';
 
 /**
- * Security finding M2: behind a load balancer, the peer of every connection is the load
- * balancer, so a per-address rate limit shared one count among all users. With
- * `trustedProxyCount`, the server takes the client address from `X-Forwarded-For`, read from
- * the right, on both runtimes and every transport. A client-written entry at the left is
- * never used. Without `trustedProxyCount`, the header is ignored on both runtimes.
+ * Security finding M2: a client can write any value in `X-Forwarded-For`, so the server never
+ * takes a client address from it. The session address is the peer of the connection, on both
+ * runtimes and every transport.
  */
 
 const RUNTIMES: ('bun' | 'node')[] = ['bun', 'node'];
 type Connect = 'socketio-websocket' | 'socketio-polling' | 'websocket';
 const CONNECTS: Connect[] = ['socketio-websocket', 'socketio-polling', 'websocket'];
-
-// What a client behind one ALB sends: its own forged entry, then the address the ALB appended.
-const FORGED = '203.0.113.9';
-const CLIENT = '198.51.100.7';
-const XFF = `${FORGED}, ${CLIENT}`;
 
 const LOOPBACK = /^(::ffff:)?127\.0\.0\.1$|^::1$/;
 
@@ -66,102 +58,23 @@ let nextPort = 9700;
 describe.each(RUNTIMES)('Client address: %s runtime', (runtime) => {
   describe.each(CONNECTS)('%s', (how) => {
     const cleanup = new TestCleanupManager();
-    const transport = how === 'websocket' ? 'websocket' : 'socketio';
-    const behindProxyPort = nextPort++;
-    const directPort = nextPort++;
-    let behindProxy: UseAIServer;
-    let direct: UseAIServer;
+    const port = nextPort++;
+    let server: UseAIServer;
 
     beforeAll(() => {
-      behindProxy = new UseAIServer({ ...createServerConfig(behindProxyPort), runtime, transport, trustedProxyCount: 1 });
-      direct = new UseAIServer({ ...createServerConfig(directPort), runtime, transport });
-      cleanup.trackServer(behindProxy);
-      cleanup.trackServer(direct);
+      server = new UseAIServer({ ...createServerConfig(port), runtime, transport: how === 'websocket' ? 'websocket' : 'socketio' });
+      cleanup.trackServer(server);
     });
 
     afterAll(() => {
       cleanup.cleanup();
     });
 
-    test('with trustedProxyCount 1, uses the rightmost X-Forwarded-For entry, not the forged one', async () => {
-      const before = sessionIds(behindProxy);
-      const close = await connect(behindProxyPort, how, { 'X-Forwarded-For': XFF });
-      expect(await newSessionIp(behindProxy, before)).toBe(CLIENT);
+    test('ignores X-Forwarded-For and uses the peer address', async () => {
+      const before = sessionIds(server);
+      const close = await connect(port, how, { 'X-Forwarded-For': '203.0.113.9, 198.51.100.7' });
+      expect(await newSessionIp(server, before)).toMatch(LOOPBACK);
       close();
     });
-
-    test('with trustedProxyCount 1 and no X-Forwarded-For, uses the peer address', async () => {
-      const before = sessionIds(behindProxy);
-      const close = await connect(behindProxyPort, how, {});
-      expect(await newSessionIp(behindProxy, before)).toMatch(LOOPBACK);
-      close();
-    });
-
-    test('without trustedProxyCount, ignores X-Forwarded-For', async () => {
-      const before = sessionIds(direct);
-      const close = await connect(directPort, how, { 'X-Forwarded-For': XFF });
-      expect(await newSessionIp(direct, before)).toMatch(LOOPBACK);
-      close();
-    });
-  });
-});
-
-describe('Rate limit behind a proxy', () => {
-  const cleanup = new TestCleanupManager();
-  const port = nextPort++;
-
-  beforeAll(() => {
-    cleanup.trackServer(new UseAIServer({
-      ...createServerConfig(port),
-      rateLimitMaxRequests: 1,
-      rateLimitWindowMs: 60_000,
-      trustedProxyCount: 1,
-    }));
-  });
-
-  afterAll(() => {
-    cleanup.cleanup();
-  });
-
-  async function client(xff: string): Promise<Socket> {
-    const socket = io(`http://localhost:${port}`, { transports: ['websocket'], extraHeaders: { 'X-Forwarded-For': xff } });
-    await waitForConnection(socket);
-    cleanup.trackSocket(socket);
-    return socket;
-  }
-
-  test('one client over its limit does not stop another client behind the same proxy', async () => {
-    const a = await client(`10.0.0.1, ${CLIENT}`);
-    sendRunAgent(a, { prompt: 'first', tools: [] });
-    await waitForEventType(a, EventType.TEXT_MESSAGE_END);
-    sendRunAgent(a, { prompt: 'second', tools: [] });
-    const limited = await waitForEventType(a, EventType.RUN_ERROR);
-    expect((limited as { message: string }).message).toContain('Rate limit exceeded');
-
-    // Same forged entry at the left, different address appended by the proxy.
-    const b = await client(`10.0.0.1, ${FORGED}`);
-    sendRunAgent(b, { prompt: 'first', tools: [] });
-    const event = await waitForEventType(b, EventType.TEXT_MESSAGE_END);
-    expect(event.type).toBe(EventType.TEXT_MESSAGE_END);
-  });
-
-  test('changing the forged entry does not give a client a new count', async () => {
-    const appended = '192.0.2.77';
-    const first = await client(`192.0.2.50, ${appended}`);
-    sendRunAgent(first, { prompt: 'first', tools: [] });
-    await waitForEventType(first, EventType.TEXT_MESSAGE_END);
-
-    const forgedAgain = await client(`192.0.2.51, ${appended}`);
-    sendRunAgent(forgedAgain, { prompt: 'again', tools: [] });
-    const limited = await waitForEventType(forgedAgain, EventType.RUN_ERROR);
-    expect((limited as { message: string }).message).toContain('Rate limit exceeded');
-  });
-});
-
-describe('trustedProxyCount validation', () => {
-  test.each([-1, 1.5, Number.NaN])('refuses %p', (value) => {
-    expect(() => new UseAIServer({ ...createServerConfig(nextPort++), trustedProxyCount: value })).toThrow(
-      'trustedProxyCount must be a non-negative integer',
-    );
   });
 });
