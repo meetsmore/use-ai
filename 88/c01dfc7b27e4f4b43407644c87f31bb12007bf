@@ -1,0 +1,31 @@
+packages/server/src/agents/AISDKAgent.test.ts
+  s_fe9eb1c5fca62f::t_8a6751c5488679 2153-2229
+packages/server/src/agents/AISDKAgent.ts
+  s_fe9eb1c5fca62f::t_557611feb0aa7f 13,1293-1296,1305,1675-1676
+packages/server/src/mcp/RemoteMcpToolsProvider.test.ts
+  s_fe9eb1c5fca62f::t_dd09b4a43be725 214-252
+packages/server/src/mcp/RemoteMcpToolsProvider.ts
+  s_fe9eb1c5fca62f::t_761172c89db8fc 7,242,251,255,259,262,268-278
+packages/server/src/mcp/index.ts
+  s_fe9eb1c5fca62f::t_bdaf56802f99b1 8-12
+packages/server/src/mcp/mcpToolResultFiles.test.ts
+  s_fe9eb1c5fca62f::t_1809c2183c2f70 1-80
+packages/server/src/mcp/mcpToolResultFiles.ts
+  s_fe9eb1c5fca62f::t_7e161f8f53c541 1-157
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "88c01dfc7b27e4f4b43407644c87f31bb12007bf",
+  "prompts": {},
+  "sessions": {
+    "s_fe9eb1c5fca62f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "81e02223-97d4-47cf-9265-22bc52f8cedb",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "yuma.ito <yuma.ito@meetsmore.com>"
+    }
+  }
+}
