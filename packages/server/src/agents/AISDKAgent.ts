@@ -1759,7 +1759,7 @@ export class AISDKAgent implements Agent {
         inputSchema: jsonSchema(inputSchema as JSONSchema7),
         execute,
         // MCP tools can return images and PDFs; show them to the model as content parts.
-        ...(isRemoteTool(toolDef) ? { toModelOutput: toModelOutputWithFiles } : {}),
+        ...(isRemoteTool(toolDef) ? { toModelOutput: ({ output }: { output: unknown }) => toModelOutputWithFiles(output) } : {}),
       };
     }
 
