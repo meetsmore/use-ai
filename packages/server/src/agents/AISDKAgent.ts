@@ -11,7 +11,11 @@ import type { McpHeadersMap } from '@meetsmore-oss/use-ai-core';
 import type { RemoteToolDefinition } from '../mcp';
 import { isUseAIInternalResponse } from '../mcp/useAIInternalResponse';
 import { isMcpConfirmationResponse, handleMcpConfirmation } from '../mcp/mcpConfirmation';
-import { omitToolResultFiles, toModelOutputWithFiles } from '../mcp/mcpToolResultFiles';
+import {
+  omitToolResultFiles,
+  toModelOutputWithFiles,
+  type ToolResultFilePartOptions,
+} from '../mcp/mcpToolResultFiles';
 import { EventType, ErrorCode } from '../types';
 import { createClientToolExecutor } from '../utils/toolConverter';
 import { isRemoteTool, isServerTool } from '../utils/toolFilters';
@@ -784,7 +788,10 @@ export class AISDKAgent implements Agent {
       const stepConfig = {
         messages: messagesForStep,
         tools: stepCtx.currentTools.length > 0
-          ? (this.sanitizeToolsForAPI(this.filterTools(stepCtx.currentTools), ctx.session, events, ctx.mcpHeaders) as any)
+          ? (this.sanitizeToolsForAPI(this.filterTools(stepCtx.currentTools), ctx.session, events, ctx.mcpHeaders, {
+            // A model ID string is resolved through the AI Gateway, which takes only `media` file parts.
+            mediaParts: typeof ctx.resolved.model === 'string',
+          }) as any)
           : undefined,
         metadata: {
           ...this.runTelemetryMetadata(ctx),
@@ -1726,7 +1733,8 @@ export class AISDKAgent implements Agent {
     tools: ToolDefinition[],
     session: ClientSession,
     events: EventEmitter,
-    mcpHeaders: McpHeadersMap | undefined
+    mcpHeaders: McpHeadersMap | undefined,
+    filePartOptions: ToolResultFilePartOptions = {}
   ): Record<string, unknown> {
     const toolsObject: Record<string, unknown> = {};
     const clientToolExecutor = createClientToolExecutor(session);
@@ -1759,7 +1767,9 @@ export class AISDKAgent implements Agent {
         inputSchema: jsonSchema(inputSchema as JSONSchema7),
         execute,
         // MCP tools can return images and PDFs; show them to the model as content parts.
-        ...(isRemoteTool(toolDef) ? { toModelOutput: toModelOutputWithFiles } : {}),
+        ...(isRemoteTool(toolDef)
+          ? { toModelOutput: (output: unknown) => toModelOutputWithFiles(output, filePartOptions) }
+          : {}),
       };
     }
 

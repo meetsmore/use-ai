@@ -60,6 +60,7 @@ export type ModelToolResultOutput =
         | { type: 'text'; text: string }
         | { type: 'image-data'; data: string; mediaType: string }
         | { type: 'file-data'; data: string; mediaType: string; filename?: string }
+        | { type: 'media'; data: string; mediaType: string }
       >;
     };
 
@@ -118,12 +119,27 @@ export function hasToolResultFiles(
   );
 }
 
+/** How file parts are written in the tool result the model sees. */
+export interface ToolResultFilePartOptions {
+  /**
+   * Write each file as `{ type: 'media', data, mediaType }` instead of `image-data` /
+   * `file-data`. The Vercel AI Gateway, which resolves gateway model ID strings, accepts
+   * only `text` and `media` (or `image`) parts in tool result content and rejects the
+   * other part types with 400 `invalid_union`. Provider packages called directly (such
+   * as `@ai-sdk/anthropic`) read `image-data` / `file-data`.
+   */
+  mediaParts?: boolean;
+}
+
 /**
  * Builds the tool result the model sees.
  * Without files this is the same output the AI SDK builds when a tool has no
  * `toModelOutput`: text for a string, JSON otherwise.
  */
-export function toModelOutputWithFiles(output: unknown): ModelToolResultOutput {
+export function toModelOutputWithFiles(
+  output: unknown,
+  options: ToolResultFilePartOptions = {}
+): ModelToolResultOutput {
   if (!hasToolResultFiles(output)) {
     return typeof output === 'string'
       ? { type: 'text', value: output }
@@ -136,7 +152,9 @@ export function toModelOutputWithFiles(output: unknown): ModelToolResultOutput {
     value: [
       { type: 'text', text: JSON.stringify(rest) },
       ...files.map(file =>
-        file.mediaType.startsWith('image/')
+        options.mediaParts
+          ? { type: 'media' as const, data: file.data, mediaType: file.mediaType }
+          : file.mediaType.startsWith('image/')
           ? { type: 'image-data' as const, data: file.data, mediaType: file.mediaType }
           : {
               type: 'file-data' as const,
