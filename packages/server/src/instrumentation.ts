@@ -56,7 +56,7 @@ export function popTraceIdForRun(runId: string): string | undefined {
  */
 export interface ErrorTraceParams {
   runId: string;
-  errorCategory: 'agent_not_found' | 'rate_limit_exceeded' | 'unhandled_error' | 'pre_stream_error';
+  errorCategory: 'agent_not_found' | 'unhandled_error' | 'pre_stream_error';
   errorMessage: string;
   sessionId: string;
   threadId?: string;

@@ -95,8 +95,6 @@ LABEL config.env.required.anthropic_api_key="Anthropic Claude API key (required 
       config.env.optional.openai_model="OpenAI model (default: gpt-4-turbo)" \
       config.env.optional.port="Server port (default: 8081)" \
       config.env.optional.log_format="Log format: pretty|json (default: json)" \
-      config.env.optional.rate_limit_max_requests="Max requests per window, 0=unlimited (default: 0)" \
-      config.env.optional.rate_limit_window_ms="Rate limit window in ms (default: 60000)" \
       config.env.optional.langfuse_public_key="Langfuse public key for observability" \
       config.env.optional.langfuse_secret_key="Langfuse secret key for observability" \
       config.env.optional.langfuse_base_url="Langfuse base URL (default: https://cloud.langfuse.com)" \

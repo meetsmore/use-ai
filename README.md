@@ -138,9 +138,6 @@ services:
       # Optional: Server configuration
       # - PORT=8081
       # - LOG_FORMAT=json
-      # - RATE_LIMIT_MAX_REQUESTS=0
-      # - RATE_LIMIT_WINDOW_MS=60000
-      # - RATE_LIMIT_MAX_LLM_CALLS=0
 
       # CORS: Set to '*' for local dev, or your frontend URL for production
       - CORS_ORIGIN=*
@@ -1135,11 +1132,6 @@ ANTHROPIC_API_KEY=sk-ant-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 # MAX_HTTP_BUFFER_SIZE=10485760                       # Max payload size in bytes
 # ALLOWED_ORIGINS=https://app.example.com             # Comma-separated. Refuse connections from other origins
 
-# Rate Limiting (optional)
-# RATE_LIMIT_MAX_REQUESTS=0
-# RATE_LIMIT_WINDOW_MS=60000
-# RATE_LIMIT_MAX_LLM_CALLS=0                          # Max LLM calls (agent steps) per window
-
 # Langfuse Observability (optional)
 # LANGFUSE_PUBLIC_KEY=pk-lf-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 # LANGFUSE_SECRET_KEY=sk-lf-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
@@ -1166,8 +1158,6 @@ const server = new UseAIServer({
   defaultAgent: 'claude',
   transport: 'socketio',  // or 'websocket', see 'Transports'
   allowedOrigins: ['https://app.example.com'], // optional, see 'Origin check'
-  rateLimitMaxRequests: 1_000,
-  rateLimitWindowMs: 60_000,
   plugins: [              // see 'Plugins'
     new FeedbackPlugin()
   ],
@@ -1350,50 +1340,14 @@ defineServerTool(
 
 ### Rate Limiting
 
-`UseAIServer` supports rate limiting of runs and LLM calls.
+`UseAIServer` does not limit how often clients run the agent. Correct limits need to know who the user is and how the server is deployed, and the library knows neither. Put each limit where that is known:
 
-The library does not limit unauthenticated traffic. Do not rely on these limits to stop abuse from clients you cannot identify:
+- **Each user**: write a plugin that knows the user. Its `beforeRunAuthorized` hook runs before any external call for the run, and it can return `{ abort: true, message }` to refuse the run (see 'Plugins').
+- **Unauthenticated traffic**: put a rate rule in front of the server, for example an AWS WAF rate-based rule or an ingress rate limit. An edge rule counts across all server instances and stops the traffic before it reaches one.
+- **Failed sign-ins**: if your auth plugin makes an expensive check, such as a call to an identity provider, count failed attempts in its `beforeRunAuthorized` hook.
+- **One run**: `maxSteps` bounds the LLM calls in a run.
 
-- The limits count per address of the peer that opened the connection. Behind a load balancer or a reverse proxy, that is the proxy's address, so every user shares one count.
-- The server does not read `X-Forwarded-For`, because a client can write any value in it.
-
-To limit unauthenticated traffic, put a rate rule in front of the server, for example an AWS WAF rate-based rule or an ingress rate limit. An edge rule counts across all server instances and stops the traffic before it reaches one. To limit each user, write a plugin that knows the user (see 'Plugins'). If your auth plugin makes an expensive check, such as a call to an identity provider, limit failed attempts in its `beforeRunAuthorized` hook.
-
-You can configure it using environment variables if using `@meetsmore-oss/use-ai-server` directly:
-
-``` bash
-# Rate Limiting (optional)
-RATE_LIMIT_MAX_REQUESTS=0
-RATE_LIMIT_WINDOW_MS=60000
-RATE_LIMIT_MAX_LLM_CALLS=0
-```
-
-Or you can use arguments to `UseAIServer`:
-
-```typescript
-  const server = new UseAIServer({
-    port: 8081,
-    agents: {
-      'claude': new AISDKAgent({ /** see AISDKAgent for an example */ })
-    },
-    defaultAgent: 'claude',
-    rateLimitMaxRequests: 1_000,
-    rateLimitWindowMs: 60_000,
-    rateLimitMaxLlmCalls: 5_000,
-  });
-```
-
-The two limits count different things:
-
-- `RATE_LIMIT_MAX_REQUESTS` (`rateLimitMaxRequests`) counts runs. One run is one user message.
-- `RATE_LIMIT_MAX_LLM_CALLS` (`rateLimitMaxLlmCalls`) counts LLM calls. One run calls the LLM once for each step, up to `maxSteps + 1` times. A run that keeps calling tools uses many LLM calls.
-
-Both limits use the same window (`RATE_LIMIT_WINDOW_MS`) and the same key. A value of `0` disables a limit. Both are `0` by default.
-
-If you use rate limiting to control token spend, set `RATE_LIMIT_MAX_LLM_CALLS`. The run limit alone does not bound the number of LLM calls.
-If a run uses up the LLM call budget, the agent does not make the next LLM call. The run stops with a `RUN_ERROR` that has the `RATE_LIMITED` error code.
-
-A custom agent receives the budget as `input.llmCallLimit`. Call `input.llmCallLimit?.consume()` before each LLM call. If it returns `allowed: false`, do not call the LLM and end the run with `RUN_ERROR`.
+The server does not read `X-Forwarded-For`, because a client can write any value in it.
 
 ### Langfuse
 

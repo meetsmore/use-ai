@@ -16,7 +16,6 @@ import type {
   AGUIEvent,
   CorsOptions,
 } from './types';
-import { RateLimiter } from './rateLimiter';
 import { logger } from './logger';
 import { recordErrorTrace, startTracing } from './instrumentation';
 import { v4 as uuidv4 } from 'uuid';
@@ -107,10 +106,6 @@ export class UseAIServer {
     transport: 'socketio' | 'websocket';
     allowedOrigins?: readonly string[];
   };
-  private rateLimiter: RateLimiter;
-  // Counts LLM calls (one for each agent step), not runs. Off when rateLimitMaxLlmCalls is 0.
-  private llmCallRateLimiter: RateLimiter;
-  private cleanupInterval: NodeJS.Timeout;
   private plugins: UseAIServerPlugin[] = [];
   private messageHandlers: Map<string, MessageHandler> = new Map();
   private mcpEndpoints: RemoteMcpToolsProvider[] = [];
@@ -133,9 +128,6 @@ export class UseAIServer {
 
     this.config = {
       port: config.port ?? 8081,
-      rateLimitMaxRequests: config.rateLimitMaxRequests ?? 0,
-      rateLimitWindowMs: config.rateLimitWindowMs ?? 60000,
-      rateLimitMaxLlmCalls: config.rateLimitMaxLlmCalls ?? 0,
       maxHttpBufferSize: config.maxHttpBufferSize ?? 20 * 1024 * 1024, // 20MB default
       cors: config.cors,
       idleTimeout: config.idleTimeout ?? 30,
@@ -164,22 +156,8 @@ export class UseAIServer {
       defaultAgent: this.defaultAgentId,
     };
 
-    this.rateLimiter = new RateLimiter({
-      maxRequests: this.config.rateLimitMaxRequests,
-      windowMs: this.config.rateLimitWindowMs,
-    });
-    this.llmCallRateLimiter = new RateLimiter({
-      maxRequests: this.config.rateLimitMaxLlmCalls,
-      windowMs: this.config.rateLimitWindowMs,
-    });
-
     // Create client IP tracker
     this.clientIpTracker = createClientIpTracker();
-
-    this.cleanupInterval = setInterval(() => {
-      this.rateLimiter.cleanup();
-      this.llmCallRateLimiter.cleanup();
-    }, this.config.rateLimitWindowMs);
 
     // Create RemoteMcpToolsProvider instances (to reference remote tools)
     if (config.mcpEndpoints && config.mcpEndpoints.length > 0) {
@@ -232,19 +210,6 @@ export class UseAIServer {
         transport: 'websocket',
         onConnection: (socket) => this.acceptConnection(new WebSocketClientConnection(`ws-${uuidv4()}`, socket)),
       };
-    }
-
-    if (this.rateLimiter.isEnabled()) {
-      logger.info('Rate limiting enabled', {
-        maxRequests: this.config.rateLimitMaxRequests,
-        windowMs: this.config.rateLimitWindowMs,
-      });
-    }
-    if (this.llmCallRateLimiter.isEnabled()) {
-      logger.info('LLM call rate limiting enabled', {
-        maxLlmCalls: this.config.rateLimitMaxLlmCalls,
-        windowMs: this.config.rateLimitWindowMs,
-      });
     }
 
     this.serverHandle = this.runtimeAdapter.createServer(listener, {
@@ -494,27 +459,6 @@ export class UseAIServer {
         });
         return;
       }
-    }
-
-    // Rate limiting by IP address
-    const rateLimitCheck = this.rateLimiter.checkLimit(session.ipAddress);
-    if (!rateLimitCheck.allowed) {
-      const retryAfterSeconds = Math.ceil((rateLimitCheck.retryAfterMs || 0) / 1000);
-      recordErrorTrace({
-        runId,
-        errorCategory: 'rate_limit_exceeded',
-        errorMessage: 'Rate limit exceeded',
-        sessionId: session.clientId,
-        threadId,
-        ipAddress: session.ipAddress,
-        metadata: { retryAfterSeconds, ...forwardedProps?.telemetryMetadata },
-      });
-      this.sendEvent(session.socket, {
-        type: EventType.RUN_ERROR,
-        message: `Rate limit exceeded. Please try again in ${retryAfterSeconds} seconds.`,
-        timestamp: Date.now(),
-      });
-      return;
     }
 
     // Update session
@@ -912,10 +856,6 @@ export class UseAIServer {
       systemPrompt,
       originalInput: message.data,
       mcpHeaders,
-      // Uses the same key as the run rate limit above.
-      llmCallLimit: this.llmCallRateLimiter.isEnabled()
-        ? { consume: () => this.llmCallRateLimiter.checkLimit(session.ipAddress) }
-        : undefined,
     };
 
     // Run beforeRunAgent hooks from all plugins
@@ -1185,7 +1125,6 @@ export class UseAIServer {
    * Stops accepting new connections and terminates all existing connections.
    */
   public async close() {
-    clearInterval(this.cleanupInterval);
 
     // Clean up all MCP endpoints
     this.mcpEndpoints.forEach(endpoint => endpoint.destroy());
