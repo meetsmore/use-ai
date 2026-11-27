@@ -12,7 +12,7 @@ type AgentModel = ConstructorParameters<typeof AISDKAgent>[0]['model'];
 
 const port = Number(process.env.PORT) || 8081;
 
-const removedRateLimitEnv = ['RATE_LIMIT_MAX_REQUESTS', 'RATE_LIMIT_WINDOW_MS', 'RATE_LIMIT_MAX_LLM_CALLS'].filter(name => process.env[name] !== undefined);
+const removedRateLimitEnv = ['RATE_LIMIT_MAX_REQUESTS', 'RATE_LIMIT_WINDOW_MS', 'RATE_LIMIT_MAX_LLM_CALLS'].filter(name => Number(process.env[name]) > 0);
 if (removedRateLimitEnv.length > 0) {
   logger.warn(
     'Rate limit env vars were removed and are ignored. Limit each user in an auth plugin and unauthenticated traffic at the edge. See "Rate Limiting" in the README.',

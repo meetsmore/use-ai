@@ -73,8 +73,11 @@ describe.each(RUNTIMES)('Client address: %s runtime', (runtime) => {
     test('ignores X-Forwarded-For and uses the peer address', async () => {
       const before = sessionIds(server);
       const close = await connect(port, how, { 'X-Forwarded-For': '203.0.113.9, 198.51.100.7' });
-      expect(await newSessionIp(server, before)).toMatch(LOOPBACK);
-      close();
+      try {
+        expect(await newSessionIp(server, before)).toMatch(LOOPBACK);
+      } finally {
+        close();
+      }
     });
   });
 });

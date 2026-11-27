@@ -17,9 +17,6 @@ import type {
   CorsOptions,
 } from './types';
 import { logger } from './logger';
-
-/** Options of UseAIServerConfig that were removed with the built-in rate limits. */
-const REMOVED_RATE_LIMIT_OPTIONS = ['rateLimitMaxRequests', 'rateLimitWindowMs', 'rateLimitMaxLlmCalls'];
 import { recordErrorTrace, startTracing } from './instrumentation';
 import { v4 as uuidv4 } from 'uuid';
 import type { Agent, EventEmitter, AGUIEventExtended } from './agents/types';
@@ -41,6 +38,9 @@ import {
 } from './runtime';
 import { SocketIOClientConnection } from './socketIOConnection';
 import { WebSocketClientConnection } from './webSocketConnection';
+
+/** Options of UseAIServerConfig that were removed with the built-in rate limits. */
+const REMOVED_RATE_LIMIT_OPTIONS = ['rateLimitMaxRequests', 'rateLimitWindowMs', 'rateLimitMaxLlmCalls'];
 
 // Re-export session types for external use
 export type { ClientSession, ClientConnection } from './agents/types';
@@ -130,7 +130,10 @@ export class UseAIServer {
 
     // The rate limit options were removed. JavaScript callers and spread configs get no type error,
     // so say it at startup instead of dropping the limits silently.
-    const removedRateLimitOptions = REMOVED_RATE_LIMIT_OPTIONS.filter(option => option in config);
+    // 0 and undefined meant 'off' before, so they lose nothing.
+    const removedRateLimitOptions = REMOVED_RATE_LIMIT_OPTIONS.filter(
+      option => Number((config as unknown as Record<string, unknown>)[option]) > 0,
+    );
     if (removedRateLimitOptions.length > 0) {
       logger.warn(
         'Rate limit options were removed and are ignored. Limit each user in an auth plugin and unauthenticated traffic at the edge. See "Rate Limiting" in the README.',

@@ -5,7 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { AISDKAgent } from './AISDKAgent';
 import type { AgentInput, EventEmitter, AGUIEventExtended } from './types';
 import type { ServerToolDefinition } from '../tools/types';
-import { EventType, ErrorCode } from '@meetsmore-oss/use-ai-core';
+import { EventType } from '@meetsmore-oss/use-ai-core';
 
 function createToolLoopMockModel(toolName: string, calls: { count: number }) {
   return new MockLanguageModelV3({
