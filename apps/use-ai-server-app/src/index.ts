@@ -11,6 +11,14 @@ import { z } from 'zod';
 type AgentModel = ConstructorParameters<typeof AISDKAgent>[0]['model'];
 
 const port = Number(process.env.PORT) || 8081;
+
+const removedRateLimitEnv = ['RATE_LIMIT_MAX_REQUESTS', 'RATE_LIMIT_WINDOW_MS', 'RATE_LIMIT_MAX_LLM_CALLS'].filter(name => process.env[name] !== undefined);
+if (removedRateLimitEnv.length > 0) {
+  logger.warn(
+    'Rate limit env vars were removed and are ignored. Limit each user in an auth plugin and unauthenticated traffic at the edge. See "Rate Limiting" in the README.',
+    { envVars: removedRateLimitEnv },
+  );
+}
 const logFormat = process.env.LOG_FORMAT || 'pretty';
 // Max HTTP buffer size for file uploads (default 20MB)
 const maxHttpBufferSize = process.env.MAX_HTTP_BUFFER_SIZE

@@ -1345,7 +1345,7 @@ defineServerTool(
 - **Each user**: write a plugin that knows the user. Its `beforeRunAuthorized` hook runs before any external call for the run, and it can return `{ abort: true, message }` to refuse the run (see 'Plugins').
 - **Unauthenticated traffic**: put a rate rule in front of the server, for example an AWS WAF rate-based rule or an ingress rate limit. An edge rule counts across all server instances and stops the traffic before it reaches one.
 - **Failed sign-ins**: if your auth plugin makes an expensive check, such as a call to an identity provider, count failed attempts in its `beforeRunAuthorized` hook.
-- **One run**: `maxSteps` bounds the LLM calls in a run.
+- **One run**: in `AISDKAgent`, `maxSteps` bounds the LLM calls in a run to `maxSteps + 1` (the last one writes a summary). A custom agent sets its own bound.
 
 The server does not read `X-Forwarded-For`, because a client can write any value in it.
 

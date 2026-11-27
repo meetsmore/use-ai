@@ -8,7 +8,7 @@ import type { ToolDefinition, AGUIEvent, ToolApprovalRequestEvent, UseAIClientMe
 export interface ClientConnection {
   /** Identifies the connection for the lifetime of the session. */
   readonly id: string;
-  /** Address the connection came from, used for rate limiting. */
+  /** Address of the peer that opened the connection (the proxy's address behind a proxy). Used for logs and traces. */
   readonly ipAddress: string;
   /** Whether the connection is still open. */
   readonly connected: boolean;
@@ -27,7 +27,7 @@ export interface ClientConnection {
 export interface ClientSession {
   /** Unique identifier for this client connection (`client-<uuid v4>`, unique across processes) */
   clientId: string;
-  /** IP address of the client (used for rate limiting) */
+  /** Address of the peer that opened the connection (the proxy's address behind a proxy). Used for logs and traces. */
   ipAddress: string;
   /** Connection to the client. Emit named payloads on it to reach the client. */
   socket: ClientConnection;

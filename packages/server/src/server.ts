@@ -17,6 +17,9 @@ import type {
   CorsOptions,
 } from './types';
 import { logger } from './logger';
+
+/** Options of UseAIServerConfig that were removed with the built-in rate limits. */
+const REMOVED_RATE_LIMIT_OPTIONS = ['rateLimitMaxRequests', 'rateLimitWindowMs', 'rateLimitMaxLlmCalls'];
 import { recordErrorTrace, startTracing } from './instrumentation';
 import { v4 as uuidv4 } from 'uuid';
 import type { Agent, EventEmitter, AGUIEventExtended } from './agents/types';
@@ -53,7 +56,6 @@ export type { ClientSession, ClientConnection } from './agents/types';
  * - Emits AG-UI events (TEXT_MESSAGE_*, TOOL_CALL_*, etc.)
  * - Routes tool execution requests back to clients
  * - Maintains conversation history and state per session
- * - Handles rate limiting
  * - Supports plugins for extending functionality
  *
  * @example
@@ -125,6 +127,16 @@ export class UseAIServer {
     // Start OTel tracing with optional custom span processors.
     // No-op after first call, so safe if multiple UseAIServer instances are created.
     startTracing(config.spanProcessors);
+
+    // The rate limit options were removed. JavaScript callers and spread configs get no type error,
+    // so say it at startup instead of dropping the limits silently.
+    const removedRateLimitOptions = REMOVED_RATE_LIMIT_OPTIONS.filter(option => option in config);
+    if (removedRateLimitOptions.length > 0) {
+      logger.warn(
+        'Rate limit options were removed and are ignored. Limit each user in an auth plugin and unauthenticated traffic at the edge. See "Rate Limiting" in the README.',
+        { options: removedRateLimitOptions },
+      );
+    }
 
     this.config = {
       port: config.port ?? 8081,
@@ -350,7 +362,6 @@ export class UseAIServer {
 
   /**
    * Tears down a session whose connection has gone away.
-   * Rate limiting persists by IP address across connections, so it is not reset here.
    */
   private destroySession(session: ClientSession) {
     // Abort any pending tool calls/approvals for this session
