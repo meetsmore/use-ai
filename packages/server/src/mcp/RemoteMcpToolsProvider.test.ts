@@ -1,5 +1,6 @@
 import { describe, test, expect, mock, spyOn, beforeEach, afterEach } from 'bun:test';
 import { RemoteMcpToolsProvider } from './RemoteMcpToolsProvider';
+import { USE_AI_FILES } from './mcpToolResultFiles';
 import { logger } from '../logger';
 
 describe('RemoteMcpToolsProvider', () => {
@@ -345,13 +346,11 @@ describe('RemoteMcpToolsProvider', () => {
 
       const result = await provider.executeTool('test-tool', {});
 
-      expect(result).toEqual({
-        name: 'quote.pdf',
-        _use_ai_files: [
+      expect(JSON.stringify(result)).toBe('{"name":"quote.pdf"}');
+      expect(result[USE_AI_FILES]).toEqual([
           { mediaType: 'image/png', data: 'aW1n' },
           { mediaType: 'application/pdf', data: 'cGRm', filename: 'quote.pdf' },
-        ],
-      });
+      ]);
     });
 
     test('returns the text result unchanged when there are no files', async () => {

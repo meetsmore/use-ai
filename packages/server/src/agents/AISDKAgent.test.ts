@@ -6,6 +6,7 @@ import type { AgentInput, EventEmitter, AGUIEventExtended } from './types';
 import { EventType, ErrorCode, TOOL_APPROVAL_REQUEST } from '../types';
 import type { ToolDefinition } from '../types';
 import type { RemoteToolDefinition } from '../mcp';
+import { USE_AI_FILES } from '../mcp/mcpToolResultFiles';
 import type { ServerToolDefinition } from '../tools/types';
 import { v4 as uuidv4 } from 'uuid';
 import { MockLanguageModelV3 } from 'ai/test';
@@ -2219,7 +2220,7 @@ describe('AISDKAgent', () => {
             executeTool: mock(() =>
               Promise.resolve({
                 name: 'quote.pdf',
-                _use_ai_files: [{ mediaType: 'application/pdf', data: pdfData, filename: 'quote.pdf' }],
+                [USE_AI_FILES]: [{ mediaType: 'application/pdf', data: pdfData, filename: 'quote.pdf' }],
               })
             ),
           } as unknown as RemoteToolDefinition['_remote']['provider'],
@@ -2247,6 +2248,7 @@ describe('AISDKAgent', () => {
       const toolCallResultEvent = emittedEvents.find(e => e.type === EventType.TOOL_CALL_RESULT);
       const content = (toolCallResultEvent as { content: string }).content;
       expect(content).toContain('quote.pdf');
+      expect(content).toContain('Call the tool again');
       expect(content).not.toContain(pdfData);
     });
 

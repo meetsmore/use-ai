@@ -2,17 +2,24 @@
  * Files (images and PDFs) returned in a remote MCP tool result.
  *
  * MCP tools can return `image` content parts and embedded `resource` parts with a base64
- * `blob`. These are handed to the model as part of the tool result for the current call
- * only. Whatever leaves the server (the TOOL_CALL_RESULT event the client stores as
- * history, and the logs) carries a short note in place of the file data, so the history
- * does not grow by the size of the file and the data is not written to logs. To read the
+ * `blob`. These are handed to the model as part of the tool result, and stay in the
+ * model input for the rest of that run. The files are kept under a symbol key, so
+ * `JSON.stringify` of the tool output (AI SDK telemetry spans, logs) leaves the file data
+ * out. The TOOL_CALL_RESULT event the client stores as history carries a short note in
+ * place of each file, so the history does not grow by the size of the file. To read the
  * file again on a later turn, the model calls the tool again.
  *
  * @see https://modelcontextprotocol.io/specification/2025-06-18/server/tools#tool-result
  */
 
-/** Key under which the files are attached to a tool result object. */
-export const USE_AI_FILES_KEY = '_use_ai_files';
+/**
+ * Key under which the files are attached to a tool result object. A symbol, so that
+ * serializing the output for telemetry or logs does not copy the file data.
+ */
+export const USE_AI_FILES = Symbol.for('use-ai.toolResultFiles');
+
+/** Key under which the notes replacing the files appear in the history. */
+export const USE_AI_FILES_NOTE_KEY = '_use_ai_files';
 
 /** A file taken from an MCP tool result, to be shown to the model. */
 export interface ToolResultFile {
@@ -103,11 +110,11 @@ export function extractFilesFromMcpContent(content: McpContentPart[]): ToolResul
 /** Whether a tool result carries files for the model. */
 export function hasToolResultFiles(
   output: unknown
-): output is Record<string, unknown> & { [USE_AI_FILES_KEY]: ToolResultFile[] } {
+): output is Record<string, unknown> & { [USE_AI_FILES]: ToolResultFile[] } {
   return (
     typeof output === 'object' &&
     output !== null &&
-    Array.isArray((output as Record<string, unknown>)[USE_AI_FILES_KEY])
+    Array.isArray((output as Record<PropertyKey, unknown>)[USE_AI_FILES])
   );
 }
 
@@ -123,7 +130,7 @@ export function toModelOutputWithFiles(output: unknown): ModelToolResultOutput {
       : { type: 'json', value: output === undefined ? null : output };
   }
 
-  const { [USE_AI_FILES_KEY]: files, ...rest } = output;
+  const { [USE_AI_FILES]: files, ...rest } = output;
   return {
     type: 'content',
     value: [
@@ -143,15 +150,16 @@ export function toModelOutputWithFiles(output: unknown): ModelToolResultOutput {
 }
 
 /**
- * Replaces file data with a short note, for anything that leaves the model call
- * (the TOOL_CALL_RESULT event and logs). Outputs without files are returned as-is.
+ * Replaces the files with short notes, for the TOOL_CALL_RESULT event the client keeps
+ * as history. Outputs without files are returned as-is.
  */
 export function omitToolResultFiles(output: unknown): unknown {
   if (!hasToolResultFiles(output)) return output;
-  const omitted: OmittedToolResultFile[] = output[USE_AI_FILES_KEY].map(file => ({
+  const { [USE_AI_FILES]: files, ...rest } = output;
+  const omitted: OmittedToolResultFile[] = files.map(file => ({
     mediaType: file.mediaType,
     ...(file.filename ? { filename: file.filename } : {}),
     note: OMITTED_NOTE,
   }));
-  return { ...output, [USE_AI_FILES_KEY]: omitted };
+  return { ...rest, [USE_AI_FILES_NOTE_KEY]: omitted };
 }

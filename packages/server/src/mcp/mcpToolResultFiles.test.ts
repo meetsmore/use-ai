@@ -3,7 +3,8 @@ import {
   extractFilesFromMcpContent,
   omitToolResultFiles,
   toModelOutputWithFiles,
-  USE_AI_FILES_KEY,
+  USE_AI_FILES,
+  USE_AI_FILES_NOTE_KEY,
 } from './mcpToolResultFiles';
 
 describe('extractFilesFromMcpContent', () => {
@@ -41,7 +42,7 @@ describe('toModelOutputWithFiles', () => {
   test('puts the rest of the result as text and each file as a content part', () => {
     const output = toModelOutputWithFiles({
       name: 'quote.pdf',
-      [USE_AI_FILES_KEY]: [
+      [USE_AI_FILES]: [
         { mediaType: 'image/png', data: 'aW1n' },
         { mediaType: 'application/pdf', data: 'cGRm', filename: 'quote.pdf' },
       ],
@@ -62,12 +63,12 @@ describe('omitToolResultFiles', () => {
   test('replaces file data with a note and keeps the rest', () => {
     const omitted = omitToolResultFiles({
       name: 'quote.pdf',
-      [USE_AI_FILES_KEY]: [{ mediaType: 'application/pdf', data: 'cGRm', filename: 'quote.pdf' }],
+      [USE_AI_FILES]: [{ mediaType: 'application/pdf', data: 'cGRm', filename: 'quote.pdf' }],
     }) as Record<string, unknown>;
 
     expect(omitted.name).toBe('quote.pdf');
     expect(JSON.stringify(omitted)).not.toContain('cGRm');
-    expect(omitted[USE_AI_FILES_KEY]).toEqual([
+    expect(omitted[USE_AI_FILES_NOTE_KEY]).toEqual([
       { mediaType: 'application/pdf', filename: 'quote.pdf', note: expect.stringContaining('Call the tool again') },
     ]);
   });

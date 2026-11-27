@@ -6,7 +6,7 @@ export {
 } from './useAIInternalResponse';
 export { isMcpConfirmationResponse, type McpConfirmationResponse } from './mcpConfirmation';
 export {
-  USE_AI_FILES_KEY,
+  USE_AI_FILES,
   type ToolResultFile,
   type OmittedToolResultFile,
 } from './mcpToolResultFiles';

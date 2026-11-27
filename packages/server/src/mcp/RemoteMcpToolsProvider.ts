@@ -4,7 +4,7 @@ import { logger } from '../logger';
 import { findMcpHeadersForUrl } from './mcpHeaderPatterns';
 import { McpHttpClient, McpRequestTimeoutError } from './McpHttpClient';
 import { buildMcpParamHeaders, readMcpParamHeaders, type McpParamHeader } from './mcpParamHeaders';
-import { extractFilesFromMcpContent, USE_AI_FILES_KEY, type McpContentPart } from './mcpToolResultFiles';
+import { extractFilesFromMcpContent, USE_AI_FILES, type McpContentPart } from './mcpToolResultFiles';
 
 /**
  * Schema format returned by MCP endpoints.
@@ -218,13 +218,13 @@ export class RemoteMcpToolsProvider {
         return result;
       }
 
-      // Images and PDFs ride along under USE_AI_FILES_KEY; AISDKAgent hands them to
+      // Images and PDFs ride along under USE_AI_FILES; AISDKAgent hands them to
       // the model and keeps them out of the history and logs.
       const base =
         typeof result === 'object' && result !== null && !Array.isArray(result)
           ? (result as Record<string, unknown>)
           : { result };
-      return { ...base, [USE_AI_FILES_KEY]: files };
+      return { ...base, [USE_AI_FILES]: files };
     } catch (error) {
       if (error instanceof McpRequestTimeoutError) {
         const errorMsg = `Tool execution timeout after ${error.timeout}ms`;
