@@ -806,57 +806,6 @@ describe('Error recording and abort handling', () => {
     }
   });
 
-  test('Rate limit exceeded records rate_limit_exceeded trace with telemetryMetadata', async () => {
-    const port = 9324;
-    const lf = enableMockLangfuse();
-    try {
-      const server = new UseAIServer(
-        createServerConfig(port, 'test-agent', {
-          rateLimitMaxRequests: 1,
-          rateLimitWindowMs: 60000,
-        })
-      );
-      cleanup.trackServer(server);
-
-      const socket = await cleanup.createTestClient(port);
-
-      // First request succeeds (uses up the rate limit)
-      sendRunAgent(socket, { prompt: 'first request', tools: [] });
-      await waitForEventType(socket, EventType.RUN_FINISHED, 5000);
-
-      // The successful first request records no error trace
-      expect(await lf.errorTraces()).toHaveLength(0);
-
-      // Second request should be rate-limited (with telemetryMetadata)
-      sendRunAgent(socket, {
-        prompt: 'second request',
-        tools: [],
-        forwardedProps: {
-          telemetryMetadata: { userId: 'rate-limited-user', retryAfterSeconds: 0 },
-        },
-      });
-      const errorEvent = await waitForEventType(socket, EventType.RUN_ERROR);
-      expect((errorEvent as any).message).toContain('Rate limit exceeded');
-
-      const traces = await lf.errorTraces();
-      expect(traces).toHaveLength(1);
-      const call = traces[0];
-      expect(call.tags).toEqual(['error', 'rate_limit_exceeded']);
-      // Verify telemetryMetadata is included
-      expect(call.metadata.userId).toBe('rate-limited-user');
-      // Server-set retryAfterSeconds wins over the same key in telemetryMetadata
-      expect(Number(call.metadata.retryAfterSeconds)).toBeGreaterThan(0);
-
-      // Verify error span was created
-      expect(call.span.level).toBe('ERROR');
-
-      socket.disconnect();
-      server.close();
-    } finally {
-      await lf.restore();
-    }
-  });
-
   test('Unhandled agent error records unhandled_error trace with telemetryMetadata', async () => {
     const port = 9325;
     const lf = enableMockLangfuse();

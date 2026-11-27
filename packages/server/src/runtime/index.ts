@@ -13,7 +13,7 @@ export type {
   WebSocketListener,
 } from './types';
 export { detectRuntime } from './detection';
-export { createClientIpTracker, forwardedClientIp, type ClientIpTracker, type ClientIpConnection } from './clientIp';
+export { createClientIpTracker, type ClientIpTracker, type ClientIpConnection } from './clientIp';
 
 /**
  * Creates a runtime adapter for the specified or detected runtime.

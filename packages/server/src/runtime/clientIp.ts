@@ -4,6 +4,9 @@
  * WebSocket connections can get the remote address directly from the socket.
  * Polling connections need to track the IP at connection time because the
  * transport socket may not be available later.
+ *
+ * The address is the peer of the connection. Behind a proxy, it is the proxy's address.
+ * `X-Forwarded-For` is not read: a client can write any value in it.
  */
 
 /**
@@ -39,16 +42,6 @@ export interface ClientIpTracker {
    * For polling: uses the stored IP from trackPollingConnection.
    */
   getClientIp(conn: ClientIpConnection): string | undefined;
-}
-
-/**
- * The client address behind a proxy: the first hop of `X-Forwarded-For`, else the fallback.
- */
-export function forwardedClientIp(
-  forwardedFor: string | string[] | undefined,
-  fallback: string | undefined,
-): string | undefined {
-  return typeof forwardedFor === 'string' ? forwardedFor.split(',')[0].trim() : fallback;
 }
 
 /**

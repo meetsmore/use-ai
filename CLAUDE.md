@@ -52,9 +52,6 @@ bun run kill                   # Kill processes on ports 3000, 3002, 8081
 - `ANTHROPIC_WORKSPACE_ID` (required for an identity-linked key): sent as the `anthropic-workspace-id` header
 - `LOG_FORMAT` (optional): `pretty` (default) or `json`
 - `LOG_LLM_CONTENT` (optional): `true` to also log user prompts, AI responses and tool results (off by default)
-- `RATE_LIMIT_MAX_REQUESTS` (optional): Max requests per window (0 = unlimited)
-- `RATE_LIMIT_WINDOW_MS` (optional): Window in ms (default: 60000)
-- `RATE_LIMIT_MAX_LLM_CALLS` (optional): Max LLM calls per window (0 = unlimited). Each agent step is one LLM call, so one run can use up to `maxSteps + 1`. If the budget runs out mid-run, the run stops with `RUN_ERROR` (`RATE_LIMITED`). Same window and key as `RATE_LIMIT_MAX_REQUESTS`.
 - `ALLOWED_ORIGINS` (optional): comma-separated origins that may connect. Sets `allowedOrigins` on `UseAIServer`. Unset: no Origin check.
 - `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_BASE_URL` (optional): LLM observability
 
@@ -194,7 +191,7 @@ Optional Langfuse integration tracks Claude API calls, token usage, tool calls, 
 
 ## Security
 
-- **Rate limiting**: Per-IP address (configured via env vars). `RATE_LIMIT_MAX_REQUESTS` counts runs. `RATE_LIMIT_MAX_LLM_CALLS` counts LLM calls (agent steps).
+- **Rate limiting**: Not in the library. Per-user limits belong in a plugin (`beforeRunAuthorized` can abort the run). Unauthenticated traffic: an edge rate rule (AWS WAF rate-based rule, ingress limit). `maxSteps` bounds one run. `X-Forwarded-For` is not read.
 - **Origin check**: Optional. `allowedOrigins: string[]` on `UseAIServer` refuses a Socket.IO handshake or WebSocket upgrade with HTTP 403 when the `Origin` header is missing or not in the list. Both transports and both runtimes. Default: no check. A non-browser client can forge `Origin`, so this does not replace auth.
 - **Client-only scope**: AI can only see/manipulate what's on the page
 - **No backend API access**: V1 intentionally limits security risks
@@ -282,6 +279,6 @@ Server designed for Kubernetes deployment:
 
 - Conversation history is session-based (lost on disconnect)
 - No authentication/authorization built-in
-- Rate limiting is per-IP, not per-user
+- No built-in rate limiting (use plugins and an edge rule)
 - No backend tool execution support
 - Clustering requires sticky sessions or Redis adapter

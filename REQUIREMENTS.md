@@ -129,16 +129,6 @@ This document lists user-facing capabilities in requirements format with test co
 ✅ The server waits for tool results from the client before continuing
 ✅ The server handles multiple sequential tool calls in a single conversation turn
 
-### Rate Limiting
-
-✅ Rate limiting can be configured per IP address using a sliding window algorithm
-✅ The maximum number of requests per window can be configured via environment variables
-✅ The window duration can be configured via environment variables
-✅ Rate limiting can be disabled by setting max requests to 0
-✅ Different clients have independent rate limits
-✅ Rate limits reset after the time window expires
-✅ The system returns helpful error messages with retry-after information when rate limited
-
 ### MCP (Model Context Protocol) Integration
 
 ✅ Remote MCP servers can be specified on the backend to provide additional tools
