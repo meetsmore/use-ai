@@ -1,0 +1,28 @@
+packages/server/src/server.ts
+  s_92af7bc6281499::t_9294e05e4d521e 20-22,131-139
+  s_92af7bc6281499::t_0f52821a1e4f7b 140
+packages/server/src/agents/types.ts
+  s_92af7bc6281499::t_9294e05e4d521e 11,30
+apps/use-ai-server-app/src/index.ts
+  s_92af7bc6281499::t_9294e05e4d521e 14-21
+packages/server/src/removedRateLimitOptions.test.ts
+  s_92af7bc6281499::t_141af82b5742c2 1-33
+README.md
+  s_92af7bc6281499::t_9294e05e4d521e 1348
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "05404dd78b358c378e5929a6add7eeef7d54408c",
+  "prompts": {},
+  "sessions": {
+    "s_92af7bc6281499": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5d759e49-fd6d-4f60-ab6f-2d488244b5b1",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "yuma.ito <yuma.ito@meetsmore.com>"
+    }
+  }
+}
